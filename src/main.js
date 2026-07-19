@@ -55,17 +55,21 @@ class RoomScene extends Phaser.Scene {
       .setAlpha(0.55)
       .setDepth(1000);
 
-    this.createJoystick();
-
     this.onWindowBlur = () => this.resetJoystick();
     this.onVisibilityChange = () => {
       if (document.hidden) {
         this.resetJoystick();
       }
     };
+    this.onNativePointerCancel = (event) => this.handleNativePointerEnd(event);
+    this.onNativeLostPointerCapture = (event) => this.handleNativePointerEnd(event);
+    this.onNativeTouchCancel = (event) => this.handleNativeTouchCancel(event);
+
+    this.createJoystick();
 
     window.addEventListener("blur", this.onWindowBlur);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    this.sceneListenersAttached = true;
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroySceneListeners, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.destroySceneListeners, this);
@@ -73,6 +77,8 @@ class RoomScene extends Phaser.Scene {
 
   createJoystick() {
     this.activeJoystickPointerId = null;
+    this.activeDomPointerId = null;
+    this.activeTouchIdentifier = null;
     this.joystickVector = { x: 0, y: 0 };
 
     const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
@@ -94,8 +100,11 @@ class RoomScene extends Phaser.Scene {
     this.input.on("pointerup", this.handleJoystickPointerUp, this);
     this.input.on("pointerupoutside", this.handleJoystickPointerUp, this);
     this.input.on("gameout", this.resetJoystick, this);
-    this.input.on("pointercancel", this.resetJoystick, this);
-    this.input.on("lostpointercapture", this.resetJoystick, this);
+
+    const canvas = this.game.canvas;
+    canvas.addEventListener("pointercancel", this.onNativePointerCancel);
+    canvas.addEventListener("lostpointercapture", this.onNativeLostPointerCapture);
+    canvas.addEventListener("touchcancel", this.onNativeTouchCancel, { passive: true });
   }
 
   handleJoystickPointerDown(pointer) {
@@ -108,6 +117,9 @@ class RoomScene extends Phaser.Scene {
     }
 
     this.activeJoystickPointerId = pointer.id;
+    this.activeDomPointerId =
+      typeof pointer.event?.pointerId === "number" ? pointer.event.pointerId : null;
+    this.activeTouchIdentifier = pointer.wasTouch ? pointer.identifier : null;
     this.updateJoystick(pointer);
   }
 
@@ -125,6 +137,30 @@ class RoomScene extends Phaser.Scene {
     }
   }
 
+  handleNativePointerEnd(event) {
+    if (this.activeJoystickPointerId === null || this.activeDomPointerId === null) {
+      return;
+    }
+
+    if (event.pointerId === this.activeDomPointerId) {
+      this.resetJoystick();
+    }
+  }
+
+  handleNativeTouchCancel(event) {
+    if (this.activeJoystickPointerId === null || this.activeTouchIdentifier === null) {
+      return;
+    }
+
+    const activeTouchWasCanceled = Array.from(event.changedTouches ?? []).some(
+      (touch) => touch.identifier === this.activeTouchIdentifier,
+    );
+
+    if (activeTouchWasCanceled) {
+      this.resetJoystick();
+    }
+  }
+
   updateJoystick(pointer) {
     const state = getJoystickState(pointer.x, pointer.y);
     this.joystickVector = { x: state.movementX, y: state.movementY };
@@ -133,11 +169,18 @@ class RoomScene extends Phaser.Scene {
 
   resetJoystick() {
     this.activeJoystickPointerId = null;
+    this.activeDomPointerId = null;
+    this.activeTouchIdentifier = null;
     this.joystickVector = { x: 0, y: 0 };
     this.joystickKnob?.setPosition(JOYSTICK.centerX, JOYSTICK.centerY);
   }
 
   destroySceneListeners() {
+    if (!this.sceneListenersAttached) {
+      return;
+    }
+
+    this.sceneListenersAttached = false;
     window.removeEventListener("blur", this.onWindowBlur);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.input.off("pointerdown", this.handleJoystickPointerDown, this);
@@ -145,8 +188,11 @@ class RoomScene extends Phaser.Scene {
     this.input.off("pointerup", this.handleJoystickPointerUp, this);
     this.input.off("pointerupoutside", this.handleJoystickPointerUp, this);
     this.input.off("gameout", this.resetJoystick, this);
-    this.input.off("pointercancel", this.resetJoystick, this);
-    this.input.off("lostpointercapture", this.resetJoystick, this);
+
+    const canvas = this.game.canvas;
+    canvas.removeEventListener("pointercancel", this.onNativePointerCancel);
+    canvas.removeEventListener("lostpointercapture", this.onNativeLostPointerCapture);
+    canvas.removeEventListener("touchcancel", this.onNativeTouchCancel);
     this.resetJoystick();
   }
 
