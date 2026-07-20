@@ -42,6 +42,7 @@ jobs:
 
           python - <<'PY'
           from pathlib import Path
+          import urllib.request
           from playwright.sync_api import sync_playwright
 
           page_url = "https://forchild.itch.io/village-tileset"
@@ -68,13 +69,20 @@ jobs:
                   ) as response_info:
                       page.locator(selector).click()
 
-                  response = response_info.value
-                  data = response.body()
+                  signed_url = response_info.value.url
+                  request = urllib.request.Request(
+                      signed_url,
+                      headers={"User-Agent": "Mozilla/5.0"},
+                  )
+                  with urllib.request.urlopen(request, timeout=120) as archive_response:
+                      data = archive_response.read()
+                      status = archive_response.status
+
                   destination = target / filename
                   destination.write_bytes(data)
-                  if response.status != 200 or not data.startswith(b"PK"):
+                  if status != 200 or not data.startswith(b"PK"):
                       raise RuntimeError(
-                          f"Bad archive response for {filename}: status={response.status}; first bytes={data[:80]!r}"
+                          f"Bad archive response for {filename}: status={status}; first bytes={data[:80]!r}"
                       )
                   print(f"downloaded {filename}: {len(data)} bytes")
 
