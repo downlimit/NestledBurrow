@@ -2,12 +2,21 @@ import Phaser from "phaser";
 import "./style.css";
 import {
   JOYSTICK,
-  clampVectorLength,
   getJoystickState,
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
+import {
+  applyBlockedAxes,
+  createMovementState,
+  createRuntimeMovementConfig,
+  isMoving,
+  movementDelta,
+  movementSpeed,
+  stepCharacterMovement,
+} from "./characterMovement.js";
 import { moveWithCollision } from "./movement.js";
+import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "./movementConfig.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
@@ -16,7 +25,6 @@ import {
   HOUSE_TEXTURE_KEY,
   OUTDOOR_IMAGE_PATH,
   OUTDOOR_TEXTURE_KEY,
-  PLAYER_SPEED,
   TILE_SIZE,
   TREES_IMAGE_PATH,
   TREES_TEXTURE_KEY,
@@ -36,6 +44,7 @@ import {
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const PLAYER_ASSET_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney/player`;
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
+const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
 class WorldScene extends Phaser.Scene {
   constructor() {
@@ -54,12 +63,15 @@ class WorldScene extends Phaser.Scene {
   }
 
   create() {
+    this.movementDebugEnabled =
+      new URLSearchParams(window.location.search).get("movementDebug") === "1";
     this.worldLayout = createWorldLayout();
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.renderWorld();
     this.createPlayerAnimations();
     this.createPlayer();
     this.createInput();
+    this.createMovementDebugPanel();
     this.createBuildLabel();
     this.attachSceneListeners();
     this.createJoystick();
@@ -97,6 +109,9 @@ class WorldScene extends Phaser.Scene {
 
   createPlayer() {
     this.lastFacing = "down";
+    const debugOverrides = this.movementDebugEnabled ? this.loadMovementDebugConfig() : {};
+    this.movementConfig = createRuntimeMovementConfig(debugOverrides);
+    this.playerMovement = createMovementState();
     const spawn = this.worldLayout.spawn;
     this.player = this.add
       .sprite(spawn.x, spawn.y, PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX])
@@ -108,6 +123,116 @@ class WorldScene extends Phaser.Scene {
   createInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
+  }
+
+  createMovementDebugPanel() {
+    if (!this.movementDebugEnabled) return;
+
+    const panel = document.createElement("section");
+    panel.className = "movement-debug-panel";
+    panel.setAttribute("aria-label", "Movement tuning");
+
+    const title = document.createElement("strong");
+    title.textContent = "Movement tuning";
+    panel.append(title);
+
+    for (const field of MOVEMENT_TUNING_FIELDS) {
+      const label = document.createElement("label");
+      const name = document.createElement("span");
+      name.textContent = field.key;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = String(field.min);
+      input.max = String(field.max);
+      input.step = String(field.step);
+      input.value = String(this.movementConfig[field.key]);
+      input.dataset.field = field.key;
+      input.addEventListener("input", () => {
+        const value = Number(input.value);
+        if (!Number.isFinite(value)) return;
+        const next = createRuntimeMovementConfig({
+          ...this.movementConfig,
+          [field.key]: value,
+        });
+        Object.assign(this.movementConfig, next);
+        input.value = String(this.movementConfig[field.key]);
+        this.saveMovementDebugConfig();
+      });
+      label.append(name, input);
+      panel.append(label);
+    }
+
+    const status = document.createElement("output");
+    status.className = "movement-debug-status";
+    panel.append(status);
+    this.movementDebugStatus = status;
+
+    const actions = document.createElement("div");
+    actions.className = "movement-debug-actions";
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.textContent = "Reset defaults";
+    reset.addEventListener("click", () => {
+      Object.assign(this.movementConfig, createRuntimeMovementConfig(DEFAULT_MOVEMENT_CONFIG));
+      try {
+        localStorage.removeItem(MOVEMENT_STORAGE_KEY);
+      } catch {
+        // Debug persistence is optional.
+      }
+      panel.querySelectorAll("input[data-field]").forEach((input) => {
+        input.value = String(this.movementConfig[input.dataset.field]);
+      });
+    });
+
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.textContent = "Copy config";
+    copy.addEventListener("click", async () => {
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+        await navigator.clipboard.writeText(JSON.stringify(this.movementConfig, null, 2));
+        copy.textContent = "Copied";
+      } catch {
+        copy.textContent = "Copy unavailable";
+      }
+      window.setTimeout(() => {
+        copy.textContent = "Copy config";
+      }, 1200);
+    });
+
+    actions.append(reset, copy);
+    panel.append(actions);
+    document.body.append(panel);
+    this.movementDebugPanel = panel;
+    this.updateMovementDebugStatus();
+  }
+
+  loadMovementDebugConfig() {
+    try {
+      return JSON.parse(localStorage.getItem(MOVEMENT_STORAGE_KEY) ?? "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  saveMovementDebugConfig() {
+    if (!this.movementDebugEnabled) return;
+    try {
+      localStorage.setItem(MOVEMENT_STORAGE_KEY, JSON.stringify(this.movementConfig));
+    } catch {
+      // Debug persistence is optional.
+    }
+  }
+
+  updateMovementDebugStatus() {
+    if (!this.movementDebugStatus) return;
+    const velocity = this.playerMovement.velocity;
+    this.movementDebugStatus.textContent = [
+      `speed ${movementSpeed(this.playerMovement).toFixed(1)} / ${this.movementConfig.maxSpeed}`,
+      `velocity ${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}`,
+      `facing ${this.lastFacing}`,
+    ].join("\n");
   }
 
   createBuildLabel() {
@@ -246,26 +371,33 @@ class WorldScene extends Phaser.Scene {
     canvas.removeEventListener("lostpointercapture", this.onNativeLostPointerCapture);
     canvas.removeEventListener("touchcancel", this.onNativeTouchCancel);
     this.resetJoystick();
+    this.movementDebugPanel?.remove();
+    this.movementDebugPanel = null;
+    this.movementDebugStatus = null;
   }
 
   update(_time, delta) {
-    const direction = clampVectorLength(this.getMovementVector());
-    this.updateLastFacing(direction);
-    this.updatePlayerAnimation(direction);
+    this.playerMovement = stepCharacterMovement(
+      this.playerMovement,
+      this.getMovementVector(),
+      delta,
+      { config: this.movementConfig },
+    );
 
-    const next = moveWithCollision(
+    const moveResult = moveWithCollision(
       { x: this.player.x, y: this.player.y },
-      {
-        x: direction.x * PLAYER_SPEED * (delta / 1000),
-        y: direction.y * PLAYER_SPEED * (delta / 1000),
-      },
+      movementDelta(this.playerMovement, delta, this.movementConfig),
       this.worldLayout,
       PLAYER_FOOT_WIDTH,
       PLAYER_FOOT_DEPTH,
     );
 
-    this.player.setPosition(next.x, next.y);
+    this.playerMovement = applyBlockedAxes(this.playerMovement, moveResult.blockedAxes);
+    this.player.setPosition(moveResult.position.x, moveResult.position.y);
     this.updatePlayerDepth();
+    this.updateLastFacing(this.playerMovement.facingDirection);
+    this.updatePlayerAnimation(this.playerMovement);
+    this.updateMovementDebugStatus();
   }
 
   updatePlayerDepth() {
@@ -298,14 +430,14 @@ class WorldScene extends Phaser.Scene {
           : "up";
   }
 
-  updatePlayerAnimation(direction) {
-    const moving = direction.x !== 0 || direction.y !== 0;
-    if (!moving) {
+  updatePlayerAnimation(movement) {
+    if (!isMoving(movement, this.movementConfig)) {
       this.player.anims.stop();
       const idleFrame = PLAYER_FRAMES[this.lastFacing][PLAYER_IDLE_FRAME_INDEX];
       if (this.player.texture.key !== idleFrame) this.player.setTexture(idleFrame);
       return;
     }
+
     const key = `walk-${this.lastFacing}`;
     if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== key) {
       this.player.anims.play(key);
