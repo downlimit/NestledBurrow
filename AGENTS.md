@@ -48,12 +48,15 @@ For room, world or tile changes, explicitly verify:
 
 ## Review-efficient delivery
 
-Prepare work so the main-chat review can be strict without unnecessary repeated CI cycles.
+Prepare work so the main-chat review can be strict without unnecessary repeated CI cycles or notification mail.
 
+- Develop in a feature branch without an open pull request.
+- Complete implementation, self-review, browser inspection and all known repairs before creating the PR.
+- Run the mandatory local checks before creating the PR.
+- Create the PR once, after the branch is ready for review. Do not use draft PRs as a development workspace.
 - Classify the PR as `docs`, `code` or `visual` in its description.
-- Complete the implementation, self-review and all known repairs before the final push whenever possible.
 - Do not knowingly open a PR with obvious visual defects merely because automated checks pass.
-- Do not push a separate correction for every small defect. Batch related final corrections before asking for review.
+- Batch related final corrections before asking for review; avoid one push per small defect.
 - Keep one coherent implementation concern per PR when `main` can remain usable between stages.
 - Do not combine unrelated architecture, gameplay, visual and infrastructure changes.
 - State every manual-test limitation explicitly. A missing browser, mobile device or coarse-pointer runtime is not a passed check.
@@ -87,12 +90,13 @@ Before integrating a spritesheet pack:
 4. Render supplied sample maps when available to confirm how related tiles are assembled.
 5. Select frames only after visual inspection.
 6. For semantically ambiguous frames, obtain explicit user approval of the numbered choices before integration.
-7. Extract the selected art into semantically named standalone files or a compact semantic atlas. Runtime code must never load a large source sheet by raw numeric IDs.
-8. Record the source pack, source sheet geometry, original frame number or rectangle and SHA-256 in a canonical manifest.
-9. Reference semantic frame names in gameplay code. Raw source frame numbers belong only in the audit manifest.
-10. Pin the selected asset hashes and the pixel hash of approved visual previews.
+7. Centralize selected frames behind semantic configuration names; gameplay behavior must not contain unexplained numeric indexes.
+8. For large or ambiguous source sheets, extract selected art into semantically named standalone files or a compact semantic atlas.
+9. A compact author-provided canonical sheet may be loaded directly only when its grid is verified, selected frames are centralized in one configuration module, the source is documented in `ASSETS.md`, and the rendered preview is visually approved.
+10. Record source pack, sheet geometry, selected frame rectangles or indexes and asset hashes in canonical documentation or a manifest.
+11. Pin or otherwise verify the pixel output of approved visual previews when the layout becomes a stable production baseline.
 
-When an atlas, layout or world composition changes, `npm run check` must generate the relevant preview artifacts. Do not update an approved preview hash until the image has been opened and visually approved. The PR workflow must upload the same preview for inspection before merge.
+When an atlas, layout or world composition changes, `npm run check` must generate the relevant preview artifacts. The PR workflow must upload the same preview for inspection before merge.
 
 ## Completion report
 
