@@ -1,13 +1,13 @@
 # External assets and licenses
 
-This project uses only the listed third-party assets in the playable prototype. Full source archives were used as temporary integration sources and have been removed from the repository after selecting the needed PNG files.
+This project uses only the listed third-party assets in the playable prototype. Full source archives were used as temporary integration sources and are not stored on the current `main` branch after the required files were selected.
 
 ## Kenney RPG Urban Pack
 
 - **Author:** Kenney
 - **Official source page:** https://kenney.nl/assets/rpg-urban-pack
 - **License:** CC0 1.0 Universal
-- **Used parts:** one small ordinary human character with walk/idle frames for down, up, left, and right movement.
+- **Used parts:** one small ordinary human character with walk and idle frames for down, up, left, and right movement.
 - **Source files selected from archive:**
   - `Tiles/tile_0266.png`
   - `Tiles/tile_0267.png`
@@ -35,6 +35,32 @@ This project uses only the listed third-party assets in the playable prototype. 
   - `public/assets/third-party/kenney/player/tile_0322.png`
   - `public/assets/third-party/kenney/player/tile_0323.png`
 
-## Temporary room art
+## Kenney Roguelike/RPG Pack
 
-The current wooden floor, horizontal walls, vertical walls, and corner tiles are deterministic 16×16 Phaser-generated placeholder textures defined in `src/main.js`. They do not use external files or carry a third-party license. This replaced the previously selected Kenney room spritesheet after the chosen frame indexes produced unrelated props instead of valid room tiles.
+- **Author:** Kenney
+- **Official source page:** https://kenney.nl/assets/roguelike-rpg-pack
+- **License:** CC0 1.0 Universal
+- **Used parts:** one floor tile and a verified family of outer, middle, inner, side, left-edge, and right-edge wall tiles.
+- **Historical source archive:** commit `c202320f7b8d4620f19707bf41503c79a347ded4`, path `tasks/pixel-room/source/kenney_roguelike-rpg-pack.zip`.
+- **Source sheet:** `Spritesheet/roguelikeSheet_transparent.png`, 968×526 pixels, 16×16 frames, `margin=0`, `spacing=1`, 57 columns and 31 rows.
+- **Selection method:** every source frame was sliced into a labeled contact sheet, the supplied indoor sample map was reconstructed, and the selected tiles were visually inspected before integration. Raw frame numbers are not used by gameplay code.
+- **Final semantic atlas:**
+  - `public/assets/third-party/kenney/room/kenney-room-tiles.png`
+  - `public/assets/third-party/kenney/room/kenney-room-tiles.json`
+- **Canonical machine-readable audit manifest:** `src/kenneyRoomConfig.json`.
+- **Atlas SHA-256:** `b7f461ec87dee4ed44ee5e02f9a693bd4a7ca29b316eb7cc2acb3bcdf0dc1fc0`.
+- **Approved 960×540 room-preview pixel SHA-256:** `f3a896c06740dd7cd46475440c971e3d6fd56f25ffc462fae62eaea6ec299ae5`.
+- **Semantic names and original source frames:**
+  - `floor` → `119`
+  - `wallOuter` → `698`
+  - `wallVertical` → `756`
+  - `wallOuterLeft` → `757`
+  - `wallOuterRight` → `758`
+  - `wallMiddle` → `873`
+  - `wallMiddleLeft` → `872`
+  - `wallMiddleRight` → `874`
+  - `wallInner` → `868`
+  - `wallInnerLeft` → `869`
+  - `wallInnerRight` → `871`
+
+Original frame numbers and source-file hashes are retained only in `src/kenneyRoomConfig.json` for traceability. Runtime code addresses the compact atlas exclusively by semantic frame names.

@@ -23,8 +23,26 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Node dependencies
         run: npm ci
+
+      - name: Install visual check dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
       - name: Run project checks
         run: npm run check
+
+      - name: Upload room preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-preview-pr-${{ github.event.pull_request.number }}
+          path: artifacts/room-preview.png
+          if-no-files-found: warn
+          retention-days: 7

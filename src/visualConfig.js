@@ -1,6 +1,8 @@
-export const ART_SCALE = 3;
+import roomConfig from "./kenneyRoomConfig.json" with { type: "json" };
+
 export const TILE_SIZE = 16;
-export const WALL_TILES = 1;
+export const ROOM_SCALE = roomConfig.roomScale;
+export const PLAYER_SCALE = roomConfig.playerScale;
 export const PLAYER_FOOT_WIDTH = 24;
 export const PLAYER_FOOT_DEPTH = 10;
 export const FACING_HYSTERESIS = 0.15;
@@ -14,9 +16,6 @@ export const PLAYER_FRAMES = Object.freeze({
   right: Object.freeze(["tile_0269", "tile_0296", "tile_0323"]),
 });
 
-export const ROOM_TEXTURES = Object.freeze({
-  floor: "room-floor",
-  wallHorizontal: "room-wall-horizontal",
-  wallVertical: "room-wall-vertical",
-  corner: "room-wall-corner",
-});
+export const ROOM_TEXTURE_KEY = roomConfig.textureKey;
+export const ROOM_IMAGE_PATH = roomConfig.imagePath;
+export const ROOM_ATLAS_PATH = roomConfig.atlasPath;

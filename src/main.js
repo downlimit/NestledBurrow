@@ -7,17 +7,20 @@ import {
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
+import { buildRoomLayout, ROOM_WALL_BANDS } from "./roomLayout.js";
 import {
-  ART_SCALE,
   FACING_HYSTERESIS,
   PLAYER_FOOT_DEPTH,
   PLAYER_FOOT_WIDTH,
   PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
-  ROOM_TEXTURES,
+  PLAYER_SCALE,
+  ROOM_ATLAS_PATH,
+  ROOM_IMAGE_PATH,
+  ROOM_SCALE,
+  ROOM_TEXTURE_KEY,
   TILE_SIZE,
   WALK_FRAME_RATE,
-  WALL_TILES,
 } from "./visualConfig.js";
 
 const GAME_WIDTH = 960;
@@ -26,7 +29,7 @@ const PLAYER_SPEED = 260;
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const ASSET_BASE_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney`;
 
-const ROOM_TILE_SIZE = TILE_SIZE * ART_SCALE;
+const ROOM_TILE_SIZE = TILE_SIZE * ROOM_SCALE;
 const ROOM_COLUMNS = Math.floor(GAME_WIDTH / ROOM_TILE_SIZE);
 const ROOM_ROWS = Math.floor(GAME_HEIGHT / ROOM_TILE_SIZE);
 const ROOM_OFFSET_X = Math.floor((GAME_WIDTH - ROOM_COLUMNS * ROOM_TILE_SIZE) / 2);
@@ -43,10 +46,15 @@ class RoomScene extends Phaser.Scene {
       .forEach((frame) => {
         this.load.image(frame, `${ASSET_BASE_URL}/player/${frame}.png`);
       });
+
+    this.load.atlas(
+      ROOM_TEXTURE_KEY,
+      `${ASSET_BASE_URL}/${ROOM_IMAGE_PATH}`,
+      `${ASSET_BASE_URL}/${ROOM_ATLAS_PATH}`,
+    );
   }
 
   create() {
-    this.createRoomTextures();
     this.createRoom();
     this.createPlayerAnimations();
     this.createPlayer();
@@ -56,63 +64,12 @@ class RoomScene extends Phaser.Scene {
     this.createJoystick();
   }
 
-  createRoomTextures() {
-    if (this.textures.exists(ROOM_TEXTURES.floor)) {
-      return;
-    }
-
-    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-
-    graphics.fillStyle(0x8a5a3b, 1);
-    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    graphics.fillStyle(0xa06a47, 1);
-    graphics.fillRect(1, 1, TILE_SIZE - 2, 6);
-    graphics.fillRect(1, 9, TILE_SIZE - 2, 6);
-    graphics.fillStyle(0x5d3928, 1);
-    graphics.fillRect(0, 7, TILE_SIZE, 2);
-    graphics.fillRect(0, 15, TILE_SIZE, 1);
-    graphics.fillRect(5, 0, 1, 7);
-    graphics.fillRect(11, 9, 1, 6);
-    graphics.generateTexture(ROOM_TEXTURES.floor, TILE_SIZE, TILE_SIZE);
-    graphics.clear();
-
-    graphics.fillStyle(0x4a3328, 1);
-    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    graphics.fillStyle(0x785541, 1);
-    graphics.fillRect(0, 2, TILE_SIZE, TILE_SIZE - 4);
-    graphics.fillStyle(0x2c211c, 1);
-    graphics.fillRect(0, 0, TILE_SIZE, 2);
-    graphics.fillRect(0, TILE_SIZE - 2, TILE_SIZE, 2);
-    graphics.fillRect(7, 2, 2, TILE_SIZE - 4);
-    graphics.generateTexture(ROOM_TEXTURES.wallHorizontal, TILE_SIZE, TILE_SIZE);
-    graphics.clear();
-
-    graphics.fillStyle(0x4a3328, 1);
-    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    graphics.fillStyle(0x785541, 1);
-    graphics.fillRect(2, 0, TILE_SIZE - 4, TILE_SIZE);
-    graphics.fillStyle(0x2c211c, 1);
-    graphics.fillRect(0, 0, 2, TILE_SIZE);
-    graphics.fillRect(TILE_SIZE - 2, 0, 2, TILE_SIZE);
-    graphics.fillRect(2, 7, TILE_SIZE - 4, 2);
-    graphics.generateTexture(ROOM_TEXTURES.wallVertical, TILE_SIZE, TILE_SIZE);
-    graphics.clear();
-
-    graphics.fillStyle(0x2c211c, 1);
-    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    graphics.fillStyle(0x785541, 1);
-    graphics.fillRect(3, 3, TILE_SIZE - 6, TILE_SIZE - 6);
-    graphics.fillStyle(0xa77a59, 1);
-    graphics.fillRect(5, 5, TILE_SIZE - 10, TILE_SIZE - 10);
-    graphics.generateTexture(ROOM_TEXTURES.corner, TILE_SIZE, TILE_SIZE);
-    graphics.destroy();
-  }
-
   createRoom() {
-    const interiorLeft = ROOM_OFFSET_X + WALL_TILES * ROOM_TILE_SIZE;
-    const interiorTop = ROOM_OFFSET_Y + WALL_TILES * ROOM_TILE_SIZE;
-    const interiorWidth = (ROOM_COLUMNS - WALL_TILES * 2) * ROOM_TILE_SIZE;
-    const interiorHeight = (ROOM_ROWS - WALL_TILES * 2) * ROOM_TILE_SIZE;
+    const wallBandCount = ROOM_WALL_BANDS.length;
+    const interiorLeft = ROOM_OFFSET_X + ROOM_TILE_SIZE;
+    const interiorTop = ROOM_OFFSET_Y + wallBandCount * ROOM_TILE_SIZE;
+    const interiorWidth = (ROOM_COLUMNS - 2) * ROOM_TILE_SIZE;
+    const interiorHeight = (ROOM_ROWS - wallBandCount * 2) * ROOM_TILE_SIZE;
 
     this.roomBounds = new Phaser.Geom.Rectangle(
       interiorLeft,
@@ -121,37 +78,26 @@ class RoomScene extends Phaser.Scene {
       interiorHeight,
     );
 
-    for (let y = WALL_TILES; y < ROOM_ROWS - WALL_TILES; y += 1) {
-      for (let x = WALL_TILES; x < ROOM_COLUMNS - WALL_TILES; x += 1) {
-        this.addRoomTile(x, y, ROOM_TEXTURES.floor, 0);
-      }
-    }
-
-    for (let x = WALL_TILES; x < ROOM_COLUMNS - WALL_TILES; x += 1) {
-      this.addRoomTile(x, 0, ROOM_TEXTURES.wallHorizontal, 10);
-      this.addRoomTile(x, ROOM_ROWS - 1, ROOM_TEXTURES.wallHorizontal, 10);
-    }
-
-    for (let y = WALL_TILES; y < ROOM_ROWS - WALL_TILES; y += 1) {
-      this.addRoomTile(0, y, ROOM_TEXTURES.wallVertical, 10);
-      this.addRoomTile(ROOM_COLUMNS - 1, y, ROOM_TEXTURES.wallVertical, 10);
-    }
-
-    this.addRoomTile(0, 0, ROOM_TEXTURES.corner, 10);
-    this.addRoomTile(ROOM_COLUMNS - 1, 0, ROOM_TEXTURES.corner, 10);
-    this.addRoomTile(0, ROOM_ROWS - 1, ROOM_TEXTURES.corner, 10);
-    this.addRoomTile(ROOM_COLUMNS - 1, ROOM_ROWS - 1, ROOM_TEXTURES.corner, 10);
+    const layout = buildRoomLayout(ROOM_COLUMNS, ROOM_ROWS);
+    layout.forEach((row, tileY) => {
+      row.forEach((frame, tileX) => {
+        if (frame !== null) {
+          this.addRoomTile(tileX, tileY, frame, frame === "floor" ? 0 : 10);
+        }
+      });
+    });
   }
 
-  addRoomTile(tileX, tileY, texture, depth) {
+  addRoomTile(tileX, tileY, frame, depth) {
     return this.add
       .image(
         ROOM_OFFSET_X + tileX * ROOM_TILE_SIZE,
         ROOM_OFFSET_Y + tileY * ROOM_TILE_SIZE,
-        texture,
+        ROOM_TEXTURE_KEY,
+        frame,
       )
       .setOrigin(0, 0)
-      .setScale(ART_SCALE)
+      .setScale(ROOM_SCALE)
       .setDepth(depth);
   }
 
@@ -175,7 +121,7 @@ class RoomScene extends Phaser.Scene {
         PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX],
       )
       .setOrigin(0.5, 1)
-      .setScale(ART_SCALE)
+      .setScale(PLAYER_SCALE)
       .setDepth(100);
   }
 
