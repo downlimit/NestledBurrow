@@ -12,12 +12,16 @@ const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
 const PLAYER_SPEED = 260;
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
+const ASSET_BASE_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney`;
 
 const ART_SCALE = 3;
 const TILE_SIZE = 16;
 const ROOM_TILE_SIZE = TILE_SIZE * ART_SCALE;
 const WALL_TILES = 1;
-const WALL_SIZE = ROOM_TILE_SIZE * WALL_TILES;
+const ROOM_COLUMNS = Math.floor(GAME_WIDTH / ROOM_TILE_SIZE);
+const ROOM_ROWS = Math.floor(GAME_HEIGHT / ROOM_TILE_SIZE);
+const ROOM_OFFSET_X = Math.floor((GAME_WIDTH - ROOM_COLUMNS * ROOM_TILE_SIZE) / 2);
+const ROOM_OFFSET_Y = Math.floor((GAME_HEIGHT - ROOM_ROWS * ROOM_TILE_SIZE) / 2);
 const PLAYER_FOOT_WIDTH = 24;
 const PLAYER_FOOT_DEPTH = 10;
 const FACING_HYSTERESIS = 0.15;
@@ -48,16 +52,22 @@ class RoomScene extends Phaser.Scene {
   }
 
   preload() {
-    Object.values(PLAYER_FRAMES).flat().forEach((frame) => {
-      this.load.image(frame, `/assets/third-party/kenney/player/${frame}.png`);
-    });
+    Object.values(PLAYER_FRAMES)
+      .flat()
+      .forEach((frame) => {
+        this.load.image(frame, `${ASSET_BASE_URL}/player/${frame}.png`);
+      });
 
-    this.load.spritesheet("roomTiles", "/assets/third-party/kenney/room/roguelikeSheet_transparent.png", {
-      frameWidth: TILE_SIZE,
-      frameHeight: TILE_SIZE,
-      margin: 1,
-      spacing: 1,
-    });
+    this.load.spritesheet(
+      "roomTiles",
+      `${ASSET_BASE_URL}/room/roguelikeSheet_transparent.png`,
+      {
+        frameWidth: TILE_SIZE,
+        frameHeight: TILE_SIZE,
+        margin: 1,
+        spacing: 1,
+      },
+    );
   }
 
   create() {
@@ -66,46 +76,53 @@ class RoomScene extends Phaser.Scene {
     this.createPlayer();
     this.createInput();
     this.createBuildLabel();
-    this.createJoystick();
     this.attachSceneListeners();
+    this.createJoystick();
   }
 
   createRoom() {
+    const interiorLeft = ROOM_OFFSET_X + WALL_TILES * ROOM_TILE_SIZE;
+    const interiorTop = ROOM_OFFSET_Y + WALL_TILES * ROOM_TILE_SIZE;
+    const interiorWidth = (ROOM_COLUMNS - WALL_TILES * 2) * ROOM_TILE_SIZE;
+    const interiorHeight = (ROOM_ROWS - WALL_TILES * 2) * ROOM_TILE_SIZE;
+
     this.roomBounds = new Phaser.Geom.Rectangle(
-      WALL_SIZE,
-      WALL_SIZE,
-      GAME_WIDTH - WALL_SIZE * 2,
-      GAME_HEIGHT - WALL_SIZE * 2,
+      interiorLeft,
+      interiorTop,
+      interiorWidth,
+      interiorHeight,
     );
 
-    const columns = Math.ceil(GAME_WIDTH / ROOM_TILE_SIZE);
-    const rows = Math.ceil(GAME_HEIGHT / ROOM_TILE_SIZE);
-
-    for (let y = WALL_TILES; y < rows - WALL_TILES; y += 1) {
-      for (let x = WALL_TILES; x < columns - WALL_TILES; x += 1) {
+    for (let y = WALL_TILES; y < ROOM_ROWS - WALL_TILES; y += 1) {
+      for (let x = WALL_TILES; x < ROOM_COLUMNS - WALL_TILES; x += 1) {
         this.addRoomTile(x, y, ROOM_FRAMES.floor, 0);
       }
     }
 
-    for (let x = WALL_TILES; x < columns - WALL_TILES; x += 1) {
+    for (let x = WALL_TILES; x < ROOM_COLUMNS - WALL_TILES; x += 1) {
       this.addRoomTile(x, 0, ROOM_FRAMES.top, 10);
-      this.addRoomTile(x, rows - 1, ROOM_FRAMES.bottom, 10);
+      this.addRoomTile(x, ROOM_ROWS - 1, ROOM_FRAMES.bottom, 10);
     }
 
-    for (let y = WALL_TILES; y < rows - WALL_TILES; y += 1) {
+    for (let y = WALL_TILES; y < ROOM_ROWS - WALL_TILES; y += 1) {
       this.addRoomTile(0, y, ROOM_FRAMES.left, 10);
-      this.addRoomTile(columns - 1, y, ROOM_FRAMES.right, 10);
+      this.addRoomTile(ROOM_COLUMNS - 1, y, ROOM_FRAMES.right, 10);
     }
 
     this.addRoomTile(0, 0, ROOM_FRAMES.topLeft, 10);
-    this.addRoomTile(columns - 1, 0, ROOM_FRAMES.topRight, 10);
-    this.addRoomTile(0, rows - 1, ROOM_FRAMES.bottomLeft, 10);
-    this.addRoomTile(columns - 1, rows - 1, ROOM_FRAMES.bottomRight, 10);
+    this.addRoomTile(ROOM_COLUMNS - 1, 0, ROOM_FRAMES.topRight, 10);
+    this.addRoomTile(0, ROOM_ROWS - 1, ROOM_FRAMES.bottomLeft, 10);
+    this.addRoomTile(ROOM_COLUMNS - 1, ROOM_ROWS - 1, ROOM_FRAMES.bottomRight, 10);
   }
 
   addRoomTile(tileX, tileY, frame, depth) {
     return this.add
-      .image(tileX * ROOM_TILE_SIZE, tileY * ROOM_TILE_SIZE, "roomTiles", frame)
+      .image(
+        ROOM_OFFSET_X + tileX * ROOM_TILE_SIZE,
+        ROOM_OFFSET_Y + tileY * ROOM_TILE_SIZE,
+        "roomTiles",
+        frame,
+      )
       .setOrigin(0, 0)
       .setScale(ART_SCALE)
       .setDepth(depth);
