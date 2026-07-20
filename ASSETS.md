@@ -35,12 +35,6 @@ This project uses only the listed third-party assets in the playable prototype. 
   - `public/assets/third-party/kenney/player/tile_0322.png`
   - `public/assets/third-party/kenney/player/tile_0323.png`
 
-## Kenney Roguelike/RPG Pack
+## Temporary room art
 
-- **Author:** Kenney
-- **Official source page:** https://kenney.nl/assets/roguelike-rpg-pack
-- **License:** CC0 1.0 Universal
-- **Used parts:** minimal room tile frames from the transparent spritesheet: repeating floor, top/bottom/left/right walls, and four connecting corners.
-- **Source file selected from archive:** `Spritesheet/roguelikeSheet_transparent.png`
-- **Final project path:** `public/assets/third-party/kenney/room/roguelikeSheet_transparent.png`
-- **Used frame indexes:** floor `494`; top wall `90`; bottom wall `147`; left wall `146`; right wall `148`; corners `89`, `91`, `203`, and `205`.
+The current wooden floor, horizontal walls, vertical walls, and corner tiles are deterministic 16×16 Phaser-generated placeholder textures defined in `src/main.js`. They do not use external files or carry a third-party license. This replaced the previously selected Kenney room spritesheet after the chosen frame indexes produced unrelated props instead of valid room tiles.
