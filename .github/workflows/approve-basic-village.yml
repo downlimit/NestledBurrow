@@ -1,0 +1,73 @@
+name: Finalize Basic Village Migration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/approve-basic-village.yml
+      - tasks/basic-village/final-payload.tar.gz.b64
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/basic-village-tileset
+          fetch-depth: 0
+
+      - name: Apply migration payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode tasks/basic-village/final-payload.tar.gz.b64 > /tmp/basic-village-final-payload.tar.gz
+          echo "1d86c05b0078048512043c974e4fbe58270a3254c759fb9432ae5b0f1923434c  /tmp/basic-village-final-payload.tar.gz" | sha256sum --check
+          tar -xzf /tmp/basic-village-final-payload.tar.gz
+          rm -rf public/assets/third-party/kenney/room public/assets/third-party/kenney/world
+          rm -f src/kenneyRoomConfig.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Approve previews and validate final build
+        run: |
+          python scripts/check-room-preview.py --approve
+          npm run check
+
+      - name: Remove migration-only files
+        run: |
+          rm -rf tasks/basic-village
+          rm -f .github/workflows/package-basic-village-audit.yml
+          rm -f .github/workflows/approve-basic-village.yml
+
+      - name: Commit finalized migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Finalize Basic Village tileset migration"
+          git push origin HEAD:feature/basic-village-tileset
