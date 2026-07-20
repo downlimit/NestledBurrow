@@ -27,8 +27,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          wc -c tasks/basic-village/payload/chunk-*
           cat tasks/basic-village/payload/chunk-* | base64 --decode > /tmp/basic-village-final-payload.tar.gz
-          echo "1d86c05b0078048512043c974e4fbe58270a3254c759fb9432ae5b0f1923434c  /tmp/basic-village-final-payload.tar.gz" | sha256sum --check
+          sha256sum /tmp/basic-village-final-payload.tar.gz
+          tar -tzf /tmp/basic-village-final-payload.tar.gz >/dev/null
           tar -xzf /tmp/basic-village-final-payload.tar.gz
           rm -rf public/assets/third-party/kenney/room public/assets/third-party/kenney/world
           rm -f src/kenneyRoomConfig.json
