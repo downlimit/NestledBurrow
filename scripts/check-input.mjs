@@ -6,6 +6,7 @@ import {
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "../src/input.js";
+import { getMovementVector, resolveFacing } from "../src/movement.js";
 
 function simulateJoystick() {
   const state = {
@@ -73,5 +74,55 @@ for (const reason of ["pointerupoutside", "pointercancel", "window blur", "visib
 const combined = clampVectorLength({ x: 1, y: 1 });
 assert(Math.abs(Math.hypot(combined.x, combined.y) - 1) < 1e-12, "keyboard plus joystick is clamped to speed 1");
 assert.deepEqual(clampVectorLength({ x: 1, y: 0 }), { x: 1, y: 0 }, "keyboard vector is preserved when already within speed 1");
+
+assert.deepEqual(
+  getMovementVector({ left: true, right: false, up: true, down: false }),
+  { x: -1, y: -1 },
+  "keyboard state produces the expected up-left movement vector",
+);
+assert.deepEqual(
+  getMovementVector({ left: true, right: true, up: false, down: false }),
+  { x: 0, y: 0 },
+  "opposite keyboard directions cancel before movement is clamped",
+);
+assert.deepEqual(
+  getMovementVector(
+    { left: false, right: true, up: false, down: false },
+    { x: -0.25, y: 0.5 },
+  ),
+  { x: 0.75, y: 0.5 },
+  "keyboard and joystick vectors combine before the final speed clamp",
+);
+
+assert.equal(
+  resolveFacing("down", { x: 0, y: 0 }, 0.15),
+  "down",
+  "idle keeps the last facing direction",
+);
+assert.equal(
+  resolveFacing("down", { x: 1, y: 0.1 }, 0.15),
+  "right",
+  "mostly horizontal movement faces right",
+);
+assert.equal(
+  resolveFacing("right", { x: -1, y: 0.1 }, 0.15),
+  "left",
+  "mostly horizontal movement faces left",
+);
+assert.equal(
+  resolveFacing("left", { x: 0.1, y: -1 }, 0.15),
+  "up",
+  "mostly vertical movement faces up",
+);
+assert.equal(
+  resolveFacing("up", { x: 0.1, y: 1 }, 0.15),
+  "down",
+  "mostly vertical movement faces down",
+);
+assert.equal(
+  resolveFacing("left", { x: 0.5, y: 0.55 }, 0.15),
+  "left",
+  "near-diagonal movement keeps facing stable inside hysteresis",
+);
 
 console.log("input checks passed");

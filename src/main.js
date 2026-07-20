@@ -7,7 +7,7 @@ import {
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
-import { moveWithCollision } from "./movement.js";
+import { getMovementVector, moveWithCollision, resolveFacing } from "./movement.js";
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -316,38 +316,19 @@ class WorldScene extends Phaser.Scene {
   }
 
   getMovementVector() {
-    const left = this.cursors.left.isDown || this.wasd.A.isDown;
-    const right = this.cursors.right.isDown || this.wasd.D.isDown;
-    const up = this.cursors.up.isDown || this.wasd.W.isDown;
-    const down = this.cursors.down.isDown || this.wasd.S.isDown;
-    const joystickVector = this.joystickVector ?? { x: 0, y: 0 };
-
-    return {
-      x: Number(right) - Number(left) + joystickVector.x,
-      y: Number(down) - Number(up) + joystickVector.y,
-    };
+    return getMovementVector(
+      {
+        left: this.cursors.left.isDown || this.wasd.A.isDown,
+        right: this.cursors.right.isDown || this.wasd.D.isDown,
+        up: this.cursors.up.isDown || this.wasd.W.isDown,
+        down: this.cursors.down.isDown || this.wasd.S.isDown,
+      },
+      this.joystickVector ?? { x: 0, y: 0 },
+    );
   }
 
   updateLastFacing(direction) {
-    const absX = Math.abs(direction.x);
-    const absY = Math.abs(direction.y);
-
-    if (absX === 0 && absY === 0) {
-      return;
-    }
-
-    if (Math.abs(absX - absY) <= FACING_HYSTERESIS) {
-      return;
-    }
-
-    this.lastFacing =
-      absX > absY
-        ? direction.x > 0
-          ? "right"
-          : "left"
-        : direction.y > 0
-          ? "down"
-          : "up";
+    this.lastFacing = resolveFacing(this.lastFacing, direction, FACING_HYSTERESIS);
   }
 
   updatePlayerAnimation(direction) {

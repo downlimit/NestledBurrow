@@ -11,6 +11,35 @@ export function getFootBox(position, footWidth, footDepth) {
   };
 }
 
+export function getMovementVector(
+  { left = false, right = false, up = false, down = false } = {},
+  joystickVector = { x: 0, y: 0 },
+) {
+  return {
+    x: Number(right) - Number(left) + joystickVector.x,
+    y: Number(down) - Number(up) + joystickVector.y,
+  };
+}
+
+export function resolveFacing(currentFacing, direction, hysteresis) {
+  const absX = Math.abs(direction.x);
+  const absY = Math.abs(direction.y);
+
+  if (absX === 0 && absY === 0) {
+    return currentFacing;
+  }
+
+  if (Math.abs(absX - absY) <= hysteresis) {
+    return currentFacing;
+  }
+
+  if (absX > absY) {
+    return direction.x > 0 ? "right" : "left";
+  }
+
+  return direction.y > 0 ? "down" : "up";
+}
+
 export function collides(position, layout, footWidth, footDepth) {
   const box = getFootBox(position, footWidth, footDepth);
 
