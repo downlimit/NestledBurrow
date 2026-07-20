@@ -10,17 +10,67 @@ import {
 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
-const WALL_SIZE = 24;
-const PLAYER_SIZE = 32;
 const PLAYER_SPEED = 260;
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
+
+const ART_SCALE = 3;
+const TILE_SIZE = 16;
+const ROOM_TILE_SIZE = TILE_SIZE * ART_SCALE;
+const WALL_TILES = 1;
+const WALL_SIZE = ROOM_TILE_SIZE * WALL_TILES;
+const PLAYER_FOOT_WIDTH = 24;
+const PLAYER_FOOT_DEPTH = 10;
+const FACING_HYSTERESIS = 0.15;
+const WALK_FRAME_RATE = 8;
+
+const PLAYER_FRAMES = {
+  down: ["tile_0267", "tile_0294", "tile_0321"],
+  up: ["tile_0268", "tile_0295", "tile_0322"],
+  left: ["tile_0269", "tile_0296", "tile_0323"],
+  right: ["tile_0266", "tile_0293", "tile_0320"],
+};
+
+const ROOM_FRAMES = {
+  floor: 494,
+  top: 90,
+  bottom: 147,
+  left: 146,
+  right: 148,
+  topLeft: 89,
+  topRight: 91,
+  bottomLeft: 203,
+  bottomRight: 205,
+};
 
 class RoomScene extends Phaser.Scene {
   constructor() {
     super("room");
   }
 
+  preload() {
+    Object.values(PLAYER_FRAMES).flat().forEach((frame) => {
+      this.load.image(frame, `/assets/third-party/kenney/player/${frame}.png`);
+    });
+
+    this.load.spritesheet("roomTiles", "/assets/third-party/kenney/room/roguelikeSheet_transparent.png", {
+      frameWidth: TILE_SIZE,
+      frameHeight: TILE_SIZE,
+      margin: 1,
+      spacing: 1,
+    });
+  }
+
   create() {
+    this.createRoom();
+    this.createPlayerAnimations();
+    this.createPlayer();
+    this.createInput();
+    this.createBuildLabel();
+    this.createJoystick();
+    this.attachSceneListeners();
+  }
+
+  createRoom() {
     this.roomBounds = new Phaser.Geom.Rectangle(
       WALL_SIZE,
       WALL_SIZE,
@@ -28,23 +78,70 @@ class RoomScene extends Phaser.Scene {
       GAME_HEIGHT - WALL_SIZE * 2,
     );
 
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x25211d);
-    this.add.rectangle(GAME_WIDTH / 2, WALL_SIZE / 2, GAME_WIDTH, WALL_SIZE, 0x6d5f4b);
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - WALL_SIZE / 2, GAME_WIDTH, WALL_SIZE, 0x4f6a57);
-    this.add.rectangle(WALL_SIZE / 2, GAME_HEIGHT / 2, WALL_SIZE, GAME_HEIGHT, 0x5f4c6b);
-    this.add.rectangle(GAME_WIDTH - WALL_SIZE / 2, GAME_HEIGHT / 2, WALL_SIZE, GAME_HEIGHT, 0x6a4f4a);
+    const columns = Math.ceil(GAME_WIDTH / ROOM_TILE_SIZE);
+    const rows = Math.ceil(GAME_HEIGHT / ROOM_TILE_SIZE);
 
-    this.player = this.add.rectangle(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      PLAYER_SIZE,
-      PLAYER_SIZE,
-      0xd9c18f,
-    );
+    for (let y = WALL_TILES; y < rows - WALL_TILES; y += 1) {
+      for (let x = WALL_TILES; x < columns - WALL_TILES; x += 1) {
+        this.addRoomTile(x, y, ROOM_FRAMES.floor, 0);
+      }
+    }
 
+    for (let x = WALL_TILES; x < columns - WALL_TILES; x += 1) {
+      this.addRoomTile(x, 0, ROOM_FRAMES.top, 10);
+      this.addRoomTile(x, rows - 1, ROOM_FRAMES.bottom, 10);
+    }
+
+    for (let y = WALL_TILES; y < rows - WALL_TILES; y += 1) {
+      this.addRoomTile(0, y, ROOM_FRAMES.left, 10);
+      this.addRoomTile(columns - 1, y, ROOM_FRAMES.right, 10);
+    }
+
+    this.addRoomTile(0, 0, ROOM_FRAMES.topLeft, 10);
+    this.addRoomTile(columns - 1, 0, ROOM_FRAMES.topRight, 10);
+    this.addRoomTile(0, rows - 1, ROOM_FRAMES.bottomLeft, 10);
+    this.addRoomTile(columns - 1, rows - 1, ROOM_FRAMES.bottomRight, 10);
+  }
+
+  addRoomTile(tileX, tileY, frame, depth) {
+    return this.add
+      .image(tileX * ROOM_TILE_SIZE, tileY * ROOM_TILE_SIZE, "roomTiles", frame)
+      .setOrigin(0, 0)
+      .setScale(ART_SCALE)
+      .setDepth(depth);
+  }
+
+  createPlayerAnimations() {
+    Object.entries(PLAYER_FRAMES).forEach(([facing, frames]) => {
+      this.anims.create({
+        key: `idle-${facing}`,
+        frames: [{ key: frames[1] }],
+      });
+      this.anims.create({
+        key: `walk-${facing}`,
+        frames: frames.map((key) => ({ key })),
+        frameRate: WALK_FRAME_RATE,
+        repeat: -1,
+      });
+    });
+  }
+
+  createPlayer() {
+    this.lastFacing = "down";
+    this.player = this.add
+      .sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, PLAYER_FRAMES.down[1])
+      .setOrigin(0.5, 1)
+      .setScale(ART_SCALE)
+      .setDepth(100);
+    this.player.anims.play("idle-down");
+  }
+
+  createInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
+  }
 
+  createBuildLabel() {
     this.add
       .text(GAME_WIDTH - 12, 12, `build: ${BUILD_ID}`, {
         fontFamily: "system-ui, sans-serif",
@@ -54,7 +151,9 @@ class RoomScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setAlpha(0.55)
       .setDepth(1000);
+  }
 
+  attachSceneListeners() {
     this.onWindowBlur = () => this.resetJoystick();
     this.onVisibilityChange = () => {
       if (document.hidden) {
@@ -64,8 +163,6 @@ class RoomScene extends Phaser.Scene {
     this.onNativePointerCancel = (event) => this.handleNativePointerEnd(event);
     this.onNativeLostPointerCapture = (event) => this.handleNativePointerEnd(event);
     this.onNativeTouchCancel = (event) => this.handleNativeTouchCancel(event);
-
-    this.createJoystick();
 
     window.addEventListener("blur", this.onWindowBlur);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
@@ -197,38 +294,73 @@ class RoomScene extends Phaser.Scene {
   }
 
   update(_time, delta) {
-    const left = this.cursors.left.isDown || this.wasd.A.isDown;
-    const right = this.cursors.right.isDown || this.wasd.D.isDown;
-    const up = this.cursors.up.isDown || this.wasd.W.isDown;
-    const down = this.cursors.down.isDown || this.wasd.S.isDown;
-
-    const keyboardVector = {
-      x: Number(right) - Number(left),
-      y: Number(down) - Number(up),
-    };
-    const joystickVector = this.joystickVector ?? { x: 0, y: 0 };
-    const direction = new Phaser.Math.Vector2(
-      keyboardVector.x + joystickVector.x,
-      keyboardVector.y + joystickVector.y,
-    );
-    const limitedDirection = clampVectorLength(direction);
+    const movement = this.getMovementVector();
+    const limitedDirection = clampVectorLength(movement);
+    this.updateLastFacing(limitedDirection);
+    this.updatePlayerAnimation(limitedDirection);
 
     if (limitedDirection.x === 0 && limitedDirection.y === 0) {
       return;
     }
 
-    direction.set(limitedDirection.x, limitedDirection.y).scale(PLAYER_SPEED * (delta / 1000));
+    const step = new Phaser.Math.Vector2(limitedDirection.x, limitedDirection.y).scale(
+      PLAYER_SPEED * (delta / 1000),
+    );
 
     this.player.x = Phaser.Math.Clamp(
-      this.player.x + direction.x,
-      this.roomBounds.left + PLAYER_SIZE / 2,
-      this.roomBounds.right - PLAYER_SIZE / 2,
+      this.player.x + step.x,
+      this.roomBounds.left + PLAYER_FOOT_WIDTH / 2,
+      this.roomBounds.right - PLAYER_FOOT_WIDTH / 2,
     );
     this.player.y = Phaser.Math.Clamp(
-      this.player.y + direction.y,
-      this.roomBounds.top + PLAYER_SIZE / 2,
-      this.roomBounds.bottom - PLAYER_SIZE / 2,
+      this.player.y + step.y,
+      this.roomBounds.top + PLAYER_FOOT_DEPTH,
+      this.roomBounds.bottom,
     );
+  }
+
+  getMovementVector() {
+    const left = this.cursors.left.isDown || this.wasd.A.isDown;
+    const right = this.cursors.right.isDown || this.wasd.D.isDown;
+    const up = this.cursors.up.isDown || this.wasd.W.isDown;
+    const down = this.cursors.down.isDown || this.wasd.S.isDown;
+
+    const joystickVector = this.joystickVector ?? { x: 0, y: 0 };
+    return {
+      x: Number(right) - Number(left) + joystickVector.x,
+      y: Number(down) - Number(up) + joystickVector.y,
+    };
+  }
+
+  updateLastFacing(direction) {
+    const absX = Math.abs(direction.x);
+    const absY = Math.abs(direction.y);
+
+    if (absX === 0 && absY === 0) {
+      return;
+    }
+
+    if (Math.abs(absX - absY) <= FACING_HYSTERESIS) {
+      return;
+    }
+
+    if (absX > absY) {
+      this.lastFacing = direction.x > 0 ? "right" : "left";
+      return;
+    }
+
+    this.lastFacing = direction.y > 0 ? "down" : "up";
+  }
+
+  updatePlayerAnimation(direction) {
+    const moving = direction.x !== 0 || direction.y !== 0;
+    const animationKey = `${moving ? "walk" : "idle"}-${this.lastFacing}`;
+
+    if (this.player.anims.currentAnim?.key === animationKey) {
+      return;
+    }
+
+    this.player.anims.play(animationKey);
   }
 }
 
@@ -238,6 +370,9 @@ new Phaser.Game({
   backgroundColor: "#201b18",
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
+  pixelArt: true,
+  antialias: false,
+  roundPixels: true,
   scene: RoomScene,
   scale: {
     mode: Phaser.Scale.FIT,
