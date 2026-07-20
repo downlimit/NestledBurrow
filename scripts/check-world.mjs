@@ -19,7 +19,11 @@ const footWidth = 8;
 const footDepth = 5;
 
 assert(WORLD_WIDTH > GAME_WIDTH && WORLD_HEIGHT > GAME_HEIGHT, "world is larger than camera");
-assert.equal(layout.groundTiles.length >= WORLD_COLUMNS * WORLD_ROWS, true);
+assert.equal(
+  layout.groundTiles.length,
+  WORLD_COLUMNS * WORLD_ROWS + (WORLD_ROWS - DOOR_Y) * 3,
+  "ground contains one base tile per cell plus the three-tile path overlay",
+);
 assert.equal(layout.houseFloorTiles.length > 0, true);
 assert.equal(layout.houseWallTiles.length > 0, true);
 assert.equal(layout.decorationTiles.length, 48, "four 3x4 trees are present");
@@ -56,6 +60,8 @@ assert(position.y >= layout.outdoorTarget.y - routeStep, "route reaches the outd
 
 const wallY = (HOUSE.y + 5) * TILE_SIZE + TILE_SIZE - 2;
 const nearLeftWallX = (HOUSE.x + 1) * TILE_SIZE + TILE_SIZE / 2;
+const minimumInteriorCenterX = (HOUSE.x + 1) * TILE_SIZE + footWidth / 2;
+
 const wallTry = moveWithCollision(
   { x: nearLeftWallX, y: wallY },
   { x: -TILE_SIZE * 2, y: 0 },
@@ -63,6 +69,42 @@ const wallTry = moveWithCollision(
   footWidth,
   footDepth,
 );
-assert(wallTry.x > HOUSE.x * TILE_SIZE + TILE_SIZE / 2, "movement cannot cross a wall");
+assert(wallTry.x >= minimumInteriorCenterX, "movement cannot cross a solid wall");
 
-console.log(`world checks passed: ${WORLD_WIDTH}x${WORLD_HEIGHT}, Basic Village house ${HOUSE.columns}x${HOUSE.rows}`);
+const highSpeedTry = moveWithCollision(
+  { x: nearLeftWallX, y: wallY },
+  { x: -TILE_SIZE * 8, y: 0 },
+  layout,
+  footWidth,
+  footDepth,
+);
+assert(
+  highSpeedTry.x >= minimumInteriorCenterX,
+  "large frame deltas cannot tunnel through a wall",
+);
+
+const slide = moveWithCollision(
+  { x: nearLeftWallX, y: wallY },
+  { x: -TILE_SIZE * 2, y: TILE_SIZE / 2 },
+  layout,
+  footWidth,
+  footDepth,
+);
+assert(slide.x >= minimumInteriorCenterX, "sliding does not enter the wall");
+assert(slide.y > wallY, "axis-separated movement slides along the wall");
+
+assert.deepEqual(
+  moveWithCollision(
+    { x: footWidth / 2, y: footDepth },
+    { x: -99, y: -99 },
+    layout,
+    footWidth,
+    footDepth,
+  ),
+  { x: footWidth / 2, y: footDepth },
+  "world bounds clamp correctly",
+);
+
+console.log(
+  `world checks passed: ${WORLD_WIDTH}x${WORLD_HEIGHT}, Basic Village house ${HOUSE.columns}x${HOUSE.rows}, doorway, sliding, anti-tunneling and bounds`,
+);
