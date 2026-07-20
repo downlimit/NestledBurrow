@@ -14,6 +14,7 @@ A task is not complete because the code compiles. Before creating a PR, run:
 
 ```bash
 npm ci
+python -m pip install -r requirements-dev.txt
 npm run check
 ```
 
@@ -38,9 +39,27 @@ For room or tile changes, explicitly verify:
 
 - the intended floor tile fills the interior;
 - horizontal and vertical walls use the intended tiles;
-- all four corners connect correctly;
-- no unrelated sprites appear because of a wrong spritesheet margin, spacing or frame index;
-- pixels remain crisp.
+- all corners and wall bands connect correctly;
+- no unrelated sprites appear;
+- pixels remain crisp;
+- the generated `artifacts/room-preview.png` is the intended result.
+
+## Third-party spritesheet protocol
+
+Never select production assets by guessing raw spritesheet frame indexes.
+
+Before integrating a spritesheet pack:
+
+1. Read the pack metadata, tile dimensions, margin and spacing.
+2. Generate a labeled contact sheet for every source frame.
+3. Render supplied sample maps when available to confirm how related tiles are assembled.
+4. Select frames only after visual inspection.
+5. Copy selected frames into a small semantic atlas with names such as `floor`, `wallOuter` or `wallInnerLeft`.
+6. Record the source pack, source sheet geometry, original frame number and SHA-256 in a canonical manifest.
+7. Reference semantic frame names in gameplay code. Raw source frame numbers belong only in the audit manifest.
+8. Pin the selected atlas hash and the pixel hash of an approved room preview.
+
+When the room atlas or layout changes, `npm run check` must generate `artifacts/room-preview.png`. Do not update `approvedPreviewSha256` until that image has been opened and visually approved. The PR workflow uploads the same preview as an artifact; it must be inspected before merge.
 
 ## Completion report
 
@@ -49,6 +68,7 @@ The final task response must list:
 - exact commands that were run;
 - whether each command passed;
 - which runtime states were manually inspected;
+- which preview or screenshot artifact was inspected;
 - any check that could not be performed and why.
 
 Do not claim that a visual task is complete, and do not update `PROJECT.md` as completed, when the runtime result was not inspected. If browser inspection is unavailable, state that clearly and leave the task for review instead of presenting it as finished.
