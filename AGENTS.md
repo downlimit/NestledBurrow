@@ -42,6 +42,16 @@ For room or tile changes, explicitly verify:
 - no unrelated sprites appear because of a wrong spritesheet margin, spacing or frame index;
 - pixels remain crisp.
 
+## Third-party pixel asset rules
+
+- Never select art by unexplained numeric frame IDs copied from a contact sheet or guessed from row/column order.
+- Prefer standalone source PNG files from the pack.
+- When a spritesheet must be used, read the pack's official XML/JSON/atlas metadata and extract the selected sprites into standalone PNG files before runtime.
+- Every selected asset must have a semantic project name and a manifest entry containing: source pack, exact source path or atlas name, source rectangle when applicable, dimensions, SHA-256 and intended role.
+- Runtime code must reference semantic names such as `floorWood`, `wallTop` or `playerWalkLeft`, not raw atlas indexes.
+- Generate and inspect a labeled contact sheet of all selected assets before integrating them.
+- A visual test must fail when the manifest, extracted PNG dimensions or hashes do not match the committed files.
+
 ## Completion report
 
 The final task response must list:
