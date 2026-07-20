@@ -43,5 +43,5 @@ export const HOUSE_FRAMES = Object.freeze({
   bottomLeft: 24,
   bottom: 25,
   bottomRight: 26,
-  floor: Object.freeze([53, 54, 55, 65, 66, 67, 77, 78, 79]),
+  floor: 66,
 });
