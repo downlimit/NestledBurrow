@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kenney Roguelike/RPG — номерной атлас</title>
+  <style>
+    :root { color-scheme: dark; --tile-scale: 5; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #111; color: #eee; font-family: system-ui, sans-serif; }
+    header { position: sticky; top: 0; z-index: 10; padding: 10px; background: rgba(20,20,20,.96); border-bottom: 1px solid #3b3b3b; }
+    h1 { margin: 0 0 8px; font-size: 17px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    input, select, button { min-height: 38px; padding: 7px 9px; border: 1px solid #555; border-radius: 7px; background: #262626; color: #eee; font: inherit; }
+    input { width: 82px; }
+    button { cursor: pointer; }
+    .status { margin-top: 7px; font-size: 13px; color: #bbb; }
+    .error { color: #ff9e9e; }
+    main { padding: 10px; }
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+    .cell { min-width: 0; padding: 5px; border: 2px solid #373737; border-radius: 7px; background: #202020; cursor: pointer; }
+    .cell:hover { border-color: #aaa; }
+    .cell.used-edge { border-color: #f2a33a; }
+    .cell.used-center { border-color: #3e9ee8; }
+    .cell.used-floor { border-color: #58bd69; }
+    .tile-wrap { display: flex; align-items: center; justify-content: center; min-height: 84px; overflow: hidden; border-radius: 4px; background-color: #4a4a4a; background-image: linear-gradient(45deg,#5b5b5b 25%,transparent 25%),linear-gradient(-45deg,#5b5b5b 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#5b5b5b 75%),linear-gradient(-45deg,transparent 75%,#5b5b5b 75%); background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0; }
+    .tile { image-rendering: pixelated; background-repeat: no-repeat; flex: none; }
+    .id { margin-top: 4px; text-align: center; font-weight: 750; }
+    .coord { text-align: center; color: #999; font-size: 11px; }
+    dialog { width: min(94vw, 760px); max-height: 92vh; overflow: auto; padding: 14px; border: 1px solid #666; border-radius: 12px; background: #181818; color: #eee; }
+    dialog::backdrop { background: rgba(0,0,0,.78); }
+    .dialog-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .dialog-head h2 { margin: 0; }
+    .preview { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+    .big-wrap { width: 272px; }
+    .big { width: 256px; height: 256px; image-rendering: pixelated; background-repeat: no-repeat; background-color: #4a4a4a; }
+    .neighbors { display: grid; grid-template-columns: repeat(7, 56px); gap: 4px; }
+    .neighbors .cell { width: 56px; padding: 2px; border-width: 1px; }
+    .neighbors .tile-wrap { min-height: 48px; }
+    .neighbors .id { font-size: 10px; }
+    .neighbors .coord { display: none; }
+    .legend { margin-top: 7px; font-size: 12px; color: #aaa; }
+    a { color: #8dc8ff; }
+    @media (max-width: 600px) {
+      #grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+      .cell { padding: 3px; }
+      .tile-wrap { min-height: 68px; }
+      .neighbors { grid-template-columns: repeat(5, 52px); }
+      .neighbors .cell:nth-child(-n+7), .neighbors .cell:nth-last-child(-n+7) { display: none; }
+      header { padding-top: max(10px, env(safe-area-inset-top)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Kenney Roguelike/RPG — 1767 пронумерованных кадров</h1>
+    <div class="controls">
+      <label>От <input id="from" type="number" min="0" max="1766" value="640"></label>
+      <label>До <input id="to" type="number" min="0" max="1766" value="930"></label>
+      <button id="show" type="button">Показать</button>
+      <button type="button" data-range="680,779">680–779</button>
+      <button type="button" data-range="840,899">840–899</button>
+      <label>Размер
+        <select id="scale">
+          <option value="4">4×</option>
+          <option value="5" selected>5×</option>
+          <option value="6">6×</option>
+          <option value="8">8×</option>
+        </select>
+      </label>
+    </div>
+    <div id="status" class="status">Загрузка исходного spritesheet…</div>
+    <div class="legend">Оранжевый — использованные края, синий — центры стен, зелёный — пол. Нажми тайл, чтобы открыть его крупно и увидеть соседние номера.</div>
+  </header>
+  <main><div id="grid"></div></main>
+
+  <dialog id="dialog">
+    <div class="dialog-head"><h2 id="dialog-title"></h2><button id="close" type="button">Закрыть</button></div>
+    <div class="preview">
+      <div class="big-wrap">
+        <div id="big" class="big"></div>
+        <p><button id="copy" type="button"></button></p>
+      </div>
+      <div><strong>Соседние кадры</strong><div id="neighbors" class="neighbors"></div></div>
+    </div>
+  </dialog>
+
+  <script>
+    const SOURCE = "https://raw.githubusercontent.com/prestonwong7/MobileRPG/master/roguelikeSheet_transparent.png";
+    const SOURCE_PAGE = "https://github.com/prestonwong7/MobileRPG/blob/master/roguelikeSheet_transparent.png";
+    const COLS = 57, ROWS = 31, STEP = 17, TILE = 16, SHEET_W = 968, SHEET_H = 526, TOTAL = COLS * ROWS;
+    const usedEdge = new Set([756, 757, 758, 868, 869, 871, 872, 874]);
+    const usedCenter = new Set([698, 873, 868]);
+    const usedFloor = new Set([119]);
+    const grid = document.querySelector("#grid");
+    const from = document.querySelector("#from");
+    const to = document.querySelector("#to");
+    const scale = document.querySelector("#scale");
+    const status = document.querySelector("#status");
+    const dialog = document.querySelector("#dialog");
+    let sourceReady = false;
+    let selected = 0;
+
+    function styleFor(id, zoom) {
+      const column = id % COLS;
+      const row = Math.floor(id / COLS);
+      return `width:${TILE * zoom}px;height:${TILE * zoom}px;background-image:url('${SOURCE}');background-size:${SHEET_W * zoom}px ${SHEET_H * zoom}px;background-position:${-column * STEP * zoom}px ${-row * STEP * zoom}px`;
+    }
+
+    function makeCell(id, zoom, neighbor = false) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      if (usedEdge.has(id)) cell.classList.add("used-edge");
+      if (usedCenter.has(id)) cell.classList.add("used-center");
+      if (usedFloor.has(id)) cell.classList.add("used-floor");
+      const column = id % COLS;
+      const row = Math.floor(id / COLS);
+      const effectiveZoom = neighbor ? 3 : zoom;
+      cell.innerHTML = `<div class="tile-wrap"><div class="tile" style="${styleFor(id, effectiveZoom)}"></div></div><div class="id">${String(id).padStart(4, "0")}</div><div class="coord">c${column} r${row}</div>`;
+      cell.addEventListener("click", () => openTile(id));
+      return cell;
+    }
+
+    function render() {
+      const first = Math.max(0, Math.min(TOTAL - 1, Number(from.value) || 0));
+      const last = Math.max(first, Math.min(TOTAL - 1, Number(to.value) || first));
+      const zoom = Number(scale.value);
+      const fragment = document.createDocumentFragment();
+      grid.replaceChildren();
+      for (let id = first; id <= last; id += 1) fragment.appendChild(makeCell(id, zoom));
+      grid.appendChild(fragment);
+      const sourceText = sourceReady ? "spritesheet загружен" : "spritesheet ещё загружается";
+      status.textContent = `Показано ${last - first + 1} кадров; ${sourceText}.`;
+      const url = new URL(location.href);
+      url.searchParams.set("from", first);
+      url.searchParams.set("to", last);
+      history.replaceState(null, "", url);
+    }
+
+    function openTile(id) {
+      selected = id;
+      document.querySelector("#dialog-title").textContent = `Кадр ${String(id).padStart(4, "0")}`;
+      document.querySelector("#big").setAttribute("style", styleFor(id, 16));
+      document.querySelector("#copy").textContent = `Скопировать номер ${id}`;
+      const neighbors = document.querySelector("#neighbors");
+      neighbors.replaceChildren();
+      for (let dy = -3; dy <= 3; dy += 1) {
+        for (let dx = -3; dx <= 3; dx += 1) {
+          const column = id % COLS + dx;
+          const row = Math.floor(id / COLS) + dy;
+          if (column < 0 || column >= COLS || row < 0 || row >= ROWS) {
+            neighbors.appendChild(document.createElement("div"));
+          } else {
+            neighbors.appendChild(makeCell(row * COLS + column, 3, true));
+          }
+        }
+      }
+      dialog.showModal();
+    }
+
+    document.querySelector("#show").addEventListener("click", render);
+    scale.addEventListener("change", render);
+    document.querySelector("#close").addEventListener("click", () => dialog.close());
+    document.querySelector("#copy").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(String(selected)); }
+      catch { prompt("Скопируй номер:", String(selected)); }
+    });
+    document.querySelectorAll("[data-range]").forEach((button) => button.addEventListener("click", () => {
+      [from.value, to.value] = button.dataset.range.split(",");
+      render();
+    }));
+
+    const params = new URLSearchParams(location.search);
+    if (params.has("from")) from.value = params.get("from");
+    if (params.has("to")) to.value = params.get("to");
+
+    const preloader = new Image();
+    preloader.onload = () => { sourceReady = true; render(); };
+    preloader.onerror = () => {
+      sourceReady = false;
+      status.innerHTML = `Не удалось загрузить spritesheet. <a href="${SOURCE_PAGE}" target="_blank" rel="noreferrer">Открыть исходник на GitHub</a>.`;
+    };
+    preloader.src = SOURCE;
+    render();
+  </script>
+</body>
+</html>
