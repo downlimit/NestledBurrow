@@ -27,45 +27,76 @@ jobs:
           ref: feature/basic-village-tileset
           fetch-depth: 0
 
-      - name: Capture official itch page and upload metadata
+      - name: Download official Forchild archives
         shell: bash
         run: |
           set -euo pipefail
-          target="tasks/basic-village/diagnostic"
-          mkdir -p "$target"
+          target="tasks/basic-village/source"
+          rm -rf "$target" tasks/basic-village/diagnostic
+          mkdir -p "$target/basic" "$target/godot"
+
+          base="https://forchild.itch.io/village-tileset"
+          agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
+
           curl --fail --location --retry 4 --retry-all-errors \
-            -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36" \
-            "https://forchild.itch.io/village-tileset" \
-            -o "$target/itch-page.html"
+            -A "$agent" \
+            -e "$base" \
+            --data '' \
+            "$base/file/4644644" \
+            -o "$target/BasicVillageTileset.zip"
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            -A "$agent" \
+            -e "$base" \
+            --data '' \
+            "$base/file/4659743" \
+            -o "$target/GodotTilemapImport.zip"
 
           python - <<'PY'
           from pathlib import Path
-          import html
-          import re
 
-          path = Path("tasks/basic-village/diagnostic/itch-page.html")
-          source = path.read_text(encoding="utf-8", errors="replace")
-          report = []
-          report.append(f"page_length={len(source)}")
-          report.append("upload_ids=" + ",".join(re.findall(r'data-upload_id=[\"\'](\d+)[\"\']', source)))
-          report.append("file_links=")
-          for href in re.findall(r'href=[\"\']([^\"\']*/file/\d+[^\"\']*)[\"\']', source):
-              report.append(html.unescape(href))
-          for filename in ("BasicVillageTileset.zip", "GodotTilemapImport.zip"):
-              pos = source.find(filename)
-              report.append(f"\n===== {filename} position={pos} =====")
-              if pos >= 0:
-                  report.append(source[max(0, pos - 3000):pos + 1500])
-          Path("tasks/basic-village/diagnostic/report.txt").write_text("\n".join(report), encoding="utf-8")
-          print("\n".join(report[:4]))
+          for name in ("BasicVillageTileset.zip", "GodotTilemapImport.zip"):
+              path = Path("tasks/basic-village/source") / name
+              data = path.read_bytes()
+              if not data.startswith(b"PK"):
+                  raise RuntimeError(f"{name} is not a ZIP archive; first bytes={data[:80]!r}")
+              print(f"verified {name}: {len(data)} bytes")
           PY
 
-      - name: Commit diagnostics
+          unzip -tq "$target/BasicVillageTileset.zip"
+          unzip -tq "$target/GodotTilemapImport.zip"
+          unzip -oq "$target/BasicVillageTileset.zip" -d "$target/basic"
+          unzip -oq "$target/GodotTilemapImport.zip" -d "$target/godot"
+
+          (
+            cd "$target"
+            sha256sum BasicVillageTileset.zip GodotTilemapImport.zip > SHA256SUMS
+          )
+
+          find "$target" -maxdepth 6 -type f -print | sort
+
+      - name: Add source note and remove one-off workflow
+        shell: bash
+        run: |
+          cat > tasks/basic-village/source/README.md <<'EOF'
+          # Temporary Basic Village integration source
+
+          - Official source: https://forchild.itch.io/village-tileset
+          - Author: Forchild
+          - License: CC0
+          - Tile grid: 16x16
+          - Official uploads: `BasicVillageTileset.zip` and `GodotTilemapImport.zip`
+
+          These archives and extracted files are temporary integration inputs. Keep only production assets and canonical audit information after the migration is complete.
+          EOF
+          rm .github/workflows/prepare-basic-village-assets.yml
+
+      - name: Commit prepared source bundle
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tasks/basic-village/diagnostic
-          git commit -m "Capture Basic Village download metadata"
+          git add tasks/basic-village .github/workflows/prepare-basic-village-assets.yml
+          git commit -m "Prepare Basic Village source assets"
           git push origin HEAD:feature/basic-village-tileset
