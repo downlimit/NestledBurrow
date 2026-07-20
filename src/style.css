@@ -31,8 +31,51 @@ canvas {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  image-rendering: pixelated;
 }
 
-canvas {
-  image-rendering: pixelated;
+.movement-debug-panel {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  width: min(280px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  padding: 10px;
+  overflow: auto;
+  color: #f2eadc;
+  background: rgb(23 23 36 / 94%);
+  border: 1px solid rgb(242 234 220 / 45%);
+  font: 12px system-ui, sans-serif;
+}
+
+.movement-debug-panel label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  gap: 8px;
+  align-items: center;
+}
+
+.movement-debug-panel input,
+.movement-debug-panel button {
+  min-width: 0;
+  font: inherit;
+}
+
+.movement-debug-panel input {
+  width: 84px;
+}
+
+.movement-debug-status {
+  white-space: pre;
+  font-family: ui-monospace, monospace;
+  line-height: 1.35;
+}
+
+.movement-debug-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
