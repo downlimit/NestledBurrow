@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - .github/workflows/approve-basic-village.yml
-      - tasks/basic-village/final-payload.tar.gz.b64
+      - tasks/basic-village/payload/**
 
 permissions:
   contents: write
@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode tasks/basic-village/final-payload.tar.gz.b64 > /tmp/basic-village-final-payload.tar.gz
+          cat tasks/basic-village/payload/chunk-* | base64 --decode > /tmp/basic-village-final-payload.tar.gz
           echo "1d86c05b0078048512043c974e4fbe58270a3254c759fb9432ae5b0f1923434c  /tmp/basic-village-final-payload.tar.gz" | sha256sum --check
           tar -xzf /tmp/basic-village-final-payload.tar.gz
           rm -rf public/assets/third-party/kenney/room public/assets/third-party/kenney/world
