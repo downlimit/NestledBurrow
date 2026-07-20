@@ -64,7 +64,7 @@ while (position.y < layout.outdoorTarget.y && routeSteps < routeStepLimit) {
     layout,
     footWidth,
     footDepth,
-  );
+  ).position;
   routeSteps += 1;
 }
 
@@ -76,13 +76,16 @@ assert(
 
 const wallY = (ROOM_TILE_Y + 4) * TILE_SIZE + TILE_SIZE - 2;
 const nearLeftWallX = (ROOM_TILE_X + 1) * TILE_SIZE + TILE_SIZE / 2;
-const wallTry = moveWithCollision(
+const wallResult = moveWithCollision(
   { x: nearLeftWallX, y: wallY },
   { x: -TILE_SIZE * 1.5, y: 0 },
   layout,
   footWidth,
   footDepth,
 );
+const wallTry = wallResult.position;
+assert.equal(wallResult.blockedAxes.x, true, "wall collision reports blocked x axis");
+assert.equal(wallResult.blockedAxes.y, false, "wall collision leaves y axis unblocked");
 assert(
   wallTry.x > ROOM_TILE_X * TILE_SIZE + TILE_SIZE / 2,
   "movement cannot cross a solid wall",
@@ -98,19 +101,22 @@ const highSpeedTry = moveWithCollision(
   layout,
   footWidth,
   footDepth,
-);
+).position;
 assert(
   highSpeedTry.x >= (ROOM_TILE_X + 1) * TILE_SIZE + footWidth / 2,
   "large frame deltas cannot tunnel through a wall",
 );
 
-const slide = moveWithCollision(
+const slideResult = moveWithCollision(
   { x: nearLeftWallX, y: wallY },
   { x: -TILE_SIZE * 1.5, y: TILE_SIZE / 2 },
   layout,
   footWidth,
   footDepth,
 );
+const slide = slideResult.position;
+assert.equal(slideResult.blockedAxes.x, true, "sliding collision reports blocked wall axis");
+assert.equal(slideResult.blockedAxes.y, false, "sliding collision keeps travel axis unblocked");
 assert(slide.y > wallY, "axis-separated movement slides along wall");
 
 assert.deepEqual(
@@ -120,7 +126,7 @@ assert.deepEqual(
     layout,
     footWidth,
     footDepth,
-  ),
+  ).position,
   { x: footWidth / 2, y: footDepth },
   "world bounds clamp correctly",
 );

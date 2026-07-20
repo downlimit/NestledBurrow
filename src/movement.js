@@ -41,6 +41,7 @@ export function collides(position, layout, footWidth, footDepth) {
 
 export function moveWithCollision(position, delta, layout, footWidth, footDepth) {
   const next = { ...position };
+  const blockedAxes = { x: false, y: false };
   const substepCount = Math.max(
     1,
     Math.ceil(Math.max(Math.abs(delta.x), Math.abs(delta.y)) / MAX_COLLISION_STEP),
@@ -55,7 +56,12 @@ export function moveWithCollision(position, delta, layout, footWidth, footDepth)
     };
 
     if (!collides(tryX, layout, footWidth, footDepth)) {
+      if (stepX !== 0 && tryX.x === next.x) {
+        blockedAxes.x = true;
+      }
       next.x = tryX.x;
+    } else if (stepX !== 0) {
+      blockedAxes.x = true;
     }
 
     const tryY = {
@@ -64,11 +70,16 @@ export function moveWithCollision(position, delta, layout, footWidth, footDepth)
     };
 
     if (!collides(tryY, layout, footWidth, footDepth)) {
+      if (stepY !== 0 && tryY.y === next.y) {
+        blockedAxes.y = true;
+      }
       next.y = tryY.y;
+    } else if (stepY !== 0) {
+      blockedAxes.y = true;
     }
   }
 
-  return next;
+  return { position: next, blockedAxes };
 }
 
 function clamp(value, min, max) {

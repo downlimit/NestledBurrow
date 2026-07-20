@@ -2,16 +2,22 @@ import Phaser from "phaser";
 import "./style.css";
 import {
   JOYSTICK,
-  clampVectorLength,
   getJoystickState,
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
+import {
+  applyBlockedAxes,
+  createMovementState,
+  createRuntimeMovementConfig,
+  isMoving,
+  stepCharacterMovement,
+} from "./characterMovement.js";
 import { moveWithCollision } from "./movement.js";
+import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_CONFIG_FIELDS } from "./movementConfig.js";
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
-  PLAYER_SPEED,
   ROOM_ATLAS_PATH,
   ROOM_IMAGE_PATH,
   ROOM_TEXTURE_KEY,
@@ -68,6 +74,7 @@ class WorldScene extends Phaser.Scene {
     this.createPlayerAnimations();
     this.createPlayer();
     this.createInput();
+    this.createMovementDebugPanel();
     this.createBuildLabel();
     this.attachSceneListeners();
     this.createJoystick();
@@ -107,6 +114,8 @@ class WorldScene extends Phaser.Scene {
 
   createPlayer() {
     this.lastFacing = "down";
+    this.movementConfig = createRuntimeMovementConfig(this.loadMovementDebugConfig());
+    this.playerMovement = createMovementState();
     const spawn = this.worldLayout.spawn;
 
     this.player = this.add
@@ -120,6 +129,75 @@ class WorldScene extends Phaser.Scene {
   createInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
+  }
+
+
+  createMovementDebugPanel() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("movementDebug") !== "1") {
+      return;
+    }
+
+    const panel = document.createElement("form");
+    panel.className = "movement-debug-panel";
+    panel.innerHTML = `<strong>Movement debug</strong>`;
+
+    MOVEMENT_CONFIG_FIELDS.forEach((key) => {
+      const label = document.createElement("label");
+      label.textContent = key;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.step = key === "facingTurnSpeed" ? "0.5" : "1";
+      input.value = String(this.movementConfig[key]);
+      input.addEventListener("input", () => {
+        const value = Number(input.value);
+        if (Number.isFinite(value) && value >= 0) {
+          this.movementConfig[key] = value;
+          this.saveMovementDebugConfig();
+        }
+      });
+      label.append(input);
+      panel.append(label);
+    });
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.textContent = "Reset defaults";
+    reset.addEventListener("click", () => {
+      Object.assign(this.movementConfig, DEFAULT_MOVEMENT_CONFIG);
+      localStorage.removeItem("nestledBurrow.movementDebug");
+      panel.querySelectorAll("input").forEach((input) => {
+        input.value = String(this.movementConfig[input.parentElement.firstChild.textContent]);
+      });
+    });
+
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.textContent = "Copy config";
+    copy.addEventListener("click", async () => {
+      await navigator.clipboard?.writeText(JSON.stringify(this.movementConfig, null, 2));
+    });
+
+    panel.append(reset, copy);
+    document.body.append(panel);
+    this.movementDebugPanel = panel;
+  }
+
+  loadMovementDebugConfig() {
+    try {
+      const stored = JSON.parse(localStorage.getItem("nestledBurrow.movementDebug") ?? "{}");
+      return Object.fromEntries(
+        MOVEMENT_CONFIG_FIELDS
+          .filter((key) => Number.isFinite(stored[key]) && stored[key] >= 0)
+          .map((key) => [key, stored[key]]),
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  saveMovementDebugConfig() {
+    localStorage.setItem("nestledBurrow.movementDebug", JSON.stringify(this.movementConfig));
   }
 
   createBuildLabel() {
@@ -294,25 +372,32 @@ class WorldScene extends Phaser.Scene {
     canvas.removeEventListener("lostpointercapture", this.onNativeLostPointerCapture);
     canvas.removeEventListener("touchcancel", this.onNativeTouchCancel);
     this.resetJoystick();
+    this.movementDebugPanel?.remove();
   }
 
   update(_time, delta) {
-    const direction = clampVectorLength(this.getMovementVector());
-    this.updateLastFacing(direction);
-    this.updatePlayerAnimation(direction);
+    this.playerMovement = stepCharacterMovement(
+      this.playerMovement,
+      this.getMovementVector(),
+      delta,
+      { config: this.movementConfig },
+    );
 
-    const next = moveWithCollision(
+    const moveResult = moveWithCollision(
       { x: this.player.x, y: this.player.y },
       {
-        x: direction.x * PLAYER_SPEED * (delta / 1000),
-        y: direction.y * PLAYER_SPEED * (delta / 1000),
+        x: this.playerMovement.velocity.x * (Math.min(delta, this.movementConfig.maxDeltaMs) / 1000),
+        y: this.playerMovement.velocity.y * (Math.min(delta, this.movementConfig.maxDeltaMs) / 1000),
       },
       this.worldLayout,
       PLAYER_FOOT_WIDTH,
       PLAYER_FOOT_DEPTH,
     );
 
-    this.player.setPosition(next.x, next.y);
+    this.playerMovement = applyBlockedAxes(this.playerMovement, moveResult.blockedAxes);
+    this.player.setPosition(moveResult.position.x, moveResult.position.y);
+    this.updateLastFacing(this.playerMovement.facingDirection);
+    this.updatePlayerAnimation(this.playerMovement);
   }
 
   getMovementVector() {
@@ -350,8 +435,8 @@ class WorldScene extends Phaser.Scene {
           : "up";
   }
 
-  updatePlayerAnimation(direction) {
-    const moving = direction.x !== 0 || direction.y !== 0;
+  updatePlayerAnimation(movement) {
+    const moving = isMoving(movement, this.movementConfig);
 
     if (!moving) {
       this.player.anims.stop();
