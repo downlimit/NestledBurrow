@@ -3,7 +3,7 @@
   "imagePath": "room/kenney-room-tiles.png",
   "atlasPath": "room/kenney-room-tiles.json",
   "atlasSha256": "b7f461ec87dee4ed44ee5e02f9a693bd4a7ca29b316eb7cc2acb3bcdf0dc1fc0",
-  "approvedPreviewSha256": "db6f136cd82af91549ae81c53c6501b9bbe746181a6e0255a43af0d68ecbcd77",
+  "approvedPreviewSha256": "f3a896c06740dd7cd46475440c971e3d6fd56f25ffc462fae62eaea6ec299ae5",
   "roomScale": 2,
   "playerScale": 3,
   "floorFrame": "floor",
