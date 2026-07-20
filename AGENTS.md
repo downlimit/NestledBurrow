@@ -7,6 +7,7 @@ These rules apply to every task in this repository.
 1. Read `PROJECT.md` and `LIBRARY.md`.
 2. Read the files directly related to the task.
 3. Confirm that the task branch starts from the current `main`.
+4. Read `REVIEW.md` before preparing the pull request and follow its report contract.
 
 ## Mandatory validation
 
@@ -45,6 +46,21 @@ For room, world or tile changes, explicitly verify:
 - pixels remain crisp;
 - every generated preview artifact is the intended result.
 
+## Review-efficient delivery
+
+Prepare work so the main-chat review can be strict without unnecessary repeated CI cycles.
+
+- Classify the PR as `docs`, `code` or `visual` in its description.
+- Complete the implementation, self-review and all known repairs before the final push whenever possible.
+- Do not knowingly open a PR with obvious visual defects merely because automated checks pass.
+- Do not push a separate correction for every small defect. Batch related final corrections before asking for review.
+- Keep one coherent implementation concern per PR when `main` can remain usable between stages.
+- Do not combine unrelated architecture, gameplay, visual and infrastructure changes.
+- State every manual-test limitation explicitly. A missing browser, mobile device or coarse-pointer runtime is not a passed check.
+- Ensure preview artifacts and the PR report refer to the final head commit.
+
+When a visual choice is ambiguous, stop before production integration and provide labeled numbered options for user approval. This applies especially to wall corners, transitions, directional animation frames and visually similar tiles. Do not substitute a guessed transform for an unverified source tile.
+
 ## Pixel-grid protocol
 
 All world art drawn from the same source pixel grid must use one visual pixel size.
@@ -70,23 +86,26 @@ Before integrating a spritesheet pack:
 3. Generate a labeled contact sheet for every source frame when a sheet must be inspected.
 4. Render supplied sample maps when available to confirm how related tiles are assembled.
 5. Select frames only after visual inspection.
-6. Extract the selected art into semantically named standalone files or a compact semantic atlas. Runtime code must never load a large source sheet by raw numeric IDs.
-7. Record the source pack, source sheet geometry, original frame number or rectangle and SHA-256 in a canonical manifest.
-8. Reference semantic frame names in gameplay code. Raw source frame numbers belong only in the audit manifest.
-9. Pin the selected asset hashes and the pixel hash of approved visual previews.
+6. For semantically ambiguous frames, obtain explicit user approval of the numbered choices before integration.
+7. Extract the selected art into semantically named standalone files or a compact semantic atlas. Runtime code must never load a large source sheet by raw numeric IDs.
+8. Record the source pack, source sheet geometry, original frame number or rectangle and SHA-256 in a canonical manifest.
+9. Reference semantic frame names in gameplay code. Raw source frame numbers belong only in the audit manifest.
+10. Pin the selected asset hashes and the pixel hash of approved visual previews.
 
 When an atlas, layout or world composition changes, `npm run check` must generate the relevant preview artifacts. Do not update an approved preview hash until the image has been opened and visually approved. The PR workflow must upload the same preview for inspection before merge.
 
 ## Completion report
 
-The final task response must list:
+The PR description and final task response must list:
 
+- review class: `docs`, `code` or `visual`;
 - exact commands that were run;
 - whether each command passed;
 - which runtime states were manually inspected;
 - which preview or screenshot artifacts were inspected;
 - which viewport sizes were checked for pixel consistency;
-- any check that could not be performed and why.
+- any check that could not be performed and why;
+- user-approved source frame numbers when asset selection was involved.
 
 Do not claim that a visual task is complete, and do not update `PROJECT.md` as completed, when the runtime result was not inspected. If browser inspection is unavailable, state that clearly and leave the task for review instead of presenting it as finished.
 
