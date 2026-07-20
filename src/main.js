@@ -14,8 +14,7 @@ import {
   PLAYER_FOOT_WIDTH,
   PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
-  ROOM_FRAMES,
-  ROOM_SHEET,
+  ROOM_TEXTURES,
   TILE_SIZE,
   WALK_FRAME_RATE,
   WALL_TILES,
@@ -44,20 +43,10 @@ class RoomScene extends Phaser.Scene {
       .forEach((frame) => {
         this.load.image(frame, `${ASSET_BASE_URL}/player/${frame}.png`);
       });
-
-    this.load.spritesheet(
-      "roomTiles",
-      `${ASSET_BASE_URL}/room/roguelikeSheet_transparent.png`,
-      {
-        frameWidth: ROOM_SHEET.frameWidth,
-        frameHeight: ROOM_SHEET.frameHeight,
-        margin: ROOM_SHEET.margin,
-        spacing: ROOM_SHEET.spacing,
-      },
-    );
   }
 
   create() {
+    this.createRoomTextures();
     this.createRoom();
     this.createPlayerAnimations();
     this.createPlayer();
@@ -65,6 +54,58 @@ class RoomScene extends Phaser.Scene {
     this.createBuildLabel();
     this.attachSceneListeners();
     this.createJoystick();
+  }
+
+  createRoomTextures() {
+    if (this.textures.exists(ROOM_TEXTURES.floor)) {
+      return;
+    }
+
+    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+
+    graphics.fillStyle(0x8a5a3b, 1);
+    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    graphics.fillStyle(0xa06a47, 1);
+    graphics.fillRect(1, 1, TILE_SIZE - 2, 6);
+    graphics.fillRect(1, 9, TILE_SIZE - 2, 6);
+    graphics.fillStyle(0x5d3928, 1);
+    graphics.fillRect(0, 7, TILE_SIZE, 2);
+    graphics.fillRect(0, 15, TILE_SIZE, 1);
+    graphics.fillRect(5, 0, 1, 7);
+    graphics.fillRect(11, 9, 1, 6);
+    graphics.generateTexture(ROOM_TEXTURES.floor, TILE_SIZE, TILE_SIZE);
+    graphics.clear();
+
+    graphics.fillStyle(0x4a3328, 1);
+    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    graphics.fillStyle(0x785541, 1);
+    graphics.fillRect(0, 2, TILE_SIZE, TILE_SIZE - 4);
+    graphics.fillStyle(0x2c211c, 1);
+    graphics.fillRect(0, 0, TILE_SIZE, 2);
+    graphics.fillRect(0, TILE_SIZE - 2, TILE_SIZE, 2);
+    graphics.fillRect(7, 2, 2, TILE_SIZE - 4);
+    graphics.generateTexture(ROOM_TEXTURES.wallHorizontal, TILE_SIZE, TILE_SIZE);
+    graphics.clear();
+
+    graphics.fillStyle(0x4a3328, 1);
+    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    graphics.fillStyle(0x785541, 1);
+    graphics.fillRect(2, 0, TILE_SIZE - 4, TILE_SIZE);
+    graphics.fillStyle(0x2c211c, 1);
+    graphics.fillRect(0, 0, 2, TILE_SIZE);
+    graphics.fillRect(TILE_SIZE - 2, 0, 2, TILE_SIZE);
+    graphics.fillRect(2, 7, TILE_SIZE - 4, 2);
+    graphics.generateTexture(ROOM_TEXTURES.wallVertical, TILE_SIZE, TILE_SIZE);
+    graphics.clear();
+
+    graphics.fillStyle(0x2c211c, 1);
+    graphics.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    graphics.fillStyle(0x785541, 1);
+    graphics.fillRect(3, 3, TILE_SIZE - 6, TILE_SIZE - 6);
+    graphics.fillStyle(0xa77a59, 1);
+    graphics.fillRect(5, 5, TILE_SIZE - 10, TILE_SIZE - 10);
+    graphics.generateTexture(ROOM_TEXTURES.corner, TILE_SIZE, TILE_SIZE);
+    graphics.destroy();
   }
 
   createRoom() {
@@ -82,33 +123,32 @@ class RoomScene extends Phaser.Scene {
 
     for (let y = WALL_TILES; y < ROOM_ROWS - WALL_TILES; y += 1) {
       for (let x = WALL_TILES; x < ROOM_COLUMNS - WALL_TILES; x += 1) {
-        this.addRoomTile(x, y, ROOM_FRAMES.floor, 0);
+        this.addRoomTile(x, y, ROOM_TEXTURES.floor, 0);
       }
     }
 
     for (let x = WALL_TILES; x < ROOM_COLUMNS - WALL_TILES; x += 1) {
-      this.addRoomTile(x, 0, ROOM_FRAMES.top, 10);
-      this.addRoomTile(x, ROOM_ROWS - 1, ROOM_FRAMES.bottom, 10);
+      this.addRoomTile(x, 0, ROOM_TEXTURES.wallHorizontal, 10);
+      this.addRoomTile(x, ROOM_ROWS - 1, ROOM_TEXTURES.wallHorizontal, 10);
     }
 
     for (let y = WALL_TILES; y < ROOM_ROWS - WALL_TILES; y += 1) {
-      this.addRoomTile(0, y, ROOM_FRAMES.left, 10);
-      this.addRoomTile(ROOM_COLUMNS - 1, y, ROOM_FRAMES.right, 10);
+      this.addRoomTile(0, y, ROOM_TEXTURES.wallVertical, 10);
+      this.addRoomTile(ROOM_COLUMNS - 1, y, ROOM_TEXTURES.wallVertical, 10);
     }
 
-    this.addRoomTile(0, 0, ROOM_FRAMES.topLeft, 10);
-    this.addRoomTile(ROOM_COLUMNS - 1, 0, ROOM_FRAMES.topRight, 10);
-    this.addRoomTile(0, ROOM_ROWS - 1, ROOM_FRAMES.bottomLeft, 10);
-    this.addRoomTile(ROOM_COLUMNS - 1, ROOM_ROWS - 1, ROOM_FRAMES.bottomRight, 10);
+    this.addRoomTile(0, 0, ROOM_TEXTURES.corner, 10);
+    this.addRoomTile(ROOM_COLUMNS - 1, 0, ROOM_TEXTURES.corner, 10);
+    this.addRoomTile(0, ROOM_ROWS - 1, ROOM_TEXTURES.corner, 10);
+    this.addRoomTile(ROOM_COLUMNS - 1, ROOM_ROWS - 1, ROOM_TEXTURES.corner, 10);
   }
 
-  addRoomTile(tileX, tileY, frame, depth) {
+  addRoomTile(tileX, tileY, texture, depth) {
     return this.add
       .image(
         ROOM_OFFSET_X + tileX * ROOM_TILE_SIZE,
         ROOM_OFFSET_Y + tileY * ROOM_TILE_SIZE,
-        "roomTiles",
-        frame,
+        texture,
       )
       .setOrigin(0, 0)
       .setScale(ART_SCALE)
