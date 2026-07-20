@@ -1,0 +1,25 @@
+name: Package Basic Village Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/package-basic-village-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+      - name: Upload Basic Village audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: basic-village-audit
+          path: tasks/basic-village/audit
+          if-no-files-found: error
+          retention-days: 2
