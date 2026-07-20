@@ -1,0 +1,59 @@
+name: Materialize Pixel Assets
+
+on:
+  push:
+    branches:
+      - codex/-task.md
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v6
+        with:
+          ref: codex/-task.md
+          fetch-depth: 0
+
+      - name: Decode selected PNG assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export_dir="tasks/pixel-room/export"
+          test -f "$export_dir/MANIFEST.md"
+
+          mkdir -p public/assets/third-party/kenney/player
+          mkdir -p public/assets/third-party/kenney/room
+
+          for name in \
+            tile_0266 tile_0267 tile_0268 tile_0269 \
+            tile_0293 tile_0294 tile_0295 tile_0296 \
+            tile_0320 tile_0321 tile_0322 tile_0323
+          do
+            base64 --decode "$export_dir/${name}.png.base64.txt" \
+              > "public/assets/third-party/kenney/player/${name}.png"
+          done
+
+          base64 --decode "$export_dir/roguelikeSheet_transparent.png.base64.txt" \
+            > public/assets/third-party/kenney/room/roguelikeSheet_transparent.png
+
+          file public/assets/third-party/kenney/player/*.png
+          file public/assets/third-party/kenney/room/roguelikeSheet_transparent.png
+
+          rm -rf tasks/pixel-room
+          rm -f .github/workflows/materialize-pixel-assets.yml
+
+      - name: Commit materialized assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Materialize selected pixel assets"
+          git push origin HEAD:codex/-task.md
