@@ -31,10 +31,11 @@ export function cloneMovementConfig(config = DEFAULT_MOVEMENT_CONFIG) {
 }
 
 export function sanitizeMovementConfig(overrides = {}, base = DEFAULT_MOVEMENT_CONFIG) {
+  const source = overrides && typeof overrides === "object" ? overrides : {};
   const result = cloneMovementConfig(base);
 
   for (const field of MOVEMENT_TUNING_FIELDS) {
-    const value = Number(overrides[field.key]);
+    const value = Number(source[field.key]);
     if (!Number.isFinite(value)) continue;
     result[field.key] = clamp(value, field.min, field.max);
   }
