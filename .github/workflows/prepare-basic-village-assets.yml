@@ -27,81 +27,99 @@ jobs:
           ref: feature/basic-village-tileset
           fetch-depth: 0
 
-      - name: Install browser inspector
+      - name: Install browser downloader
         run: |
           python -m pip install --disable-pip-version-check playwright==1.55.0
           python -m playwright install chromium
 
-      - name: Inspect official download interaction
+      - name: Download official Forchild archives
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf tasks/basic-village/browser-diagnostic
-          mkdir -p tasks/basic-village/browser-diagnostic
+          target="tasks/basic-village/source"
+          rm -rf "$target" tasks/basic-village/diagnostic tasks/basic-village/browser-diagnostic
+          mkdir -p "$target/basic" "$target/godot"
 
           python - <<'PY'
           from pathlib import Path
-          import json
-          import traceback
           from playwright.sync_api import sync_playwright
 
-          target = Path("tasks/basic-village/browser-diagnostic")
-          events = []
+          page_url = "https://forchild.itch.io/village-tileset"
+          uploads = {
+              "4644644": "BasicVillageTileset.zip",
+              "4659743": "GodotTilemapImport.zip",
+          }
+          target = Path("tasks/basic-village/source")
 
           with sync_playwright() as playwright:
               browser = playwright.chromium.launch(headless=True)
-              page = browser.new_page(accept_downloads=True)
-              page.on("request", lambda request: events.append({
-                  "kind": "request",
-                  "method": request.method,
-                  "url": request.url,
-                  "post_data": request.post_data,
-                  "headers": request.headers,
-              }))
-              page.on("response", lambda response: events.append({
-                  "kind": "response",
-                  "status": response.status,
-                  "url": response.url,
-                  "headers": response.headers,
-              }))
-              page.on("download", lambda download: events.append({
-                  "kind": "download",
-                  "url": download.url,
-                  "suggested_filename": download.suggested_filename,
-              }))
-              page.on("popup", lambda popup: events.append({"kind": "popup", "url": popup.url}))
-              page.on("console", lambda message: events.append({"kind": "console", "type": message.type, "text": message.text}))
+              page = browser.new_page()
+              page.goto(page_url, wait_until="networkidle", timeout=120_000)
 
-              try:
-                  page.goto("https://forchild.itch.io/village-tileset", wait_until="networkidle", timeout=120_000)
-                  selector = 'a.download_btn[data-upload_id="4644644"]'
-                  locator = page.locator(selector)
-                  locator.wait_for(state="visible", timeout=60_000)
-                  events.append({
-                      "kind": "element",
-                      "outer_html": locator.evaluate("element => element.outerHTML"),
-                      "href": locator.get_attribute("href"),
-                  })
-                  locator.click(timeout=30_000)
-                  page.wait_for_timeout(10_000)
-              except Exception:
-                  events.append({"kind": "exception", "traceback": traceback.format_exc()})
+              for upload_id, filename in uploads.items():
+                  selector = f'a.download_btn[data-upload_id="{upload_id}"]'
+                  page.locator(selector).wait_for(state="visible", timeout=60_000)
+                  with page.expect_response(
+                      lambda response, expected=upload_id: (
+                          "cloudflarestorage.com/upload2/game/1245185/" in response.url
+                          and f"/{expected}?" in response.url
+                      ),
+                      timeout=120_000,
+                  ) as response_info:
+                      page.locator(selector).click()
 
-              events.append({"kind": "final", "url": page.url, "title": page.title()})
-              page.screenshot(path=target / "after-click.png", full_page=True)
-              (target / "page-after-click.html").write_text(page.content(), encoding="utf-8")
+                  response = response_info.value
+                  data = response.body()
+                  destination = target / filename
+                  destination.write_bytes(data)
+                  if response.status != 200 or not data.startswith(b"PK"):
+                      raise RuntimeError(
+                          f"Bad archive response for {filename}: status={response.status}; first bytes={data[:80]!r}"
+                      )
+                  print(f"downloaded {filename}: {len(data)} bytes")
+
+                  close_button = page.locator("#lightbox_container .close_button")
+                  if close_button.count() and close_button.is_visible():
+                      close_button.click()
+                      page.wait_for_timeout(250)
+
               browser.close()
-
-          (target / "events.json").write_text(json.dumps(events, indent=2), encoding="utf-8")
-          print(json.dumps(events[-12:], indent=2))
           PY
 
-      - name: Commit browser diagnostics
+          unzip -tq "$target/BasicVillageTileset.zip"
+          unzip -tq "$target/GodotTilemapImport.zip"
+          unzip -oq "$target/BasicVillageTileset.zip" -d "$target/basic"
+          unzip -oq "$target/GodotTilemapImport.zip" -d "$target/godot"
+
+          (
+            cd "$target"
+            sha256sum BasicVillageTileset.zip GodotTilemapImport.zip > SHA256SUMS
+          )
+
+          find "$target" -maxdepth 6 -type f -print | sort
+
+      - name: Add source note and remove one-off workflow
+        shell: bash
+        run: |
+          cat > tasks/basic-village/source/README.md <<'EOF'
+          # Temporary Basic Village integration source
+
+          - Official source: https://forchild.itch.io/village-tileset
+          - Author: Forchild
+          - License: CC0
+          - Tile grid: 16x16
+          - Official uploads: `BasicVillageTileset.zip` and `GodotTilemapImport.zip`
+
+          These archives and extracted files are temporary integration inputs. Keep only production assets and canonical audit information after the migration is complete.
+          EOF
+          rm .github/workflows/prepare-basic-village-assets.yml
+
+      - name: Commit prepared source bundle
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tasks/basic-village/browser-diagnostic
-          git commit -m "Inspect Basic Village browser download flow"
+          git add tasks/basic-village .github/workflows/prepare-basic-village-assets.yml
+          git commit -m "Prepare Basic Village source assets"
           git push origin HEAD:feature/basic-village-tileset
