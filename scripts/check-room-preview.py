@@ -49,7 +49,7 @@ HOUSE_FRAMES = {
     "bottomLeft": 24,
     "bottom": 25,
     "bottomRight": 26,
-    "floor": [53, 54, 55, 65, 66, 67, 77, 78, 79],
+    "floor": 66,
 }
 
 TREES = [
@@ -75,6 +75,12 @@ def draw_tile(world: Image.Image, sheet: Image.Image, frame_index: int, x: int, 
     world.alpha_composite(crop_frame(sheet, frame_index), (x * TILE_SIZE, y * TILE_SIZE))
 
 
+def grass_frame(x: int, y: int) -> int:
+    value = (((x + 1) * 73856093) ^ ((y + 1) * 19349663)) & 0xFFFFFFFF
+    details = OUTDOOR_FRAMES["grassDetails"]
+    return details[value % len(details)] if value % 131 < len(details) else OUTDOOR_FRAMES["grass"]
+
+
 def render_world() -> Image.Image:
     outdoor = load_sheet("Outdoor_tileset.png")
     house = load_sheet("House_tileset.png")
@@ -83,13 +89,7 @@ def render_world() -> Image.Image:
 
     for y in range(WORLD_ROWS):
         for x in range(WORLD_COLUMNS):
-            detail = (x * 17 + y * 29) % 43
-            frame = (
-                OUTDOOR_FRAMES["grassDetails"][detail]
-                if detail < len(OUTDOOR_FRAMES["grassDetails"])
-                else OUTDOOR_FRAMES["grass"]
-            )
-            draw_tile(world, outdoor, frame, x, y)
+            draw_tile(world, outdoor, grass_frame(x, y), x, y)
 
     for y in range(DOOR_Y, WORLD_ROWS):
         frames = OUTDOOR_FRAMES["pathTop"] if y == DOOR_Y else OUTDOOR_FRAMES["pathMiddle"]
@@ -98,9 +98,7 @@ def render_world() -> Image.Image:
 
     for y in range(HOUSE_Y + 1, DOOR_Y):
         for x in range(HOUSE_X + 1, HOUSE_X + HOUSE_COLUMNS - 1):
-            local_x = (x - HOUSE_X - 1) % 3
-            local_y = (y - HOUSE_Y - 1) % 3
-            draw_tile(world, house, HOUSE_FRAMES["floor"][local_y * 3 + local_x], x, y)
+            draw_tile(world, house, HOUSE_FRAMES["floor"], x, y)
 
     for x in range(HOUSE_X, HOUSE_X + HOUSE_COLUMNS):
         if x == HOUSE_X:
