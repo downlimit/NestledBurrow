@@ -7,15 +7,6 @@ export const FACING_HYSTERESIS = 0.15;
 export const WALK_FRAME_RATE = 8;
 export const PLAYER_IDLE_FRAME_INDEX = 0;
 
-export const ROOM_SHEET = Object.freeze({
-  frameWidth: TILE_SIZE,
-  frameHeight: TILE_SIZE,
-  margin: 0,
-  spacing: 1,
-  sourceWidth: 968,
-  sourceHeight: 526,
-});
-
 export const PLAYER_FRAMES = Object.freeze({
   down: Object.freeze(["tile_0267", "tile_0294", "tile_0321"]),
   up: Object.freeze(["tile_0268", "tile_0295", "tile_0322"]),
@@ -23,14 +14,9 @@ export const PLAYER_FRAMES = Object.freeze({
   right: Object.freeze(["tile_0269", "tile_0296", "tile_0323"]),
 });
 
-export const ROOM_FRAMES = Object.freeze({
-  floor: 494,
-  top: 90,
-  bottom: 147,
-  left: 146,
-  right: 148,
-  topLeft: 89,
-  topRight: 91,
-  bottomLeft: 203,
-  bottomRight: 205,
+export const ROOM_TEXTURES = Object.freeze({
+  floor: "room-floor",
+  wallHorizontal: "room-wall-horizontal",
+  wallVertical: "room-wall-vertical",
+  corner: "room-wall-corner",
 });
