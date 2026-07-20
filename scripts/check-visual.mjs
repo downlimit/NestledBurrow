@@ -28,7 +28,11 @@ function readPngDimensions(filePath) {
 assert.equal(TILE_SIZE, 16);
 assert.equal(GAME_WIDTH, 320);
 assert.equal(GAME_HEIGHT, 180);
-assert(/basic-village/.test(mainSource), "Basic Village assets are loaded");
+assert.equal(
+  BASIC_VILLAGE_ASSET_PATH,
+  "assets/third-party/basic-village",
+  "Basic Village is the canonical environment asset root",
+);
 assert(/load\.spritesheet/.test(mainSource), "raw 16x16 sheets are used directly");
 assert(!/kenney-room|kenney-world-extension/.test(mainSource), "old Kenney world atlases are not used");
 assert(!/ROOM_SCALE|PLAYER_SCALE|Phaser\.Scale\.FIT/.test(mainSource));
