@@ -28,3 +28,12 @@ export const WORLD_FRAMES = Object.freeze({
   grass: "grass",
   dirtPath: "dirtPath",
 });
+
+const WORLD_EXTENSION_FRAME_NAMES = new Set([
+  ...Object.values(WORLD_FRAMES),
+  ...roomConfig.wallBands.flatMap((band) => [band.upperLeft, band.upperRight]),
+]);
+
+export function isWorldExtensionFrame(frame) {
+  return WORLD_EXTENSION_FRAME_NAMES.has(frame);
+}
