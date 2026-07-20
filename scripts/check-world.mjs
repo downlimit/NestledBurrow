@@ -3,21 +3,17 @@ import { moveWithCollision } from "../src/movement.js";
 import { createWorldLayout, isBlockedCell } from "../src/worldLayout.js";
 import {
   DOOR_LEFT,
-  DOOR_WIDTH,
   DOOR_Y,
   GAME_HEIGHT,
   GAME_WIDTH,
-  ROOM_COLUMNS,
-  ROOM_ROWS,
-  ROOM_TILE_X,
-  ROOM_TILE_Y,
+  HOUSE,
+  HOUSE_FRAMES,
   TILE_SIZE,
   WORLD_COLUMNS,
   WORLD_HEIGHT,
   WORLD_ROWS,
   WORLD_WIDTH,
 } from "../src/worldConfig.js";
-import roomConfig from "../src/kenneyRoomConfig.json" with { type: "json" };
 
 const layout = createWorldLayout();
 const footWidth = 8;
@@ -25,32 +21,28 @@ const footDepth = 5;
 
 assert(WORLD_WIDTH > GAME_WIDTH && WORLD_HEIGHT > GAME_HEIGHT, "world is larger than camera");
 assert.equal(
-  layout.outdoorTiles.length,
-  WORLD_COLUMNS * WORLD_ROWS,
-  "outdoor layout has exactly one terrain tile per cell",
+  layout.groundTiles.length,
+  WORLD_COLUMNS * WORLD_ROWS + (WORLD_ROWS - DOOR_Y) * 3,
+  "ground contains one base tile per cell plus the three-tile path overlay",
 );
-assert.equal(
-  new Set(layout.outdoorTiles.map((tile) => `${tile.x},${tile.y}`)).size,
-  layout.outdoorTiles.length,
-  "outdoor layout has no duplicate tile coordinates",
+assert.equal(layout.houseFloorTiles.length > 0, true);
+assert(
+  layout.houseFloorTiles.every((tile) => tile.frame === HOUSE_FRAMES.floor),
+  "the interior uses the verified fully opaque floor tile without transparent gaps",
 );
+assert.equal(layout.houseWallTiles.length > 0, true);
+assert.equal(layout.decorationTiles.length, 48, "four 3x4 trees are present");
 
-for (let x = DOOR_LEFT; x < DOOR_LEFT + DOOR_WIDTH; x += 1) {
+for (let x = DOOR_LEFT; x < DOOR_LEFT + HOUSE.doorWidth; x += 1) {
   assert.equal(isBlockedCell(layout, x, DOOR_Y), false, "doorway is open");
 }
 
-for (const tile of layout.roomTiles) {
-  const inDoor =
-    tile.y === DOOR_Y && tile.x >= DOOR_LEFT && tile.x < DOOR_LEFT + DOOR_WIDTH;
-
-  if (tile.frame !== roomConfig.floorFrame && !inDoor) {
-    assert.equal(
-      isBlockedCell(layout, tile.x, tile.y),
-      true,
-      `wall ${tile.x},${tile.y} blocks`,
-    );
-  }
-}
+assert.equal(isBlockedCell(layout, HOUSE.x, HOUSE.y), true, "top-left wall blocks");
+assert.equal(
+  isBlockedCell(layout, HOUSE.x + HOUSE.columns - 1, HOUSE.y + 5),
+  true,
+  "side wall blocks",
+);
 
 let position = { ...layout.spawn };
 const routeStep = TILE_SIZE / 2;
@@ -68,50 +60,43 @@ while (position.y < layout.outdoorTarget.y && routeSteps < routeStepLimit) {
   routeSteps += 1;
 }
 
-assert(routeSteps < routeStepLimit, "walkable route does not stall before reaching outdoor path");
-assert(
-  position.y >= layout.outdoorTarget.y - routeStep,
-  "walkable route reaches outdoor path",
-);
+assert(routeSteps < routeStepLimit, "walkable route does not stall");
+assert(position.y >= layout.outdoorTarget.y - routeStep, "route reaches the outdoor path");
 
-const wallY = (ROOM_TILE_Y + 4) * TILE_SIZE + TILE_SIZE - 2;
-const nearLeftWallX = (ROOM_TILE_X + 1) * TILE_SIZE + TILE_SIZE / 2;
+const wallY = (HOUSE.y + 5) * TILE_SIZE + TILE_SIZE - 2;
+const nearLeftWallX = (HOUSE.x + 1) * TILE_SIZE + TILE_SIZE / 2;
+const minimumInteriorCenterX = (HOUSE.x + 1) * TILE_SIZE + footWidth / 2;
+
 const wallTry = moveWithCollision(
   { x: nearLeftWallX, y: wallY },
-  { x: -TILE_SIZE * 1.5, y: 0 },
+  { x: -TILE_SIZE * 2, y: 0 },
   layout,
   footWidth,
   footDepth,
 );
-assert(
-  wallTry.x > ROOM_TILE_X * TILE_SIZE + TILE_SIZE / 2,
-  "movement cannot cross a solid wall",
-);
+assert(wallTry.x >= minimumInteriorCenterX, "movement cannot cross a solid wall");
 
-const highSpeedStart = {
-  x: (ROOM_TILE_X + 2) * TILE_SIZE + TILE_SIZE / 2,
-  y: wallY,
-};
 const highSpeedTry = moveWithCollision(
-  highSpeedStart,
-  { x: -TILE_SIZE * 6, y: 0 },
+  { x: nearLeftWallX, y: wallY },
+  { x: -TILE_SIZE * 8, y: 0 },
   layout,
   footWidth,
   footDepth,
 );
 assert(
-  highSpeedTry.x >= (ROOM_TILE_X + 1) * TILE_SIZE + footWidth / 2,
+  highSpeedTry.x >= minimumInteriorCenterX,
   "large frame deltas cannot tunnel through a wall",
 );
 
 const slide = moveWithCollision(
   { x: nearLeftWallX, y: wallY },
-  { x: -TILE_SIZE * 1.5, y: TILE_SIZE / 2 },
+  { x: -TILE_SIZE * 2, y: TILE_SIZE / 2 },
   layout,
   footWidth,
   footDepth,
 );
-assert(slide.y > wallY, "axis-separated movement slides along wall");
+assert(slide.x >= minimumInteriorCenterX, "sliding does not enter the wall");
+assert(slide.y > wallY, "axis-separated movement slides along the wall");
 
 assert.deepEqual(
   moveWithCollision(
@@ -126,5 +111,5 @@ assert.deepEqual(
 );
 
 console.log(
-  `world checks passed: ${WORLD_WIDTH}x${WORLD_HEIGHT}, room ${ROOM_COLUMNS}x${ROOM_ROWS}`,
+  `world checks passed: ${WORLD_WIDTH}x${WORLD_HEIGHT}, continuous Basic Village floor, doorway, sliding, anti-tunneling and bounds`,
 );

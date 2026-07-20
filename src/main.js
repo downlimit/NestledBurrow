@@ -9,19 +9,19 @@ import {
 } from "./input.js";
 import { moveWithCollision } from "./movement.js";
 import {
+  BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
   GAME_WIDTH,
+  HOUSE_IMAGE_PATH,
+  HOUSE_TEXTURE_KEY,
+  OUTDOOR_IMAGE_PATH,
+  OUTDOOR_TEXTURE_KEY,
   PLAYER_SPEED,
-  ROOM_ATLAS_PATH,
-  ROOM_IMAGE_PATH,
-  ROOM_TEXTURE_KEY,
   TILE_SIZE,
-  WORLD_ATLAS_PATH,
+  TREES_IMAGE_PATH,
+  TREES_TEXTURE_KEY,
   WORLD_HEIGHT,
-  WORLD_IMAGE_PATH,
-  WORLD_TEXTURE_KEY,
   WORLD_WIDTH,
-  isWorldExtensionFrame,
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
 import {
@@ -34,7 +34,8 @@ import {
 } from "./visualConfig.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
-const ASSET_BASE_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney`;
+const PLAYER_ASSET_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney/player`;
+const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
 
 class WorldScene extends Phaser.Scene {
   constructor() {
@@ -44,26 +45,17 @@ class WorldScene extends Phaser.Scene {
   preload() {
     Object.values(PLAYER_FRAMES)
       .flat()
-      .forEach((frame) => {
-        this.load.image(frame, `${ASSET_BASE_URL}/player/${frame}.png`);
-      });
+      .forEach((frame) => this.load.image(frame, `${PLAYER_ASSET_URL}/${frame}.png`));
 
-    this.load.atlas(
-      ROOM_TEXTURE_KEY,
-      `${ASSET_BASE_URL}/${ROOM_IMAGE_PATH}`,
-      `${ASSET_BASE_URL}/${ROOM_ATLAS_PATH}`,
-    );
-    this.load.atlas(
-      WORLD_TEXTURE_KEY,
-      `${ASSET_BASE_URL}/${WORLD_IMAGE_PATH}`,
-      `${ASSET_BASE_URL}/${WORLD_ATLAS_PATH}`,
-    );
+    const sheet = { frameWidth: TILE_SIZE, frameHeight: TILE_SIZE };
+    this.load.spritesheet(OUTDOOR_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${OUTDOOR_IMAGE_PATH}`, sheet);
+    this.load.spritesheet(HOUSE_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${HOUSE_IMAGE_PATH}`, sheet);
+    this.load.spritesheet(TREES_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${TREES_IMAGE_PATH}`, sheet);
   }
 
   create() {
     this.worldLayout = createWorldLayout();
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-
     this.renderWorld();
     this.createPlayerAnimations();
     this.createPlayer();
@@ -75,16 +67,14 @@ class WorldScene extends Phaser.Scene {
   }
 
   renderWorld() {
-    this.worldLayout.outdoorTiles.forEach((tile) => {
-      this.addTile(tile, WORLD_TEXTURE_KEY, 0);
-    });
-
-    this.worldLayout.roomTiles.forEach((tile) => {
-      const textureKey = isWorldExtensionFrame(tile.frame)
-        ? WORLD_TEXTURE_KEY
-        : ROOM_TEXTURE_KEY;
-      this.addTile(tile, textureKey, tile.frame === "floor" ? 5 : 10);
-    });
+    this.worldLayout.groundTiles.forEach((tile) => this.addTile(tile, OUTDOOR_TEXTURE_KEY, 0));
+    this.worldLayout.houseFloorTiles.forEach((tile) => this.addTile(tile, HOUSE_TEXTURE_KEY, 20));
+    this.worldLayout.houseWallTiles.forEach((tile) =>
+      this.addTile(tile, HOUSE_TEXTURE_KEY, 400 + tile.y * TILE_SIZE),
+    );
+    this.worldLayout.decorationTiles.forEach((tile) =>
+      this.addTile(tile, TREES_TEXTURE_KEY, tile.depth),
+    );
   }
 
   addTile(tile, textureKey, depth) {
@@ -108,12 +98,10 @@ class WorldScene extends Phaser.Scene {
   createPlayer() {
     this.lastFacing = "down";
     const spawn = this.worldLayout.spawn;
-
     this.player = this.add
       .sprite(spawn.x, spawn.y, PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX])
-      .setOrigin(0.5, 1)
-      .setDepth(100);
-
+      .setOrigin(0.5, 1);
+    this.updatePlayerDepth();
     this.cameras.main.startFollow(this.player, true, 1, 1);
   }
 
@@ -131,16 +119,14 @@ class WorldScene extends Phaser.Scene {
       })
       .setOrigin(1, 0)
       .setAlpha(0.7)
-      .setDepth(1000)
+      .setDepth(10000)
       .setScrollFactor(0);
   }
 
   attachSceneListeners() {
     this.onWindowBlur = () => this.resetJoystick();
     this.onVisibilityChange = () => {
-      if (document.hidden) {
-        this.resetJoystick();
-      }
+      if (document.hidden) this.resetJoystick();
     };
     this.onNativePointerCancel = (event) => this.handleNativePointerEnd(event);
     this.onNativeLostPointerCapture = (event) => this.handleNativePointerEnd(event);
@@ -150,17 +136,13 @@ class WorldScene extends Phaser.Scene {
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.sceneListenersAttached = true;
-
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroySceneListeners, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.destroySceneListeners, this);
   }
 
   syncIntegerZoom() {
-    const nextZoom = this.scale.getMaxZoom();
-
-    if (this.scale.zoom !== nextZoom) {
-      this.scale.setZoom(nextZoom);
-    }
+    const zoom = this.scale.getMaxZoom();
+    if (this.scale.zoom !== zoom) this.scale.setZoom(zoom);
   }
 
   createJoystick() {
@@ -175,26 +157,14 @@ class WorldScene extends Phaser.Scene {
     }
 
     this.joystickBase = this.add
-      .circle(
-        JOYSTICK.centerX,
-        JOYSTICK.centerY,
-        JOYSTICK.baseRadius,
-        0xd9c18f,
-        0.22,
-      )
+      .circle(JOYSTICK.centerX, JOYSTICK.centerY, JOYSTICK.baseRadius, 0xd9c18f, 0.22)
       .setStrokeStyle(1, 0xf2eadc, 0.32)
-      .setDepth(900)
+      .setDepth(9000)
       .setScrollFactor(0);
     this.joystickKnob = this.add
-      .circle(
-        JOYSTICK.centerX,
-        JOYSTICK.centerY,
-        JOYSTICK.knobRadius,
-        0xf2eadc,
-        0.55,
-      )
+      .circle(JOYSTICK.centerX, JOYSTICK.centerY, JOYSTICK.knobRadius, 0xf2eadc, 0.55)
       .setStrokeStyle(1, 0xffffff, 0.65)
-      .setDepth(901)
+      .setDepth(9001)
       .setScrollFactor(0);
 
     this.input.on("pointerdown", this.handleJoystickPointerDown, this);
@@ -210,13 +180,9 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleJoystickPointerDown(pointer) {
-    if (
-      this.activeJoystickPointerId !== null ||
-      !isInsideJoystickActivation(pointer.x, pointer.y)
-    ) {
+    if (this.activeJoystickPointerId !== null || !isInsideJoystickActivation(pointer.x, pointer.y)) {
       return;
     }
-
     this.activeJoystickPointerId = pointer.id;
     this.activeDomPointerId =
       typeof pointer.event?.pointerId === "number" ? pointer.event.pointerId : null;
@@ -225,15 +191,11 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleJoystickPointerMove(pointer) {
-    if (pointer.id === this.activeJoystickPointerId) {
-      this.updateJoystick(pointer);
-    }
+    if (pointer.id === this.activeJoystickPointerId) this.updateJoystick(pointer);
   }
 
   handleJoystickPointerUp(pointer) {
-    if (pointer.id === this.activeJoystickPointerId) {
-      this.resetJoystick();
-    }
+    if (pointer.id === this.activeJoystickPointerId) this.resetJoystick();
   }
 
   handleNativePointerEnd(event) {
@@ -247,17 +209,11 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleNativeTouchCancel(event) {
-    if (this.activeJoystickPointerId === null || this.activeTouchIdentifier === null) {
-      return;
-    }
-
-    const activeTouchWasCanceled = Array.from(event.changedTouches ?? []).some(
+    if (this.activeJoystickPointerId === null || this.activeTouchIdentifier === null) return;
+    const canceled = Array.from(event.changedTouches ?? []).some(
       (touch) => touch.identifier === this.activeTouchIdentifier,
     );
-
-    if (activeTouchWasCanceled) {
-      this.resetJoystick();
-    }
+    if (canceled) this.resetJoystick();
   }
 
   updateJoystick(pointer) {
@@ -275,10 +231,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   destroySceneListeners() {
-    if (!this.sceneListenersAttached) {
-      return;
-    }
-
+    if (!this.sceneListenersAttached) return;
     this.sceneListenersAttached = false;
     window.removeEventListener("blur", this.onWindowBlur);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
@@ -288,7 +241,6 @@ class WorldScene extends Phaser.Scene {
     this.input.off("pointerup", this.handleJoystickPointerUp, this);
     this.input.off("pointerupoutside", this.handleJoystickPointerUp, this);
     this.input.off("gameout", this.resetJoystick, this);
-
     const canvas = this.game.canvas;
     canvas.removeEventListener("pointercancel", this.onNativePointerCancel);
     canvas.removeEventListener("lostpointercapture", this.onNativeLostPointerCapture);
@@ -313,6 +265,11 @@ class WorldScene extends Phaser.Scene {
     );
 
     this.player.setPosition(next.x, next.y);
+    this.updatePlayerDepth();
+  }
+
+  updatePlayerDepth() {
+    this.player.setDepth(500 + Math.round(this.player.y));
   }
 
   getMovementVector() {
@@ -320,26 +277,17 @@ class WorldScene extends Phaser.Scene {
     const right = this.cursors.right.isDown || this.wasd.D.isDown;
     const up = this.cursors.up.isDown || this.wasd.W.isDown;
     const down = this.cursors.down.isDown || this.wasd.S.isDown;
-    const joystickVector = this.joystickVector ?? { x: 0, y: 0 };
-
+    const joystick = this.joystickVector ?? { x: 0, y: 0 };
     return {
-      x: Number(right) - Number(left) + joystickVector.x,
-      y: Number(down) - Number(up) + joystickVector.y,
+      x: Number(right) - Number(left) + joystick.x,
+      y: Number(down) - Number(up) + joystick.y,
     };
   }
 
   updateLastFacing(direction) {
     const absX = Math.abs(direction.x);
     const absY = Math.abs(direction.y);
-
-    if (absX === 0 && absY === 0) {
-      return;
-    }
-
-    if (Math.abs(absX - absY) <= FACING_HYSTERESIS) {
-      return;
-    }
-
+    if ((absX === 0 && absY === 0) || Math.abs(absX - absY) <= FACING_HYSTERESIS) return;
     this.lastFacing =
       absX > absY
         ? direction.x > 0
@@ -352,22 +300,15 @@ class WorldScene extends Phaser.Scene {
 
   updatePlayerAnimation(direction) {
     const moving = direction.x !== 0 || direction.y !== 0;
-
     if (!moving) {
       this.player.anims.stop();
       const idleFrame = PLAYER_FRAMES[this.lastFacing][PLAYER_IDLE_FRAME_INDEX];
-      if (this.player.texture.key !== idleFrame) {
-        this.player.setTexture(idleFrame);
-      }
+      if (this.player.texture.key !== idleFrame) this.player.setTexture(idleFrame);
       return;
     }
-
-    const animationKey = `walk-${this.lastFacing}`;
-    if (
-      !this.player.anims.isPlaying ||
-      this.player.anims.currentAnim?.key !== animationKey
-    ) {
-      this.player.anims.play(animationKey);
+    const key = `walk-${this.lastFacing}`;
+    if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== key) {
+      this.player.anims.play(key);
     }
   }
 }
@@ -375,7 +316,7 @@ class WorldScene extends Phaser.Scene {
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game",
-  backgroundColor: "#201b18",
+  backgroundColor: "#171724",
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   pixelArt: true,
