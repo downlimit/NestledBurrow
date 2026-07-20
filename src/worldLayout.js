@@ -27,6 +27,15 @@ function addTree(tiles, blocked, x, y, variant) {
   blocked.add(cellKey(x + 1, y + 3));
 }
 
+function getGrassFrame(x, y) {
+  const hash = (Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663)) >>> 0;
+  const detailFrames = OUTDOOR_FRAMES.grassDetails;
+
+  return hash % 131 < detailFrames.length
+    ? detailFrames[hash % detailFrames.length]
+    : OUTDOOR_FRAMES.grass;
+}
+
 export function createWorldLayout() {
   const groundTiles = [];
   const houseFloorTiles = [];
@@ -36,15 +45,7 @@ export function createWorldLayout() {
 
   for (let y = 0; y < WORLD_ROWS; y += 1) {
     for (let x = 0; x < WORLD_COLUMNS; x += 1) {
-      const detail = (x * 17 + y * 29) % 43;
-      groundTiles.push({
-        x,
-        y,
-        frame:
-          detail < OUTDOOR_FRAMES.grassDetails.length
-            ? OUTDOOR_FRAMES.grassDetails[detail]
-            : OUTDOOR_FRAMES.grass,
-      });
+      groundTiles.push({ x, y, frame: getGrassFrame(x, y) });
     }
   }
 
@@ -57,9 +58,7 @@ export function createWorldLayout() {
 
   for (let y = HOUSE.y + 1; y < DOOR_Y; y += 1) {
     for (let x = HOUSE.x + 1; x < HOUSE.x + HOUSE.columns - 1; x += 1) {
-      const localX = (x - HOUSE.x - 1) % 3;
-      const localY = (y - HOUSE.y - 1) % 3;
-      houseFloorTiles.push({ x, y, frame: HOUSE_FRAMES.floor[localY * 3 + localX] });
+      houseFloorTiles.push({ x, y, frame: HOUSE_FRAMES.floor });
     }
   }
 
