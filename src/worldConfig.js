@@ -1,39 +1,47 @@
-import roomConfig from "./kenneyRoomConfig.json" with { type: "json" };
-
-export const GAME_WIDTH = roomConfig.world.gameWidth;
-export const GAME_HEIGHT = roomConfig.world.gameHeight;
-export const TILE_SIZE = roomConfig.world.tileSize;
-export const WORLD_COLUMNS = roomConfig.world.columns;
-export const WORLD_ROWS = roomConfig.world.rows;
+export const GAME_WIDTH = 320;
+export const GAME_HEIGHT = 180;
+export const TILE_SIZE = 16;
+export const WORLD_COLUMNS = 64;
+export const WORLD_ROWS = 48;
 export const WORLD_WIDTH = WORLD_COLUMNS * TILE_SIZE;
 export const WORLD_HEIGHT = WORLD_ROWS * TILE_SIZE;
 export const PLAYER_SPEED = 87;
 
-export const ROOM_COLUMNS = roomConfig.world.roomColumns;
-export const ROOM_ROWS = roomConfig.world.roomRows;
-export const ROOM_TILE_X = roomConfig.world.roomTileX;
-export const ROOM_TILE_Y = roomConfig.world.roomTileY;
-export const DOOR_WIDTH = roomConfig.world.doorWidth;
-export const DOOR_LEFT = ROOM_TILE_X + Math.floor((ROOM_COLUMNS - DOOR_WIDTH) / 2);
-export const DOOR_Y = ROOM_TILE_Y + ROOM_ROWS - roomConfig.wallBands.length;
+export const BASIC_VILLAGE_ASSET_PATH = "assets/third-party/basic-village";
+export const OUTDOOR_TEXTURE_KEY = "basic-village-outdoor";
+export const HOUSE_TEXTURE_KEY = "basic-village-house";
+export const TREES_TEXTURE_KEY = "basic-village-trees";
+export const OUTDOOR_IMAGE_PATH = "Outdoor_tileset.png";
+export const HOUSE_IMAGE_PATH = "House_tileset.png";
+export const TREES_IMAGE_PATH = "Trees_and_bushes.png";
 
-export const ROOM_TEXTURE_KEY = roomConfig.textureKey;
-export const WORLD_TEXTURE_KEY = roomConfig.extension.textureKey;
-export const ROOM_IMAGE_PATH = roomConfig.imagePath;
-export const ROOM_ATLAS_PATH = roomConfig.atlasPath;
-export const WORLD_IMAGE_PATH = roomConfig.extension.imagePath;
-export const WORLD_ATLAS_PATH = roomConfig.extension.atlasPath;
-
-export const WORLD_FRAMES = Object.freeze({
-  grass: "grass",
-  dirtPath: "dirtPath",
+export const HOUSE = Object.freeze({
+  x: 19,
+  y: 11,
+  columns: 26,
+  rows: 17,
+  doorWidth: 2,
 });
 
-const WORLD_EXTENSION_FRAME_NAMES = new Set([
-  ...Object.values(WORLD_FRAMES),
-  ...roomConfig.wallBands.flatMap((band) => [band.upperLeft, band.upperRight]),
-]);
+export const DOOR_LEFT = HOUSE.x + Math.floor((HOUSE.columns - HOUSE.doorWidth) / 2);
+export const DOOR_Y = HOUSE.y + HOUSE.rows - 1;
 
-export function isWorldExtensionFrame(frame) {
-  return WORLD_EXTENSION_FRAME_NAMES.has(frame);
-}
+export const OUTDOOR_FRAMES = Object.freeze({
+  grass: 0,
+  grassDetails: Object.freeze([1, 2, 12, 13, 14, 24, 25, 26]),
+  pathTop: Object.freeze([3, 4, 5]),
+  pathMiddle: Object.freeze([15, 16, 17]),
+  pathBottom: Object.freeze([27, 28, 29]),
+});
+
+export const HOUSE_FRAMES = Object.freeze({
+  topLeft: 0,
+  top: 1,
+  topRight: 2,
+  sideLeft: 3,
+  sideRight: 4,
+  bottomLeft: 24,
+  bottom: 25,
+  bottomRight: 26,
+  floor: Object.freeze([53, 54, 55, 65, 66, 67, 77, 78, 79]),
+});

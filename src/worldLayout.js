@@ -1,64 +1,123 @@
-import roomConfig from "./kenneyRoomConfig.json" with { type: "json" };
-import { buildRoomLayout, ROOM_WALL_BANDS } from "./roomLayout.js";
 import {
   DOOR_LEFT,
-  DOOR_WIDTH,
   DOOR_Y,
-  ROOM_COLUMNS,
-  ROOM_ROWS,
-  ROOM_TILE_X,
-  ROOM_TILE_Y,
+  HOUSE,
+  HOUSE_FRAMES,
+  OUTDOOR_FRAMES,
   TILE_SIZE,
   WORLD_COLUMNS,
-  WORLD_FRAMES,
   WORLD_ROWS,
 } from "./worldConfig.js";
 
-export function createWorldLayout() {
-  const terrain = Array.from({ length: WORLD_ROWS }, () =>
-    Array(WORLD_COLUMNS).fill(WORLD_FRAMES.grass),
-  );
-  const room = buildRoomLayout(ROOM_COLUMNS, ROOM_ROWS, {
-    doorway: { left: DOOR_LEFT - ROOM_TILE_X, width: DOOR_WIDTH },
-  });
-  const blocked = new Set();
-  const roomTiles = [];
-  const outdoorTiles = [];
+function addTree(tiles, blocked, x, y, variant) {
+  const base = variant * 3;
+  const depth = 500 + (y + 4) * TILE_SIZE;
 
-  for (let y = DOOR_Y + 1; y < WORLD_ROWS; y += 1) {
-    for (let x = DOOR_LEFT; x < DOOR_LEFT + DOOR_WIDTH; x += 1) {
-      terrain[y][x] = WORLD_FRAMES.dirtPath;
+  for (let row = 0; row < 4; row += 1) {
+    for (let column = 0; column < 3; column += 1) {
+      tiles.push({
+        x: x + column,
+        y: y + row,
+        frame: base + row * 9 + column,
+        depth,
+      });
     }
   }
+
+  blocked.add(cellKey(x + 1, y + 3));
+}
+
+export function createWorldLayout() {
+  const groundTiles = [];
+  const houseFloorTiles = [];
+  const houseWallTiles = [];
+  const decorationTiles = [];
+  const blocked = new Set();
 
   for (let y = 0; y < WORLD_ROWS; y += 1) {
     for (let x = 0; x < WORLD_COLUMNS; x += 1) {
-      outdoorTiles.push({ x, y, frame: terrain[y][x] });
+      const detail = (x * 17 + y * 29) % 43;
+      groundTiles.push({
+        x,
+        y,
+        frame:
+          detail < OUTDOOR_FRAMES.grassDetails.length
+            ? OUTDOOR_FRAMES.grassDetails[detail]
+            : OUTDOOR_FRAMES.grass,
+      });
     }
   }
 
-  room.forEach((row, localY) => {
-    row.forEach((frame, localX) => {
-      if (frame === null) {
-        return;
-      }
+  for (let y = DOOR_Y; y < WORLD_ROWS; y += 1) {
+    const frames = y === DOOR_Y ? OUTDOOR_FRAMES.pathTop : OUTDOOR_FRAMES.pathMiddle;
+    for (let column = 0; column < 3; column += 1) {
+      groundTiles.push({ x: DOOR_LEFT - 1 + column, y, frame: frames[column] });
+    }
+  }
 
-      const x = ROOM_TILE_X + localX;
-      const y = ROOM_TILE_Y + localY;
-      roomTiles.push({ x, y, frame });
+  for (let y = HOUSE.y + 1; y < DOOR_Y; y += 1) {
+    for (let x = HOUSE.x + 1; x < HOUSE.x + HOUSE.columns - 1; x += 1) {
+      const localX = (x - HOUSE.x - 1) % 3;
+      const localY = (y - HOUSE.y - 1) % 3;
+      houseFloorTiles.push({ x, y, frame: HOUSE_FRAMES.floor[localY * 3 + localX] });
+    }
+  }
 
-      if (frame !== roomConfig.floorFrame) {
-        blocked.add(cellKey(x, y));
-      }
+  for (let x = HOUSE.x; x < HOUSE.x + HOUSE.columns; x += 1) {
+    const frame =
+      x === HOUSE.x
+        ? HOUSE_FRAMES.topLeft
+        : x === HOUSE.x + HOUSE.columns - 1
+          ? HOUSE_FRAMES.topRight
+          : HOUSE_FRAMES.top;
+    houseWallTiles.push({ x, y: HOUSE.y, frame });
+    blocked.add(cellKey(x, HOUSE.y));
+  }
+
+  for (let y = HOUSE.y + 1; y < DOOR_Y; y += 1) {
+    houseWallTiles.push({ x: HOUSE.x, y, frame: HOUSE_FRAMES.sideLeft });
+    houseWallTiles.push({
+      x: HOUSE.x + HOUSE.columns - 1,
+      y,
+      frame: HOUSE_FRAMES.sideRight,
     });
-  });
+    blocked.add(cellKey(HOUSE.x, y));
+    blocked.add(cellKey(HOUSE.x + HOUSE.columns - 1, y));
+  }
+
+  for (let x = HOUSE.x; x < HOUSE.x + HOUSE.columns; x += 1) {
+    const inDoor = x >= DOOR_LEFT && x < DOOR_LEFT + HOUSE.doorWidth;
+    if (inDoor) continue;
+
+    const frame =
+      x === HOUSE.x
+        ? HOUSE_FRAMES.bottomLeft
+        : x === HOUSE.x + HOUSE.columns - 1
+          ? HOUSE_FRAMES.bottomRight
+          : HOUSE_FRAMES.bottom;
+    houseWallTiles.push({ x, y: DOOR_Y, frame });
+    blocked.add(cellKey(x, DOOR_Y));
+  }
+
+  addTree(decorationTiles, blocked, 7, 6, 0);
+  addTree(decorationTiles, blocked, 52, 7, 1);
+  addTree(decorationTiles, blocked, 8, 33, 2);
+  addTree(decorationTiles, blocked, 51, 34, 0);
 
   return {
-    outdoorTiles,
-    roomTiles,
+    groundTiles,
+    houseFloorTiles,
+    houseWallTiles,
+    decorationTiles,
     blocked,
-    spawn: getSpawnPoint(),
-    outdoorTarget: getOutdoorTarget(),
+    spawn: {
+      x: (HOUSE.x + Math.floor(HOUSE.columns / 2)) * TILE_SIZE + TILE_SIZE / 2,
+      y: (HOUSE.y + 8) * TILE_SIZE + TILE_SIZE - 2,
+    },
+    outdoorTarget: {
+      x: (DOOR_LEFT + 1) * TILE_SIZE + TILE_SIZE / 2,
+      y: (DOOR_Y + 7) * TILE_SIZE + TILE_SIZE - 2,
+    },
   };
 }
 
@@ -68,18 +127,4 @@ export function cellKey(x, y) {
 
 export function isBlockedCell(layout, x, y) {
   return layout.blocked.has(cellKey(x, y));
-}
-
-export function getSpawnPoint() {
-  return {
-    x: (ROOM_TILE_X + Math.floor(ROOM_COLUMNS / 2)) * TILE_SIZE + TILE_SIZE / 2,
-    y: (ROOM_TILE_Y + ROOM_WALL_BANDS.length + 3) * TILE_SIZE + TILE_SIZE - 2,
-  };
-}
-
-export function getOutdoorTarget() {
-  return {
-    x: (DOOR_LEFT + Math.floor(DOOR_WIDTH / 2)) * TILE_SIZE + TILE_SIZE / 2,
-    y: (DOOR_Y + 6) * TILE_SIZE + TILE_SIZE - 2,
-  };
 }
