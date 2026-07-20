@@ -7,6 +7,7 @@ import {
   GAME_HEIGHT,
   GAME_WIDTH,
   HOUSE,
+  HOUSE_FRAMES,
   TILE_SIZE,
   WORLD_COLUMNS,
   WORLD_HEIGHT,
@@ -25,6 +26,10 @@ assert.equal(
   "ground contains one base tile per cell plus the three-tile path overlay",
 );
 assert.equal(layout.houseFloorTiles.length > 0, true);
+assert(
+  layout.houseFloorTiles.every((tile) => tile.frame === HOUSE_FRAMES.floor),
+  "the interior uses the verified fully opaque floor tile without transparent gaps",
+);
 assert.equal(layout.houseWallTiles.length > 0, true);
 assert.equal(layout.decorationTiles.length, 48, "four 3x4 trees are present");
 
@@ -106,5 +111,5 @@ assert.deepEqual(
 );
 
 console.log(
-  `world checks passed: ${WORLD_WIDTH}x${WORLD_HEIGHT}, Basic Village house ${HOUSE.columns}x${HOUSE.rows}, doorway, sliding, anti-tunneling and bounds`,
+  `world checks passed: ${WORLD_WIDTH}x${WORLD_HEIGHT}, continuous Basic Village floor, doorway, sliding, anti-tunneling and bounds`,
 );
