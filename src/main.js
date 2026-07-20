@@ -7,6 +7,19 @@ import {
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
+import {
+  ART_SCALE,
+  FACING_HYSTERESIS,
+  PLAYER_FOOT_DEPTH,
+  PLAYER_FOOT_WIDTH,
+  PLAYER_FRAMES,
+  PLAYER_IDLE_FRAME_INDEX,
+  ROOM_FRAMES,
+  ROOM_SHEET,
+  TILE_SIZE,
+  WALK_FRAME_RATE,
+  WALL_TILES,
+} from "./visualConfig.js";
 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
@@ -14,37 +27,11 @@ const PLAYER_SPEED = 260;
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const ASSET_BASE_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney`;
 
-const ART_SCALE = 3;
-const TILE_SIZE = 16;
 const ROOM_TILE_SIZE = TILE_SIZE * ART_SCALE;
-const WALL_TILES = 1;
 const ROOM_COLUMNS = Math.floor(GAME_WIDTH / ROOM_TILE_SIZE);
 const ROOM_ROWS = Math.floor(GAME_HEIGHT / ROOM_TILE_SIZE);
 const ROOM_OFFSET_X = Math.floor((GAME_WIDTH - ROOM_COLUMNS * ROOM_TILE_SIZE) / 2);
 const ROOM_OFFSET_Y = Math.floor((GAME_HEIGHT - ROOM_ROWS * ROOM_TILE_SIZE) / 2);
-const PLAYER_FOOT_WIDTH = 24;
-const PLAYER_FOOT_DEPTH = 10;
-const FACING_HYSTERESIS = 0.15;
-const WALK_FRAME_RATE = 8;
-
-const PLAYER_FRAMES = {
-  down: ["tile_0267", "tile_0294", "tile_0321"],
-  up: ["tile_0268", "tile_0295", "tile_0322"],
-  left: ["tile_0269", "tile_0296", "tile_0323"],
-  right: ["tile_0266", "tile_0293", "tile_0320"],
-};
-
-const ROOM_FRAMES = {
-  floor: 494,
-  top: 90,
-  bottom: 147,
-  left: 146,
-  right: 148,
-  topLeft: 89,
-  topRight: 91,
-  bottomLeft: 203,
-  bottomRight: 205,
-};
 
 class RoomScene extends Phaser.Scene {
   constructor() {
@@ -62,10 +49,10 @@ class RoomScene extends Phaser.Scene {
       "roomTiles",
       `${ASSET_BASE_URL}/room/roguelikeSheet_transparent.png`,
       {
-        frameWidth: TILE_SIZE,
-        frameHeight: TILE_SIZE,
-        margin: 1,
-        spacing: 1,
+        frameWidth: ROOM_SHEET.frameWidth,
+        frameHeight: ROOM_SHEET.frameHeight,
+        margin: ROOM_SHEET.margin,
+        spacing: ROOM_SHEET.spacing,
       },
     );
   }
@@ -131,10 +118,6 @@ class RoomScene extends Phaser.Scene {
   createPlayerAnimations() {
     Object.entries(PLAYER_FRAMES).forEach(([facing, frames]) => {
       this.anims.create({
-        key: `idle-${facing}`,
-        frames: [{ key: frames[1] }],
-      });
-      this.anims.create({
         key: `walk-${facing}`,
         frames: frames.map((key) => ({ key })),
         frameRate: WALK_FRAME_RATE,
@@ -146,11 +129,14 @@ class RoomScene extends Phaser.Scene {
   createPlayer() {
     this.lastFacing = "down";
     this.player = this.add
-      .sprite(GAME_WIDTH / 2, GAME_HEIGHT / 2, PLAYER_FRAMES.down[1])
+      .sprite(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 2,
+        PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX],
+      )
       .setOrigin(0.5, 1)
       .setScale(ART_SCALE)
       .setDepth(100);
-    this.player.anims.play("idle-down");
   }
 
   createInput() {
@@ -371,9 +357,18 @@ class RoomScene extends Phaser.Scene {
 
   updatePlayerAnimation(direction) {
     const moving = direction.x !== 0 || direction.y !== 0;
-    const animationKey = `${moving ? "walk" : "idle"}-${this.lastFacing}`;
 
-    if (this.player.anims.currentAnim?.key === animationKey) {
+    if (!moving) {
+      this.player.anims.stop();
+      const idleFrame = PLAYER_FRAMES[this.lastFacing][PLAYER_IDLE_FRAME_INDEX];
+      if (this.player.texture.key !== idleFrame) {
+        this.player.setTexture(idleFrame);
+      }
+      return;
+    }
+
+    const animationKey = `walk-${this.lastFacing}`;
+    if (this.player.anims.isPlaying && this.player.anims.currentAnim?.key === animationKey) {
       return;
     }
 
