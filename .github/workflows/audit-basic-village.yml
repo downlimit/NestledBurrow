@@ -1,0 +1,133 @@
+name: Audit Basic Village Assets
+
+on:
+  push:
+    branches:
+      - feature/basic-village-tileset
+    paths:
+      - .github/workflows/audit-basic-village.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit-assets:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/basic-village-tileset
+          fetch-depth: 0
+
+      - name: Generate numbered audit sheets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check Pillow==11.3.0
+          rm -rf tasks/basic-village/audit
+          mkdir -p tasks/basic-village/audit
+
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageFont
+
+          root = Path("tasks/basic-village/source")
+          output = Path("tasks/basic-village/audit")
+          images = [
+              root / "basic/BasicVillageTileset/Outdoor_tileset.png",
+              root / "basic/BasicVillageTileset/House_tileset.png",
+              root / "basic/BasicVillageTileset/Trees_and_bushes.png",
+              root / "basic/BasicVillageTileset/Furniture.png",
+              root / "godot/BasicVillageTileset/Tileset_Merged.png",
+          ]
+          scale = 5
+          tile = 16
+          font = ImageFont.load_default()
+          pages = []
+          manifest = {"tileSize": tile, "images": []}
+
+          for source in images:
+              image = Image.open(source).convert("RGBA")
+              if image.width % tile or image.height % tile:
+                  raise RuntimeError(f"{source} is not divisible by {tile}: {image.size}")
+
+              columns = image.width // tile
+              rows = image.height // tile
+              preview = image.resize((image.width * scale, image.height * scale), Image.Resampling.NEAREST)
+              header = 64
+              canvas = Image.new("RGB", (preview.width, preview.height + header), "#242424")
+              canvas.paste(preview, (0, header), preview)
+              draw = ImageDraw.Draw(canvas)
+              draw.text((8, 8), source.name, fill="white", font=font)
+              draw.text(
+                  (8, 26),
+                  f"{image.width}x{image.height}px | {columns}x{rows} tiles | row-major IDs 0..{columns * rows - 1}",
+                  fill="#d8d8d8",
+                  font=font,
+              )
+              draw.text((8, 44), f"source: {source.as_posix()}", fill="#a8a8a8", font=font)
+
+              for x in range(columns + 1):
+                  px = x * tile * scale
+                  draw.line((px, header, px, header + preview.height), fill="#ffffff80", width=1)
+              for y in range(rows + 1):
+                  py = header + y * tile * scale
+                  draw.line((0, py, preview.width, py), fill="#ffffff80", width=1)
+
+              for row in range(rows):
+                  for column in range(columns):
+                      frame_id = row * columns + column
+                      x = column * tile * scale + 2
+                      y = header + row * tile * scale + 2
+                      label = str(frame_id)
+                      bbox = draw.textbbox((x, y), label, font=font)
+                      draw.rectangle(
+                          (bbox[0] - 1, bbox[1] - 1, bbox[2] + 1, bbox[3] + 1),
+                          fill="#000000c0",
+                      )
+                      draw.text((x, y), label, fill="white", font=font)
+
+              page_path = output / f"{source.stem}-numbered.png"
+              canvas.save(page_path)
+              pages.append(canvas)
+              digest = hashlib.sha256(source.read_bytes()).hexdigest()
+              manifest["images"].append(
+                  {
+                      "name": source.name,
+                      "path": source.as_posix(),
+                      "width": image.width,
+                      "height": image.height,
+                      "columns": columns,
+                      "rows": rows,
+                      "frameCount": columns * rows,
+                      "sha256": digest,
+                  }
+              )
+
+          rgb_pages = [page.convert("RGB") for page in pages]
+          rgb_pages[0].save(
+              output / "basic-village-numbered.pdf",
+              save_all=True,
+              append_images=rgb_pages[1:],
+              resolution=144,
+          )
+          (output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+          PY
+
+      - name: Commit audit and remove one-off workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/audit-basic-village.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tasks/basic-village/audit .github/workflows/audit-basic-village.yml
+          git commit -m "Generate Basic Village numbered audit"
+          git push origin HEAD:feature/basic-village-tileset
