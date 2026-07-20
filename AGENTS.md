@@ -51,13 +51,14 @@ Never select production assets by guessing raw spritesheet frame indexes.
 Before integrating a spritesheet pack:
 
 1. Read the pack metadata, tile dimensions, margin and spacing.
-2. Generate a labeled contact sheet for every source frame.
-3. Render supplied sample maps when available to confirm how related tiles are assembled.
-4. Select frames only after visual inspection.
-5. Copy selected frames into a small semantic atlas with names such as `floor`, `wallOuter` or `wallInnerLeft`.
-6. Record the source pack, source sheet geometry, original frame number and SHA-256 in a canonical manifest.
-7. Reference semantic frame names in gameplay code. Raw source frame numbers belong only in the audit manifest.
-8. Pin the selected atlas hash and the pixel hash of an approved room preview.
+2. Prefer standalone source PNG files when the pack provides them.
+3. Generate a labeled contact sheet for every source frame when a sheet must be inspected.
+4. Render supplied sample maps when available to confirm how related tiles are assembled.
+5. Select frames only after visual inspection.
+6. Extract the selected art into semantically named standalone files or a compact semantic atlas. Runtime code must never load a large source sheet by raw numeric IDs.
+7. Record the source pack, source sheet geometry, original frame number or rectangle and SHA-256 in a canonical manifest.
+8. Reference semantic frame names in gameplay code. Raw source frame numbers belong only in the audit manifest.
+9. Pin the selected asset hashes and the pixel hash of an approved room preview.
 
 When the room atlas or layout changes, `npm run check` must generate `artifacts/room-preview.png`. Do not update `approvedPreviewSha256` until that image has been opened and visually approved. The PR workflow uploads the same preview as an artifact; it must be inspected before merge.
 
