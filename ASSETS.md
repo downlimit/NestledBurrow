@@ -10,17 +10,19 @@ This project uses only the listed third-party assets in the playable prototype. 
 - **Tile grid:** 16×16
 - **Role in project:** canonical and priority environment tileset for the playable prototype.
 - **Selection policy:** use Basic Village first for terrain, buildings, vegetation and compatible environment props. A different pack requires a missing asset category or explicit visual approval.
+- **Official archive SHA-256:** `b4297a432566699e7a2858b067b4050c8631d8a96aa3cca99d29e97cae782b9a` (`BasicVillageTileset.zip`).
 - **Runtime source sheets:**
-  - `Outdoor_tileset.png`
-  - `House_tileset.png`
-  - `Trees_and_bushes.png`
+  - `Outdoor_tileset.png` — 192×128, 12×8 frames, SHA-256 `967806f572267b87787d05414e98350c9cb19f5eab426db6d4889d99b123f89c`
+  - `House_tileset.png` — 192×160, 12×10 frames, SHA-256 `89b48d140121ddec253b50d7e36c7bcae0c5b8e1168ae47b7cfeb5439b584085`
+  - `Trees_and_bushes.png` — 144×96, 9×6 frames, SHA-256 `55be641f0a0f8461c9bdd5f1a1fc2fef607428194df152197335eabc96dd9b5a`
 - **Final project paths:**
   - `public/assets/third-party/basic-village/Outdoor_tileset.png`
   - `public/assets/third-party/basic-village/House_tileset.png`
   - `public/assets/third-party/basic-village/Trees_and_bushes.png`
-- **Runtime configuration:** `src/worldConfig.js`
+- **Selected frame groups:** centralized under semantic names in `src/worldConfig.js` as `OUTDOOR_FRAMES` and `HOUSE_FRAMES`; tree variants are assembled in `src/worldLayout.js` from verified 3×4 regions.
 - **World composition:** `src/worldLayout.js`
-- **Visual verification:** `scripts/check-visual.mjs` and `scripts/check-room-preview.py`
+- **Integrity and geometry checks:** `scripts/check-visual.mjs`
+- **Rendered verification:** `scripts/check-room-preview.py`
 
 ## Kenney RPG Urban Pack
 
