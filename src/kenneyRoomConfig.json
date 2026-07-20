@@ -1,0 +1,45 @@
+{
+  "textureKey": "kenney-room",
+  "imagePath": "room/kenney-room-tiles.png",
+  "atlasPath": "room/kenney-room-tiles.json",
+  "atlasSha256": "b7f461ec87dee4ed44ee5e02f9a693bd4a7ca29b316eb7cc2acb3bcdf0dc1fc0",
+  "approvedPreviewSha256": "db6f136cd82af91549ae81c53c6501b9bbe746181a6e0255a43af0d68ecbcd77",
+  "roomScale": 2,
+  "playerScale": 3,
+  "floorFrame": "floor",
+  "sideFrame": "wallVertical",
+  "wallBands": [
+    { "left": "wallOuterLeft", "center": "wallOuter", "right": "wallOuterRight" },
+    { "left": "wallMiddleLeft", "center": "wallMiddle", "right": "wallMiddleRight" },
+    { "left": "wallInnerLeft", "center": "wallInner", "right": "wallInnerRight" }
+  ],
+  "source": {
+    "pack": "Kenney Roguelike/RPG Pack",
+    "page": "https://kenney.nl/assets/roguelike-rpg-pack",
+    "license": "CC0 1.0 Universal",
+    "archiveCommit": "c202320f7b8d4620f19707bf41503c79a347ded4",
+    "archivePath": "tasks/pixel-room/source/kenney_roguelike-rpg-pack.zip",
+    "sheetPath": "Spritesheet/roguelikeSheet_transparent.png",
+    "sheetWidth": 968,
+    "sheetHeight": 526,
+    "frameWidth": 16,
+    "frameHeight": 16,
+    "margin": 0,
+    "spacing": 1,
+    "columns": 57,
+    "rows": 31
+  },
+  "tiles": {
+    "floor": { "sourceFrame": 119, "sourceSha256": "5bc83eb68459a9cba63092dbb41b7af9a442c504c43bcb07ecd1c4482eed3665" },
+    "wallOuter": { "sourceFrame": 698, "sourceSha256": "5dceb33d464f82a02793c9d58d1f8f0b6ebeae6e0fe016d51909887fdac886fa" },
+    "wallVertical": { "sourceFrame": 756, "sourceSha256": "1f34f7d1ae8eb054b8ed438df32648eca5805fc934b0bc51eb35c8c66285b054" },
+    "wallOuterLeft": { "sourceFrame": 757, "sourceSha256": "a31915dede23dc7d8e863a8f89a089dfff3c940515758d37a9bd5d40082219a2" },
+    "wallOuterRight": { "sourceFrame": 758, "sourceSha256": "b405c8cd0caf269d0618311f8dc3a4910186e4c5157eaafd6689d9c6da618602" },
+    "wallMiddle": { "sourceFrame": 873, "sourceSha256": "5bac706fbac5d16a53a7baff1fce732ffdd61cc9d5d30a651e725b11df7c47b3" },
+    "wallMiddleLeft": { "sourceFrame": 872, "sourceSha256": "7fc6a02a44855a884e9a74b4fe0ae89aa1adfd377f914436d8efdfbc91f1f262" },
+    "wallMiddleRight": { "sourceFrame": 874, "sourceSha256": "49b28d4a8a7b5f4fe4eef5915f106a943ff80552ad4e24178aaf9ab0ebffa51c" },
+    "wallInner": { "sourceFrame": 868, "sourceSha256": "608baffc0e4edc2a00cd3f0e9e052cde4d6409962efc4f2dd6dd6d4c6a0e96f8" },
+    "wallInnerLeft": { "sourceFrame": 869, "sourceSha256": "3518d8f67ccd5d6fd341ea302e10f9fbfe58f224e6069c2f29acfef05418cddb" },
+    "wallInnerRight": { "sourceFrame": 871, "sourceSha256": "42ea52bbdb58acad95e59f6da73f57514836f5f8762f97041eb65e9f43d3d1f3" }
+  }
+}
