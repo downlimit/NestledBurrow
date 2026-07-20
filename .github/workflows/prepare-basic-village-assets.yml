@@ -1,6 +1,11 @@
 name: Prepare Basic Village Assets
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/prepare-basic-village-assets.yml
   push:
     branches:
       - feature/basic-village-tileset
