@@ -5,16 +5,12 @@ import { fileURLToPath } from "node:url";
 import {
   PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
-  ROOM_FRAMES,
-  ROOM_SHEET,
+  ROOM_TEXTURES,
+  TILE_SIZE,
 } from "../src/visualConfig.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const playerDirectory = path.join(root, "public/assets/third-party/kenney/player");
-const roomSheetPath = path.join(
-  root,
-  "public/assets/third-party/kenney/room/roguelikeSheet_transparent.png",
-);
 
 function readPngDimensions(filePath) {
   const bytes = fs.readFileSync(filePath);
@@ -27,20 +23,17 @@ function readPngDimensions(filePath) {
   };
 }
 
-function countFrames(sourceSize, frameSize, margin, spacing, axisName) {
-  const numerator = sourceSize - margin * 2 + spacing;
-  const denominator = frameSize + spacing;
-  assert.equal(
-    numerator % denominator,
-    0,
-    `${axisName} does not divide into whole spritesheet frames`,
-  );
-  return numerator / denominator;
-}
-
+assert.equal(TILE_SIZE, 16);
 assert.deepEqual(PLAYER_FRAMES.left, ["tile_0266", "tile_0293", "tile_0320"]);
 assert.deepEqual(PLAYER_FRAMES.right, ["tile_0269", "tile_0296", "tile_0323"]);
 assert.equal(PLAYER_IDLE_FRAME_INDEX, 0, "Idle must use the neutral first frame");
+assert.deepEqual(Object.keys(ROOM_TEXTURES), [
+  "floor",
+  "wallHorizontal",
+  "wallVertical",
+  "corner",
+]);
+assert.equal(new Set(Object.values(ROOM_TEXTURES)).size, 4, "Room textures must use unique keys");
 
 const playerFiles = Object.values(PLAYER_FRAMES).flat();
 assert.equal(new Set(playerFiles).size, 12, "Player animation frames must be unique");
@@ -51,34 +44,4 @@ for (const frame of playerFiles) {
   assert.deepEqual(readPngDimensions(filePath), { width: 16, height: 16 });
 }
 
-assert.ok(fs.existsSync(roomSheetPath), `Missing room spritesheet: ${roomSheetPath}`);
-assert.deepEqual(readPngDimensions(roomSheetPath), {
-  width: ROOM_SHEET.sourceWidth,
-  height: ROOM_SHEET.sourceHeight,
-});
-assert.equal(ROOM_SHEET.margin, 0, "Kenney room sheet has no outer margin");
-assert.equal(ROOM_SHEET.spacing, 1, "Kenney room sheet uses one-pixel spacing");
-
-const columns = countFrames(
-  ROOM_SHEET.sourceWidth,
-  ROOM_SHEET.frameWidth,
-  ROOM_SHEET.margin,
-  ROOM_SHEET.spacing,
-  "Spritesheet width",
-);
-const rows = countFrames(
-  ROOM_SHEET.sourceHeight,
-  ROOM_SHEET.frameHeight,
-  ROOM_SHEET.margin,
-  ROOM_SHEET.spacing,
-  "Spritesheet height",
-);
-assert.equal(columns, 57);
-assert.equal(rows, 31);
-
-const frameCount = columns * rows;
-for (const [name, frame] of Object.entries(ROOM_FRAMES)) {
-  assert.ok(Number.isInteger(frame) && frame >= 0 && frame < frameCount, `${name} frame is invalid`);
-}
-
-console.log(`Visual asset checks passed: ${playerFiles.length} player frames, ${columns}x${rows} room sheet.`);
+console.log(`Visual checks passed: ${playerFiles.length} player frames and 4 deterministic room textures.`);
