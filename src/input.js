@@ -1,10 +1,10 @@
 export const JOYSTICK = {
-  centerX: 96,
-  centerY: 540 - 96,
-  baseRadius: 64,
-  knobRadius: 26,
-  maxOffset: 44,
-  activationRadius: 92,
+  centerX: 32,
+  centerY: 180 - 32,
+  baseRadius: 21,
+  knobRadius: 9,
+  maxOffset: 15,
+  activationRadius: 31,
   deadZoneRatio: 0.15,
 };
 

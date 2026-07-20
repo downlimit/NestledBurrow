@@ -7,37 +7,38 @@ import {
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
-import { buildRoomLayout, ROOM_WALL_BANDS } from "./roomLayout.js";
+import { moveWithCollision } from "./movement.js";
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  PLAYER_SPEED,
+  ROOM_ATLAS_PATH,
+  ROOM_IMAGE_PATH,
+  ROOM_TEXTURE_KEY,
+  TILE_SIZE,
+  WORLD_ATLAS_PATH,
+  WORLD_HEIGHT,
+  WORLD_IMAGE_PATH,
+  WORLD_TEXTURE_KEY,
+  WORLD_WIDTH,
+  isWorldExtensionFrame,
+} from "./worldConfig.js";
+import { createWorldLayout } from "./worldLayout.js";
 import {
   FACING_HYSTERESIS,
   PLAYER_FOOT_DEPTH,
   PLAYER_FOOT_WIDTH,
   PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
-  PLAYER_SCALE,
-  ROOM_ATLAS_PATH,
-  ROOM_IMAGE_PATH,
-  ROOM_SCALE,
-  ROOM_TEXTURE_KEY,
-  TILE_SIZE,
   WALK_FRAME_RATE,
 } from "./visualConfig.js";
 
-const GAME_WIDTH = 960;
-const GAME_HEIGHT = 540;
-const PLAYER_SPEED = 260;
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const ASSET_BASE_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney`;
 
-const ROOM_TILE_SIZE = TILE_SIZE * ROOM_SCALE;
-const ROOM_COLUMNS = Math.floor(GAME_WIDTH / ROOM_TILE_SIZE);
-const ROOM_ROWS = Math.floor(GAME_HEIGHT / ROOM_TILE_SIZE);
-const ROOM_OFFSET_X = Math.floor((GAME_WIDTH - ROOM_COLUMNS * ROOM_TILE_SIZE) / 2);
-const ROOM_OFFSET_Y = Math.floor((GAME_HEIGHT - ROOM_ROWS * ROOM_TILE_SIZE) / 2);
-
-class RoomScene extends Phaser.Scene {
+class WorldScene extends Phaser.Scene {
   constructor() {
-    super("room");
+    super("world");
   }
 
   preload() {
@@ -52,52 +53,44 @@ class RoomScene extends Phaser.Scene {
       `${ASSET_BASE_URL}/${ROOM_IMAGE_PATH}`,
       `${ASSET_BASE_URL}/${ROOM_ATLAS_PATH}`,
     );
+    this.load.atlas(
+      WORLD_TEXTURE_KEY,
+      `${ASSET_BASE_URL}/${WORLD_IMAGE_PATH}`,
+      `${ASSET_BASE_URL}/${WORLD_ATLAS_PATH}`,
+    );
   }
 
   create() {
-    this.createRoom();
+    this.worldLayout = createWorldLayout();
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+    this.renderWorld();
     this.createPlayerAnimations();
     this.createPlayer();
     this.createInput();
     this.createBuildLabel();
     this.attachSceneListeners();
     this.createJoystick();
+    this.syncIntegerZoom();
   }
 
-  createRoom() {
-    const wallBandCount = ROOM_WALL_BANDS.length;
-    const interiorLeft = ROOM_OFFSET_X + ROOM_TILE_SIZE;
-    const interiorTop = ROOM_OFFSET_Y + wallBandCount * ROOM_TILE_SIZE;
-    const interiorWidth = (ROOM_COLUMNS - 2) * ROOM_TILE_SIZE;
-    const interiorHeight = (ROOM_ROWS - wallBandCount * 2) * ROOM_TILE_SIZE;
+  renderWorld() {
+    this.worldLayout.outdoorTiles.forEach((tile) => {
+      this.addTile(tile, WORLD_TEXTURE_KEY, 0);
+    });
 
-    this.roomBounds = new Phaser.Geom.Rectangle(
-      interiorLeft,
-      interiorTop,
-      interiorWidth,
-      interiorHeight,
-    );
-
-    const layout = buildRoomLayout(ROOM_COLUMNS, ROOM_ROWS);
-    layout.forEach((row, tileY) => {
-      row.forEach((frame, tileX) => {
-        if (frame !== null) {
-          this.addRoomTile(tileX, tileY, frame, frame === "floor" ? 0 : 10);
-        }
-      });
+    this.worldLayout.roomTiles.forEach((tile) => {
+      const textureKey = isWorldExtensionFrame(tile.frame)
+        ? WORLD_TEXTURE_KEY
+        : ROOM_TEXTURE_KEY;
+      this.addTile(tile, textureKey, tile.frame === "floor" ? 5 : 10);
     });
   }
 
-  addRoomTile(tileX, tileY, frame, depth) {
+  addTile(tile, textureKey, depth) {
     return this.add
-      .image(
-        ROOM_OFFSET_X + tileX * ROOM_TILE_SIZE,
-        ROOM_OFFSET_Y + tileY * ROOM_TILE_SIZE,
-        ROOM_TEXTURE_KEY,
-        frame,
-      )
+      .image(tile.x * TILE_SIZE, tile.y * TILE_SIZE, textureKey, tile.frame)
       .setOrigin(0, 0)
-      .setScale(ROOM_SCALE)
       .setDepth(depth);
   }
 
@@ -114,15 +107,14 @@ class RoomScene extends Phaser.Scene {
 
   createPlayer() {
     this.lastFacing = "down";
+    const spawn = this.worldLayout.spawn;
+
     this.player = this.add
-      .sprite(
-        GAME_WIDTH / 2,
-        GAME_HEIGHT / 2,
-        PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX],
-      )
+      .sprite(spawn.x, spawn.y, PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX])
       .setOrigin(0.5, 1)
-      .setScale(PLAYER_SCALE)
       .setDepth(100);
+
+    this.cameras.main.startFollow(this.player, true, 1, 1);
   }
 
   createInput() {
@@ -132,14 +124,15 @@ class RoomScene extends Phaser.Scene {
 
   createBuildLabel() {
     this.add
-      .text(GAME_WIDTH - 12, 12, `build: ${BUILD_ID}`, {
+      .text(GAME_WIDTH - 4, 4, `build: ${BUILD_ID}`, {
         fontFamily: "system-ui, sans-serif",
-        fontSize: "14px",
+        fontSize: "7px",
         color: "#f2eadc",
       })
       .setOrigin(1, 0)
-      .setAlpha(0.55)
-      .setDepth(1000);
+      .setAlpha(0.7)
+      .setDepth(1000)
+      .setScrollFactor(0);
   }
 
   attachSceneListeners() {
@@ -155,10 +148,19 @@ class RoomScene extends Phaser.Scene {
 
     window.addEventListener("blur", this.onWindowBlur);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.sceneListenersAttached = true;
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroySceneListeners, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.destroySceneListeners, this);
+  }
+
+  syncIntegerZoom() {
+    const nextZoom = this.scale.getMaxZoom();
+
+    if (this.scale.zoom !== nextZoom) {
+      this.scale.setZoom(nextZoom);
+    }
   }
 
   createJoystick() {
@@ -173,13 +175,27 @@ class RoomScene extends Phaser.Scene {
     }
 
     this.joystickBase = this.add
-      .circle(JOYSTICK.centerX, JOYSTICK.centerY, JOYSTICK.baseRadius, 0xd9c18f, 0.22)
-      .setStrokeStyle(3, 0xf2eadc, 0.32)
-      .setDepth(900);
+      .circle(
+        JOYSTICK.centerX,
+        JOYSTICK.centerY,
+        JOYSTICK.baseRadius,
+        0xd9c18f,
+        0.22,
+      )
+      .setStrokeStyle(1, 0xf2eadc, 0.32)
+      .setDepth(900)
+      .setScrollFactor(0);
     this.joystickKnob = this.add
-      .circle(JOYSTICK.centerX, JOYSTICK.centerY, JOYSTICK.knobRadius, 0xf2eadc, 0.55)
-      .setStrokeStyle(2, 0xffffff, 0.65)
-      .setDepth(901);
+      .circle(
+        JOYSTICK.centerX,
+        JOYSTICK.centerY,
+        JOYSTICK.knobRadius,
+        0xf2eadc,
+        0.55,
+      )
+      .setStrokeStyle(1, 0xffffff, 0.65)
+      .setDepth(901)
+      .setScrollFactor(0);
 
     this.input.on("pointerdown", this.handleJoystickPointerDown, this);
     this.input.on("pointermove", this.handleJoystickPointerMove, this);
@@ -194,11 +210,10 @@ class RoomScene extends Phaser.Scene {
   }
 
   handleJoystickPointerDown(pointer) {
-    if (this.activeJoystickPointerId !== null) {
-      return;
-    }
-
-    if (!isInsideJoystickActivation(pointer.x, pointer.y)) {
+    if (
+      this.activeJoystickPointerId !== null ||
+      !isInsideJoystickActivation(pointer.x, pointer.y)
+    ) {
       return;
     }
 
@@ -210,11 +225,9 @@ class RoomScene extends Phaser.Scene {
   }
 
   handleJoystickPointerMove(pointer) {
-    if (pointer.id !== this.activeJoystickPointerId) {
-      return;
+    if (pointer.id === this.activeJoystickPointerId) {
+      this.updateJoystick(pointer);
     }
-
-    this.updateJoystick(pointer);
   }
 
   handleJoystickPointerUp(pointer) {
@@ -224,11 +237,11 @@ class RoomScene extends Phaser.Scene {
   }
 
   handleNativePointerEnd(event) {
-    if (this.activeJoystickPointerId === null || this.activeDomPointerId === null) {
-      return;
-    }
-
-    if (event.pointerId === this.activeDomPointerId) {
+    if (
+      this.activeJoystickPointerId !== null &&
+      this.activeDomPointerId !== null &&
+      event.pointerId === this.activeDomPointerId
+    ) {
       this.resetJoystick();
     }
   }
@@ -269,6 +282,7 @@ class RoomScene extends Phaser.Scene {
     this.sceneListenersAttached = false;
     window.removeEventListener("blur", this.onWindowBlur);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.input.off("pointerdown", this.handleJoystickPointerDown, this);
     this.input.off("pointermove", this.handleJoystickPointerMove, this);
     this.input.off("pointerup", this.handleJoystickPointerUp, this);
@@ -283,29 +297,22 @@ class RoomScene extends Phaser.Scene {
   }
 
   update(_time, delta) {
-    const movement = this.getMovementVector();
-    const limitedDirection = clampVectorLength(movement);
-    this.updateLastFacing(limitedDirection);
-    this.updatePlayerAnimation(limitedDirection);
+    const direction = clampVectorLength(this.getMovementVector());
+    this.updateLastFacing(direction);
+    this.updatePlayerAnimation(direction);
 
-    if (limitedDirection.x === 0 && limitedDirection.y === 0) {
-      return;
-    }
-
-    const step = new Phaser.Math.Vector2(limitedDirection.x, limitedDirection.y).scale(
-      PLAYER_SPEED * (delta / 1000),
+    const next = moveWithCollision(
+      { x: this.player.x, y: this.player.y },
+      {
+        x: direction.x * PLAYER_SPEED * (delta / 1000),
+        y: direction.y * PLAYER_SPEED * (delta / 1000),
+      },
+      this.worldLayout,
+      PLAYER_FOOT_WIDTH,
+      PLAYER_FOOT_DEPTH,
     );
 
-    this.player.x = Phaser.Math.Clamp(
-      this.player.x + step.x,
-      this.roomBounds.left + PLAYER_FOOT_WIDTH / 2,
-      this.roomBounds.right - PLAYER_FOOT_WIDTH / 2,
-    );
-    this.player.y = Phaser.Math.Clamp(
-      this.player.y + step.y,
-      this.roomBounds.top + PLAYER_FOOT_DEPTH,
-      this.roomBounds.bottom,
-    );
+    this.player.setPosition(next.x, next.y);
   }
 
   getMovementVector() {
@@ -313,8 +320,8 @@ class RoomScene extends Phaser.Scene {
     const right = this.cursors.right.isDown || this.wasd.D.isDown;
     const up = this.cursors.up.isDown || this.wasd.W.isDown;
     const down = this.cursors.down.isDown || this.wasd.S.isDown;
-
     const joystickVector = this.joystickVector ?? { x: 0, y: 0 };
+
     return {
       x: Number(right) - Number(left) + joystickVector.x,
       y: Number(down) - Number(up) + joystickVector.y,
@@ -333,12 +340,14 @@ class RoomScene extends Phaser.Scene {
       return;
     }
 
-    if (absX > absY) {
-      this.lastFacing = direction.x > 0 ? "right" : "left";
-      return;
-    }
-
-    this.lastFacing = direction.y > 0 ? "down" : "up";
+    this.lastFacing =
+      absX > absY
+        ? direction.x > 0
+          ? "right"
+          : "left"
+        : direction.y > 0
+          ? "down"
+          : "up";
   }
 
   updatePlayerAnimation(direction) {
@@ -354,11 +363,12 @@ class RoomScene extends Phaser.Scene {
     }
 
     const animationKey = `walk-${this.lastFacing}`;
-    if (this.player.anims.isPlaying && this.player.anims.currentAnim?.key === animationKey) {
-      return;
+    if (
+      !this.player.anims.isPlaying ||
+      this.player.anims.currentAnim?.key !== animationKey
+    ) {
+      this.player.anims.play(animationKey);
     }
-
-    this.player.anims.play(animationKey);
   }
 }
 
@@ -371,9 +381,9 @@ new Phaser.Game({
   pixelArt: true,
   antialias: false,
   roundPixels: true,
-  scene: RoomScene,
+  scene: WorldScene,
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.NONE,
+    zoom: Phaser.Scale.MAX_ZOOM,
   },
 });
