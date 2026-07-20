@@ -39,11 +39,15 @@ jobs:
       - name: Run project checks
         run: npm run check
 
-      - name: Upload room preview
+      - name: Upload world previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: room-preview-pr-${{ github.event.pull_request.number }}
-          path: artifacts/room-preview.png
+          name: world-previews-pr-${{ github.event.pull_request.number }}
+          path: |
+            artifacts/world-overview.png
+            artifacts/camera-indoor.png
+            artifacts/camera-outdoor.png
+            artifacts/top-wall-detail.png
           if-no-files-found: warn
           retention-days: 7

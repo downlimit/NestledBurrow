@@ -16,6 +16,12 @@ body,
   margin: 0;
 }
 
+#game {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 body {
   overflow: hidden;
 }
@@ -25,4 +31,8 @@ canvas {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+canvas {
+  image-rendering: pixelated;
 }

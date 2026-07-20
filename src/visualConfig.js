@@ -1,10 +1,7 @@
 import roomConfig from "./kenneyRoomConfig.json" with { type: "json" };
 
-export const TILE_SIZE = 16;
-export const ROOM_SCALE = roomConfig.roomScale;
-export const PLAYER_SCALE = roomConfig.playerScale;
-export const PLAYER_FOOT_WIDTH = 24;
-export const PLAYER_FOOT_DEPTH = 10;
+export const PLAYER_FOOT_WIDTH = 8;
+export const PLAYER_FOOT_DEPTH = 5;
 export const FACING_HYSTERESIS = 0.15;
 export const WALK_FRAME_RATE = 8;
 export const PLAYER_IDLE_FRAME_INDEX = 0;

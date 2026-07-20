@@ -49,7 +49,7 @@ const joystick = simulateJoystick();
 joystick.down({ id: 1, x: JOYSTICK.centerX + 10, y: JOYSTICK.centerY });
 assert.equal(joystick.state.activePointerId, 1, "press inside activation zone captures joystick");
 
-joystick.move({ id: 1, x: JOYSTICK.centerX + 44, y: JOYSTICK.centerY + 44 });
+joystick.move({ id: 1, x: JOYSTICK.centerX + JOYSTICK.maxOffset, y: JOYSTICK.centerY + JOYSTICK.maxOffset });
 assert(Math.abs(Math.hypot(joystick.state.vector.x, joystick.state.vector.y) - 1) < 1e-12, "diagonal movement reaches full strength without exceeding 1");
 assert(Math.hypot(joystick.state.knob.x - JOYSTICK.centerX, joystick.state.knob.y - JOYSTICK.centerY) <= JOYSTICK.maxOffset + 1e-12, "knob clamps at max offset outside base");
 
@@ -64,7 +64,7 @@ assert.deepEqual(joystick.state.knob, { x: JOYSTICK.centerX, y: JOYSTICK.centerY
 
 for (const reason of ["pointerupoutside", "pointercancel", "window blur", "visibilitychange hidden"]) {
   joystick.down({ id: 3, x: JOYSTICK.centerX, y: JOYSTICK.centerY });
-  joystick.move({ id: 3, x: JOYSTICK.centerX + 80, y: JOYSTICK.centerY });
+  joystick.move({ id: 3, x: JOYSTICK.centerX + JOYSTICK.activationRadius, y: JOYSTICK.centerY });
   joystick.reset();
   assert.equal(joystick.state.activePointerId, null, `${reason} clears active pointer`);
   assert.deepEqual(joystick.state.vector, { x: 0, y: 0 }, `${reason} stops joystick movement`);
@@ -73,11 +73,5 @@ for (const reason of ["pointerupoutside", "pointercancel", "window blur", "visib
 const combined = clampVectorLength({ x: 1, y: 1 });
 assert(Math.abs(Math.hypot(combined.x, combined.y) - 1) < 1e-12, "keyboard plus joystick is clamped to speed 1");
 assert.deepEqual(clampVectorLength({ x: 1, y: 0 }), { x: 1, y: 0 }, "keyboard vector is preserved when already within speed 1");
-
-const wallClamp = (x, y) => ({
-  x: Math.min(Math.max(x, 24 + 16), 960 - 24 - 16),
-  y: Math.min(Math.max(y, 24 + 16), 540 - 24 - 16),
-});
-assert.deepEqual(wallClamp(-100, 999), { x: 40, y: 500 }, "player remains inside walls");
 
 console.log("input checks passed");

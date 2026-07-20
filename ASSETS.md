@@ -64,3 +64,13 @@ This project uses only the listed third-party assets in the playable prototype. 
   - `wallInnerRight` → `871`
 
 Original frame numbers and source-file hashes are retained only in `src/kenneyRoomConfig.json` for traceability. Runtime code addresses the compact atlas exclusively by semantic frame names.
+
+### Continuous world extension atlas
+
+- **Used parts:** outdoor frames `0005` (`grass`) and `0006` (`dirtPath`), plus vertically flipped copies of the already audited wall edge frames for the down-facing upper joins.
+- **Final semantic atlas:**
+  - `public/assets/third-party/kenney/world/kenney-world-extension.png`
+  - `public/assets/third-party/kenney/world/kenney-world-extension.json`
+- **Canonical machine-readable audit manifest:** `src/kenneyRoomConfig.json`.
+- **Atlas SHA-256:** `e491f948634436e3a5115e923d5f4cd724004d9935088f25c30e3baa53281efe`.
+- **Approved preview artifacts:** `artifacts/world-overview.png`, `artifacts/camera-indoor.png`, `artifacts/camera-outdoor.png`, and `artifacts/top-wall-detail.png`.
