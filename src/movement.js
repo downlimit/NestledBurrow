@@ -30,9 +30,7 @@ export function collides(position, layout, footWidth, footDepth) {
 
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
-      if (layout.blocked.has(`${x},${y}`)) {
-        return true;
-      }
+      if (layout.blocked.has(`${x},${y}`)) return true;
     }
   }
 
@@ -41,6 +39,7 @@ export function collides(position, layout, footWidth, footDepth) {
 
 export function moveWithCollision(position, delta, layout, footWidth, footDepth) {
   const next = { ...position };
+  const blockedAxes = { x: false, y: false };
   const substepCount = Math.max(
     1,
     Math.ceil(Math.max(Math.abs(delta.x), Math.abs(delta.y)) / MAX_COLLISION_STEP),
@@ -49,26 +48,30 @@ export function moveWithCollision(position, delta, layout, footWidth, footDepth)
   const stepY = delta.y / substepCount;
 
   for (let index = 0; index < substepCount; index += 1) {
-    const tryX = {
-      x: clamp(next.x + stepX, footWidth / 2, WORLD_WIDTH - footWidth / 2),
-      y: next.y,
-    };
+    const requestedX = next.x + stepX;
+    const clampedX = clamp(requestedX, footWidth / 2, WORLD_WIDTH - footWidth / 2);
+    const tryX = { x: clampedX, y: next.y };
 
     if (!collides(tryX, layout, footWidth, footDepth)) {
-      next.x = tryX.x;
+      if (stepX !== 0 && clampedX !== requestedX) blockedAxes.x = true;
+      next.x = clampedX;
+    } else if (stepX !== 0) {
+      blockedAxes.x = true;
     }
 
-    const tryY = {
-      x: next.x,
-      y: clamp(next.y + stepY, footDepth, WORLD_HEIGHT),
-    };
+    const requestedY = next.y + stepY;
+    const clampedY = clamp(requestedY, footDepth, WORLD_HEIGHT);
+    const tryY = { x: next.x, y: clampedY };
 
     if (!collides(tryY, layout, footWidth, footDepth)) {
-      next.y = tryY.y;
+      if (stepY !== 0 && clampedY !== requestedY) blockedAxes.y = true;
+      next.y = clampedY;
+    } else if (stepY !== 0) {
+      blockedAxes.y = true;
     }
   }
 
-  return next;
+  return { position: next, blockedAxes };
 }
 
 function clamp(value, min, max) {
