@@ -26,7 +26,7 @@ const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 assert(main.includes("onNewGame: () => this.startNewGame()"), "composition root wires New Game callback");
 assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "all HUD areas exclude MobileJoystick input");
-assert(gameHud.includes("localization.t("hud:progress.newGame")"), "New Game label is localized");
+assert(gameHud.includes('localization.t("hud:progress.newGame")'), "New Game label is localized");
 assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "localized HUD text uses locale Unicode font");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
 console.log("hud checks passed: build, fullscreen, language and localized New Game controls are aligned");
