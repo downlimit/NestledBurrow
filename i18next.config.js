@@ -1,19 +1,18 @@
 export default {
   locales: ["en", "ru"],
-  defaultLocale: "en",
-  input: ["src/**/*.{js,mjs}"],
-  output: "public/locales/$LOCALE/$NAMESPACE.json",
-  namespaceSeparator: ":",
-  keySeparator: ".",
-  lexers: {
-    js: ["JavascriptLexer"],
+  extract: {
+    input: ["src/**/*.{js,mjs}"],
+    output: "public/locales/{{language}}/{{namespace}}.json",
+    defaultNS: "common",
+    nsSeparator: ":",
+    keySeparator: ".",
+    primaryLanguage: "en",
+    secondaryLanguages: ["ru"],
+    removeUnusedKeys: false,
+    preservePatterns: ["common:*", "hud:*", "dialogue:*"],
+    extractFromComments: false,
   },
-  keepRemoved: [
-    /^common:language\./,
-    /^hud:fullscreen\./,
-    /^hud:language\./,
-    /^hud:interaction\./,
-    /^dialogue:homeGreeting\./,
-    /^dialogue:validation\./,
-  ],
+  lint: {
+    checkInterpolationParams: true,
+  },
 };
