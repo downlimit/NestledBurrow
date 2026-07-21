@@ -31,6 +31,42 @@ The direct prompt is the task contract. Do not expand its scope by mining unrela
 5. Never create or push an additional remote branch.
 6. Inspect the relevant existing implementation before choosing an architecture.
 7. Respect `Owned paths` and `Shared files allowed` from the prompt.
+8. When the task adds or replaces binary assets, complete the binary asset delivery preflight below before implementing dependent code.
+
+## Binary asset delivery preflight
+
+A task that adds or replaces PNG, JPG, WebP, font, audio, archive or another binary file must prove its delivery path before implementation begins.
+
+Before editing dependent code:
+
+1. identify every required new or replaced binary path;
+2. verify whether each file is already committed in the supplied base;
+3. verify that the current execution environment and repository policy permit the actual binary files to be staged, committed, pushed to the supplied branch and included in a PR;
+4. verify that PR creation remains available after those binary commits;
+5. only then start code, config, tests and documentation that reference the assets.
+
+A generic statement that Git normally supports binaries is not proof that the current Codex/tooling path can deliver them.
+
+If binary delivery is blocked or uncertain:
+
+- stop immediately before implementing binary-dependent code;
+- report the exact blocked file types and paths;
+- do not spend the task implementing references to assets that cannot be delivered;
+- do not claim the task is substantially complete;
+- do not create a code-only PR that claims the missing visual result;
+- wait for a binary-capable import step or a revised task that uses files already present in the repository.
+
+Forbidden workarounds:
+
+- base64 text files committed instead of the required runtime binaries;
+- ZIP archives when runtime expects separate files;
+- fake text extensions or reconstructed placeholder assets;
+- code or `ASSETS.md` entries that reference files absent from the branch;
+- using unrelated existing assets while claiming they are the requested new variants.
+
+When the prompt states that binaries were pre-imported, verify their exact paths, dimensions and hashes in the supplied base before using them.
+
+A binary-asset task is deliverable only when the final branch contains the actual runtime files, code references, applicable license/source records and validation evidence together.
 
 ## Task entry modes
 
@@ -234,6 +270,8 @@ Never select production frames by guessing raw numeric indexes.
 6. Centralize approved selections behind semantic names.
 7. Record source, geometry, selected rectangles/indexes and hashes in `ASSETS.md` or a canonical manifest when applicable.
 8. Ensure visual previews from the final head are available before merge.
+
+The spritesheet protocol does not replace the binary asset delivery preflight. Frame selection begins only after the required runtime binaries are known to be deliverable through the current branch and PR path.
 
 ## Completion report
 
