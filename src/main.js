@@ -18,16 +18,9 @@ import {
   measureBitmapText,
   renderFullscreenIcon,
 } from "./hud.js";
-import {
-  applyBlockedAxes,
-  createMovementState,
-  createRuntimeMovementConfig,
-  isMoving,
-  movementDelta,
-  movementSpeed,
-  stepCharacterMovement,
-} from "./characterMovement.js";
-import { moveWithCollision } from "./movement.js";
+import { createRuntimeMovementConfig, movementSpeed } from "./characterMovement.js";
+import { createCharacter, createNpcMovementConfig } from "./character.js";
+import { createPatrolController, createPlayerController } from "./controllers.js";
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "./movementConfig.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
@@ -44,12 +37,9 @@ import {
   WORLD_WIDTH,
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
+import { NPCS } from "./npcConfig.js";
 import {
-  FACING_HYSTERESIS,
-  PLAYER_FOOT_DEPTH,
-  PLAYER_FOOT_WIDTH,
   PLAYER_FRAMES,
-  PLAYER_IDLE_FRAME_INDEX,
   WALK_FRAME_RATE,
 } from "./visualConfig.js";
 
@@ -80,9 +70,9 @@ class WorldScene extends Phaser.Scene {
     this.worldLayout = createWorldLayout();
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.renderWorld();
-    this.createPlayerAnimations();
-    this.createPlayer();
+    this.createCharacterAnimations();
     this.createInput();
+    this.createCharacters();
     this.createMovementDebugPanel();
     this.createHud();
     this.attachSceneListeners();
@@ -108,10 +98,10 @@ class WorldScene extends Phaser.Scene {
       .setDepth(depth);
   }
 
-  createPlayerAnimations() {
+  createCharacterAnimations() {
     Object.entries(PLAYER_FRAMES).forEach(([facing, frames]) => {
       this.anims.create({
-        key: `walk-${facing}`,
+        key: `character-walk-${facing}`,
         frames: frames.map((key) => ({ key })),
         frameRate: WALK_FRAME_RATE,
         repeat: -1,
@@ -119,17 +109,34 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
-  createPlayer() {
-    this.lastFacing = "down";
+  createCharacters() {
     const debugOverrides = this.movementDebugEnabled ? this.loadMovementDebugConfig() : {};
     this.movementConfig = createRuntimeMovementConfig(debugOverrides);
-    this.playerMovement = createMovementState();
-    const spawn = this.worldLayout.spawn;
-    this.player = this.add
-      .sprite(spawn.x, spawn.y, PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX])
-      .setOrigin(0.5, 1);
-    this.updatePlayerDepth();
+    this.npcMovementConfig = createNpcMovementConfig(this.movementConfig);
+    this.playerCharacter = createCharacter(this, {
+      id: "player",
+      spawn: this.worldLayout.spawn,
+      controller: createPlayerController({ getInputDirection: () => this.getMovementVector() }),
+      movementConfig: this.movementConfig,
+    });
+    this.player = this.playerCharacter.sprite;
+    this.characters = [
+      this.playerCharacter,
+      ...NPCS.map((npc) =>
+        createCharacter(this, {
+          id: npc.id,
+          spawn: npc.spawn,
+          controller: createPatrolController(npc.patrol),
+          movementConfig: this.npcMovementConfig,
+        }),
+      ),
+    ];
     this.cameras.main.startFollow(this.player, true, 1, 1);
+  }
+
+  syncNpcMovementConfig() {
+    if (!this.npcMovementConfig) return;
+    Object.assign(this.npcMovementConfig, createNpcMovementConfig(this.movementConfig));
   }
 
   createInput() {
@@ -167,6 +174,7 @@ class WorldScene extends Phaser.Scene {
           [field.key]: value,
         });
         Object.assign(this.movementConfig, next);
+        this.syncNpcMovementConfig();
         input.value = String(this.movementConfig[field.key]);
         this.saveMovementDebugConfig();
       });
@@ -187,6 +195,7 @@ class WorldScene extends Phaser.Scene {
     reset.textContent = "Reset defaults";
     reset.addEventListener("click", () => {
       Object.assign(this.movementConfig, createRuntimeMovementConfig(DEFAULT_MOVEMENT_CONFIG));
+      this.syncNpcMovementConfig();
       try {
         localStorage.removeItem(MOVEMENT_STORAGE_KEY);
       } catch {
@@ -239,11 +248,11 @@ class WorldScene extends Phaser.Scene {
 
   updateMovementDebugStatus() {
     if (!this.movementDebugStatus) return;
-    const velocity = this.playerMovement.velocity;
+    const velocity = this.playerCharacter.movement.velocity;
     this.movementDebugStatus.textContent = [
-      `speed ${movementSpeed(this.playerMovement).toFixed(1)} / ${this.movementConfig.maxSpeed}`,
+      `speed ${movementSpeed(this.playerCharacter.movement).toFixed(1)} / ${this.movementConfig.maxSpeed}`,
       `velocity ${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}`,
-      `facing ${this.lastFacing}`,
+      `facing ${this.playerCharacter.lastFacing}`,
     ].join("\n");
   }
 
@@ -527,31 +536,8 @@ class WorldScene extends Phaser.Scene {
   }
 
   update(_time, delta) {
-    this.playerMovement = stepCharacterMovement(
-      this.playerMovement,
-      this.getMovementVector(),
-      delta,
-      { config: this.movementConfig },
-    );
-
-    const moveResult = moveWithCollision(
-      { x: this.player.x, y: this.player.y },
-      movementDelta(this.playerMovement, delta, this.movementConfig),
-      this.worldLayout,
-      PLAYER_FOOT_WIDTH,
-      PLAYER_FOOT_DEPTH,
-    );
-
-    this.playerMovement = applyBlockedAxes(this.playerMovement, moveResult.blockedAxes);
-    this.player.setPosition(moveResult.position.x, moveResult.position.y);
-    this.updatePlayerDepth();
-    this.updateLastFacing(this.playerMovement.facingDirection);
-    this.updatePlayerAnimation(this.playerMovement);
+    this.characters.forEach((character) => character.update(delta, this.worldLayout));
     this.updateMovementDebugStatus();
-  }
-
-  updatePlayerDepth() {
-    this.player.setDepth(500 + Math.round(this.player.y));
   }
 
   getMovementVector() {
@@ -566,33 +552,6 @@ class WorldScene extends Phaser.Scene {
     };
   }
 
-  updateLastFacing(direction) {
-    const absX = Math.abs(direction.x);
-    const absY = Math.abs(direction.y);
-    if ((absX === 0 && absY === 0) || Math.abs(absX - absY) <= FACING_HYSTERESIS) return;
-    this.lastFacing =
-      absX > absY
-        ? direction.x > 0
-          ? "right"
-          : "left"
-        : direction.y > 0
-          ? "down"
-          : "up";
-  }
-
-  updatePlayerAnimation(movement) {
-    if (!isMoving(movement, this.movementConfig)) {
-      this.player.anims.stop();
-      const idleFrame = PLAYER_FRAMES[this.lastFacing][PLAYER_IDLE_FRAME_INDEX];
-      if (this.player.texture.key !== idleFrame) this.player.setTexture(idleFrame);
-      return;
-    }
-
-    const key = `walk-${this.lastFacing}`;
-    if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== key) {
-      this.player.anims.play(key);
-    }
-  }
 }
 
 new Phaser.Game({

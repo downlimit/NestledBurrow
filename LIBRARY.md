@@ -41,7 +41,19 @@
 
 ### `src/main.js`
 
-Phaser-сцена непрерывного мира: Basic Village, игрок, камера, анимации, клавиатура, динамический мобильный джойстик с native pointer capture, внутриигровой screen-space HUD и debug-панель движения по `?movementDebug=1`.
+Phaser-сцена непрерывного мира: Basic Village, координация Character-сущностей, камера игрока, клавиатура, динамический мобильный джойстик с native pointer capture, внутриигровой screen-space HUD и debug-панель движения по `?movementDebug=1`.
+
+### `src/character.js`
+
+Переиспользуемая Character-сущность для игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting.
+
+### `src/controllers.js`
+
+Небольшие контроллеры направления: `PlayerController` берёт направление из клавиатуры/джойстика, `PatrolController` ведёт NPC по loop или ping-pong waypoint-маршрутам.
+
+### `src/npcConfig.js`
+
+Декларативные spawn-точки и waypoint-маршруты текущих NPC: домашний loop-патруль и уличный ping-pong-патруль.
 
 ### `src/input.js`
 
@@ -96,6 +108,10 @@ Mock-проверки Fullscreen API helper: supported state, вход, выхо
 ### `scripts/check-movement.mjs`
 
 Проверки max speed, диагонали, разгона, торможения, разворота через ноль, поворота на 90°, аналоговой силы, blocked axes, независимого aim, tuning limits и frame-delta cap.
+
+### `scripts/check-character.mjs`
+
+Проверки общей Character-фабрики игрока и NPC, NPC-тюнинга в половину player-разгона/торможения/разворота, loop и ping-pong переходов, waypoint tolerance, world collision и camera target игрока.
 
 ### `scripts/check-visual.mjs`
 
