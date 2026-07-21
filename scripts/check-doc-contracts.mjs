@@ -26,6 +26,18 @@ assert(
   project.includes("Не следует автоматически добавлять в ключ `PROJECT.md`, `REVIEW.md` или `LIBRARY.md`."),
   "PROJECT.md must keep routine Codex prompts free of lead-only context",
 );
+assert(
+  project.includes("## Операционный запуск нового чата"),
+  "PROJECT.md must turn PR requests into immediate operational work",
+);
+assert(
+  project.includes("`api_tool.list_resources`"),
+  "PROJECT.md must define dynamic GitHub tool discovery for new chats",
+);
+assert(
+  project.includes("Наличие описания функции без уже загруженной схемы **не является ограничением среды**."),
+  "PROJECT.md must reject false tool-unavailability claims",
+);
 
 assert(
   agents.includes("Do **not** read `PROJECT.md`, `REVIEW.md` or `LIBRARY.md` by default."),
@@ -47,6 +59,18 @@ assert(
 assert(
   review.includes("The user must never need to request routine Markdown maintenance."),
   "REVIEW.md must assign documentation drift ownership to the main chat",
+);
+assert(
+  review.includes("## 1. Operational trigger"),
+  "REVIEW.md must require execution instead of plan-only PR responses",
+);
+assert(
+  review.includes("Do not claim `fetch_pr_patch` or another described action is unavailable"),
+  "REVIEW.md must require actual tool discovery before reporting a blocker",
+);
+assert(
+  review.includes("A side question during active review does not cancel the operation"),
+  "REVIEW.md must preserve active work across user interruptions",
 );
 assert(
   taskTemplate.includes("Optional only when genuinely needed:"),
