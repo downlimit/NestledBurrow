@@ -171,9 +171,14 @@ A local network, proxy, package-index, browser-install or dependency failure doe
 
 - Develop without an open PR.
 - Finish implementation, self-review, browser inspection and known repairs first.
+- Run all applicable local validation before opening the PR. A deterministic local failure blocks PR creation.
 - Batch related corrections instead of pushing one commit per small defect.
-- Create exactly one final PR after applicable validation.
-- Do not use draft PRs, close/reopen cycles or replacement PRs as a development mechanism.
+- Create exactly one final non-draft PR after applicable validation.
+- A draft PR is not a normal development mechanism. It is allowed only as a circuit breaker after an already-open final PR exposes a remote-only or previously unknown CI failure.
+- Do not push diagnostic or incremental repair commits to an open non-draft PR.
+- After a failed final-head CI run, read the complete failing logs, reproduce locally when possible, collect all blockers and make one consolidated corrective push.
+- If another repair cycle is unavoidable, convert the PR to draft before any further branch mutation. Keep it draft while diagnosing and mark it ready only after applicable local checks pass; the ready transition is the single intended final CI trigger.
+- Do not use close/reopen cycles or replacement PRs as a development mechanism.
 - Keep one coherent implementation concern per PR when `main` can remain usable between stages.
 - Do not knowingly open a PR with obvious defects merely because automated checks pass.
 - Ensure all evidence and artifacts refer to the final head SHA.
