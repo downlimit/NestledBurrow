@@ -73,7 +73,7 @@ export function createInteractionHud(scene, options = {}) {
     hideDialogue() { dialogueState = null; redraw(); },
     consumeInteractPressed() { const pressed = latchedInteract; latchedInteract = false; return pressed; },
     isPointInHud(x, y) {
-      return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_ACTION_RECT)) || (promptState && isPointInRect(x, y, PROMPT_RECT)));
+      return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && isPointInRect(x, y, PROMPT_RECT)));
     },
     destroy() {
       if (destroyed) return;
