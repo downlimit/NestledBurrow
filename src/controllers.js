@@ -20,7 +20,7 @@ export function createPlayerController({ getInputDirection, getAimDirection, get
   };
 }
 
-export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_TOLERANCE }) {
+export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_TOLERANCE, isPaused } = {}) {
   if (!Array.isArray(waypoints) || waypoints.length < 2) {
     throw new Error("Patrol routes need at least two waypoints");
   }
@@ -39,6 +39,9 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
       return index;
     },
     getCommand(context, deltaMs) {
+      if (isPaused?.()) {
+        return createControllerCommand({ moveDirection: IDLE_DIRECTION });
+      }
       const position = context.position;
       const waypoint = waypoints[index];
       const dx = waypoint.x - position.x;

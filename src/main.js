@@ -37,6 +37,11 @@ import {
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
 import { NPCS } from "./npcConfig.js";
+import { createGameSessionState } from "./gameSessionState.js";
+import { getDialogueDefinition } from "./dialogueConfig.js";
+import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
+import { createInteractionRuntime } from "./interactionRuntime.js";
+import { createInteractionHud } from "./interactionHud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 
@@ -70,6 +75,7 @@ class WorldScene extends Phaser.Scene {
     this.createCharacterAnimations();
     this.createInput();
     this.createCharacters();
+    this.createSessionAndInteractionRuntime();
     this.createMovementDebugPanel();
     this.createHud();
     this.attachSceneListeners();
@@ -121,7 +127,10 @@ class WorldScene extends Phaser.Scene {
     this.playerCharacter = createCharacter(this, {
       id: "player",
       spawn: this.worldLayout.spawn,
-      controller: createPlayerController({ getInputDirection: () => this.getMovementVector() }),
+      controller: createPlayerController({
+        getInputDirection: () => this.getMovementVector(),
+        getActions: () => this.frameActions,
+      }),
       movementConfig: this.movementConfig,
       actorProfile: playerProfile,
     });
@@ -131,7 +140,10 @@ class WorldScene extends Phaser.Scene {
       this.characterSystem.add(createCharacter(this, {
         id: npc.id,
         spawn: npc.spawn,
-        controller: createPatrolController(npc.patrol),
+        controller: createPatrolController({
+          ...npc.patrol,
+          isPaused: () => this.interactionRuntime?.isEntityInActiveDialogue(npc.id) ?? false,
+        }),
         movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
         actorProfile,
       }));
@@ -170,6 +182,26 @@ class WorldScene extends Phaser.Scene {
   createInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
+    this.interactKeys = this.input.keyboard.addKeys("E,SPACE");
+    this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
+  }
+
+  createSessionAndInteractionRuntime() {
+    this.sessionState = createGameSessionState({
+      currentWorldId: "village",
+      playerId: "player",
+      initialEntityIds: NPCS.map((npc) => npc.id),
+    });
+    this.interactionHud = createInteractionHud(this, {
+      isCoarsePointer: () => this.isCoarsePointer(),
+    });
+    this.interactionRuntime = createInteractionRuntime({
+      sessionState: this.sessionState,
+      characterSystem: this.characterSystem,
+      interactionDefinitions: INTERACTION_DEFINITIONS,
+      getDialogueDefinition,
+      presenter: this.interactionHud,
+    });
   }
 
   createMovementDebugPanel() {
@@ -223,7 +255,11 @@ class WorldScene extends Phaser.Scene {
   }
 
   isHudPoint(x, y) {
-    return isPointInRect(x, y, FULLSCREEN_HIT_AREA);
+    return isPointInRect(x, y, FULLSCREEN_HIT_AREA) || Boolean(this.interactionHud?.isPointInHud(x, y));
+  }
+
+  isCoarsePointer() {
+    return window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
   }
 
   attachSceneListeners() {
@@ -257,6 +293,10 @@ class WorldScene extends Phaser.Scene {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
+    this.interactionRuntime?.destroy();
+    this.interactionRuntime = null;
+    this.interactionHud?.destroy();
+    this.interactionHud = null;
     this.movementDebugPanel?.destroy();
     this.movementDebugPanel = null;
     this.characterSystem?.destroy();
@@ -267,11 +307,26 @@ class WorldScene extends Phaser.Scene {
   }
 
   update(_time, delta) {
+    this.sampleFrameActions();
     this.characterSystem?.update(delta);
+    this.interactionRuntime?.update({ actions: this.frameActions });
     this.updateMovementDebugStatus();
   }
 
+  sampleFrameActions() {
+    const keyboardPressed =
+      Phaser.Input.Keyboard.JustDown(this.interactKeys.E) ||
+      Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE);
+    const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
+    this.frameActions = Object.freeze({
+      interact: keyboardPressed || mobilePressed,
+      primary: false,
+      secondary: false,
+    });
+  }
+
   getMovementVector() {
+    if (this.interactionRuntime?.isDialogueActive()) return { x: 0, y: 0 };
     const left = this.cursors.left.isDown || this.wasd.A.isDown;
     const right = this.cursors.right.isDown || this.wasd.D.isDown;
     const up = this.cursors.up.isDown || this.wasd.W.isDown;
