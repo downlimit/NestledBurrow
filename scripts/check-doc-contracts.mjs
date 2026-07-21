@@ -15,6 +15,7 @@ const review = read("REVIEW.md");
 const library = read("LIBRARY.md");
 const taskTemplate = read("tasks/TEMPLATE.md");
 const prTemplate = read(".github/pull_request_template.md");
+const prWorkflow = read(".github/workflows/pr-check.yml");
 
 hasAll(
   project,
@@ -99,10 +100,26 @@ hasAll(
     "Merge phase",
     "Owned paths",
     "Shared files allowed",
+    "Develop without an open PR.",
+    "Do not push diagnostic or incremental repair commits to an open non-draft PR.",
+    "one consolidated corrective push",
+    "the ready transition is the single intended final CI trigger",
   ],
   "AGENTS.md",
 );
 assert(!agents.includes("Read `PROJECT.md`, `LIBRARY.md`"), "AGENTS.md must not restore blanket context loading");
+
+hasAll(
+  prWorkflow,
+  [
+    "types:",
+    "synchronize",
+    "ready_for_review",
+    "cancel-in-progress: true",
+    "if: github.event.pull_request.draft == false",
+  ],
+  ".github/workflows/pr-check.yml",
+);
 
 hasAll(
   library,
@@ -137,4 +154,4 @@ hasAll(
   ".github/pull_request_template.md",
 );
 
-console.log("documentation contracts passed: risk-based Project, Lead, Integrator and Codex roles are aligned");
+console.log("documentation contracts passed: risk-based Project, Lead, Integrator, Codex and anti-spam PR rules are aligned");
