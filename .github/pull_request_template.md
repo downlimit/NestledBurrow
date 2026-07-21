@@ -1,4 +1,4 @@
-<!-- Keep only applicable sections. For a docs-only or tiny low-risk change, a concise scope, lifecycle and validation summary is enough. Delete empty or not-applicable sections instead of filling them with bureaucracy. -->
+<!-- Keep only applicable sections. A routine task may come directly from a self-contained Codex prompt; no task file is required. For a docs-only or tiny low-risk change, a concise scope, lifecycle and validation summary is enough. Delete empty or not-applicable sections instead of filling them with bureaucracy. -->
 
 # Review class
 
@@ -13,7 +13,7 @@
 ## Git lifecycle
 
 - Base branch: `main`
-- Task branch: `<branch>`
+- Work branch: `<branch>`
 - Final head SHA: `<sha>`
 - Lifecycle: `ephemeral` / `persistent`
 - PR opened once after implementation and validation: `yes` / `no`
