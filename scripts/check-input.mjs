@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   JOYSTICK,
   clampJoystickCenter,
@@ -147,5 +148,19 @@ for (const reason of ["pointerupoutside", "pointercancel", "window blur", "visib
 const combined = clampVectorLength({ x: 1, y: 1 });
 near(Math.hypot(combined.x, combined.y), 1, "keyboard plus joystick is clamped to speed 1");
 assert.deepEqual(clampVectorLength({ x: 1, y: 0 }), { x: 1, y: 0 }, "keyboard vector is preserved when already within speed 1");
+
+const mainSource = readFileSync("src/main.js", "utf8");
+assert(
+  mainSource.includes("handleJoystickPointerMove(pointer) {\n    if (this.activeDomPointerId !== null) return;"),
+  "Phaser pointermove cannot compete with an active native DOM pointer",
+);
+assert(
+  mainSource.includes("handleJoystickPointerUp(pointer) {\n    if (this.activeDomPointerId !== null) return;"),
+  "Phaser pointerup cannot reset a different native pointer with a colliding internal id",
+);
+assert(
+  !mainSource.includes('document.addEventListener("pointermove", this.onNativePointerMove'),
+  "native fallback is registered once on window rather than processed twice through window and document",
+);
 
 console.log("input checks passed");

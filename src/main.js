@@ -353,9 +353,6 @@ class WorldScene extends Phaser.Scene {
     window.addEventListener("pointermove", this.onNativePointerMove, { capture: true, passive: false });
     window.addEventListener("pointerup", this.onNativePointerUp, { capture: true, passive: false });
     window.addEventListener("pointercancel", this.onNativePointerCancel, { capture: true, passive: false });
-    document.addEventListener("pointermove", this.onNativePointerMove, { capture: true, passive: false });
-    document.addEventListener("pointerup", this.onNativePointerUp, { capture: true, passive: false });
-    document.addEventListener("pointercancel", this.onNativePointerCancel, { capture: true, passive: false });
   }
 
   handleJoystickPointerDown(pointer) {
@@ -401,6 +398,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleJoystickPointerMove(pointer) {
+    if (this.activeDomPointerId !== null) return;
     if (pointer.id === this.activeJoystickPointerId) this.updateJoystick(pointer);
   }
 
@@ -417,15 +415,6 @@ class WorldScene extends Phaser.Scene {
     } catch {
       this.joystickPointerCaptured = false;
     }
-  }
-
-  hasActivePointerCapture() {
-    const canvas = this.game.canvas;
-    return (
-      this.activeDomPointerId !== null &&
-      this.joystickPointerCaptured &&
-      (!canvas.hasPointerCapture || canvas.hasPointerCapture(this.activeDomPointerId))
-    );
   }
 
   canvasPointFromNativeEvent(event) {
@@ -451,6 +440,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleJoystickPointerUp(pointer) {
+    if (this.activeDomPointerId !== null) return;
     if (pointer.id === this.activeJoystickPointerId) this.resetJoystick();
   }
 
@@ -527,9 +517,6 @@ class WorldScene extends Phaser.Scene {
     window.removeEventListener("pointermove", this.onNativePointerMove, { capture: true });
     window.removeEventListener("pointerup", this.onNativePointerUp, { capture: true });
     window.removeEventListener("pointercancel", this.onNativePointerCancel, { capture: true });
-    document.removeEventListener("pointermove", this.onNativePointerMove, { capture: true });
-    document.removeEventListener("pointerup", this.onNativePointerUp, { capture: true });
-    document.removeEventListener("pointercancel", this.onNativePointerCancel, { capture: true });
     this.resetJoystick();
     this.movementDebugPanel?.remove();
     this.movementDebugPanel = null;
