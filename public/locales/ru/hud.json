@@ -1,0 +1,16 @@
+{
+  "fullscreen": {
+    "enter": "На весь экран",
+    "exit": "Выйти из полноэкранного режима",
+    "unsupported": "Полноэкранный режим недоступен"
+  },
+  "language": {
+    "toggle": "Сменить язык",
+    "currentNext": "{current} / {next}"
+  },
+  "interaction": {
+    "talk": "Говорить",
+    "next": "Дальше",
+    "close": "Закрыть"
+  }
+}

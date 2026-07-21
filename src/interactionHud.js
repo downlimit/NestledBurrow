@@ -1,40 +1,36 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
-import {
-  HUD_COLORS,
-  HUD_DEPTH,
-  drawBitmapTextInto,
-  isPointInRect,
-  measureBitmapText,
-} from "./hud.js";
+import { HUD_COLORS, HUD_DEPTH, isPointInRect } from "./hud.js";
 
-const PROMPT_WIDTH = 76;
 const PROMPT_RIGHT_MARGIN = 10;
-const PROMPT_RECT = Object.freeze({
-  x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - PROMPT_WIDTH,
-  y: GAME_HEIGHT - 34,
-  width: PROMPT_WIDTH,
-  height: 24,
-});
-const DIALOGUE_RECT = Object.freeze({ x: 8, y: GAME_HEIGHT - 58, width: GAME_WIDTH - 16, height: 50 });
-const DIALOGUE_ACTION_RECT = Object.freeze({ x: GAME_WIDTH - 74, y: GAME_HEIGHT - 34, width: 66, height: 28 });
+const PROMPT_MIN_WIDTH = 76;
+const PROMPT_HEIGHT = 24;
+const DIALOGUE_RECT = Object.freeze({ x: 8, y: GAME_HEIGHT - 64, width: GAME_WIDTH - 16, height: 56 });
+const DIALOGUE_ACTION_RECT = Object.freeze({ x: GAME_WIDTH - 86, y: GAME_HEIGHT - 36, width: 78, height: 28 });
 
 export function createInteractionHud(scene, options = {}) {
   const isCoarsePointer = options.isCoarsePointer ?? (() => false);
+  const localization = options.localization;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 10).setScrollFactor(0);
-  const promptHit = scene.add.zone(PROMPT_RECT.x, PROMPT_RECT.y, PROMPT_RECT.width, PROMPT_RECT.height)
+  const promptHit = scene.add.zone(0, 0, PROMPT_MIN_WIDTH, PROMPT_HEIGHT)
     .setOrigin(0, 0).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setInteractive({ useHandCursor: true });
   const dialogueHit = scene.add.zone(DIALOGUE_ACTION_RECT.x, DIALOGUE_ACTION_RECT.y, DIALOGUE_ACTION_RECT.width, DIALOGUE_ACTION_RECT.height)
     .setOrigin(0, 0).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setInteractive({ useHandCursor: true });
+
+  const speakerText = scene.add.text(DIALOGUE_RECT.x + 8, DIALOGUE_RECT.y + 6, "", speakerStyle()).setDepth(HUD_DEPTH + 11).setScrollFactor(0).setVisible(false);
+  const bodyText = scene.add.text(DIALOGUE_RECT.x + 8, DIALOGUE_RECT.y + 21, "", bodyStyle()).setDepth(HUD_DEPTH + 11).setScrollFactor(0).setVisible(false);
+  const actionText = scene.add.text(0, DIALOGUE_RECT.y + 40, "", actionStyle()).setDepth(HUD_DEPTH + 11).setScrollFactor(0).setVisible(false);
+  const promptText = scene.add.text(0, 0, "", promptStyle()).setDepth(HUD_DEPTH + 11).setScrollFactor(0).setVisible(false);
 
   let destroyed = false;
   let promptState = null;
   let dialogueState = null;
   let renderedKey = "";
   let latchedInteract = false;
+  let promptRect = null;
 
-  const onPointerDown = (_pointer, _localX, _localY, event) => {
+  const onPointerDown = (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
-    _pointer?.event?.stopPropagation?.();
+    pointer?.event?.stopPropagation?.();
     latchedInteract = true;
   };
   promptHit.on("pointerdown", onPointerDown);
@@ -42,20 +38,30 @@ export function createInteractionHud(scene, options = {}) {
   promptHit.disableInteractive();
   dialogueHit.disableInteractive();
 
-  function redraw() {
+  function fontFamily() { return localization?.getLocale?.().fontKey ?? "sans-serif"; }
+  function speakerStyle() { return { fontFamily: fontFamily(), fontSize: "8px", color: "#d9c18f" }; }
+  function bodyStyle() { return { fontFamily: fontFamily(), fontSize: "9px", color: "#f2eadc", wordWrap: { width: DIALOGUE_RECT.width - 16, useAdvancedWrap: true } }; }
+  function actionStyle() { return { fontFamily: fontFamily(), fontSize: "8px", color: "#d9c18f" }; }
+  function promptStyle() { return { fontFamily: fontFamily(), fontSize: "9px", color: "#f2eadc" }; }
+  function translate(descriptor) { return localization.t(descriptor.textKey ?? descriptor, descriptor.values); }
+  function actionLabel(key) { return `${isCoarsePointer() ? "" : "E  "}${localization.t(key)}`; }
+
+  function redraw(force = false) {
     if (destroyed) return;
-    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()) });
-    if (key === renderedKey) return;
+    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.() });
+    if (!force && key === renderedKey) return;
     renderedKey = key;
     graphics.clear();
+    for (const t of [speakerText, bodyText, actionText, promptText]) t.setVisible(false);
 
     if (dialogueState) {
       graphics.fillStyle(HUD_COLORS.panel, 0.92).fillRect(DIALOGUE_RECT.x, DIALOGUE_RECT.y, DIALOGUE_RECT.width, DIALOGUE_RECT.height);
       graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(DIALOGUE_RECT.x + 0.5, DIALOGUE_RECT.y + 0.5, DIALOGUE_RECT.width - 1, DIALOGUE_RECT.height - 1);
-      drawBitmapTextInto(graphics, DIALOGUE_RECT.x + 8, DIALOGUE_RECT.y + 7, dialogueState.speaker, { color: HUD_COLORS.mid });
-      drawBitmapTextInto(graphics, DIALOGUE_RECT.x + 8, DIALOGUE_RECT.y + 22, dialogueState.text, { color: HUD_COLORS.light });
-      const label = `${isCoarsePointer() ? "" : "E  "}${dialogueState.continuePrompt}`;
-      drawBitmapTextInto(graphics, GAME_WIDTH - 12 - measureBitmapText(label), DIALOGUE_RECT.y + 36, label, { color: HUD_COLORS.mid });
+      speakerText.setStyle(speakerStyle()).setText(translate({ textKey: dialogueState.speakerKey, values: dialogueState.speakerValues })).setVisible(true);
+      bodyText.setStyle(bodyStyle()).setText(translate(dialogueState.line)).setVisible(true);
+      const label = actionLabel(dialogueState.continuePromptKey);
+      actionText.setStyle(actionStyle()).setText(label).setVisible(true);
+      actionText.setPosition(Math.round(GAME_WIDTH - 12 - actionText.width), Math.round(DIALOGUE_RECT.y + 40));
       dialogueHit.setInteractive({ useHandCursor: true });
       promptHit.disableInteractive();
       return;
@@ -63,35 +69,36 @@ export function createInteractionHud(scene, options = {}) {
 
     dialogueHit.disableInteractive();
     if (promptState) {
-      const label = `${isCoarsePointer() ? "" : "E  "}${promptState.prompt}`;
-      graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(PROMPT_RECT.x, PROMPT_RECT.y, PROMPT_RECT.width, PROMPT_RECT.height);
-      graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(PROMPT_RECT.x + 0.5, PROMPT_RECT.y + 0.5, PROMPT_RECT.width - 1, PROMPT_RECT.height - 1);
-      drawBitmapTextInto(graphics, PROMPT_RECT.x + 8, PROMPT_RECT.y + 9, label, { color: HUD_COLORS.light });
-      promptHit.setInteractive({ useHandCursor: true });
+      const label = actionLabel(promptState.promptKey);
+      promptText.setStyle(promptStyle()).setText(label).setVisible(true);
+      const width = Math.max(PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
+      promptRect = { x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - width, y: GAME_HEIGHT - 34, width, height: PROMPT_HEIGHT };
+      graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(promptRect.x, promptRect.y, promptRect.width, promptRect.height);
+      graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(promptRect.x + 0.5, promptRect.y + 0.5, promptRect.width - 1, promptRect.height - 1);
+      promptText.setPosition(Math.round(promptRect.x + 8), Math.round(promptRect.y + 7));
+      promptHit.setPosition(promptRect.x, promptRect.y).setSize(promptRect.width, promptRect.height).setInteractive({ useHandCursor: true });
     } else {
+      promptRect = null;
       promptHit.disableInteractive();
     }
   }
 
+  const unsubscribe = localization?.subscribe?.(() => redraw(true));
+
   return {
-    showPrompt({ prompt }) { promptState = { prompt }; redraw(); },
+    showPrompt({ promptKey }) { promptState = { promptKey }; redraw(); },
     hidePrompt() { promptState = null; redraw(); },
-    showDialogue({ speaker, text, continuePrompt }) { dialogueState = { speaker, text, continuePrompt }; promptState = null; redraw(); },
+    showDialogue(dialogue) { dialogueState = { ...dialogue }; promptState = null; redraw(); },
     hideDialogue() { dialogueState = null; redraw(); },
     consumeInteractPressed() { const pressed = latchedInteract; latchedInteract = false; return pressed; },
-    isPointInHud(x, y) {
-      return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && isPointInRect(x, y, PROMPT_RECT)));
-    },
+    isPointInHud(x, y) { return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && promptRect && isPointInRect(x, y, promptRect))); },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      promptHit.off("pointerdown", onPointerDown);
-      dialogueHit.off("pointerdown", onPointerDown);
-      promptHit.destroy();
-      dialogueHit.destroy();
-      graphics.destroy();
-      promptState = null;
-      dialogueState = null;
+      unsubscribe?.();
+      promptHit.off("pointerdown", onPointerDown); dialogueHit.off("pointerdown", onPointerDown);
+      promptHit.destroy(); dialogueHit.destroy(); graphics.destroy();
+      speakerText.destroy(); bodyText.destroy(); actionText.destroy(); promptText.destroy();
     },
   };
 }

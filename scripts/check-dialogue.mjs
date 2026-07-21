@@ -6,8 +6,8 @@ import { createGameSessionState, getEntityFlag, startDialogue } from "../src/gam
 
 const definition = getDialogueDefinition("home-npc-greeting");
 assert.equal(definition.id, "home-npc-greeting", "dialogue ID is stable");
-assert.equal(definition.speaker, "HOME NPC", "speaker is stable");
-assert.deepEqual(definition.lines, ["HELLO THERE.", "THE VILLAGE IS QUIET TODAY.", "SEE YOU AROUND."], "dialogue has validation lines");
+assert.equal(definition.speakerKey, "dialogue:homeGreeting.speaker", "speaker key is stable");
+assert.deepEqual(definition.lines.map((line) => line.textKey), ["dialogue:homeGreeting.lines.hello", "dialogue:homeGreeting.lines.quietVillage", "dialogue:homeGreeting.lines.goodbye"], "dialogue has validation line keys");
 assert.equal(definition.lines.length, 3, "dialogue has exactly three lines");
 assert.equal(getDialogueDefinition(definition.id), definition, "lookup returns canonical definition");
 assert.throws(() => getDialogueDefinition("missing"), /Unknown dialogue definition ID: missing/, "unknown dialogue IDs fail clearly");
@@ -24,7 +24,7 @@ assert.throws(() => { definition.lines.push("NOPE"); }, TypeError, "line array c
 const stateForShape = createGameSessionState({ initialEntityIds: ["home-npc"] });
 startDialogue(stateForShape, { targetId: "home-npc", dialogueId: definition.id });
 assert.deepEqual(stateForShape.dialogue, { targetId: "home-npc", dialogueId: definition.id, lineIndex: 0 }, "session stores only dialogue ID and index");
-assert(!JSON.stringify(stateForShape.dialogue).includes("HELLO THERE"), "session dialogue does not store text");
+assert(!JSON.stringify(stateForShape.dialogue).includes("homeGreeting.lines"), "session dialogue does not store localization keys or text");
 
 assert(Object.isFrozen(INTERACTION_DEFINITIONS), "interaction definitions are immutable");
 const talkDefinition = INTERACTION_DEFINITIONS[0];
@@ -67,25 +67,25 @@ runtime.update({ actions: { interact: false } });
 assert.equal(runtime.getCurrentCandidate(), null, "wrong facing hides prompt");
 characterSystem.set("player", { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } });
 runtime.update({ actions: { interact: false } });
-assert.equal(runtime.getCurrentCandidate().prompt, "TALK", "facing nearby NPC shows TALK");
+assert.equal(runtime.getCurrentCandidate().prompt, "hud:interaction.talk", "facing nearby NPC shows talk prompt key");
 runtime.update({ actions: { interact: true } });
 assert.equal(runtime.isDialogueActive(), true, "interact starts dialogue");
-assert.equal(presenter.dialogues.at(-1).text, "HELLO THERE.", "first line is displayed");
+assert.equal(presenter.dialogues.at(-1).line.textKey, "dialogue:homeGreeting.lines.hello", "first line descriptor is displayed");
 assert.equal(runtime.getCurrentCandidate(), null, "candidate prompt clears during dialogue");
 assert.equal(runtime.isEntityInActiveDialogue("home-npc"), true, "targeted NPC is paused");
 assert.equal(runtime.isEntityInActiveDialogue("street-npc"), false, "other NPC is not paused");
 runtime.update({ actions: { interact: true } });
-assert.equal(presenter.dialogues.at(-1).text, "THE VILLAGE IS QUIET TODAY.", "second line displays");
-assert.equal(presenter.dialogues.at(-1).continuePrompt, "NEXT", "middle lines use NEXT");
+assert.equal(presenter.dialogues.at(-1).line.textKey, "dialogue:homeGreeting.lines.quietVillage", "second line descriptor displays");
+assert.equal(presenter.dialogues.at(-1).continuePromptKey, "hud:interaction.next", "middle lines use next key");
 runtime.update({ actions: { interact: true } });
-assert.equal(presenter.dialogues.at(-1).text, "SEE YOU AROUND.", "third line displays");
-assert.equal(presenter.dialogues.at(-1).continuePrompt, "CLOSE", "last line uses CLOSE");
+assert.equal(presenter.dialogues.at(-1).line.textKey, "dialogue:homeGreeting.lines.goodbye", "third line descriptor displays");
+assert.equal(presenter.dialogues.at(-1).continuePromptKey, "hud:interaction.close", "last line uses close key");
 runtime.update({ actions: { interact: true } });
 assert.equal(runtime.isDialogueActive(), false, "final interact closes dialogue");
 assert.equal(getEntityFlag(session, "home-npc", "greeted"), true, "completion flag is stored after final line");
 assert.equal(runtime.isEntityInActiveDialogue("home-npc"), false, "targeted NPC resumes after close");
 runtime.update({ actions: { interact: false } });
-assert.equal(runtime.getCurrentCandidate().prompt, "TALK", "candidate can appear again after close");
+assert.equal(runtime.getCurrentCandidate().prompt, "hud:interaction.talk", "candidate can appear again after close");
 runtime.update({ actions: { interact: true } });
 assert.equal(session.dialogue.lineIndex, 0, "repeat conversation restarts at line zero");
 

@@ -1,17 +1,6 @@
 import Phaser from "phaser";
 import "./style.css";
 import { clampVectorLength } from "./input.js";
-import { isFullscreenActive, isFullscreenSupported, toggleFullscreen } from "./fullscreen.js";
-import {
-  BUILD_LABEL,
-  FULLSCREEN_HIT_AREA,
-  compactBuildLabel,
-  drawBitmapText,
-  drawFullscreenIcon,
-  isPointInRect,
-  measureBitmapText,
-  renderFullscreenIcon,
-} from "./hud.js";
 import { createRuntimeMovementConfig } from "./characterMovement.js";
 import {
   ACTOR_PROFILE_IDS,
@@ -42,6 +31,9 @@ import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
 import { createInteractionRuntime } from "./interactionRuntime.js";
 import { createInteractionHud } from "./interactionHud.js";
+import { createGameHud } from "./gameHud.js";
+import { createLocalization } from "./localization/index.js";
+import { RUBIK_FONT_KEY, RUBIK_FONT_PATH } from "./localization/font.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 import { PLAYER_WALK_FRAME_SEQUENCE } from "./visualConfig.js";
@@ -49,13 +41,16 @@ import { PLAYER_WALK_FRAME_SEQUENCE } from "./visualConfig.js";
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const PLAYER_ASSET_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney/player`;
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
+const FONT_ASSET_URL = `${import.meta.env.BASE_URL}${RUBIK_FONT_PATH}`;
 
 class WorldScene extends Phaser.Scene {
   constructor() {
     super("world");
+    this.localization = window.__NESTLED_BURROW_LOCALIZATION__;
   }
 
   preload() {
+    this.load.font(RUBIK_FONT_KEY, FONT_ASSET_URL, "truetype");
     const playerTextureKeys = new Set(
       Object.values(getActorProfile(ACTOR_PROFILE_IDS.player).visual.frames).flat(),
     );
@@ -198,6 +193,7 @@ class WorldScene extends Phaser.Scene {
     });
     this.interactionHud = createInteractionHud(this, {
       isCoarsePointer: () => this.isCoarsePointer(),
+      localization: this.localization,
     });
     this.interactionRuntime = createInteractionRuntime({
       sessionState: this.sessionState,
@@ -230,36 +226,20 @@ class WorldScene extends Phaser.Scene {
 
   createHud() {
     this.gameContainer = document.getElementById("game");
-    const label = compactBuildLabel(BUILD_ID);
-    const labelWidth = measureBitmapText(label);
-    drawBitmapText(this, BUILD_LABEL.x - labelWidth, BUILD_LABEL.y, label);
-
-    if (!isFullscreenSupported(this.gameContainer)) return;
-
-    this.fullscreenHud = drawFullscreenIcon(
-      this,
-      isFullscreenActive(document, this.gameContainer),
-    );
-    this.fullscreenHud.hit.on("pointerdown", (pointer, _localX, _localY, event) => {
-      event?.stopPropagation?.();
-      pointer.event?.stopPropagation?.();
-      void toggleFullscreen({ documentRef: document, element: this.gameContainer }).then(() => {
-        this.updateFullscreenHud();
-        this.syncIntegerZoom();
-      });
+    this.gameHud = createGameHud(this, {
+      buildId: BUILD_ID,
+      localization: this.localization,
+      gameContainer: this.gameContainer,
+      onLanguageChange: () => this.interactionRuntime?.refresh?.(),
     });
   }
 
   updateFullscreenHud() {
-    if (!this.fullscreenHud) return;
-    renderFullscreenIcon(
-      this.fullscreenHud.graphics,
-      isFullscreenActive(document, this.gameContainer),
-    );
+    this.gameHud?.render();
   }
 
   isHudPoint(x, y) {
-    return isPointInRect(x, y, FULLSCREEN_HIT_AREA) || Boolean(this.interactionHud?.isPointInHud(x, y));
+    return Boolean(this.gameHud?.isPointInHud(x, y)) || Boolean(this.interactionHud?.isPointInHud(x, y));
   }
 
   isCoarsePointer() {
@@ -305,9 +285,8 @@ class WorldScene extends Phaser.Scene {
     this.movementDebugPanel = null;
     this.characterSystem?.destroy();
     this.characterSystem = null;
-    this.fullscreenHud?.hit.destroy();
-    this.fullscreenHud?.graphics.destroy();
-    this.fullscreenHud = null;
+    this.gameHud?.destroy();
+    this.gameHud = null;
   }
 
   update(_time, delta) {
@@ -343,7 +322,10 @@ class WorldScene extends Phaser.Scene {
   }
 }
 
-new Phaser.Game({
+async function bootstrap() {
+  const localization = await createLocalization();
+  window.__NESTLED_BURROW_LOCALIZATION__ = localization;
+  new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game",
   backgroundColor: "#171724",
@@ -357,4 +339,9 @@ new Phaser.Game({
     mode: Phaser.Scale.NONE,
     zoom: Phaser.Scale.MAX_ZOOM,
   },
+  });
+}
+
+void bootstrap().catch((error) => {
+  console.error("Failed to bootstrap NestledBurrow", error);
 });
