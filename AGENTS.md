@@ -114,7 +114,7 @@ All world art drawn from the same source pixel grid must use one visual pixel si
 - The displayed canvas must be an integer multiple of the logical game resolution. Letterboxing is acceptable; fractional canvas scaling is not.
 - Use nearest-neighbor rendering only: `pixelArt: true`, `antialias: false`, `roundPixels: true` and `image-rendering: pixelated`.
 - Camera following must not introduce subpixel sampling. Camera scroll and follow results must be rounded to the logical pixel grid.
-- A visual change must be checked at least at two different viewport sizes. Confirm that one source pixel remains one consistently sized square block within each viewport.
+- A visual change must be checked at two or more different viewport sizes. Confirm that one source pixel remains one consistently sized square block within each viewport.
 - Automated checks must reject reintroduction of independent world-art scale constants or fractional display zoom.
 
 UI may use its own typography and dimensions, but it must remain screen-space UI and must not change the world-art pixel scale.
