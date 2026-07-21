@@ -12,6 +12,7 @@
 
 - Base branch: `main`
 - Task branch: `<branch>`
+- Final head SHA: `<sha>`
 - Lifecycle: `ephemeral` / `persistent`
 - PR opened once after implementation and local validation: `yes` / `no`
 - Additional remote branches created: `none` / `<explain>`
