@@ -1,5 +1,3 @@
-import roomConfig from "./kenneyRoomConfig.json" with { type: "json" };
-
 export const PLAYER_FOOT_WIDTH = 8;
 export const PLAYER_FOOT_DEPTH = 5;
 export const FACING_HYSTERESIS = 0.15;
@@ -12,7 +10,3 @@ export const PLAYER_FRAMES = Object.freeze({
   left: Object.freeze(["tile_0266", "tile_0293", "tile_0320"]),
   right: Object.freeze(["tile_0269", "tile_0296", "tile_0323"]),
 });
-
-export const ROOM_TEXTURE_KEY = roomConfig.textureKey;
-export const ROOM_IMAGE_PATH = roomConfig.imagePath;
-export const ROOM_ATLAS_PATH = roomConfig.atlasPath;

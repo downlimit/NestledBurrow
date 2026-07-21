@@ -16,6 +16,8 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
+const visualConfigSource = fs.readFileSync(path.join(root, "src/visualConfig.js"), "utf8");
+const roomPreviewSource = fs.readFileSync(path.join(root, "scripts/check-room-preview.py"), "utf8");
 const assetRoot = path.join(root, "public", BASIC_VILLAGE_ASSET_PATH);
 const playerDirectory = path.join(root, "public/assets/third-party/kenney/player");
 
@@ -48,6 +50,24 @@ const officialAssets = [
   },
 ];
 
+const removedSourcePaths = ["src/kenneyRoomConfig.json", "src/roomLayout.js"];
+const removedPublicAtlasPaths = [
+  "public/room/kenney-room-tiles.png",
+  "public/room/kenney-room-tiles.json",
+  "public/world/kenney-world-extension.png",
+  "public/world/kenney-world-extension.json",
+  "public/assets/third-party/kenney/room/kenney-room-tiles.png",
+  "public/assets/third-party/kenney/room/kenney-room-tiles.json",
+  "public/assets/third-party/kenney/world/kenney-world-extension.png",
+  "public/assets/third-party/kenney/world/kenney-world-extension.json",
+];
+
+assert(!/kenneyRoomConfig\.json/.test(visualConfigSource), "visualConfig must not import legacy room config JSON");
+assert(!/\bROOM_(TEXTURE_KEY|IMAGE_PATH|ATLAS_PATH)\b/.test(visualConfigSource), "legacy ROOM_* exports were removed");
+for (const relativePath of [...removedSourcePaths, ...removedPublicAtlasPaths]) {
+  assert(!fs.existsSync(path.join(root, relativePath)), `legacy path was removed: ${relativePath}`);
+}
+
 assert.equal(TILE_SIZE, 16);
 assert.equal(GAME_WIDTH, 320);
 assert.equal(GAME_HEIGHT, 180);
@@ -58,7 +78,7 @@ assert.equal(
 );
 assert(/BASIC_VILLAGE_ASSET_PATH/.test(mainSource), "scene uses the canonical asset root");
 assert(/load\.spritesheet/.test(mainSource), "verified 16x16 sheets are loaded as spritesheets");
-assert(!/kenney-room|kenney-world-extension/.test(mainSource), "legacy Kenney environment atlases are unused");
+assert(!/kenney-room|kenney-world-extension/.test(mainSource), "runtime does not reference removed legacy atlases");
 assert(!/ROOM_SCALE|PLAYER_SCALE|Phaser\.Scale\.FIT/.test(mainSource));
 assert(/Phaser\.Scale\.MAX_ZOOM/.test(mainSource), "display zoom remains integer");
 assert(/Phaser\.Scale\.Events\.RESIZE/.test(mainSource), "zoom is recalculated after resize");
@@ -68,6 +88,9 @@ assert(!/scroll[XY]\s*=\s*Math\.round/.test(mainSource), "camera follow is not o
 assert(/pixelArt:\s*true/.test(mainSource));
 assert(/antialias:\s*false/.test(mainSource));
 assert(/roundPixels:\s*true/.test(mainSource));
+assert(/basic-village/.test(roomPreviewSource), "room preview uses Basic Village environment assets");
+assert(/kenney"\s*\/\s*"player/.test(roomPreviewSource), "room preview uses active Kenney player sprites");
+assert(!/kenney-room|kenney-world-extension|public\/room|public\/world/.test(roomPreviewSource), "room preview does not use removed legacy atlases");
 
 for (const asset of officialAssets) {
   assert.deepEqual(readPngDimensions(asset.path), asset.dimensions);
@@ -87,5 +110,5 @@ for (const frame of playerFrames) {
 }
 
 console.log(
-  "Visual checks passed: official Basic Village hashes, native 16px grid, integer zoom, rounded camera follow and player frames.",
+  "Visual checks passed: legacy room sources/public atlases removed, Basic Village hashes, native 16px grid, integer zoom, rounded camera follow and player frames.",
 );
