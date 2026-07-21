@@ -56,13 +56,10 @@ export class Character {
   }
 
   update(deltaMs, layout) {
-    const direction = this.controller.getDirection(
-      { x: this.sprite.x, y: this.sprite.y },
-      this,
-      deltaMs,
-    );
-    this.movement = stepCharacterMovement(this.movement, direction, deltaMs, {
+    const command = this.controller.getCommand(this.createControllerContext(), deltaMs);
+    this.movement = stepCharacterMovement(this.movement, command.moveDirection, deltaMs, {
       config: this.movementConfig,
+      aimDirection: command.aimDirection,
     });
 
     const moveResult = moveWithCollision(
@@ -79,6 +76,18 @@ export class Character {
     this.updateDepth();
     this.updateFacing(this.movement.facingDirection);
     this.updateAnimation();
+  }
+
+  createControllerContext() {
+    return Object.freeze({
+      id: this.id,
+      position: { x: this.sprite.x, y: this.sprite.y },
+      velocity: { ...this.movement.velocity },
+      facingDirection: { ...this.movement.facingDirection },
+      aimDirection: { ...this.movement.aimDirection },
+      blockedAxes: { ...this.lastBlockedAxes },
+      speed: this.speed,
+    });
   }
 
   updateDepth() {
