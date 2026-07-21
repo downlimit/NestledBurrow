@@ -30,7 +30,7 @@ export function createInteractionRuntime({
 
     activeEntityId = null;
     currentCandidate = findCandidate();
-    if (currentCandidate) presenter?.showPrompt?.({ prompt: currentCandidate.prompt });
+    if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
     else presenter?.hidePrompt?.();
 
     if (interact && currentCandidate) startCandidateDialogue(currentCandidate);
@@ -65,9 +65,9 @@ export function createInteractionRuntime({
     if (!dialogueId) return;
     const definition = getDialogueDefinition(dialogueId);
     presenter?.showDialogue?.({
-      speaker: definition.speaker,
-      text: definition.lines[lineIndex],
-      continuePrompt: lineIndex >= definition.lines.length - 1 ? "CLOSE" : "NEXT",
+      speakerKey: definition.speakerKey,
+      line: definition.lines[lineIndex],
+      continuePromptKey: lineIndex >= definition.lines.length - 1 ? "hud:interaction.close" : "hud:interaction.next",
     });
   }
 
@@ -95,6 +95,11 @@ export function createInteractionRuntime({
       return !destroyed && isSessionDialogueActive(sessionState) && sessionState.dialogue.targetId === entityId;
     },
     getCurrentCandidate() { return currentCandidate ? { ...currentCandidate, payload: { ...currentCandidate.payload } } : null; },
+    refresh() {
+      if (destroyed) return;
+      if (isSessionDialogueActive(sessionState)) showCurrentDialogueLine();
+      else if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;

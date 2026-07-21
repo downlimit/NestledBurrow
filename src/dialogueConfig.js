@@ -1,10 +1,10 @@
 const HOME_NPC_GREETING = deepFreeze({
   id: "home-npc-greeting",
-  speaker: "HOME NPC",
+  speakerKey: "dialogue:homeGreeting.speaker",
   lines: [
-    "HELLO THERE.",
-    "THE VILLAGE IS QUIET TODAY.",
-    "SEE YOU AROUND.",
+    { textKey: "dialogue:homeGreeting.lines.hello" },
+    { textKey: "dialogue:homeGreeting.lines.quietVillage" },
+    { textKey: "dialogue:homeGreeting.lines.goodbye" },
   ],
 });
 

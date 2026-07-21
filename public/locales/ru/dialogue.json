@@ -1,0 +1,14 @@
+{
+  "homeGreeting": {
+    "speaker": "Домашний NPC",
+    "lines": {
+      "hello": "Привет.",
+      "quietVillage": "Сегодня в деревне тихо.",
+      "goodbye": "Увидимся позже."
+    }
+  },
+  "validation": {
+    "itemCount": "У вас {count, plural, one {# предмет} few {# предмета} many {# предметов} other {# предмета}}.",
+    "visitorMood": "Гость {mood, select, happy {рад} sad {грустит} other {спокоен}}."
+  }
+}

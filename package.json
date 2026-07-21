@@ -19,12 +19,20 @@
     "check:character": "node scripts/check-character.mjs",
     "check:runtime-components": "node scripts/check-runtime-components.mjs",
     "check:interaction": "node scripts/check-interaction.mjs",
-    "check:dialogue": "node scripts/check-dialogue.mjs"
+    "check:dialogue": "node scripts/check-dialogue.mjs",
+    "i18n:status": "i18next-cli status",
+    "i18n:lint": "i18next-cli lint",
+    "check:i18n": "node scripts/check-localization.mjs && npm run i18n:status && npm run i18n:lint"
   },
   "dependencies": {
-    "phaser": "4.2.1"
+    "phaser": "4.2.1",
+    "i18next": "^25.3.2",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "i18next-http-backend": "^3.0.2",
+    "i18next-icu": "^2.4.1"
   },
   "devDependencies": {
-    "vite": "8.1.5"
+    "vite": "8.1.5",
+    "i18next-cli": "^1.5.0"
   }
 }

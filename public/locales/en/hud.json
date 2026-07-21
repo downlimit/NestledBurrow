@@ -1,0 +1,16 @@
+{
+  "fullscreen": {
+    "enter": "Enter fullscreen",
+    "exit": "Exit fullscreen",
+    "unsupported": "Fullscreen unavailable"
+  },
+  "language": {
+    "toggle": "Switch language",
+    "currentNext": "{{current}} / {{next}}"
+  },
+  "interaction": {
+    "talk": "Talk",
+    "next": "Next",
+    "close": "Close"
+  }
+}

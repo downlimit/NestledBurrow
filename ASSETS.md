@@ -60,3 +60,11 @@ This project uses only the listed third-party assets in the playable prototype. 
 ## Legacy Kenney environment integration
 
 The earlier Kenney Roguelike/RPG room and continuous-world atlases remain historical implementation material. They are no longer the active runtime environment after the Basic Village migration and must not be selected as the default source for new environment work.
+
+## Rubik Regular font
+
+- Source: official `googlefonts/rubik` project (`fonts/ttf/Rubik-Regular.ttf`).
+- License: SIL Open Font License 1.1; intended to be stored beside the asset as `public/assets/fonts/rubik/OFL.txt`.
+- Selected file: `public/assets/fonts/rubik/Rubik-Regular.ttf`.
+- SHA-256: pending in this environment because outbound access to GitHub raw assets is blocked by the configured proxy (HTTP 403) and the repository does not contain the font yet.
+- Glyph validation: pending for the same asset-download limitation; must verify Latin and Cyrillic glyph coverage with real font inspection before merge.
