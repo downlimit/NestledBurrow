@@ -64,6 +64,22 @@ Prepare work so the main-chat review can be strict without unnecessary repeated 
 
 When a visual choice is ambiguous, stop before production integration and provide labeled numbered options for user approval. This applies especially to wall corners, transitions, directional animation frames and visually similar tiles. Do not substitute a guessed transform for an unverified source tile.
 
+## Branch lifecycle
+
+Every task file must contain a `Git lifecycle` section based on `tasks/TEMPLATE.md`.
+
+- Use the single remote task branch supplied by Codex, or the one explicit work branch named in the task. Do not create or push additional remote branches.
+- Temporary local branches and worktrees are allowed, but they must never be pushed to `origin`.
+- Normal task branches are `ephemeral`. GitHub is expected to delete them automatically after merge.
+- A task may mark a branch `persistent` only for an explicit release, archive or long-lived integration purpose.
+- Persistent branches must use one of these prefixes: `release/`, `archive/`, `keep/`.
+- Never delete or rewrite `main`, `release/*`, `archive/*` or `keep/*`.
+- Never delete a branch with an open pull request.
+- A branch from a closed unmerged PR may be deleted only after verifying that its useful changes were merged elsewhere, explicitly superseded, or intentionally abandoned.
+- Do not perform mass branch cleanup as a side effect of an implementation task. Cleanup requires a dedicated task.
+- Before any cleanup, run `git fetch --prune`, inspect remote branches and associated PR state, and report the exact preserved and deleted sets.
+- If branch status is ambiguous, preserve it and report the ambiguity instead of deleting it.
+
 ## Pixel-grid protocol
 
 All world art drawn from the same source pixel grid must use one visual pixel size.
