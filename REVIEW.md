@@ -1,8 +1,13 @@
-# Review protocol for the main chat
+<!-- audience: main-chat-review -->
+# Review protocol for the main ChatGPT chat
 
-This document is the canonical operating procedure for the main ChatGPT chat when it reviews Codex pull requests, repairs them, merges them and verifies publication.
+## Audience
 
-The goal is to keep review strict without wasting time on repeated full CI cycles, duplicate GitHub reads, branch clutter, preparatory task PRs or visual ambiguity that should have been resolved before implementation.
+This document is the canonical procedure for the main ChatGPT chat acting as virtual lead and reviewer.
+
+Codex does **not** read this file by default. Codex implementation rules are self-contained in `AGENTS.md`; this file governs independent review, repair, merge, publication and documentation maintenance performed by the main chat.
+
+The user supplies vision and evaluates the game. The main chat owns the pipeline and must not require the user to maintain branches, CI, architecture or Markdown consistency.
 
 ## 1. Review classes
 
@@ -12,235 +17,219 @@ Classify every PR before deep inspection.
 
 Use when only Markdown, comments, templates or non-executable project metadata changed.
 
-Required review:
+Required:
 
 - inspect the complete diff;
 - confirm no executable, asset, dependency or workflow file changed;
-- require successful CI when the repository workflow runs it;
-- no local application dependency installation, runtime inspection or visual artifact download is required solely for formality.
+- run or inspect `check:docs` when available;
+- require successful repository CI;
+- do not install application or visual dependencies solely for formality.
 
 ### Code, non-visual
 
-Use for logic that does not change rendered output, assets, camera, layout, input presentation or screen-space behavior.
+Use for logic that cannot plausibly change rendered output, assets, input presentation, camera, layout or screen-space behavior.
 
-Required review:
+Required:
 
 - inspect changed files and relevant surrounding code;
-- verify tests cover changed behavior and boundary cases;
-- inspect CI steps and failures if any;
-- no visual artifact download unless the change can indirectly affect runtime presentation.
+- verify targeted tests cover changed behavior and boundary cases;
+- inspect CI for the final head SHA;
+- download no visual artifact unless presentation can be affected indirectly.
 
 ### Visual/runtime
 
-Use for assets, spritesheets, animation, layout, world generation, camera, fullscreen, resize, scaling, CSS canvas behavior, joystick placement or any change whose correctness is visible or interactive in the running game.
+Use for assets, animation, layout, world generation, camera, fullscreen, resize, scaling, CSS canvas behavior, joystick behavior or any change whose correctness is visible or interactive.
 
-Required review:
+Required:
 
 - inspect the complete relevant diff;
-- inspect automated checks and runtime-report limitations;
-- download the latest workflow artifact once;
+- inspect automated checks and stated limitations;
+- download the latest final-head artifact once;
 - open every required preview or screenshot;
-- compare the artifact to the actual user request, not merely to its stored hash;
-- verify the final head commit has successful CI before merge.
+- compare the result to the user's request, not merely to a stored hash;
+- verify successful final-head CI before merge.
 
 When uncertain, choose the stricter class.
 
-## Proportionality rule
+## 2. Proportionality
 
-Review effort, evidence and reporting must be proportional to the real risk of the change.
+Use the lightest process that fully covers realistic failure modes.
 
-- Use the lightest review class that fully covers the ways the change can fail.
-- Do not demand runtime screenshots, device matrices, preview artifacts or local dependency installation for a documentation-only change.
-- Do not turn a small non-visual code change into a visual review unless it can plausibly alter presentation or interaction.
-- Routine product iterations should move directly from the user's vision to one Codex implementation branch and one final PR. Do not require a task-file PR, issue or planning PR as a gate before implementation.
-- A dedicated task file is justified only for large, high-risk, multi-stage, resumable or repeatedly reused work where a durable contract materially reduces risk.
-- When implementation makes existing canonical documentation stale, prefer updating it inside the same implementation PR instead of creating a preparatory documentation PR.
-- Do not create an issue, design document, checklist, report table, test harness, workflow or artifact merely to demonstrate process compliance.
-- New process infrastructure is justified only when it materially reduces a recurring risk or will be reused.
-- Prefer one canonical document over overlapping documents that repeat the same facts.
-- In PR reports, omit non-applicable sections instead of producing long `N/A` lists.
-- Do not repeat the same evidence across the prompt/task file, PR body, review comment and final user response.
-- Safety gates remain strict for high-risk changes; proportionality means removing irrelevant work, not skipping relevant validation.
+- Routine product iterations move directly from user vision to one Codex branch and one final PR.
+- Do not require a task-file PR, issue or planning PR before normal implementation.
+- A durable task file is reserved for large, high-risk, multi-stage, resumable or repeatedly reused work.
+- Do not create documents, checklists, tables, workflows or artifacts merely to demonstrate compliance.
+- Do not repeat the same evidence in the prompt, PR body, review comment and final response.
+- Omit non-applicable report sections instead of filling long `N/A` lists.
+- Strictness applies to relevant risk; proportionality removes irrelevant work, not safety gates.
 
-## 2. Efficient discovery
+## 3. Efficient discovery
 
-Start with one compact discovery pass:
+Start with one compact pass:
 
-1. Find the newest open PR.
-2. Record PR number, title, base SHA, head SHA, work branch, lifecycle, draft state and changed-file count.
-3. Confirm that the PR targets `main` and that no unexpected extra remote branch was created for the task.
-4. Fetch the changed filename list or one complete diff.
-5. Fetch CI state for the current head SHA.
-6. Identify whether preview or screenshot artifacts exist.
+1. find the newest relevant open PR;
+2. record PR number, title, base SHA, head SHA, branch, lifecycle and draft state;
+3. confirm target `main` and no unexpected remote branches;
+4. fetch changed filenames or one complete diff;
+5. fetch CI state for the current head;
+6. identify preview or screenshot artifacts.
 
-Do not repeatedly fetch the same full PR diff after every small operation. After the initial pass, use targeted file reads or patches for files that require deeper inspection.
+After the initial pass, use targeted file reads or patches. Do not repeatedly fetch the same full diff.
 
-Independent reads should be performed in parallel when tooling permits: CI state, changed filenames, PR body and artifact metadata do not depend on one another.
+Independent reads should run in parallel when tooling permits.
 
-## 3. One-pass defect collection
+## 4. One-pass defect collection
 
 Before writing to the PR branch:
 
-1. Read all relevant changed files.
-2. Inspect applicable tests and generated previews.
-3. Build a complete defect list.
-4. Separate blockers from optional cleanup.
-5. Decide the full repair set.
+1. read all relevant changed files;
+2. inspect applicable tests and previews;
+3. build the complete defect list;
+4. separate blockers from optional cleanup;
+5. decide one consolidated repair set.
 
-Treat these as blockers unless explicitly required by the task:
+Treat as blockers unless explicitly required:
 
 - unrelated dependency, workflow or infrastructure changes;
-- vendored fake or partial replacements for unavailable dependencies;
-- test bypasses or validation scripts weakened to accommodate a local environment;
-- claims that unavailable browser, mobile or dependency checks passed;
-- work based on stale `main` that discards or regresses already published behavior;
-- extra remote branches created without a documented persistent purpose.
+- fake or partial vendored replacements for unavailable dependencies;
+- weakened tests or validation bypasses;
+- claims that unavailable checks passed;
+- regression from stale `main`;
+- extra remote branches without an approved persistent purpose;
+- canonical documentation that materially contradicts the delivered behavior or process.
 
-Do not commit the first problem immediately after noticing it. The default is one consolidated repair batch followed by one repeated CI run.
+Default to one repair batch followed by one final CI run. Intermediate tool-forced commits are acceptable; do not evaluate CI until the full repair batch is complete.
 
-Exceptions:
+## 5. CI discipline
 
-- a preliminary repair is required to make files readable or CI runnable;
-- the branch changes underneath the review;
-- a newly generated artifact reveals a genuinely new defect that could not have been known before the repair.
-
-When multiple text files must be repaired through GitHub APIs, prefer one tree/commit operation when available. If tooling forces sequential commits, finish all edits before evaluating CI and do not wait for intermediate runs.
-
-## 4. CI rerun discipline
-
-Every push can trigger a full workflow. Avoid paying that cost repeatedly.
-
-- Ignore intermediate runs while a repair batch is still being written.
+- Ignore intermediate runs while repairs are still being written.
 - Evaluate only the workflow for the final intended head SHA.
 - Rerun a failed job only when the failure is transient and the branch did not change.
-- Do not rerun CI to conceal a deterministic test failure.
-- After successful CI, confirm that the artifact belongs to the same final head SHA.
-- A Codex-local proxy or package-install failure is not a reason to modify canonical dependencies; GitHub Actions is the canonical clean validation environment.
+- Never rerun CI to conceal a deterministic failure.
+- Confirm artifacts belong to the same final head SHA.
+- A Codex-local proxy or install failure is not a reason to alter canonical dependencies.
 
-The preferred repository architecture is:
+Path filtering must remain conservative. Changes to runtime entry points, input, fullscreen, HUD, world, visual config, CSS canvas behavior, assets or rendering dependencies require visual/runtime validation.
 
-- a fast job for input, pure logic, static checks and production build;
-- a visual job for Python dependencies, preview generation, browser screenshots and artifact upload;
-- both jobs running in parallel;
-- path-aware skipping of the visual job for documentation-only or clearly non-visual PRs.
+## 6. Visual and interactive review
 
-Path filtering must remain conservative. Changes to `src/main.js`, `src/input.js`, `src/fullscreen.js`, `src/hud.js`, `src/world*`, `src/roomLayout.js`, `src/visualConfig.js`, `src/style.css`, `public/assets/**`, visual scripts or rendering dependencies require visual/runtime validation.
+A matching hash proves reproducibility, not correctness.
 
-## 5. Visual and interactive review protocol
+For visual/runtime PRs:
 
-A matching pixel hash proves reproducibility, not correctness. The reviewer must still open the images.
+1. download final-head artifacts;
+2. open all required previews;
+3. inspect geometry, tile meaning, joins, facing, scale and unrelated sprites;
+4. ensure previews cover changed states;
+5. compare synthetic previews and actual runtime screenshots when both exist;
+6. record untested mobile, coarse-pointer, fullscreen, resize or cancellation states as explicit limitations.
 
-For each visual/runtime PR:
+Synthetic previews do not prove Phaser runtime behavior.
 
-1. Download the latest artifact from the final head SHA.
-2. Open all mandated previews.
-3. Check geometry, tile meaning, joins, facing, scale consistency and unrelated sprites.
-4. Check that previews cover the changed states rather than only a convenient static view.
-5. Compare runtime screenshots and synthetic previews when both exist.
-6. Treat an untested coarse-pointer/mobile, fullscreen, resize or cancellation state as an explicit remaining limitation.
+Interactive input changes require a real browser check whenever available. When neither Codex nor the reviewer can perform the exact gesture, state the limitation and require post-publication user acceptance if residual risk is acceptable.
 
-Synthetic Python previews remain useful for asset and layout determinism but do not prove that Phaser rendered or behaved correctly.
+## 7. Asset-selection gate
 
-Changes to joystick, fullscreen, resize, focus/cancellation or other interactive input require a real browser check whenever the available tools support it. When neither Codex nor the reviewer can perform that interaction, do not describe it as verified; document the limitation and require a post-publication user acceptance check if the remaining risk is acceptable.
+Do not allow guessed spritesheet IDs.
 
-Browser automation should eventually capture deterministic runtime screenshots for:
+When visual meaning is ambiguous:
 
-- logical 320×180 output;
-- a desktop viewport with integer zoom;
-- a narrow mobile viewport;
-- indoor and outdoor camera positions;
-- HUD and dynamic joystick screen-space placement;
-- fullscreen enter/exit states where browser automation permits it.
+1. produce a labeled contact sheet or numbered atlas;
+2. show it to the user;
+3. record approved semantic choices;
+4. only then integrate production frames.
 
-## 6. Asset-selection gate
+Runtime code uses semantic names; raw IDs belong in audit material or manifests.
 
-Do not let Codex guess visually ambiguous spritesheet IDs.
+## 8. Documentation drift gate
 
-Before implementation when asset meaning is uncertain:
+The main chat owns documentation accuracy proactively. The user must never need to request routine Markdown maintenance.
 
-1. Produce a labeled contact sheet or an interactive numbered atlas.
-2. Show it to the user.
-3. Record the user-approved frame numbers or semantic choices.
-4. Only then build or update the semantic atlas.
+Before merge, compare the delivered change against each canonical document by ownership:
 
-This gate is mandatory for directional corners, transition tiles, animation frames and other cases where several source frames are structurally valid but semantically different.
+- `PROJECT.md` — published state, product architecture, role boundaries, workflow and durable decisions;
+- `LIBRARY.md` — important files, entry points and canonical addresses;
+- `AGENTS.md` — Codex-only execution rules;
+- `REVIEW.md` — main-chat-only review and delivery rules;
+- `ASSETS.md` — external asset sources, licensing, hashes and asset policy;
+- `tasks/*.md` — only the explicit durable contract of an active complex task.
 
-Runtime code must continue to use semantic names. Raw source IDs belong in the audit manifest and review material only.
+Rules:
 
-## 7. PR and branch discipline
+1. Update only documents whose owned facts actually changed.
+2. Repair stale documentation in the same implementation branch during review when safe.
+3. Do not ask the user to identify drift or choose which Markdown file to edit.
+4. Do not copy the same rule into multiple documents; keep one canonical owner and link to it.
+5. Do not record planned or unverified behavior as shipped.
+6. After merge and `pages/live: success`, recheck that `PROJECT.md` describes the published build rather than the pre-merge branch.
+7. If the process itself changes outside an implementation task, create and complete one dedicated documentation PR without waiting for another user reminder.
 
-Prefer one coherent implementation concern per PR.
+The automated `check:docs` guard catches audience and routing regressions, but it does not replace semantic review.
 
-- The main chat normally gives Codex one self-contained direct prompt. A separate task-file PR is not part of the standard path.
-- Ordinary task work must stay on one ephemeral remote branch.
-- The PR must be opened once, after implementation and applicable local validation are complete.
-- Do not use drafts, close/reopen cycles or multiple replacement PRs as a normal development workflow.
-- Repair the existing PR branch when safe; do not create a second remote repair branch merely for reviewer convenience.
-- Do not push ordinary task repairs directly to protected `main`.
-- Large changes should be split only when each part leaves `main` usable and testable.
+## 9. PR and branch discipline
+
+- One coherent implementation concern per PR.
+- One ephemeral remote task branch for ordinary work.
+- PR opened once after implementation and applicable validation.
+- No drafts, close/reopen cycles or replacement PRs as normal workflow.
+- Repair the existing branch; do not create a reviewer convenience branch.
+- Never push ordinary repairs directly to protected `main`.
 - Do not split a task into intermediate PRs that knowingly leave the playable build broken.
-- Do not create a preparatory documentation PR merely to hand Codex its own specification. Use a direct prompt, or commit a justified durable task file as part of a genuinely documentation-centered or broader implementation change.
-- A PR that simultaneously changes assets, camera, collision, input, dependencies, CI and documentation is high-risk and must be reviewed through the visual/runtime path.
+- Persistent `release/*`, `archive/*` or `keep/*` branches require explicit reason and repository-side protection.
 
-Persistent `release/*`, `archive/*` or `keep/*` branches require an explicit reason and repository-side deletion protection. The reviewer must not assume that a name alone provides protection.
+## 10. Codex report contract
 
-## 8. Codex report contract
+The PR description uses `.github/pull_request_template.md` and keeps only applicable sections.
 
-The PR description must use `.github/pull_request_template.md`, but keep only sections applicable to the review class and actual risk.
-
-Every report must state:
+Every report identifies:
 
 - review class and concise scope;
 - work branch, lifecycle and final head SHA;
-- whether the PR was opened once and whether additional remote branches were created;
-- validation performed and any real limitation.
+- whether the PR was opened once and whether extra remote branches were created;
+- validation performed;
+- real limitations.
 
-Add runtime states, viewports, devices, artifacts, asset choices, dependency changes, workflow changes or infrastructure changes only when they apply. A concise docs-only report is correct; padding it with irrelevant fields is not.
+Runtime states, devices, artifacts, assets, dependencies and infrastructure are included only when relevant.
 
-The report is evidence to investigate, not proof. The main chat independently verifies code, CI and applicable artifacts.
+The report is evidence to investigate, not proof. The main chat independently verifies it.
 
-## 9. Merge gate
+## 11. Merge gate
 
 Merge only when all applicable conditions are true:
 
-- the branch is based on current `main` or is otherwise safely mergeable without regression;
+- branch is safely based on current `main`;
 - no unresolved blocker remains;
-- required CI for the final head SHA succeeded;
-- required visual artifacts from the final head SHA were opened and accepted;
-- interactive limitations are explicit and the residual risk is acceptable;
-- documentation accurately describes implemented behavior;
-- the PR is no longer a draft.
+- final-head CI succeeded;
+- required final-head artifacts were opened and accepted;
+- interactive limitations are explicit and residual risk is acceptable;
+- canonical documentation is accurate for the delivered change;
+- PR is not a draft.
 
 After merge:
 
-1. Record the merge SHA.
-2. Wait for `pages/live: success` on that SHA.
-3. Verify that GitHub automatic head-branch deletion removed the ephemeral task branch.
-4. If the branch remains, do not improvise a mass cleanup; use `tasks/branch-cleanup.md` or report the specific branch.
-5. Only then tell the user that the public build is ready and provide the full clickable URL.
+1. record merge SHA;
+2. wait for `pages/live: success` on that SHA;
+3. verify automatic deletion of the ephemeral head branch;
+4. recheck published-state documentation when the change affected it;
+5. only then report the ready public build to the user.
 
-## 10. Communication timing
+If the branch remains, report the specific branch or use the dedicated cleanup task; do not improvise mass cleanup.
 
-The user supplies vision and evaluates the game. The main chat owns architecture, Git, review and delivery and should not force the user to operate the pipeline manually.
+## 12. Communication
 
-- Ask the user only about real product, visual or priority ambiguity that materially changes the result.
-- Do not ask the user to choose branch strategy, test architecture or internal implementation details unless that choice changes product behavior or risk in a way only the user can decide.
-- For a quick clean PR, review silently and return the result.
-- When repair and a repeated CI cycle are required, send one concise status message stating that defects were found and final CI is running.
+- Ask the user only about real product, visual or priority ambiguity.
+- Do not ask about branch strategy, test architecture or internal implementation unless it changes the product in a way only the user can decide.
+- For a clean PR, review silently and return the result.
+- When repairs require another CI cycle, send one concise status update and continue work in the same turn.
 - Do not narrate every API call or intermediate commit.
-- If the user asks a minor question during an active review, answer it briefly and then continue the review in the same turn before sending the final result.
-- Do not say that work is continuing unless the next action actually invokes the required tools.
-- The final message should state only the outcome relevant to the user: material repairs, CI result, merge/publication status and any remaining blocker. Do not repeat the full PR report.
+- Do not claim work continues unless the next action actually invokes tools.
+- Final messages state material repairs, CI, merge/publication and remaining limitations—not the full internal report.
 
-## 11. Current optimization backlog
+## 13. Approved optimization backlog
 
-The following infrastructure improvements are approved directions but are not considered implemented until they exist in the repository:
+These are directions, not implemented facts until present in the repository:
 
-1. Split PR checks into parallel fast and visual jobs.
-2. Add conservative path-aware visual-job skipping.
-3. Add deterministic Playwright runtime screenshots.
-4. Upload one clearly named artifact bundle per final head SHA.
-
-The standard adaptive PR report template is implemented at `.github/pull_request_template.md`. npm and pip caches are already configured in the current workflows.
-
-Until the remaining improvements are implemented, the reviewer follows the existing workflow and optimizes primarily by batching repairs, applying only relevant validation and avoiding redundant reads or reruns.
+1. parallel fast and visual PR jobs;
+2. conservative path-aware visual skipping;
+3. deterministic Playwright runtime screenshots;
+4. one clearly named artifact bundle per final head SHA.
