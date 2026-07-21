@@ -1,5 +1,7 @@
 import { getSessionFlag, setSessionFlag } from "./gameSessionState.js";
 
+export const NEIGHBOR_DIALOGUE_RESOLVER_ID = "neighbor-quest";
+
 export const NEIGHBOR_QUEST_STAGES = Object.freeze({
   notStarted: "not-started",
   talkToStreet: "talk-to-street",
