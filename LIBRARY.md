@@ -5,7 +5,7 @@
 ## Как пользоваться картой
 
 - Основной чат сначала читает `PROJECT.md`, затем `REVIEW.md` перед проверкой pull request.
-- Codex сначала читает задачу, `AGENTS.md`, затем эту карту и только после этого открывает адреса, необходимые для работы.
+- Codex сначала читает прямой промпт, `AGENTS.md`, затем эту карту и только после этого открывает адреса, необходимые для работы. Файл из `tasks/` читается только когда промпт явно на него ссылается.
 
 ## Управление проектом
 
@@ -19,11 +19,11 @@
 
 ### `AGENTS.md`
 
-Обязательные правила работы Codex: одна удалённая ветка, self-test, runtime-проверка, контроль зависимостей, работа с ассетами и формат отчёта.
+Обязательные правила работы Codex: прямой промпт как стандартный вход, одна удалённая ветка, self-test, runtime-проверка, контроль зависимостей, работа с ассетами и формат отчёта.
 
 ### `tasks/TEMPLATE.md`
 
-Канонический шаблон новых задач: Git lifecycle, цель, требования, validation, границы scope и финальная доставка.
+Необязательный шаблон долговечного task-файла для крупных, рискованных, многоэтапных или возобновляемых задач. Для обычной короткой итерации отдельный task-файл и подготовительный PR не нужны.
 
 ### `tasks/branch-cleanup.md`
 
@@ -31,7 +31,7 @@
 
 ### `.github/pull_request_template.md`
 
-Стандартный доказательный отчёт финального PR: review class, Git lifecycle, команды, runtime-состояния, артефакты, ограничения и подтверждение отсутствия несвязанного scope creep.
+Адаптивный доказательный отчёт финального PR: review class, Git lifecycle, применимые проверки, runtime-состояния, артефакты, ограничения и подтверждение отсутствия несвязанного scope creep.
 
 ### `ASSETS.md`
 
@@ -41,15 +41,19 @@
 
 ### `src/main.js`
 
-Phaser-сцена непрерывного мира: Basic Village, игрок, камера, анимации, клавиатура, динамический мобильный джойстик, fullscreen-кнопка и debug-панель движения по `?movementDebug=1`.
+Phaser-сцена непрерывного мира: Basic Village, игрок, камера, анимации, клавиатура, динамический мобильный джойстик с native pointer capture, внутриигровой screen-space HUD и debug-панель движения по `?movementDebug=1`.
 
 ### `src/input.js`
 
-Каноническая логика мобильного ввода: поддержка touch/coarse pointer, активация в левой половине, runtime-центр динамического джойстика, clamp базы, dead zone, аналоговая сила и ограничение длины входного вектора.
+Каноническая чистая логика мобильного ввода: поддержка touch/coarse pointer, активация в левой половине, runtime-центр динамического джойстика, clamp базы, dead zone, аналоговая сила и ограничение длины входного вектора.
 
 ### `src/fullscreen.js`
 
 Чистый helper стандартного Fullscreen API: проверка поддержки, определение состояния по `document.fullscreenElement`, безопасный вход/выход и обработка rejected Promise.
+
+### `src/hud.js`
+
+Переиспользуемый Phaser screen-space HUD: оригинальные 5×7 bitmap glyphs, компактный build label, пиксельная fullscreen-иконка, целочисленное размещение и канонические hit areas.
 
 ### `src/movementConfig.js`
 
@@ -79,11 +83,15 @@ Foot-box collision, world bounds и axis-separated sliding без Phaser Physics
 
 ### `scripts/check-input.mjs`
 
-Проверки dynamic-center джойстика: левая/правая половина, clamp центра, dead zone, аналоговая сила, ownership одного pointer и reset-состояния.
+Проверки dynamic-center джойстика: левая/правая половина, clamp центра, dead zone, аналоговая сила, ownership одного pointer, исключение HUD, pointer capture за пределами canvas и reset-состояния.
 
 ### `scripts/check-fullscreen.mjs`
 
 Mock-проверки Fullscreen API helper: supported state, вход, выход, active state и безопасное отклонение запроса.
+
+### `scripts/check-hud.mjs`
+
+Проверяет bitmap glyph coverage, компактный build label, целочисленное HUD-размещение, fullscreen hit area, отсутствие старого DOM-контрола и отделение HUD input от джойстика.
 
 ### `scripts/check-movement.mjs`
 
@@ -118,7 +126,7 @@ Mock-проверки Fullscreen API helper: supported state, вход, выхо
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора input/fullscreen/movement/visual/world/preview проверок.
+Команды запуска, сборки и полного набора input/fullscreen/HUD/movement/visual/world/preview проверок.
 
 ## Инфраструктура
 
