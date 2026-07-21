@@ -3,6 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createCharacter } from "../src/character.js";
+import { createCharacterMotor } from "../src/characterMotor.js";
+import { createCharacterVisual } from "../src/characterVisual.js";
+import { createCharacterSystem } from "../src/characterSystem.js";
 import { createControllerCommand } from "../src/controllerCommand.js";
 import {
   BLOCKED_WAYPOINT_ADVANCE_MS,
@@ -33,16 +36,21 @@ const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
 const characterSource = fs.readFileSync(path.join(root, "src/character.js"), "utf8");
 const worldConfigSource = fs.readFileSync(path.join(root, "src/worldConfig.js"), "utf8");
 
+assert(/createCharacterSystem\(\{ collisionEnvironment: this\.worldLayout \}\)/.test(mainSource), "WorldScene creates a CharacterSystem after layout creation");
 assert(/createCharacter\(this, \{\s*id: "player"/s.test(mainSource), "player is created through Character");
 assert(/actorProfile: playerProfile/.test(mainSource), "player is created with the player actor profile");
-assert(/NPCS\.map\(\(npc\) => \{[\s\S]*return createCharacter\(this/s.test(mainSource), "NPCs are created through Character");
+assert(/for \(const npc of NPCS\)/.test(mainSource), "NPCs are registered through stable creation order");
 assert(/const actorProfile = getActorProfile\(npc\.profileId\)/.test(mainSource), "NPC profiles are looked up from NPC config");
 assert(/actorProfile,/.test(mainSource), "NPCs are created with their configured actor profiles");
 assert(!/updatePlayerAnimation|updatePlayerDepth|updateLastFacing/.test(mainSource), "WorldScene does not keep player-only movement/animation helpers");
-assert(/moveWithCollision/.test(characterSource), "Character uses world collision");
+assert(!/moveWithCollision/.test(characterSource), "Character delegates world collision to CharacterMotor");
 assert(!/PLAYER_SPEED/.test(worldConfigSource), "worldConfig does not export player speed");
 assert(!/createNpcMovementConfig/.test(characterSource), "legacy NPC movement helper is removed");
+assert(/this\.player = this\.characterSystem\.require\("player"\)\.sprite/.test(mainSource), "camera target is looked up through the character registry");
 assert(/startFollow\(this\.player, true, 1, 1\)/.test(mainSource), "camera target remains the player sprite");
+assert(!/this\.characters\s*=/.test(mainSource), "WorldScene does not keep a mutable character array registry");
+assert(!/this\.characters\.forEach/.test(mainSource), "WorldScene does not update a mutable character array directly");
+assert(/this\.characterSystem\?\.update\(delta\)/.test(mainSource), "WorldScene updates characters through CharacterSystem");
 
 
 const playerProfile = getActorProfile(ACTOR_PROFILE_IDS.player);
@@ -155,6 +163,62 @@ assert.equal(configurableCharacter.footDepth, 7, "Character collision depth is c
 assert.equal(configurableCharacter.frames, customFrames, "Character animation frames are configurable");
 
 
+
+const layout = createWorldLayout();
+
+const visualSprite = {
+  x: 0,
+  y: 0,
+  texture: { key: "custom-down" },
+  origin: null,
+  depth: 0,
+  destroyCount: 0,
+  anims: {
+    isPlaying: false,
+    currentAnim: null,
+    stopCount: 0,
+    played: [],
+    stop() { this.isPlaying = false; this.stopCount += 1; },
+    play(key) { this.isPlaying = true; this.currentAnim = { key }; this.played.push(key); },
+  },
+  setOrigin(x, y) { this.origin = { x, y }; return this; },
+  setDepth(depth) { this.depth = depth; return this; },
+  setPosition(x, y) { this.x = x; this.y = y; return this; },
+  setTexture(key) { this.texture.key = key; return this; },
+  destroy() { this.destroyCount += 1; },
+};
+const visualScene = { add: { sprite(x, y, texture) { visualSprite.x = x; visualSprite.y = y; visualSprite.texture.key = texture; return visualSprite; } } };
+const visual = createCharacterVisual(visualScene, { spawn: { x: 2, y: 3 }, actorProfile: playerProfile, frames: customFrames, idleFrameIndex: 0, facingHysteresis: 0.25 });
+assert.equal(visual.sprite.texture.key, "custom-down", "CharacterVisual creates the sprite with the configured idle frame");
+assert.deepEqual(visual.sprite.origin, { x: 0.5, y: 1 }, "CharacterVisual preserves sprite origin");
+visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 0.7, y: 0.6 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
+assert.deepEqual({ x: visual.sprite.x, y: visual.sprite.y }, { x: 7, y: 9 }, "CharacterVisual synchronizes sprite position");
+assert.equal(visual.sprite.depth, 509, "CharacterVisual keeps depth sorting as 500 plus rounded y");
+assert.equal(visual.lastFacing, "down", "CharacterVisual keeps facing hysteresis for near-diagonal input");
+visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 20, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
+assert.equal(visual.lastFacing, "right", "CharacterVisual updates cardinal facing outside hysteresis");
+assert.deepEqual(visual.sprite.anims.played.at(-1), "character-walk-right", "CharacterVisual preserves walk animation keys");
+visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
+assert.equal(visual.sprite.texture.key, "custom-right", "CharacterVisual selects the matching idle frame");
+visual.destroy();
+visual.destroy();
+assert.equal(visual.sprite.destroyCount, 1, "CharacterVisual destroy is idempotent");
+
+const plainMotor = createCharacterMotor({ id: "motor", spawn: { x: 16, y: 16 }, controller: { getCommand: () => createControllerCommand({ moveDirection: { x: 1, y: 0 }, aimDirection: { x: 0, y: -1 } }) }, movementConfig: DEFAULT_MOVEMENT_CONFIG, actorProfile: playerProfile, footWidth: PLAYER_FOOT_WIDTH, footDepth: PLAYER_FOOT_DEPTH });
+const motorSnapshot = plainMotor.update(50, layout);
+assert.equal(motorSnapshot.profileId, "player", "CharacterMotor snapshot includes profile ID");
+assert(motorSnapshot.position.x > 16, "CharacterMotor updates plain world position after movement");
+assert(motorSnapshot.speed > 0, "CharacterMotor speed matches movement core after acceleration");
+assert(motorSnapshot.aimDirection.y < 0, "CharacterMotor allows aim direction to differ from movement");
+assert.equal(plainMotor.movement.desiredDirection.x, 1, "CharacterMotor movement state follows existing movement core");
+assert(!("sprite" in plainMotor), "CharacterMotor does not own a Phaser sprite");
+const beforeMutation = plainMotor.position.x;
+assert.throws(() => { motorSnapshot.position.x = 999; }, TypeError, "CharacterMotor snapshot nested vectors are immutable");
+assert.equal(plainMotor.position.x, beforeMutation, "mutating a CharacterMotor snapshot cannot mutate the motor");
+const blockedMotor = createCharacterMotor({ id: "blocked-motor", spawn: { x: 4, y: 20 }, controller: { getCommand: () => createControllerCommand({ moveDirection: { x: -1, y: 0 } }) }, movementConfig: DEFAULT_MOVEMENT_CONFIG, actorProfile: playerProfile, footWidth: PLAYER_FOOT_WIDTH, footDepth: PLAYER_FOOT_DEPTH });
+const blockedSnapshot = blockedMotor.update(50, layout);
+assert.equal(blockedSnapshot.blockedAxes.x, true, "CharacterMotor applies blocked axes from collision");
+
 const defaultCommand = createControllerCommand();
 assert.deepEqual(defaultCommand.moveDirection, { x: 0, y: 0 }, "missing moveDirection defaults to idle");
 assert.equal(defaultCommand.aimDirection, null, "missing aimDirection defaults to null");
@@ -247,8 +311,6 @@ unrelatedAxisBlock.getCommand(
 );
 assert.equal(unrelatedAxisBlock.currentWaypointIndex, 1, "an unrelated blocked axis does not skip a valid waypoint");
 
-const layout = createWorldLayout();
-
 let capturedContext;
 const mutatingController = {
   getCommand(context) {
@@ -305,5 +367,33 @@ for (const npc of NPCS) {
     );
   }
 }
+
+const composed = createCharacter(fakeScene, { id: "composed", spawn: { x: 4, y: 8 }, controller: { getCommand: () => createControllerCommand() }, movementConfig: DEFAULT_MOVEMENT_CONFIG, frames: customFrames, idleFrameIndex: 0, footWidth: 12, footDepth: 6 });
+assert(composed.motor && composed.visual, "Character aggregate composes a motor and visual");
+assert.equal(composed.sprite, composed.visual.sprite, "Character sprite getter delegates to visual");
+assert.equal(composed.movement, composed.motor.movement, "Character movement getter delegates to motor");
+assert.equal(composed.footWidth, 12, "Character constructor foot width override reaches motor");
+assert.equal(composed.footDepth, 6, "Character constructor foot depth override reaches motor");
+assert(!("controller" in composed.visual), "CharacterVisual does not own controller state");
+assert(!("collisionEnvironment" in composed.visual), "CharacterVisual does not own collision queries");
+assert(!("sprite" in composed.motor), "CharacterMotor does not own Phaser sprite state");
+
+let updateCount = 0;
+const fakeCharacters = ["player", ...NPCS.map((npc) => npc.id)].map((id) => ({ id, sprite: { id: `${id}-sprite` }, update(delta, env) { updateCount += 1; this.lastUpdate = { delta, env }; }, getSnapshot() { return Object.freeze({ id, profileId: id === "player" ? "player" : "villager", position: Object.freeze({ x: 1, y: 2 }), velocity: Object.freeze({ x: 0, y: 0 }), facingDirection: Object.freeze({ x: 0, y: 1 }), aimDirection: Object.freeze({ x: 0, y: 1 }), blockedAxes: Object.freeze({ x: false, y: false }), speed: 0 }); } }));
+const system = createCharacterSystem({ collisionEnvironment: layout });
+fakeCharacters.forEach((character) => system.add(character));
+assert(system.has("player"), "CharacterSystem has registered player ID");
+assert.equal(system.get("player"), fakeCharacters[0], "CharacterSystem get returns the registered character");
+assert.equal(system.get("missing"), null, "CharacterSystem get returns null for unknown IDs");
+assert.equal(system.require(NPCS[0].id), fakeCharacters[1], "CharacterSystem require finds NPCs by stable ID");
+assert.throws(() => system.require("missing"), /Unknown character ID: missing/, "CharacterSystem require fails clearly for unknown IDs");
+assert.throws(() => system.add({ id: "player" }), /Duplicate character ID: player/, "CharacterSystem rejects duplicate IDs");
+assert.deepEqual(system.values().map((character) => character.id), ["player", ...NPCS.map((npc) => npc.id)], "CharacterSystem preserves stable insertion order");
+system.update(16);
+assert.equal(updateCount, fakeCharacters.length, "CharacterSystem updates each character exactly once");
+assert(fakeCharacters.every((character) => character.lastUpdate?.env === layout), "CharacterSystem passes collision environment into Character update");
+assert.deepEqual(system.getSnapshots().map((snapshot) => snapshot.id), ["player", ...NPCS.map((npc) => npc.id)], "CharacterSystem snapshot order matches insertion order");
+assert(!("sprite" in system.getSnapshot("player")), "CharacterSystem snapshots do not expose Phaser sprite objects");
+assert.equal(system.require("player").sprite.id, "player-sprite", "player camera target remains available through registry lookup");
 
 console.log("character checks passed: actor profiles, shared configurable Character, NPC tuning, patrol routes, blocked fallback, tolerance, collision and player camera target.");
