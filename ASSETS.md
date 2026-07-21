@@ -63,8 +63,9 @@ The earlier Kenney Roguelike/RPG room and continuous-world atlases remain histor
 
 ## Rubik Regular font
 
-- Source: official `googlefonts/rubik` project (`fonts/ttf/Rubik-Regular.ttf`).
-- License: SIL Open Font License 1.1; intended to be stored beside the asset as `public/assets/fonts/rubik/OFL.txt`.
-- Selected file: `public/assets/fonts/rubik/Rubik-Regular.ttf`.
-- SHA-256: pending in this environment because outbound access to GitHub raw assets is blocked by the configured proxy (HTTP 403) and the repository does not contain the font yet.
-- Glyph validation: pending for the same asset-download limitation; must verify Latin and Cyrillic glyph coverage with real font inspection before merge.
+- **Source:** official `googlefonts/rubik` project, archived version-2 file `old/version-2/fonts/ttf/Rubik-Regular.ttf`.
+- **License:** SIL Open Font License 1.1, committed as `public/assets/fonts/rubik/OFL.txt`.
+- **Runtime file:** `public/assets/fonts/rubik/Rubik-Regular.ttf`.
+- **SHA-256:** `a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235`.
+- **Glyph validation:** fontTools cmap inspection confirmed representative Latin and Cyrillic coverage: `AaZzАаЯяЁё`.
+- **Integrity check:** `scripts/check-localization.mjs` requires the committed font, license and exact SHA-256.
