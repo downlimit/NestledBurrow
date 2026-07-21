@@ -1,83 +1,104 @@
+<!-- audience: optional-map -->
 # Library: карта NestledBurrow
 
-Этот файл помогает найти нужную область проекта, не загружая в контекст всё подряд.
+## Назначение
 
-## Как пользоваться картой
+`LIBRARY.md` — необязательная карта важных адресов проекта. Она помогает найти нужную область, не читая весь репозиторий и все Markdown-файлы подряд.
 
-- Основной чат сначала читает `PROJECT.md`, затем `REVIEW.md` перед проверкой pull request.
-- Codex сначала читает прямой промпт, `AGENTS.md`, затем эту карту и только после этого открывает адреса, необходимые для работы. Файл из `tasks/` читается только когда промпт явно на него ссылается.
+Этот файл не является обязательным входом ни для основного чата, ни для Codex.
+
+## Когда читать
+
+- **Основной ChatGPT-чат** сначала восстанавливается через `PROJECT.md` и открывает `LIBRARY.md` только когда нужно найти конкретную область проекта.
+- **Codex** сначала читает прямой промпт и `AGENTS.md`. `LIBRARY.md` открывается только когда из промпта и структуры репозитория неясно, где находится нужная система.
+- Файл из `tasks/` читается только при прямой ссылке на него.
+
+## Контракты документов
+
+| Документ | Аудитория | Канонически владеет |
+|---|---|---|
+| `PROJECT.md` | основной ChatGPT-чат | опубликованное состояние, продуктовая архитектура, роли, рабочий цикл, устойчивые решения |
+| `REVIEW.md` | основной ChatGPT-чат | ревью, пакетные исправления, merge, публикация, documentation drift gate |
+| `AGENTS.md` | Codex | исполнение задачи, scope, проверки, ветка, delivery |
+| `LIBRARY.md` | обе роли по необходимости | карта важных адресов и назначение файлов |
+| `ASSETS.md` | задачи с внешними ассетами | источники, лицензии, hashes и asset policy |
+| `tasks/*.md` | только явно указанная сложная задача | долговечный task-specific контракт |
+
+Один факт должен иметь одного канонического владельца. Другие документы ссылаются на него, а не копируют полный текст.
 
 ## Управление проектом
 
 ### `PROJECT.md`
 
-Текущее положение проекта, цель, следующий шаг, блокеры, рабочий цикл и действующие решения.
+Лидовский контекст и единственная точка восстановления нового основного чата. Не является обязательным чтением Codex.
 
 ### `REVIEW.md`
 
-Канонический протокол проверки, пакетного исправления, merge, публикации и проверки удаления временной ветки pull request.
+Протокол основного чата для независимой проверки, ремонта, merge, публикации и поддержания документации в актуальном состоянии.
 
 ### `AGENTS.md`
 
-Обязательные правила работы Codex: прямой промпт как стандартный вход, одна удалённая ветка, self-test, runtime-проверка, контроль зависимостей, работа с ассетами и формат отчёта.
+Единственный обязательный репозиторный документ Codex для обычной реализации.
 
 ### `tasks/TEMPLATE.md`
 
-Необязательный шаблон долговечного task-файла для крупных, рискованных, многоэтапных или возобновляемых задач. Для обычной короткой итерации отдельный task-файл и подготовительный PR не нужны.
+Необязательный шаблон для крупных, рискованных, многоэтапных, возобновляемых или повторно используемых задач. Обычная итерация использует прямой промпт без task-файла.
 
 ### `tasks/branch-cleanup.md`
 
-Отдельная maintenance-задача безопасного удаления старых remote-веток. Не создаёт ветку, не изменяет файлы и сохраняет защищённые, активные, persistent, deployment-related и неоднозначные ветки.
+Отдельная maintenance-задача безопасного удаления старых remote-веток. Не должна запускаться как побочный эффект обычной реализации.
 
 ### `.github/pull_request_template.md`
 
-Адаптивный доказательный отчёт финального PR: review class, Git lifecycle, применимые проверки, runtime-состояния, артефакты, ограничения и подтверждение отсутствия несвязанного scope creep.
+Адаптивный отчёт финального PR: review class, scope, lifecycle, применимые проверки, runtime evidence, ограничения и documentation drift confirmation.
 
 ### `ASSETS.md`
 
-Канонический список внешних ассетов. Basic Village зафиксирован здесь как приоритетный набор окружения.
+Канонический список внешних ассетов. Basic Village зафиксирован как основной набор окружения.
 
 ## Runtime
 
 ### `src/main.js`
 
-Phaser-сцена непрерывного мира: Basic Village, координация Character-сущностей, камера игрока, клавиатура, динамический мобильный джойстик с native pointer capture, внутриигровой screen-space HUD и debug-панель движения по `?movementDebug=1`.
+Phaser-сцена непрерывного мира: создание мира, координация `Character`-сущностей, камера игрока, клавиатура, мобильный джойстик, screen-space HUD и debug-панель движения по `?movementDebug=1`.
 
 ### `src/character.js`
 
-Переиспользуемая Character-сущность для игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting.
+Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting. Также формирует NPC movement config с той же максимальной скоростью и вдвое меньшими acceleration/deceleration параметрами.
 
 ### `src/controllers.js`
 
-Небольшие контроллеры направления: `PlayerController` берёт направление из клавиатуры/джойстика, `PatrolController` ведёт NPC по loop или ping-pong waypoint-маршрутам.
+Контроллеры направления: `PlayerController` получает клавиатурный/joystick input, `PatrolController` ведёт NPC по loop или ping-pong waypoint-маршрутам и обрабатывает tolerance/blocked-waypoint fallback.
 
 ### `src/npcConfig.js`
 
-Декларативные spawn-точки и waypoint-маршруты текущих NPC: домашний loop-патруль и уличный ping-pong-патруль.
+Декларативные spawn-точки и маршруты домашнего loop-NPC и уличного ping-pong-NPC.
 
 ### `src/input.js`
 
-Каноническая чистая логика мобильного ввода: поддержка touch/coarse pointer, активация в левой половине, runtime-центр динамического джойстика, clamp базы, dead zone, аналоговая сила и ограничение длины входного вектора.
+Чистая логика мобильного ввода: touch/coarse-pointer detection, зона активации, runtime-центр джойстика, clamp, dead zone, аналоговая сила и ограничение входного вектора.
+
+Native event ownership, глобальный fallback после выхода за canvas и lifecycle listeners координируются в `src/main.js`.
 
 ### `src/fullscreen.js`
 
-Чистый helper стандартного Fullscreen API: проверка поддержки, определение состояния по `document.fullscreenElement`, безопасный вход/выход и обработка rejected Promise.
+Helper стандартного Fullscreen API: поддержка, active state, безопасный вход/выход и rejected Promise.
 
 ### `src/hud.js`
 
-Переиспользуемый Phaser screen-space HUD: оригинальные 5×7 bitmap glyphs, компактный build label, пиксельная fullscreen-иконка, целочисленное размещение и канонические hit areas.
+Переиспользуемый Phaser screen-space HUD: 5×7 bitmap glyphs, compact build label, fullscreen-иконка, pixel-aligned placement и hit areas.
 
 ### `src/movementConfig.js`
 
-Production defaults, допустимые диапазоны runtime-тюнинга и нормализация конфигурации движения.
+Production defaults, диапазоны runtime-тюнинга и нормализация конфигурации движения.
 
 ### `src/characterMovement.js`
 
-Переиспользуемое состояние и интегратор движения персонажей: желаемое направление, фактическая velocity, разгон, торможение, разворот, подавление поперечной скорости, continuous facing/aim и ограничение frame delta.
+Переиспользуемое состояние и интегратор движения: desired direction, velocity, разгон, торможение, разворот, facing/aim и delta cap.
 
 ### `src/movement.js`
 
-Foot-box collision, world bounds и axis-separated sliding без Phaser Physics. `moveWithCollision()` возвращает итоговую позицию и заблокированные оси для синхронизации velocity.
+Foot-box collision, world bounds и axis-separated sliding без Phaser Physics.
 
 ### `src/visualConfig.js`
 
@@ -85,56 +106,60 @@ Foot-box collision, world bounds и axis-separated sliding без Phaser Physics
 
 ### `src/worldConfig.js`
 
-Размеры экрана, мира и тайла; параметры дома и двери; базовая скорость; пути и frame-индексы Basic Village.
+Размеры экрана, мира и тайла; параметры дома и двери; пути и frame-индексы Basic Village.
 
 ### `src/worldLayout.js`
 
-Сборка мира: трава, дорожка, интерьер, стены, деревья, spawn, outdoor target и blocked cells.
+Сборка мира: ground, path, интерьер, стены, деревья, spawn, outdoor target и blocked cells.
 
 ## Проверки и инструменты
 
+### `scripts/check-doc-contracts.mjs`
+
+Проверяет audience markers, разделение контекста основного чата и Codex, стандартную recovery-фразу и отсутствие возврата к обязательному чтению лидовских документов исполнителем.
+
 ### `scripts/check-input.mjs`
 
-Проверки dynamic-center джойстика: левая/правая половина, clamp центра, dead zone, аналоговая сила, ownership одного pointer, исключение HUD, pointer capture за пределами canvas и reset-состояния.
+Проверки dynamic joystick: activation, clamp, dead zone, analog strength, one-pointer ownership, HUD exclusion, drag за пределами canvas, lost-capture fallback и reset states.
 
 ### `scripts/check-fullscreen.mjs`
 
-Mock-проверки Fullscreen API helper: supported state, вход, выход, active state и безопасное отклонение запроса.
+Mock-проверки Fullscreen API helper.
 
 ### `scripts/check-hud.mjs`
 
-Проверяет bitmap glyph coverage, компактный build label, целочисленное HUD-размещение, fullscreen hit area, отсутствие старого DOM-контрола и отделение HUD input от джойстика.
+Bitmap glyph coverage, build label, pixel placement, fullscreen hit area и отделение HUD input от джойстика.
 
 ### `scripts/check-movement.mjs`
 
-Проверки max speed, диагонали, разгона, торможения, разворота через ноль, поворота на 90°, аналоговой силы, blocked axes, независимого aim, tuning limits и frame-delta cap.
+Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked axes, aim, tuning limits и delta cap.
 
 ### `scripts/check-character.mjs`
 
-Проверки общей Character-фабрики игрока и NPC, NPC-тюнинга в половину player-разгона/торможения/разворота, loop и ping-pong переходов, waypoint tolerance, world collision и camera target игрока.
+Проверяет использование общей `Character`-фабрики игроком и NPC, половинные NPC acceleration/deceleration параметры, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
 
 ### `scripts/check-visual.mjs`
 
-Проверяет pixel grid, официальные Basic Village hashes, загрузку spritesheet, integer zoom, камеру и кадры персонажа.
+Pixel grid, Basic Village hashes, spritesheet loading, integer zoom, camera и character frames.
 
 ### `scripts/check-world.mjs`
 
-Проверяет Basic Village layout, doorway, collision, blocked-axis reporting, sliding, anti-tunneling и world bounds.
+World layout, doorway, collision, sliding, anti-tunneling и bounds.
 
 ### `scripts/check-room-preview.py`
 
-Генерирует preview текущего мира:
+Генерирует:
 
 - `artifacts/world-overview.png`
 - `artifacts/camera-indoor.png`
 - `artifacts/camera-outdoor.png`
 - `artifacts/top-wall-detail.png`
 
-Использует канонические Python-зависимости из `requirements-dev.txt`. Локальная ошибка установки не должна приводить к добавлению самодельной замены Pillow или другого пакета.
+Indoor/outdoor camera previews включают соответствующего NPC. Использует зависимости из `requirements-dev.txt`; локальная ошибка установки не разрешает самодельную замену Pillow.
 
 ### `scripts/audit-spritesheet.py`
 
-Инструмент аудита новых spritesheet: геометрия, кадры, CSV, SHA-256 и contact sheets.
+Аудит spritesheet: геометрия, кадры, CSV, SHA-256 и contact sheets.
 
 ### `requirements-dev.txt`
 
@@ -142,23 +167,23 @@ Mock-проверки Fullscreen API helper: supported state, вход, выхо
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора input/fullscreen/HUD/movement/visual/world/preview проверок.
+Команды запуска, сборки и полного набора documentation/input/fullscreen/HUD/movement/character/visual/world/preview проверок.
 
 ## Инфраструктура
 
 ### `.github/workflows/pr-check.yml`
 
-Проверяет финальный PR и загружает world preview. PR открывается только после завершения работы в одной временной ветке, чтобы не создавать промежуточные CI-письма.
+Проверяет финальный PR и загружает world previews.
 
 ### `.github/workflows/deploy-pages.yml`
 
-Публикует GitHub Pages через Actions artifact, создаёт `/version.json`, проверяет фактически опубликованный SHA и выставляет `pages/live`. Отдельная `gh-pages` deployment-ветка сейчас не используется.
+Публикует GitHub Pages, создаёт `/version.json`, проверяет опубликованный SHA и выставляет `pages/live`.
 
 ### Настройки GitHub
 
 - `main` защищён от удаления и force-push.
-- Automatic head-branch deletion удаляет обычные временные ветки после merge.
-- Persistent `release/*`, `archive/*` и `keep/*` должны дополнительно получить repository-side deletion protection до использования.
+- Automatic head-branch deletion удаляет обычные merged ветки.
+- Persistent `release/*`, `archive/*` и `keep/*` требуют отдельной repository-side protection.
 
 ## Legacy
 
@@ -166,7 +191,8 @@ Mock-проверки Fullscreen API helper: supported state, вход, выхо
 
 ## Правила развития карты
 
-- Новая самостоятельная область знаний получает один канонический адрес.
-- Факты не дублируются без необходимости между документами.
-- Пустые разделы «на будущее» не создаются.
-- При добавлении, переименовании или удалении адреса обновляется эта карта.
+- Добавлять адрес только для самостоятельной и реально используемой области.
+- Обновлять карту при добавлении, удалении, переименовании или существенной смене ответственности файла.
+- Не обновлять карту ради каждой мелкой поведенческой правки.
+- Не дублировать подробные правила из `PROJECT.md`, `AGENTS.md`, `REVIEW.md` или `ASSETS.md`.
+- Не создавать пустые разделы «на будущее».
