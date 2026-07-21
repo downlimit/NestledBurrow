@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import "./style.css";
 import { clampVectorLength } from "./input.js";
-import { createRuntimeMovementConfig } from "./characterMovement.js";
+import { createMovementState, createRuntimeMovementConfig } from "./characterMovement.js";
 import {
   ACTOR_PROFILE_IDS,
   createDebugMovementConfigFromPolicy,
@@ -26,12 +26,18 @@ import {
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
 import { NPCS } from "./npcConfig.js";
-import { createGameSessionState } from "./gameSessionState.js";
+import { createFreshGameSessionState } from "./gameSessionState.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
 import { createInteractionRuntime } from "./interactionRuntime.js";
 import { createInteractionHud } from "./interactionHud.js";
 import { createGameHud } from "./gameHud.js";
+import {
+  completeNeighborDialogue,
+  NEIGHBOR_DIALOGUE_RESOLVER_ID,
+  resolveNeighborDialogueId,
+} from "./neighborQuest.js";
+import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { RUBIK_FONT_KEY, RUBIK_FONT_PATH } from "./localization/font.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
@@ -78,6 +84,7 @@ class WorldScene extends Phaser.Scene {
     this.attachSceneListeners();
     this.createJoystick();
     this.syncIntegerZoom();
+    this.installE2EBridge();
   }
 
   renderWorld() {
@@ -186,11 +193,16 @@ class WorldScene extends Phaser.Scene {
   }
 
   createSessionAndInteractionRuntime() {
-    this.sessionState = createGameSessionState({
+    this.sessionPersistence = this.createPersistence();
+    const loaded = this.sessionPersistence?.load();
+    this.sessionState = loaded?.state ?? createFreshGameSessionState({
       currentWorldId: "village",
       playerId: "player",
       initialEntityIds: NPCS.map((npc) => npc.id),
     });
+    if (loaded?.diagnostic) {
+      console.warn("Recovered NestledBurrow session", loaded.diagnostic);
+    }
     this.interactionHud = createInteractionHud(this, {
       isCoarsePointer: () => this.isCoarsePointer(),
       localization: this.localization,
@@ -200,8 +212,31 @@ class WorldScene extends Phaser.Scene {
       characterSystem: this.characterSystem,
       interactionDefinitions: INTERACTION_DEFINITIONS,
       getDialogueDefinition,
+      resolveDialogueId: (resolverId, state, entityId) => {
+        if (resolverId !== NEIGHBOR_DIALOGUE_RESOLVER_ID) {
+          throw new Error(`Unknown dialogue resolver ID: ${resolverId}`);
+        }
+        return resolveNeighborDialogueId(state, entityId);
+      },
+      completeDialogue: completeNeighborDialogue,
+      onPersistentMutation: () => this.saveSession(),
       presenter: this.interactionHud,
     });
+  }
+
+  createPersistence() {
+    try {
+      return createSessionPersistence({ storage: window.localStorage });
+    } catch (error) {
+      console.warn("Session persistence unavailable", error);
+      return null;
+    }
+  }
+
+  saveSession() {
+    const result = this.sessionPersistence?.save(this.sessionState);
+    if (result?.status === "error") console.warn("Session save failed", result.diagnostic);
+    return result;
   }
 
   createMovementDebugPanel() {
@@ -231,6 +266,7 @@ class WorldScene extends Phaser.Scene {
       localization: this.localization,
       gameContainer: this.gameContainer,
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
+      onNewGame: () => this.startNewGame(),
     });
   }
 
@@ -240,6 +276,39 @@ class WorldScene extends Phaser.Scene {
 
   isHudPoint(x, y) {
     return Boolean(this.gameHud?.isPointInHud(x, y)) || Boolean(this.interactionHud?.isPointInHud(x, y));
+  }
+
+  startNewGame() {
+    const result = this.sessionPersistence?.clear();
+    if (result?.status === "error") console.warn("Session reset failed", result.diagnostic);
+    this.scene.restart();
+  }
+
+  installE2EBridge() {
+    if (!import.meta.env.VITE_E2E) return;
+    const bridge = {
+      getSession: () => JSON.parse(JSON.stringify(this.sessionState)),
+      getLanguage: () => this.localization.getLanguage(),
+      setLanguage: async (language) => {
+        await this.localization.changeLanguage(language);
+        this.gameHud?.render();
+        this.interactionRuntime?.refresh();
+      },
+      placePlayerNear: (entityId) => {
+        const target = this.characterSystem.getSnapshot(entityId);
+        const player = this.characterSystem.require(this.sessionState.playerId);
+        player.motor.position = { x: target.position.x - 12, y: target.position.y };
+        player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
+      },
+      getInteractionState: () => ({
+        candidate: this.interactionRuntime?.getCurrentCandidate() ?? null,
+        dialogueActive: this.interactionRuntime?.isDialogueActive() ?? false,
+        dialogue: { ...this.sessionState.dialogue },
+      }),
+      getHudState: () => ({ newGameConfirming: this.gameHud?.isConfirming?.() ?? false }),
+    };
+    this.e2eBridge = bridge;
+    window.__NESTLED_BURROW_E2E__ = bridge;
   }
 
   isCoarsePointer() {
@@ -287,6 +356,10 @@ class WorldScene extends Phaser.Scene {
     this.characterSystem = null;
     this.gameHud?.destroy();
     this.gameHud = null;
+    if (window.__NESTLED_BURROW_E2E__ === this.e2eBridge) {
+      delete window.__NESTLED_BURROW_E2E__;
+    }
+    this.e2eBridge = null;
   }
 
   update(_time, delta) {

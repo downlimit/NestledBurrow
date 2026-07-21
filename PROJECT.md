@@ -80,15 +80,16 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - Неизменяемые actor profiles `player` и `villager` являются каноническими источниками movement и visual параметров; runtime-конфигурации создаются отдельными mutable-копиями.
 - Player и patrol controllers возвращают нормализованный `ControllerCommand` с movement, aim и actions.
 - Collision resolver получает bounds, cell size и blocking query через явный environment contract.
-- `GameSessionState` хранит JSON-сериализуемые player/NPC entities, flags и состояние диалога без Phaser/runtime references.
-- Первый interaction/dialogue vertical slice работает в runtime: у домашнего NPC появляется `TALK`, а `E`, `SPACE` или мобильный tap запускают и пролистывают трёхстрочный диалог.
+- `GameSessionState` хранит JSON-сериализуемые player/NPC entities, durable flags и transient dialogue state без Phaser/runtime references.
+- Версионированный save envelope сохраняет только устойчивый прогресс, безопасно восстанавливается после повреждённого/неподдерживаемого save и не смешивает язык с игровым состоянием.
+- Первый законченный мини-квест связывает домашнего и уличного NPC: поручение, ответ, возвращение и repeat-реплики определяются стабильными dialogue/flag IDs.
 - Interaction targets строятся из свежих `CharacterSystem` snapshots; во время разговора блокируется movement input игрока и приостанавливается только выбранный NPC.
-- Завершение разговора записывает entity flag `greeted`.
-- `InteractionHud` рисует prompt и dialogue panel в Phaser и отделяет touch interaction от мобильного джойстика.
-- Клавиатура и динамический мобильный джойстик объединяются в единый нормализованный movement vector.
-- `MobileJoystick` владеет pointer lifecycle, capture/fallback, safety reset, графикой и cleanup.
-- `MovementDebugPanel` владеет tuning UI, persistence, status и cleanup; `WorldScene` остаётся composition root.
-- Камера следует за игроком с целочисленным pixel-grid рендером; Phaser HUD содержит build label и fullscreen.
+- EN/RU локализация построена на i18next, ICU namespaces и локально поставляемом Rubik с проверенным Latin/Cyrillic coverage; язык меняет уже видимые HUD/dialogue строки.
+- `GameHud` владеет build label, fullscreen, language toggle и локализованным `NEW GAME`; сброс удаляет quest progress, но сохраняет языковую preference.
+- `InteractionHud` рисует Unicode prompt/dialogue panel и отделяет touch interaction от мобильного джойстика.
+- Клавиатура и динамический мобильный джойстик объединяются в единый нормализованный movement vector; desktop/mobile Chromium E2E покрывает язык, quest flow, reload persistence и reset.
+- `MobileJoystick` и `MovementDebugPanel` сохраняют самостоятельное lifecycle ownership; `WorldScene` остаётся composition root.
+- Камера следует за игроком с целочисленным pixel-grid рендером; GitHub Pages публикует только проверенный `main`.
 - GitHub Pages публикует только проверенный `main`; `pages/live` подтверждает фактически доступный SHA.
 
 ## Текущая цель

@@ -10,5 +10,35 @@
   "validation": {
     "itemCount": "У вас {count, plural, one {# предмет} few {# предмета} many {# предметов} other {# предмета}}.",
     "visitorMood": "Гость {mood, select, happy {рад} sad {грустит} other {спокоен}}."
+  },
+  "neighbor": {
+    "speakers": {
+      "home": "Мира",
+      "street": "Роуэн"
+    },
+    "homeIntro": {
+      "first": "Проверь, пожалуйста, как там Роуэн у дороги.",
+      "second": "Возвращайся, когда поговоришь с ним."
+    },
+    "homeReminder": {
+      "first": "Роуэн обычно стоит у тропинки снаружи."
+    },
+    "homeCompletion": {
+      "first": "Ты нашёл Роуэна. Спасибо.",
+      "second": "Теперь деревня кажется чуть менее тихой."
+    },
+    "homeAfter": {
+      "first": "Ещё раз спасибо за помощь."
+    },
+    "streetBefore": {
+      "first": "Привет. Тебя прислала Мира?"
+    },
+    "streetResponse": {
+      "first": "Скажи Мире, что со мной всё хорошо.",
+      "second": "Я вернусь домой до темноты."
+    },
+    "streetAfter": {
+      "first": "Мира ждёт твоих новостей."
+    }
   }
 }

@@ -10,5 +10,35 @@
   "validation": {
     "itemCount": "You have {count, plural, one {# item} other {# items}}.",
     "visitorMood": "The visitor is {mood, select, happy {happy} sad {sad} other {calm}}."
+  },
+  "neighbor": {
+    "speakers": {
+      "home": "Mira",
+      "street": "Rowan"
+    },
+    "homeIntro": {
+      "first": "Could you check on Rowan by the road?",
+      "second": "Come back after you have spoken."
+    },
+    "homeReminder": {
+      "first": "Rowan is usually near the path outside."
+    },
+    "homeCompletion": {
+      "first": "You found Rowan. Thank you.",
+      "second": "The village feels a little less quiet now."
+    },
+    "homeAfter": {
+      "first": "Thank you again for helping us."
+    },
+    "streetBefore": {
+      "first": "Hello. Did Mira send you?"
+    },
+    "streetResponse": {
+      "first": "Tell Mira I am all right.",
+      "second": "I will return home before dark."
+    },
+    "streetAfter": {
+      "first": "Mira is waiting for your news."
+    }
   }
 }

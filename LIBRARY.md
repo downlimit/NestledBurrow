@@ -72,7 +72,7 @@
 
 ### `src/main.js`
 
-Phaser composition root непрерывного мира: создаёт layout, `CharacterSystem`, персонажей по actor profiles, `GameSessionState`, `InteractionHud` и `InteractionRuntime`; связывает keyboard/mobile actions, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD; вызывает system/runtime update и уничтожает runtime-компоненты.
+Phaser composition root непрерывного мира: создаёт layout, `CharacterSystem`, локализованный `GameHud`/`InteractionHud`, загружает versioned session через persistence и связывает neighbor quest resolver/effects с `InteractionRuntime`; координирует input, camera, runtime update, auto-save, `NEW GAME` и cleanup.
 
 ### `src/actorProfiles.js`
 
@@ -108,7 +108,15 @@ Stable-ID insertion-ordered registry персонажей: add/lookup/require, o
 
 ### `src/gameSessionState.js`
 
-Plain JSON-сериализуемая session-модель: version, current world, player/entity IDs, global/entity flags и dialogue state. Предоставляет создание/lookup entities, flag operations и start/advance/close dialogue без runtime ссылок. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+Plain JSON-сериализуемая session-модель и canonical fresh/normalize boundary: version, current world, player/entity IDs, global/entity flags и transient dialogue state. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+
+### `src/sessionPersistence.js`
+
+Версионированный save envelope и adapter над Storage: load/save/clear, strict validation, migration boundary, durable flags only и safe fresh-state recovery для empty/corrupt/unsupported saves.
+
+### `src/neighborQuest.js`
+
+Pure domain первого мини-квеста: stable stages, entity/dialogue/flag/resolver IDs, deterministic dialogue resolution и idempotent completion transitions.
 
 ### `src/interaction.js`
 
@@ -116,19 +124,31 @@ Immutable interaction-target descriptors и чистый выбор лучшей
 
 ### `src/interactionConfig.js`
 
-Неизменяемые runtime interaction definitions без статической world position. Текущая запись `talk-home-npc` связывает домашнего NPC, `TALK`, facing/radius policy и dialogue ID через JSON-like payload.
+Неизменяемые runtime interaction definitions без статической world position. Home/street NPC используют общий stable quest resolver ID, локализованный `TALK` prompt и JSON-like payload.
 
 ### `src/dialogueConfig.js`
 
-Неизменяемые dialogue definitions и strict own-key lookup. Текущий `home-npc-greeting` содержит speaker и три строки; session хранит только dialogue ID и line index, а не текст.
+Неизменяемые локализуемые definitions для всех стадий neighbor quest и strict own-key lookup. Session хранит только stable dialogue ID и line index, а presenter получает translation-key descriptors.
 
 ### `src/interactionRuntime.js`
 
-Phaser-agnostic coordinator первого interaction/dialogue vertical slice: получает свежие snapshots из `CharacterSystem`, подставляет target positions, выбирает candidate, управляет session dialogue lifecycle, вызывает presenter, выставляет completion flags и сообщает, какой NPC участвует в активном разговоре.
+Phaser-agnostic coordinator локализованного quest dialogue lifecycle: получает snapshots, выбирает candidate, разрешает dialogue ID через injected resolver, применяет pure completion transition, вызывает auto-save только при persistent mutation и передаёт presenter translation-key descriptors.
 
 ### `src/interactionHud.js`
 
-Phaser presenter boundary для `TALK` prompt и нижней dialogue panel: bitmap rendering, desktop/mobile labels, latched tap action, pointer propagation guard, повторное использование graphics/zones, полная HUD exclusion область для mobile joystick и idempotent cleanup.
+Phaser Unicode presenter boundary для локализованных `TALK` prompt и dialogue panel: locale font, live language redraw, latched mobile tap, pointer guard, полная joystick exclusion и idempotent cleanup.
+
+### `src/gameHud.js`
+
+Единый владелец screen-space build/fullscreen/language/`NEW GAME` UI: locale-aware Phaser Text, confirmation lifecycle, hit-area exclusion, language preference preservation и cleanup.
+
+### `src/localization/index.js`
+
+Framework-independent i18next application service: browser locale detection, EN fallback, namespace loading, ICU, separate language persistence, `html lang/dir` sync, subscriptions и lifecycle destroy.
+
+### `public/locales/{en,ru}`
+
+Канонические JSON resources `common`, `hud`, `dialogue` с semantic keys и namespace parity.
 
 ### `src/input.js`
 
@@ -199,6 +219,18 @@ Mock-проверки Fullscreen API helper.
 ### `scripts/check-hud.mjs`
 
 Bitmap glyph coverage, build label, fullscreen hit area, reusable interaction HUD objects, prompt/dialogue mobile tap latch, full visible dialogue-panel joystick exclusion и cleanup.
+
+### `scripts/check-progress.mjs`
+
+Pure checks neighbor quest stages/transitions и versioned persistence load/save/clear/recovery behavior.
+
+### `scripts/check-localization.mjs`
+
+Namespace/key parity, non-empty translations, ICU samples, locale normalization, bundled Rubik/OFL presence и exact font SHA-256.
+
+### `playwright.config.js` и `tests/e2e/localized-loop.spec.js`
+
+Desktop/mobile Chromium evidence для locale detection/persistence, полного quest flow, reload save, localized `NEW GAME` и mobile touch dialogue start.
 
 ### `scripts/check-movement.mjs`
 

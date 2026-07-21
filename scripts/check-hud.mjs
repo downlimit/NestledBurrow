@@ -1,23 +1,32 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { BUILD_LABEL, FULLSCREEN_HIT_AREA, HUD_GLYPHS, compactBuildLabel, isPointInRect, measureBitmapText } from "../src/hud.js";
-import { LANGUAGE_HIT_AREA, PROGRESS_ACTION_RESERVED } from "../src/gameHud.js";
-import { GAME_WIDTH } from "../src/worldConfig.js";
+import {
+  LANGUAGE_HIT_AREA,
+  NEW_GAME_CANCEL_HIT_AREA,
+  NEW_GAME_CONFIRM_HIT_AREA,
+  NEW_GAME_CONFIRM_PANEL,
+  NEW_GAME_HIT_AREA,
+} from "../src/gameHud.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
 assert.equal(compactBuildLabel("4e090db123"), "v 4e090db", "HUD uses compact canonical short build identifier");
 assert.equal(measureBitmapText("v 4e090db"), 51, "bitmap label width is deterministic for alignment");
 assert(Number.isInteger(BUILD_LABEL.x) && Number.isInteger(BUILD_LABEL.y), "build label aligns to whole logical pixels");
-assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area is larger than compact icon for touch");
-assert.equal(FULLSCREEN_HIT_AREA.x + FULLSCREEN_HIT_AREA.width, GAME_WIDTH - 4, "fullscreen HUD is fixed to logical viewport edge");
-assert.equal(isPointInRect(GAME_WIDTH - 20, 12, FULLSCREEN_HIT_AREA), true, "fullscreen pointer is detected inside hit area");
-assert.equal(isPointInRect(LANGUAGE_HIT_AREA.x + 4, 12, LANGUAGE_HIT_AREA), true, "language pointer is detected inside hit area");
+assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch sized");
+assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width < LANGUAGE_HIT_AREA.x, "New Game and language hit areas do not overlap");
 assert(LANGUAGE_HIT_AREA.x + LANGUAGE_HIT_AREA.width <= FULLSCREEN_HIT_AREA.x, "language and fullscreen hit areas do not overlap");
-assert.equal(PROGRESS_ACTION_RESERVED.id, "new-game", "GameHud reserves a future progress action without rendering it");
+for (const rect of [NEW_GAME_HIT_AREA, LANGUAGE_HIT_AREA, NEW_GAME_CONFIRM_PANEL, NEW_GAME_CONFIRM_HIT_AREA, NEW_GAME_CANCEL_HIT_AREA]) {
+  assert(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= GAME_WIDTH && rect.y + rect.height <= GAME_HEIGHT, "GameHud rectangle stays inside logical viewport");
+}
+assert(isPointInRect(NEW_GAME_CONFIRM_HIT_AREA.x + 2, NEW_GAME_CONFIRM_HIT_AREA.y + 2, NEW_GAME_CONFIRM_PANEL), "confirm action stays inside confirmation panel");
+assert(isPointInRect(NEW_GAME_CANCEL_HIT_AREA.x + 2, NEW_GAME_CANCEL_HIT_AREA.y + 2, NEW_GAME_CONFIRM_PANEL), "cancel action stays inside confirmation panel");
 for (const char of "v devabcdef0123456789") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
 const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
-assert(main.includes("createGameHud"), "scene delegates top-right HUD to GameHud");
-assert(gameHud.includes("drawBitmapText"), "GameHud renders build identifier with bitmap HUD text");
-assert(gameHud.includes("onLanguageChange"), "GameHud notifies composition root about language changes");
-assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "HUD hit areas are passed to MobileJoystick as exclusion callback");
-console.log("hud checks passed");
+assert(main.includes("onNewGame: () => this.startNewGame()"), "composition root wires New Game callback");
+assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "all HUD areas exclude MobileJoystick input");
+assert(gameHud.includes('localization.t("hud:progress.newGame")'), "New Game label is localized");
+assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "localized HUD text uses locale Unicode font");
+assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
+console.log("hud checks passed: build, fullscreen, language and localized New Game controls are aligned");

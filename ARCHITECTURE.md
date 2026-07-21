@@ -280,30 +280,23 @@ Unit/contract tests остаются основным доказательств
 15. Введены `InteractionRuntime` и `InteractionHud`.
 16. HUD exclusion покрывает dialogue panel.
 17. Villager получил прогулочную скорость, waypoint waits и естественные multi-point маршруты.
+18. Visual repair закрепил four-phase cadence и явный возврат в neutral idle frame.
+19. Введены i18next localization service, EN/RU namespaces, Unicode Rubik и `GameHud`.
+20. Введены pure neighbor quest domain и versioned session persistence.
+21. Fan-in подключил локализованный playable quest, auto-save/load и `NEW GAME`, сохраняющий язык.
+22. Desktop/mobile Playwright проверяет language lifecycle, полный quest flow, reload persistence, reset и touch dialogue start.
 
-Visual repair с проверенным cadence, neutral idle и разными NPC skins не считается опубликованным до фактического merge и runtime inspection.
+Visual repair, localization/progress fan-out и playable fan-in опубликованы как законченная функциональная волна.
 
 ## Приоритетная очередь
 
-### Следующая безопасная волна после visual repair
-
-1. Параллельно:
-   - localization platform + Unicode text + `GameHud`;
-   - pure mini-quest/progress domain + versioned persistence.
-2. Fan-in:
-   - локализованный playable mini-quest;
-   - auto-save/load;
-   - `NEW GAME`, сохраняющий язык;
-   - desktop/mobile Playwright evidence.
-3. Обновить каноническую документацию в том же integration PR, без отдельного DOC PR.
-
-### После этой волны
+### Следующая безопасная волна
 
 1. Interaction с объектом, отличным от NPC.
 2. Zones/triggers и переход между двумя пространствами.
-3. Разделение world definition/runtime/renderer по фактической потребности.
+3. Разделение world definition/runtime/renderer по фактической потребности переходов.
 4. Новые behavior states и route recovery по реальному контенту.
-5. Новые actor/visual types по игровой роли.
+5. Новые actor/visual types только по появившейся игровой роли.
 
 ## Ограничения
 
@@ -327,4 +320,4 @@ Visual repair с проверенным cadence, neutral idle и разными 
 
 ## Текущий implementation status
 
-Movement/collision core, actor profiles, `CharacterSystem`, session state, interaction targeting, первый dialogue slice и прогулочное поведение NPC реализованы. Следующий шаг после фактического visual repair — крупная localization/progress wave с одним playable fan-in, persistence и browser-level evidence.
+Movement/collision core, actor profiles, `CharacterSystem`, локализованный interaction/dialogue runtime, neighbor mini-quest, versioned persistence, `GameHud`, `NEW GAME` и desktop/mobile browser evidence реализованы. Следующий продуктовый шаг — interaction с не-NPC объектом и zones/transitions между пространствами.
