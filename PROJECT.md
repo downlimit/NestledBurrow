@@ -100,8 +100,10 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - Домашний NPC патрулирует замкнутый loop-маршрут внутри дома; уличный NPC ходит по ping-pong-маршруту вдоль дорожки.
 - Villager имеет ту же максимальную скорость, что и игрок, но явно заданные вдвое меньшие acceleration, braking, reverse acceleration и turn deceleration.
 - Collision resolver получает `bounds`, `cellSize` и blocking query через collision environment и не зависит от глобальных размеров единственной карты.
-- Добавлен минимальный JSON-сериализуемый `GameSessionState` для world/player/entity IDs, flags и состояния диалога; он пока не подключён к Phaser runtime.
-- Добавлены неизменяемые interaction-target descriptors и чистый детерминированный выбор лучшей цели по radius, facing, priority, distance и ID; UI и запуск диалога в runtime остаются следующей интеграцией.
+- `WorldScene` создаёт минимальный JSON-сериализуемый `GameSessionState` с player/NPC entities, flags и состоянием диалога; Phaser objects и runtime references в session не хранятся.
+- Первый interaction/dialogue vertical slice подключён к runtime: при приближении и правильном facing к домашнему NPC появляется `TALK`, а `E`, `SPACE` или мобильный tap запускают и последовательно закрывают трёхстрочный диалог.
+- Interaction targets собираются из свежих `CharacterSystem` snapshots; во время разговора блокируется player movement input, приостанавливается только выбранный NPC, а завершение записывает entity flag `greeted`.
+- `InteractionHud` рисует prompt и нижнюю dialogue panel в Phaser, повторно использует созданные объекты, перехватывает нужные taps и блокирует мобильный джойстик по всей видимой области панели.
 - Legacy Kenney room/world конфигурация и неиспользуемые атласы удалены; Basic Village остаётся каноническим runtime-окружением.
 - Все три персонажа временно используют совместимые CC0-ассеты Kenney.
 - Velocity-based движение с разгоном, торможением, разворотом и collision foot box.

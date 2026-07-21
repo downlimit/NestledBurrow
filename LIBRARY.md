@@ -72,7 +72,7 @@
 
 ### `src/main.js`
 
-Phaser composition root непрерывного мира: создаёт layout, `CharacterSystem`, персонажей по actor profiles, связывает клавиатуру, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD, вызывает system update и уничтожает runtime-компоненты.
+Phaser composition root непрерывного мира: создаёт layout, `CharacterSystem`, персонажей по actor profiles, `GameSessionState`, `InteractionHud` и `InteractionRuntime`; связывает keyboard/mobile actions, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD; вызывает system/runtime update и уничтожает runtime-компоненты.
 
 ### `src/actorProfiles.js`
 
@@ -100,7 +100,7 @@ Stable-ID insertion-ordered registry персонажей: add/lookup/require, o
 
 ### `src/controllers.js`
 
-`PlayerController` и `PatrolController` возвращают общий `ControllerCommand`. Player получает input/aim/actions callbacks; patrol ведёт NPC по loop или ping-pong waypoint-маршрутам и обрабатывает tolerance/blocked-waypoint fallback.
+`PlayerController` и `PatrolController` возвращают общий `ControllerCommand`. Player получает input/aim/actions callbacks; patrol ведёт NPC по loop или ping-pong waypoint-маршрутам, обрабатывает tolerance/blocked-waypoint fallback и поддерживает optional pause policy без продвижения waypoint/timer.
 
 ### `src/npcConfig.js`
 
@@ -108,11 +108,27 @@ Stable-ID insertion-ordered registry персонажей: add/lookup/require, o
 
 ### `src/gameSessionState.js`
 
-Минимальная plain JSON-сериализуемая session-модель: version, current world, player/entity IDs, global/entity flags и dialogue state. Предоставляет создание/lookup entities, flag operations и start/advance/close dialogue без runtime ссылок. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+Plain JSON-сериализуемая session-модель: version, current world, player/entity IDs, global/entity flags и dialogue state. Предоставляет создание/lookup entities, flag operations и start/advance/close dialogue без runtime ссылок. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
 
 ### `src/interaction.js`
 
 Immutable interaction-target descriptors и чистый выбор лучшей доступной цели по radius, facing, priority, distance и stable ID tie-break. Payload defensively клонируется как строгий JSON-like graph: только plain objects, dense arrays и JSON primitives без non-finite numbers, class instances или cycles.
+
+### `src/interactionConfig.js`
+
+Неизменяемые runtime interaction definitions без статической world position. Текущая запись `talk-home-npc` связывает домашнего NPC, `TALK`, facing/radius policy и dialogue ID через JSON-like payload.
+
+### `src/dialogueConfig.js`
+
+Неизменяемые dialogue definitions и strict own-key lookup. Текущий `home-npc-greeting` содержит speaker и три строки; session хранит только dialogue ID и line index, а не текст.
+
+### `src/interactionRuntime.js`
+
+Phaser-agnostic coordinator первого interaction/dialogue vertical slice: получает свежие snapshots из `CharacterSystem`, подставляет target positions, выбирает candidate, управляет session dialogue lifecycle, вызывает presenter, выставляет completion flags и сообщает, какой NPC участвует в активном разговоре.
+
+### `src/interactionHud.js`
+
+Phaser presenter boundary для `TALK` prompt и нижней dialogue panel: bitmap rendering, desktop/mobile labels, latched tap action, pointer propagation guard, повторное использование graphics/zones, полная HUD exclusion область для mobile joystick и idempotent cleanup.
 
 ### `src/input.js`
 
@@ -132,7 +148,7 @@ Helper стандартного Fullscreen API: поддержка, active state
 
 ### `src/hud.js`
 
-Переиспользуемый Phaser screen-space HUD: 5×7 bitmap glyphs, compact build label, fullscreen-иконка, pixel-aligned placement и hit areas.
+Переиспользуемый Phaser screen-space HUD: 5×7 bitmap glyphs, reusable `drawBitmapTextInto`, compact build label, fullscreen-иконка, pixel-aligned placement, colors и hit-area helpers.
 
 ### `src/movementConfig.js`
 
@@ -182,7 +198,7 @@ Mock-проверки Fullscreen API helper.
 
 ### `scripts/check-hud.mjs`
 
-Bitmap glyph coverage, build label, pixel placement, fullscreen hit area и передача HUD exclusion в `MobileJoystick`.
+Bitmap glyph coverage, build label, fullscreen hit area, reusable interaction HUD objects, prompt/dialogue mobile tap latch, full visible dialogue-panel joystick exclusion и cleanup.
 
 ### `scripts/check-movement.mjs`
 
@@ -190,11 +206,15 @@ Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked
 
 ### `scripts/check-character.mjs`
 
-Проверяет actor profiles, controller command/snapshot isolation, `CharacterMotor` movement/collision/snapshots, `CharacterVisual` facing/animation/depth/destroy, aggregate compatibility, `CharacterSystem` registry/order/update/snapshots/lifecycle, NPC patrols и WorldScene integration.
+Проверяет actor profiles, controller command/snapshot isolation, `CharacterMotor` movement/collision/snapshots, `CharacterVisual` facing/animation/depth/destroy, aggregate compatibility, `CharacterSystem` registry/order/update/snapshots/lifecycle, NPC patrols, dialogue pause policy и WorldScene integration.
 
 ### `scripts/check-interaction.mjs`
 
 Проверяет canonical session shape, entity/flag/dialogue operations, reserved IDs, JSON round-trip, immutable interaction descriptors, strict payload validation, defensive copying, radius/facing filtering и deterministic priority/distance/ID ranking.
+
+### `scripts/check-dialogue.mjs`
+
+Проверяет immutable dialogue/interaction config, strict dialogue lookup включая inherited object keys, dynamic target positions, approach/facing/prompt, start/advance/close lifecycle, selected-NPC pause, completion flag, replay, session JSON round-trip и idempotent runtime destroy.
 
 ### `scripts/check-visual.mjs`
 
@@ -225,7 +245,7 @@ Indoor/outdoor camera previews включают соответствующего
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/interaction/visual/world/preview проверок.
+Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/interaction/dialogue/visual/world/preview проверок.
 
 ## Инфраструктура
 
