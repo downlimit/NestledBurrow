@@ -20,18 +20,33 @@ export function createCharacter(scene, options) {
 }
 
 export class Character {
-  constructor(scene, { id, spawn, controller, movementConfig, animationPrefix = "character" }) {
+  constructor(
+    scene,
+    {
+      id,
+      spawn,
+      controller,
+      movementConfig,
+      animationPrefix = "character",
+      frames = PLAYER_FRAMES,
+      idleFrameIndex = PLAYER_IDLE_FRAME_INDEX,
+      footWidth = PLAYER_FOOT_WIDTH,
+      footDepth = PLAYER_FOOT_DEPTH,
+    },
+  ) {
     this.id = id;
     this.controller = controller;
     this.movementConfig = movementConfig;
     this.animationPrefix = animationPrefix;
-    this.footWidth = PLAYER_FOOT_WIDTH;
-    this.footDepth = PLAYER_FOOT_DEPTH;
+    this.frames = frames;
+    this.idleFrameIndex = idleFrameIndex;
+    this.footWidth = footWidth;
+    this.footDepth = footDepth;
     this.lastFacing = "down";
     this.movement = createMovementState();
     this.lastBlockedAxes = { x: false, y: false };
     this.sprite = scene.add
-      .sprite(spawn.x, spawn.y, PLAYER_FRAMES.down[PLAYER_IDLE_FRAME_INDEX])
+      .sprite(spawn.x, spawn.y, this.frames.down[this.idleFrameIndex])
       .setOrigin(0.5, 1);
     this.updateDepth();
   }
@@ -87,7 +102,7 @@ export class Character {
   updateAnimation() {
     if (!isMoving(this.movement, this.movementConfig)) {
       this.sprite.anims.stop();
-      const idleFrame = PLAYER_FRAMES[this.lastFacing][PLAYER_IDLE_FRAME_INDEX];
+      const idleFrame = this.frames[this.lastFacing][this.idleFrameIndex];
       if (this.sprite.texture.key !== idleFrame) this.sprite.setTexture(idleFrame);
       return;
     }
