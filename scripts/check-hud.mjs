@@ -61,6 +61,8 @@ assert.equal(interactionHud.consumeInteractPressed(), true, "mobile prompt tap l
 assert.equal(interactionHud.consumeInteractPressed(), false, "consume clears mobile interact latch");
 interactionHud.showDialogue({ speaker: "HOME NPC", text: "HELLO THERE.", continuePrompt: "NEXT" });
 assert.equal(interactionHud.isPointInHud(270, 150), true, "visible dialogue action area blocks joystick");
+assert.equal(interactionHud.isPointInHud(100, 135), true, "entire visible dialogue panel blocks joystick activation");
+assert.equal(interactionHud.isPointInHud(100, 110), false, "area above dialogue panel remains available to gameplay input");
 interactionHud.showDialogue({ speaker: "HOME NPC", text: "SEE YOU AROUND.", continuePrompt: "CLOSE" });
 assert.equal(zones.length, 2, "dialogue updates reuse HUD objects");
 zones[1].emitPointerDown();
