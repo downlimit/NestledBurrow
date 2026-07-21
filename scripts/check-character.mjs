@@ -9,6 +9,7 @@ import { createCharacterSystem } from "../src/characterSystem.js";
 import { createControllerCommand } from "../src/controllerCommand.js";
 import {
   BLOCKED_WAYPOINT_ADVANCE_MS,
+  PATROL_MODE_LOOP,
   createPatrolController,
   createPlayerController,
   WAYPOINT_TOLERANCE,
@@ -397,3 +398,30 @@ assert(!("sprite" in system.getSnapshot("player")), "CharacterSystem snapshots d
 assert.equal(system.require("player").sprite.id, "player-sprite", "player camera target remains available through registry lookup");
 
 console.log("character checks passed: actor profiles, shared configurable Character, NPC tuning, patrol routes, blocked fallback, tolerance, collision and player camera target.");
+
+let paused = true;
+const pausedPatrol = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }],
+  tolerance: 1,
+  isPaused: () => paused,
+});
+const pausedIndex = pausedPatrol.currentWaypointIndex;
+const pausedCommand = pausedPatrol.getCommand({ position: { x: 0, y: 0 }, blockedAxes: { x: true } }, BLOCKED_WAYPOINT_ADVANCE_MS + 100);
+assert.deepEqual(pausedCommand.moveDirection, { x: 0, y: 0 }, "paused patrol returns idle movement");
+assert.deepEqual(pausedCommand.actions, { interact: false, primary: false, secondary: false }, "paused patrol returns idle actions");
+assert.equal(pausedCommand.aimDirection, null, "paused patrol returns no aim");
+assert.equal(pausedPatrol.currentWaypointIndex, pausedIndex, "paused patrol does not advance waypoint index");
+pausedPatrol.getCommand({ position: { x: 0, y: 0 }, blockedAxes: { x: true } }, BLOCKED_WAYPOINT_ADVANCE_MS + 100);
+assert.equal(pausedPatrol.currentWaypointIndex, pausedIndex, "paused patrol blocked timer does not advance waypoint");
+paused = false;
+const resumedCommand = pausedPatrol.getCommand({ position: { x: 0, y: 0 }, blockedAxes: {} }, 16);
+assert(resumedCommand.moveDirection.x > 0, "resumed patrol continues toward previous waypoint");
+assert.equal(pausedPatrol.currentWaypointIndex, pausedIndex, "resumed patrol keeps previous waypoint until reached or blocked");
+const independentPatrol = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0 }],
+  tolerance: 1,
+});
+const independentCommand = independentPatrol.getCommand({ position: { x: 0, y: 0 }, blockedAxes: {} }, 16);
+assert(independentCommand.moveDirection.x > 0, "another patrol controller is not affected by pause callback");

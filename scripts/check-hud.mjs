@@ -35,3 +35,42 @@ assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "fulls
 assert(!main.includes("isHudPointer(pointer)"), "scene no longer exposes the legacy pointer-shaped HUD check");
 
 console.log("hud checks passed");
+import { createInteractionHud } from "../src/interactionHud.js";
+
+function createEmitterObject() {
+  return {
+    interactive: false, destroyed: 0, handlers: new Map(), depth: 0, scrollFactor: 1,
+    setOrigin() { return this; }, setDepth(value) { this.depth = value; return this; }, setScrollFactor(value) { this.scrollFactor = value; return this; },
+    setInteractive() { this.interactive = true; return this; }, disableInteractive() { this.interactive = false; return this; },
+    on(name, fn) { this.handlers.set(name, fn); return this; }, off(name) { this.handlers.delete(name); return this; },
+    destroy() { this.destroyed += 1; }, emitPointerDown() { this.handlers.get("pointerdown")?.({ event: { stopped: false, stopPropagation() { this.stopped = true; } } }, 0, 0, { stopped: false, stopPropagation() { this.stopped = true; } }); },
+  };
+}
+const fakeGraphics = { clearCount: 0, destroyed: 0, setDepth() { return this; }, setScrollFactor() { return this; }, clear() { this.clearCount += 1; return this; }, fillStyle() { return this; }, fillRect() { return this; }, lineStyle() { return this; }, strokeRect() { return this; }, destroy() { this.destroyed += 1; } };
+const zones = [];
+const hudScene = { add: { graphics() { return fakeGraphics; }, zone() { const zone = createEmitterObject(); zones.push(zone); return zone; } } };
+const interactionHud = createInteractionHud(hudScene, { isCoarsePointer: () => false });
+assert.equal(interactionHud.isPointInHud(12, 150), false, "invisible interaction area does not block joystick");
+interactionHud.showPrompt({ prompt: "TALK" });
+assert.equal(interactionHud.isPointInHud(12, 150), true, "visible prompt area blocks joystick");
+const clearAfterPrompt = fakeGraphics.clearCount;
+interactionHud.showPrompt({ prompt: "TALK" });
+assert.equal(fakeGraphics.clearCount, clearAfterPrompt, "repeat prompt show does not redraw or duplicate objects");
+zones[0].emitPointerDown();
+assert.equal(interactionHud.consumeInteractPressed(), true, "mobile prompt tap latches one interact");
+assert.equal(interactionHud.consumeInteractPressed(), false, "consume clears mobile interact latch");
+interactionHud.showDialogue({ speaker: "HOME NPC", text: "HELLO THERE.", continuePrompt: "NEXT" });
+assert.equal(interactionHud.isPointInHud(270, 150), true, "visible dialogue action area blocks joystick");
+assert.equal(interactionHud.isPointInHud(100, 135), true, "entire visible dialogue panel blocks joystick activation");
+assert.equal(interactionHud.isPointInHud(100, 110), false, "area above dialogue panel remains available to gameplay input");
+interactionHud.showDialogue({ speaker: "HOME NPC", text: "SEE YOU AROUND.", continuePrompt: "CLOSE" });
+assert.equal(zones.length, 2, "dialogue updates reuse HUD objects");
+zones[1].emitPointerDown();
+assert.equal(interactionHud.consumeInteractPressed(), true, "dialogue tap advances exactly one latched action");
+interactionHud.hideDialogue();
+assert.equal(interactionHud.isPointInHud(270, 150), false, "hidden dialogue area does not block joystick");
+interactionHud.destroy();
+interactionHud.destroy();
+assert.equal(fakeGraphics.destroyed, 1, "interaction HUD destroy is idempotent for graphics");
+assert.equal(zones[0].destroyed, 1, "interaction HUD destroy is idempotent for prompt zone");
+assert(main.includes("Phaser.Input.Keyboard.JustDown(this.interactKeys.E)") && main.includes("Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE)"), "keyboard interaction uses edge-triggered JustDown for E and SPACE so hold does not repeat per frame");
