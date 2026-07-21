@@ -13,11 +13,10 @@ export const DIALOGUE_DEFINITIONS = deepFreeze({
 });
 
 export function getDialogueDefinition(dialogueId) {
-  const definition = DIALOGUE_DEFINITIONS[dialogueId];
-  if (!definition) {
+  if (!Object.hasOwn(DIALOGUE_DEFINITIONS, dialogueId)) {
     throw new Error(`Unknown dialogue definition ID: ${dialogueId}`);
   }
-  return definition;
+  return DIALOGUE_DEFINITIONS[dialogueId];
 }
 
 function deepFreeze(value) {
