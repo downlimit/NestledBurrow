@@ -1,5 +1,7 @@
 # Task: <short title>
 
+<!-- Keep the task proportional to its risk. Include only constraints that change implementation or review behavior. Do not restate repository-wide rules already defined in AGENTS.md and REVIEW.md. Remove optional sections that add no useful information. -->
+
 ## Git lifecycle
 
 - Base branch: current `main`
@@ -7,7 +9,7 @@
 - Remote branches allowed: `1`
 - Work branch: use the single branch supplied by Codex; do not create or push additional branches
 - Lifecycle: `ephemeral`
-- Create PR: `yes` — exactly once, after implementation and validation
+- Create PR: `yes` — exactly once, after implementation and applicable validation
 - Delete task branch after merge: `yes` — handled by GitHub automatic head-branch deletion
 - Codex deletes its own active branch: `no`
 - Persistent/protected branch: `no`
@@ -33,39 +35,27 @@ Persistent branches are exceptional. Do not create or configure branch protectio
 - `PROJECT.md`
 - `LIBRARY.md`
 - `REVIEW.md`
-- <directly relevant files>
+- <only directly relevant files>
 
 ## Requirements
 
-<Required behavior, architecture and technical constraints.>
+<Only behavior, architecture or technical constraints specific to this task.>
 
 ## Validation
 
-Run the canonical repository checks required by `AGENTS.md` and manually inspect every affected runtime state.
+Use the review class and proportional validation rules from `AGENTS.md` and `REVIEW.md`.
 
-List task-specific checks here:
+List only task-specific risks not already covered by canonical checks:
 
-- <automated behavior or boundary case>
-- <browser/runtime state>
-- <desktop/mobile viewport when relevant>
-- <preview or screenshot artifact when relevant>
+- <behavior or boundary case>
+- <runtime state, viewport or artifact only when relevant>
 
 A local dependency, proxy, browser-install or package-index failure must be reported as a limitation. It must not be worked around by adding an unrelated fallback package, vendored compatibility module, test bypass or workflow change.
 
 ## Scope boundary
 
-Do not add or change:
-
-- <explicitly excluded gameplay or UI behavior>
-- unrelated dependencies or compatibility layers;
-- unrelated architecture, assets, workflows or infrastructure;
-- canonical validation solely to accommodate the local environment.
+<Include this section only when likely scope creep needs to be explicitly blocked. Do not copy generic exclusions from AGENTS.md.>
 
 ## Delivery
 
-1. Finish implementation, self-review, browser inspection and all known repairs before opening the PR.
-2. Run the mandatory checks from `AGENTS.md`.
-3. Open exactly one final PR from the single task branch.
-4. Use `.github/pull_request_template.md` and include the completion report required by `AGENTS.md` and `REVIEW.md`.
-5. Do not create a draft PR, replacement PR, additional remote branch or close/reopen cycle as a development mechanism.
-6. Do not delete the active task branch. GitHub handles ephemeral branch deletion after merge; the main chat verifies it.
+Finish implementation, self-review and applicable validation before opening exactly one final PR from the single task branch. Use the adaptive `.github/pull_request_template.md`; keep only sections relevant to the task. Do not create a draft PR, replacement PR, additional remote branch or close/reopen cycle as a development mechanism. Do not delete the active task branch; GitHub handles ephemeral branch deletion after merge and the main chat verifies it.
