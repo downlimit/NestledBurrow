@@ -72,11 +72,15 @@
 
 ### `src/main.js`
 
-Phaser composition root непрерывного мира: создаёт мир и `Character`-сущности, связывает клавиатуру, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD, вызывает update и уничтожает runtime-компоненты.
+Phaser composition root непрерывного мира: создаёт мир и `Character`-сущности по actor profiles, связывает клавиатуру, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD, вызывает update и уничтожает runtime-компоненты.
+
+### `src/actorProfiles.js`
+
+Канонический registry неизменяемых actor profiles. Сейчас содержит стабильные ID `player` и `villager`, явные production movement/visual значения, строгий lookup и debug-only policy для синхронизации villager tuning с player debug config без зависимости production данных от mutable runtime state.
 
 ### `src/character.js`
 
-Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting. Формирует изолированный controller snapshot и применяет нормализованный `ControllerCommand`. Также формирует NPC movement config с той же максимальной скоростью и вдвое меньшими acceleration/deceleration параметрами.
+Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, actor-profile visual defaults, collision footprint, facing, animation и depth sorting. Формирует изолированный controller snapshot и применяет нормализованный `ControllerCommand`.
 
 ### `src/controllerCommand.js`
 
@@ -88,7 +92,7 @@ Phaser composition root непрерывного мира: создаёт мир
 
 ### `src/npcConfig.js`
 
-Декларативные spawn-точки и маршруты домашнего loop-NPC и уличного ping-pong-NPC.
+Декларативные profile ID, spawn-точки и маршруты домашнего loop-NPC и уличного ping-pong-NPC.
 
 ### `src/input.js`
 
@@ -112,27 +116,31 @@ Helper стандартного Fullscreen API: поддержка, active state
 
 ### `src/movementConfig.js`
 
-Production defaults, диапазоны runtime-тюнинга и нормализация конфигурации движения.
+Ссылка на канонический player movement profile, диапазоны runtime-тюнинга, cloning и нормализация конфигурации движения относительно явного base config.
 
 ### `src/characterMovement.js`
 
-Переиспользуемое состояние и интегратор движения: desired direction, velocity, разгон, торможение, разворот, facing/aim и delta cap.
+Переиспользуемое состояние и интегратор движения: desired direction, velocity, разгон, торможение, разворот, facing/aim, delta cap и создание mutable runtime config из явного base profile.
+
+### `src/collisionEnvironment.js`
+
+Контракт collision environment и фабрика grid-среды: finite bounds, положительный `cellSize`, обязательный blocking query либо удобный `blockedCells` collection.
 
 ### `src/movement.js`
 
-Foot-box collision, world bounds и axis-separated sliding без Phaser Physics.
+Foot-box collision и axis-separated sliding по переданному collision environment. Resolver использует environment bounds/cell size/blocking query, поддерживает non-zero origin и не импортирует глобальные размеры мира.
 
 ### `src/visualConfig.js`
 
-Кадры персонажа, foot box, facing hysteresis и скорость анимации.
+Активные кадры персонажа, foot box, facing hysteresis и скорость анимации. Legacy room exports удалены.
 
 ### `src/worldConfig.js`
 
-Размеры экрана, мира и тайла; параметры дома и двери; пути и frame-индексы Basic Village.
+Размеры экрана, мира и тайла; параметры дома и двери; пути и frame-индексы Basic Village. Actor movement values здесь не хранятся.
 
 ### `src/worldLayout.js`
 
-Сборка мира: ground, path, интерьер, стены, деревья, spawn, outdoor target и blocked cells.
+Сборка мира: ground, path, интерьер, стены, деревья, spawn, outdoor target и diagnostic blocked set. Возвращает production collision environment с bounds, cell size и blocking query.
 
 ## Проверки и инструменты
 
@@ -158,19 +166,19 @@ Bitmap glyph coverage, build label, pixel placement, fullscreen hit area и пе
 
 ### `scripts/check-movement.mjs`
 
-Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked axes, aim, tuning limits и delta cap.
+Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked axes, aim, tuning limits, delta cap, canonical player profile identity и независимые mutable runtime configs.
 
 ### `scripts/check-character.mjs`
 
-Проверяет общий `ControllerCommand`, sanitization/defaults, player aim/actions, изоляцию controller snapshot, общую `Character`-фабрику игрока и NPC, половинные NPC acceleration/deceleration параметры, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
+Проверяет actor profile registry и immutability, explicit villager production/debug values, NPC profile wiring, общий `ControllerCommand`, player aim/actions, изоляцию controller snapshot, общую `Character`-фабрику игрока и NPC, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
 
 ### `scripts/check-visual.mjs`
 
-Pixel grid, Basic Village hashes, spritesheet loading, integer zoom, camera и character frames.
+Проверяет удаление legacy room sources/atlases, pixel grid, Basic Village hashes, spritesheet loading, integer zoom, camera и активные character frames.
 
 ### `scripts/check-world.mjs`
 
-World layout, doorway, collision, sliding, anti-tunneling и bounds.
+Проверяет production и искусственные collision environments, bounds/cell size/blocking query, doorway, spawn/waypoint walkability, collision, sliding, anti-tunneling, blocked axes и non-zero origin.
 
 ### `scripts/check-room-preview.py`
 
@@ -210,10 +218,6 @@ Indoor/outdoor camera previews включают соответствующего
 - `main` защищён от удаления и force-push.
 - Automatic head-branch deletion удаляет обычные merged ветки.
 - Persistent `release/*`, `archive/*` и `keep/*` требуют отдельной repository-side protection.
-
-## Legacy
-
-`src/kenneyRoomConfig.json`, `src/roomLayout.js` и старые Kenney environment atlases относятся к предыдущей реализации окружения.
 
 ## Правила развития карты
 
