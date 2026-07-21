@@ -40,6 +40,48 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
+      - name: Prepare localization repair artifact
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          mkdir -p public/assets/fonts/rubik artifacts/localization-repair
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/googlefonts/rubik/main/old/version-2/fonts/ttf/Rubik-Regular.ttf \
+            --output public/assets/fonts/rubik/Rubik-Regular.ttf
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/googlefonts/rubik/main/OFL.txt \
+            --output public/assets/fonts/rubik/OFL.txt
+          python -m pip install --disable-pip-version-check fonttools
+          python - <<'PY'
+          from fontTools.ttLib import TTFont
+          from pathlib import Path
+
+          path = Path("public/assets/fonts/rubik/Rubik-Regular.ttf")
+          font = TTFont(path)
+          codepoints = set()
+          for table in font["cmap"].tables:
+              codepoints.update(table.cmap)
+          required = "AaZzАаЯяЁё"
+          missing = [character for character in required if ord(character) not in codepoints]
+          if missing:
+              raise SystemExit(f"Rubik glyph validation failed: {missing}")
+          Path("artifacts/localization-repair/font-validation.txt").write_text(
+              f"family=Rubik\nrequired={required}\nmissing=none\n",
+              encoding="utf-8",
+          )
+          PY
+          sha256sum public/assets/fonts/rubik/Rubik-Regular.ttf > artifacts/localization-repair/Rubik-Regular.sha256
+          cp package-lock.json artifacts/localization-repair/package-lock.json
+          cp public/assets/fonts/rubik/Rubik-Regular.ttf artifacts/localization-repair/Rubik-Regular.ttf
+          cp public/assets/fonts/rubik/OFL.txt artifacts/localization-repair/OFL.txt
+
+      - name: Upload localization repair artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: localization-repair-pr-${{ github.event.pull_request.number }}
+          path: artifacts/localization-repair
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Install Node dependencies
         run: npm ci
 
