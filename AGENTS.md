@@ -88,7 +88,7 @@ When a visual choice is ambiguous, stop before production integration and provid
 
 ## Branch lifecycle
 
-Every task file must contain a `Git lifecycle` section based on `tasks/TEMPLATE.md`.
+Every new implementation task file must contain a `Git lifecycle` section based on `tasks/TEMPLATE.md`. Historical completed task files do not need to be rewritten solely for metadata consistency.
 
 - Normal tasks use exactly one remote task branch. Temporary local branches and worktrees are allowed but must never be pushed to `origin`.
 - Never push ordinary task work directly to `main`.
