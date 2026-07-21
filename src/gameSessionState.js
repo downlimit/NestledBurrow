@@ -14,6 +14,20 @@ function assertBoolean(value, label) {
   }
 }
 
+function hasOwn(record, key) {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function setOwn(record, key, value) {
+  Object.defineProperty(record, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+  return value;
+}
+
 function createEntity(entityId) {
   assertNonEmptyString(entityId, "Entity ID");
   return { id: entityId, flags: {} };
@@ -48,27 +62,26 @@ export function createGameSessionState(options = {}) {
 
 export function ensureSessionEntity(state, entityId) {
   assertNonEmptyString(entityId, "Entity ID");
-  if (!state.entities[entityId]) {
-    state.entities[entityId] = createEntity(entityId);
+  if (!hasOwn(state.entities, entityId)) {
+    setOwn(state.entities, entityId, createEntity(entityId));
   }
   return state.entities[entityId];
 }
 
 export function getSessionEntity(state, entityId) {
   assertNonEmptyString(entityId, "Entity ID");
-  return state.entities[entityId] ?? null;
+  return hasOwn(state.entities, entityId) ? state.entities[entityId] : null;
 }
 
 export function setSessionFlag(state, flagId, value) {
   assertNonEmptyString(flagId, "Flag ID");
   assertBoolean(value, "Session flag value");
-  state.flags[flagId] = value;
-  return value;
+  return setOwn(state.flags, flagId, value);
 }
 
 export function getSessionFlag(state, flagId) {
   assertNonEmptyString(flagId, "Flag ID");
-  return state.flags[flagId] ?? false;
+  return hasOwn(state.flags, flagId) ? state.flags[flagId] : false;
 }
 
 export function setEntityFlag(state, entityId, flagId, value) {
@@ -78,14 +91,13 @@ export function setEntityFlag(state, entityId, flagId, value) {
   if (!entity) {
     throw new Error(`Unknown session entity: ${entityId}`);
   }
-  entity.flags[flagId] = value;
-  return value;
+  return setOwn(entity.flags, flagId, value);
 }
 
 export function getEntityFlag(state, entityId, flagId) {
   assertNonEmptyString(flagId, "Flag ID");
   const entity = getSessionEntity(state, entityId);
-  return entity?.flags[flagId] ?? false;
+  return entity && hasOwn(entity.flags, flagId) ? entity.flags[flagId] : false;
 }
 
 export function isDialogueActive(state) {
