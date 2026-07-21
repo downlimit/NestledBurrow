@@ -52,7 +52,8 @@ const hudScene = { add: { graphics() { return fakeGraphics; }, zone() { const zo
 const interactionHud = createInteractionHud(hudScene, { isCoarsePointer: () => false });
 assert.equal(interactionHud.isPointInHud(12, 150), false, "invisible interaction area does not block joystick");
 interactionHud.showPrompt({ prompt: "TALK" });
-assert.equal(interactionHud.isPointInHud(12, 150), true, "visible prompt area blocks joystick");
+assert.equal(interactionHud.isPointInHud(12, 150), false, "visible right-side prompt leaves the left side available");
+assert.equal(interactionHud.isPointInHud(GAME_WIDTH - 12, 150), true, "visible prompt area is active on the right side");
 const clearAfterPrompt = fakeGraphics.clearCount;
 interactionHud.showPrompt({ prompt: "TALK" });
 assert.equal(fakeGraphics.clearCount, clearAfterPrompt, "repeat prompt show does not redraw or duplicate objects");
