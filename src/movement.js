@@ -1,6 +1,6 @@
-import { TILE_SIZE, WORLD_HEIGHT, WORLD_WIDTH } from "./worldConfig.js";
+import { validateCollisionEnvironment } from "./collisionEnvironment.js";
 
-const MAX_COLLISION_STEP = TILE_SIZE / 4;
+const CELL_COVERAGE_EPSILON = 0.001;
 
 export function getFootBox(position, footWidth, footDepth) {
   return {
@@ -12,25 +12,27 @@ export function getFootBox(position, footWidth, footDepth) {
 }
 
 export function collides(position, layout, footWidth, footDepth) {
+  const environment = validateCollisionEnvironment(layout);
   const box = getFootBox(position, footWidth, footDepth);
+  const { bounds, cellSize } = environment;
 
   if (
-    box.left < 0 ||
-    box.top < 0 ||
-    box.right > WORLD_WIDTH ||
-    box.bottom > WORLD_HEIGHT
+    box.left < bounds.left ||
+    box.top < bounds.top ||
+    box.right > bounds.right ||
+    box.bottom > bounds.bottom
   ) {
     return true;
   }
 
-  const minX = Math.floor(box.left / TILE_SIZE);
-  const maxX = Math.floor((box.right - 0.001) / TILE_SIZE);
-  const minY = Math.floor(box.top / TILE_SIZE);
-  const maxY = Math.floor((box.bottom - 0.001) / TILE_SIZE);
+  const minX = Math.floor((box.left - bounds.left) / cellSize);
+  const maxX = Math.floor((box.right - bounds.left - CELL_COVERAGE_EPSILON) / cellSize);
+  const minY = Math.floor((box.top - bounds.top) / cellSize);
+  const maxY = Math.floor((box.bottom - bounds.top - CELL_COVERAGE_EPSILON) / cellSize);
 
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
-      if (layout.blocked.has(`${x},${y}`)) return true;
+      if (environment.isBlockedCell(x, y)) return true;
     }
   }
 
@@ -38,21 +40,26 @@ export function collides(position, layout, footWidth, footDepth) {
 }
 
 export function moveWithCollision(position, delta, layout, footWidth, footDepth) {
+  const environment = validateCollisionEnvironment(layout);
   const next = { ...position };
   const blockedAxes = { x: false, y: false };
   const substepCount = Math.max(
     1,
-    Math.ceil(Math.max(Math.abs(delta.x), Math.abs(delta.y)) / MAX_COLLISION_STEP),
+    Math.ceil(Math.max(Math.abs(delta.x), Math.abs(delta.y)) / (environment.cellSize / 4)),
   );
   const stepX = delta.x / substepCount;
   const stepY = delta.y / substepCount;
 
   for (let index = 0; index < substepCount; index += 1) {
     const requestedX = next.x + stepX;
-    const clampedX = clamp(requestedX, footWidth / 2, WORLD_WIDTH - footWidth / 2);
+    const clampedX = clamp(
+      requestedX,
+      environment.bounds.left + footWidth / 2,
+      environment.bounds.right - footWidth / 2,
+    );
     const tryX = { x: clampedX, y: next.y };
 
-    if (!collides(tryX, layout, footWidth, footDepth)) {
+    if (!collides(tryX, environment, footWidth, footDepth)) {
       if (stepX !== 0 && clampedX !== requestedX) blockedAxes.x = true;
       next.x = clampedX;
     } else if (stepX !== 0) {
@@ -60,10 +67,14 @@ export function moveWithCollision(position, delta, layout, footWidth, footDepth)
     }
 
     const requestedY = next.y + stepY;
-    const clampedY = clamp(requestedY, footDepth, WORLD_HEIGHT);
+    const clampedY = clamp(
+      requestedY,
+      environment.bounds.top + footDepth,
+      environment.bounds.bottom,
+    );
     const tryY = { x: next.x, y: clampedY };
 
-    if (!collides(tryY, layout, footWidth, footDepth)) {
+    if (!collides(tryY, environment, footWidth, footDepth)) {
       if (stepY !== 0 && clampedY !== requestedY) blockedAxes.y = true;
       next.y = clampedY;
     } else if (stepY !== 0) {

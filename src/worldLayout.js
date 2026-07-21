@@ -1,3 +1,4 @@
+import { createGridCollisionEnvironment } from "./collisionEnvironment.js";
 import {
   DOOR_LEFT,
   DOOR_Y,
@@ -7,6 +8,8 @@ import {
   TILE_SIZE,
   WORLD_COLUMNS,
   WORLD_ROWS,
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
 } from "./worldConfig.js";
 
 function addTree(tiles, blocked, x, y, variant) {
@@ -103,7 +106,14 @@ export function createWorldLayout() {
   addTree(decorationTiles, blocked, 8, 33, 2);
   addTree(decorationTiles, blocked, 51, 34, 0);
 
+  const environment = createGridCollisionEnvironment({
+    bounds: { left: 0, top: 0, right: WORLD_WIDTH, bottom: WORLD_HEIGHT },
+    cellSize: TILE_SIZE,
+    isBlockedCell: (x, y) => blocked.has(cellKey(x, y)),
+  });
+
   return {
+    ...environment,
     groundTiles,
     houseFloorTiles,
     houseWallTiles,
