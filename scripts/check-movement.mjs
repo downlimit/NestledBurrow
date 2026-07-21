@@ -102,6 +102,12 @@ assert.equal(
   createRuntimeMovementConfig({ acceleration: Number.NaN }).acceleration,
   DEFAULT_MOVEMENT_CONFIG.acceleration,
 );
+const playerProfile = getActorProfile("player");
+assert.equal(
+  DEFAULT_MOVEMENT_CONFIG,
+  playerProfile.movement,
+  "default movement is the canonical immutable player profile object",
+);
 const villagerProfile = getActorProfile("villager");
 const villagerRuntime = createRuntimeMovementConfig(villagerProfile.movement, villagerProfile.movement);
 assert.deepEqual(
