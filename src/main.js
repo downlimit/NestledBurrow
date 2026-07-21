@@ -19,6 +19,7 @@ import {
   getActorProfile,
 } from "./actorProfiles.js";
 import { createCharacter } from "./character.js";
+import { createCharacterSystem } from "./characterSystem.js";
 import { createPatrolController, createPlayerController } from "./controllers.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
@@ -63,6 +64,7 @@ class WorldScene extends Phaser.Scene {
     this.movementDebugEnabled =
       new URLSearchParams(window.location.search).get("movementDebug") === "1";
     this.worldLayout = createWorldLayout();
+    this.characterSystem = createCharacterSystem({ collisionEnvironment: this.worldLayout });
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.renderWorld();
     this.createCharacterAnimations();
@@ -123,20 +125,18 @@ class WorldScene extends Phaser.Scene {
       movementConfig: this.movementConfig,
       actorProfile: playerProfile,
     });
-    this.player = this.playerCharacter.sprite;
-    this.characters = [
-      this.playerCharacter,
-      ...NPCS.map((npc) => {
-        const actorProfile = getActorProfile(npc.profileId);
-        return createCharacter(this, {
-          id: npc.id,
-          spawn: npc.spawn,
-          controller: createPatrolController(npc.patrol),
-          movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
-          actorProfile,
-        });
-      }),
-    ];
+    this.characterSystem.add(this.playerCharacter);
+    for (const npc of NPCS) {
+      const actorProfile = getActorProfile(npc.profileId);
+      this.characterSystem.add(createCharacter(this, {
+        id: npc.id,
+        spawn: npc.spawn,
+        controller: createPatrolController(npc.patrol),
+        movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
+        actorProfile,
+      }));
+    }
+    this.player = this.characterSystem.require("player").sprite;
     this.cameras.main.startFollow(this.player, true, 1, 1);
   }
 
@@ -259,13 +259,15 @@ class WorldScene extends Phaser.Scene {
     this.mobileJoystick = null;
     this.movementDebugPanel?.destroy();
     this.movementDebugPanel = null;
+    this.characterSystem?.destroy();
+    this.characterSystem = null;
     this.fullscreenHud?.hit.destroy();
     this.fullscreenHud?.graphics.destroy();
     this.fullscreenHud = null;
   }
 
   update(_time, delta) {
-    this.characters.forEach((character) => character.update(delta, this.worldLayout));
+    this.characterSystem?.update(delta);
     this.updateMovementDebugStatus();
   }
 
