@@ -1,3 +1,5 @@
+<!-- Keep only applicable sections. For a docs-only or tiny low-risk change, a concise scope, lifecycle and validation summary is enough. Delete empty or not-applicable sections instead of filling them with bureaucracy. -->
+
 # Review class
 
 - [ ] `docs`
@@ -14,30 +16,30 @@
 - Task branch: `<branch>`
 - Final head SHA: `<sha>`
 - Lifecycle: `ephemeral` / `persistent`
-- PR opened once after implementation and local validation: `yes` / `no`
+- PR opened once after implementation and validation: `yes` / `no`
 - Additional remote branches created: `none` / `<explain>`
 
 ## Validation
 
-| Command | Result |
-|---|---|
-| `npm ci` | PASS / FAIL / NOT RUN |
-| `python -m pip install -r requirements-dev.txt` | PASS / FAIL / NOT RUN |
-| `npm run check` | PASS / FAIL / NOT RUN |
+<!-- List only checks relevant to the actual risk. State PASS, FAIL or NOT RUN with a short reason. Do not invent extra checks to make the report look complete. -->
+
+- `<command or inspection>` — `PASS / FAIL / NOT RUN`
 
 ## Runtime inspection
+
+<!-- Required only for visual/runtime or indirectly presentation-sensitive changes. Delete this section when it does not apply. -->
 
 - States inspected: `<list>`
 - Viewports/devices inspected: `<list>`
 - Preview or screenshot artifacts inspected: `<list>`
-- User-approved asset/frame choices: `<list or not applicable>`
+- User-approved asset/frame choices: `<list>`
 
 ## Limitations
 
-<!-- A missing browser, mobile/coarse-pointer device, dependency installation, or other unavailable check must be stated here. Do not describe an unavailable check as passed. -->
+<!-- Keep only real limitations. Delete this section when there are none. Never describe an unavailable check as passed. -->
 
 ## Scope confirmation
 
 - [ ] No unrelated dependency, fallback package, architecture, asset, workflow or infrastructure change was added.
-- [ ] The report and artifacts refer to the final head commit.
-- [ ] The branch is ready for strict review and merge; this PR is not being used as a development workspace.
+- [ ] Evidence refers to the final head commit.
+- [ ] The branch is ready for strict review and merge; this PR is not a development workspace.

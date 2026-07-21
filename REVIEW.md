@@ -17,7 +17,7 @@ Required review:
 - inspect the complete diff;
 - confirm no executable, asset, dependency or workflow file changed;
 - require successful CI when the repository workflow runs it;
-- no visual artifact download is required.
+- no local application dependency installation, runtime inspection or visual artifact download is required solely for formality.
 
 ### Code, non-visual
 
@@ -45,6 +45,20 @@ Required review:
 
 When uncertain, choose the stricter class.
 
+## Proportionality rule
+
+Review effort, evidence and reporting must be proportional to the real risk of the change.
+
+- Use the lightest review class that fully covers the ways the change can fail.
+- Do not demand runtime screenshots, device matrices, preview artifacts or local dependency installation for a documentation-only change.
+- Do not turn a small non-visual code change into a visual review unless it can plausibly alter presentation or interaction.
+- Do not create an issue, design document, checklist, report table, test harness, workflow or artifact merely to demonstrate process compliance.
+- New process infrastructure is justified only when it materially reduces a recurring risk or will be reused.
+- Prefer one canonical document over overlapping documents that repeat the same facts.
+- In PR reports, omit non-applicable sections instead of producing long `N/A` lists.
+- Do not repeat the same evidence across the task file, PR body, review comment and final user response.
+- Safety gates remain strict for high-risk changes; proportionality means removing irrelevant work, not skipping relevant validation.
+
 ## 2. Efficient discovery
 
 Start with one compact discovery pass:
@@ -65,7 +79,7 @@ Independent reads should be performed in parallel when tooling permits: CI state
 Before writing to the PR branch:
 
 1. Read all relevant changed files.
-2. Inspect tests and generated previews.
+2. Inspect applicable tests and generated previews.
 3. Build a complete defect list.
 4. Separate blockers from optional cleanup.
 5. Decide the full repair set.
@@ -155,7 +169,7 @@ Runtime code must continue to use semantic names. Raw source IDs belong in the a
 Prefer one coherent implementation concern per PR.
 
 - Ordinary task work must stay on one ephemeral remote branch.
-- The PR must be opened once, after implementation and local validation are complete.
+- The PR must be opened once, after implementation and applicable local validation are complete.
 - Do not use drafts, close/reopen cycles or multiple replacement PRs as a normal development workflow.
 - Repair the existing PR branch when safe; do not create a second remote repair branch merely for reviewer convenience.
 - Do not push ordinary task repairs directly to protected `main`.
@@ -167,21 +181,18 @@ Persistent `release/*`, `archive/*` or `keep/*` branches require an explicit rea
 
 ## 8. Codex report contract
 
-The PR description must use `.github/pull_request_template.md` and state:
+The PR description must use `.github/pull_request_template.md`, but keep only sections applicable to the review class and actual risk.
 
-- review class: `docs`, `code` or `visual/runtime`;
-- concise scope;
+Every report must state:
+
+- review class and concise scope;
 - task branch, lifecycle and final head SHA;
-- confirmation that the PR was opened once and no additional remote branches were created;
-- exact commands run and results;
-- runtime states inspected;
-- viewport sizes or devices inspected;
-- artifact names inspected;
-- limitations and skipped checks;
-- user-approved source frame IDs when asset selection was involved;
-- every deliberate dependency, workflow or infrastructure change.
+- whether the PR was opened once and whether additional remote branches were created;
+- validation performed and any real limitation.
 
-The report is evidence to investigate, not proof. The main chat independently verifies code, CI and artifacts.
+Add runtime states, viewports, devices, artifacts, asset choices, dependency changes, workflow changes or infrastructure changes only when they apply. A concise docs-only report is correct; padding it with irrelevant fields is not.
+
+The report is evidence to investigate, not proof. The main chat independently verifies code, CI and applicable artifacts.
 
 ## 9. Merge gate
 
@@ -212,7 +223,7 @@ Do not leave the user waiting without context during an unusually long review.
 - Do not narrate every API call or intermediate commit.
 - If the user asks a minor question during an active review, answer it briefly and then continue the review in the same turn before sending the final result.
 - Do not say that work is continuing unless the next action actually invokes the required tools.
-- The final message should state what was repaired, CI result, merge SHA, publication status and branch cleanup status.
+- The final message should state only the outcome relevant to the user: material repairs, CI result, merge/publication status and any remaining blocker. Do not repeat the full PR report.
 
 ## 11. Current optimization backlog
 
@@ -223,6 +234,6 @@ The following infrastructure improvements are approved directions but are not co
 3. Add deterministic Playwright runtime screenshots.
 4. Upload one clearly named artifact bundle per final head SHA.
 
-The standard PR report template is implemented at `.github/pull_request_template.md`. npm and pip caches are already configured in the current workflows.
+The standard adaptive PR report template is implemented at `.github/pull_request_template.md`. npm and pip caches are already configured in the current workflows.
 
-Until the remaining improvements are implemented, the reviewer follows the existing workflow and optimizes primarily by batching repairs and avoiding redundant reads or reruns.
+Until the remaining improvements are implemented, the reviewer follows the existing workflow and optimizes primarily by batching repairs, applying only relevant validation and avoiding redundant reads or reruns.
