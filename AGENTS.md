@@ -12,13 +12,17 @@ These rules apply to every task in this repository.
 
 ## Mandatory validation
 
-A task is not complete because the code compiles. Before creating a PR, run:
+A task is not complete because the code compiles.
+
+Before creating a `code` or `visual/runtime` PR, run:
 
 ```bash
 npm ci
 python -m pip install -r requirements-dev.txt
 npm run check
 ```
+
+For a documentation-only task, do not install dependencies or run the full application check solely to fill a report. Inspect the complete diff, confirm that no executable, asset, dependency or workflow file changed, and let the normal PR workflow run when configured.
 
 For any visual, animation, input, layout or runtime change, also launch the game and inspect the actual result in a browser:
 
@@ -74,7 +78,7 @@ Prepare work so the main-chat review can be strict without unnecessary repeated 
 
 - Develop in the single task branch without an open pull request.
 - Complete implementation, self-review, browser inspection and all known repairs before creating the PR.
-- Run the mandatory local checks before creating the PR.
+- Run the validation applicable to the actual review class and risk before creating the PR.
 - Create exactly one final PR after the branch is ready for review. Do not use draft PRs, closing/reopening, or repeated PR creation as a development or notification-suppression mechanism.
 - Use `.github/pull_request_template.md` and classify the PR as `docs`, `code` or `visual/runtime`.
 - Do not knowingly open a PR with obvious defects merely because automated checks pass.
@@ -85,6 +89,20 @@ Prepare work so the main-chat review can be strict without unnecessary repeated 
 - Ensure preview artifacts and the PR report refer to the final head commit.
 
 When a visual choice is ambiguous, stop before production integration and provide labeled numbered options for user approval. This applies especially to wall corners, transitions, directional animation frames and visually similar tiles. Do not substitute a guessed transform for an unverified source tile.
+
+## Proportional process
+
+Process, validation and reporting must be proportional to the real risk of the change. Use the lightest workflow that still provides enough evidence for a safe review.
+
+- A `docs` change normally needs a complete diff inspection, scope confirmation and the repository's automatic CI only. It does not need runtime inspection, preview downloads or locally installed application dependencies unless the documentation directly affects executable tooling.
+- A small `code` change needs the relevant targeted tests plus the canonical repository check. Do not invent visual review, device matrices or extra artifacts when rendered behavior cannot change.
+- A `visual/runtime` change receives the full applicable browser, viewport, interaction and artifact review.
+- Do not create a new design document, task document, issue, report table, checklist, test harness, workflow, compatibility layer or artifact merely to make the process look complete.
+- Create or expand process infrastructure only when the task explicitly requires it, it materially reduces a real recurring risk, or it will be reused.
+- Prefer updating an existing canonical document over creating a parallel document with overlapping information.
+- Delete non-applicable sections from reports instead of filling them with repeated `N/A` explanations.
+- Do not repeat the same evidence in the task file, PR body, review comment and final response. Put each fact in the shortest canonical place needed by its audience.
+- A task file may be brief. Include only constraints that change implementation or review behavior; do not restate all repository-wide rules already present in `AGENTS.md` and `REVIEW.md`.
 
 ## Branch lifecycle
 
@@ -141,18 +159,16 @@ When an atlas, layout or world composition changes, `npm run check` must generat
 
 ## Completion report
 
-The PR description and final task response must list:
+Use the shortest report that contains the evidence applicable to the task's review class and risk.
 
-- review class: `docs`, `code` or `visual/runtime`;
-- task branch and final head SHA;
-- confirmation that no additional remote branches were created;
-- confirmation that the PR was opened once after implementation and validation;
-- exact commands that were run and whether each passed;
-- runtime states and viewport sizes manually inspected;
-- preview or screenshot artifacts inspected;
-- any check that could not be performed and why;
-- user-approved source frame numbers when asset selection was involved;
-- any deliberate dependency, workflow or infrastructure change in scope.
+Every report must identify:
+
+- review class and concise scope;
+- task branch, lifecycle and final head SHA;
+- whether additional remote branches were created;
+- validation performed and any real limitation.
+
+Include runtime states, viewport sizes, screenshots, preview artifacts, asset choices and infrastructure changes only when they apply. Documentation-only and small low-risk tasks should not contain long lists of irrelevant `not applicable` fields.
 
 Do not claim that a visual/runtime task is complete, and do not update `PROJECT.md` as completed, when the runtime result was not inspected. If browser inspection is unavailable, state that clearly and leave the task for strict review instead of presenting it as fully verified.
 
