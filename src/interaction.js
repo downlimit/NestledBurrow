@@ -14,20 +14,53 @@ function isPlainObject(value) {
   return value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
 }
 
-function cloneJsonLike(value, label) {
+function cloneJsonLike(value, label, active = new WeakSet()) {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new Error(`${label} must contain only finite JSON numbers`);
+    }
+    return value;
+  }
   if (value === undefined || typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
     throw new Error(`${label} must be JSON-serializable`);
   }
-  if (value && typeof value === "object") {
-    for (const child of Object.values(value)) {
-      cloneJsonLike(child, label);
+  if (active.has(value)) {
+    throw new Error(`${label} must not contain circular references`);
+  }
+
+  active.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const clone = [];
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) {
+          throw new Error(`${label} must not contain sparse arrays`);
+        }
+        clone.push(cloneJsonLike(value[index], label, active));
+      }
+      return clone;
     }
+
+    if (!isPlainObject(value) || Object.getOwnPropertySymbols(value).length > 0) {
+      throw new Error(`${label} must contain only plain objects, arrays and JSON primitives`);
+    }
+
+    const clone = {};
+    for (const [key, child] of Object.entries(value)) {
+      Object.defineProperty(clone, key, {
+        value: cloneJsonLike(child, label, active),
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+    return clone;
+  } finally {
+    active.delete(value);
   }
-  const clone = JSON.parse(JSON.stringify(value));
-  if (clone === undefined) {
-    throw new Error(`${label} must be JSON-serializable`);
-  }
-  return clone;
 }
 
 function deepFreeze(value) {
