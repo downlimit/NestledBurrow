@@ -1,4 +1,4 @@
-<!-- Keep only applicable sections. A routine task may come directly from a self-contained Codex prompt; no task file is required. For a docs-only or tiny low-risk change, a concise scope, lifecycle and validation summary is enough. Delete empty or not-applicable sections instead of filling them with bureaucracy. -->
+<!-- Keep only applicable sections. Routine work may come directly from a self-contained Codex prompt; no task file is required. Delete empty or not-applicable sections instead of filling them with bureaucracy. -->
 
 # Review class
 
@@ -21,13 +21,13 @@
 
 ## Validation
 
-<!-- List only checks relevant to the actual risk. State PASS, FAIL or NOT RUN with a short reason. Do not invent extra checks to make the report look complete. -->
+<!-- List only checks relevant to the actual risk. Use PASS, FAIL or NOT RUN with a short reason. Never describe an unavailable check as passed. -->
 
 - `<command or inspection>` — `PASS / FAIL / NOT RUN`
 
 ## Runtime inspection
 
-<!-- Required only for visual/runtime or indirectly presentation-sensitive changes. Delete this section when it does not apply. -->
+<!-- Required only for visual/runtime or indirectly presentation-sensitive changes. Delete when not applicable. -->
 
 - States inspected: `<list>`
 - Viewports/devices inspected: `<list>`
@@ -36,10 +36,18 @@
 
 ## Limitations
 
-<!-- Keep only real limitations. Delete this section when there are none. Never describe an unavailable check as passed. -->
+<!-- Keep only real limitations. Delete when there are none. -->
+
+## Canonical documentation
+
+<!-- State only documents whose owned facts changed. The main ChatGPT reviewer performs the final semantic drift check. -->
+
+- Updated: `<PROJECT.md / LIBRARY.md / AGENTS.md / REVIEW.md / ASSETS.md / none>`
+- Reason: `<brief reason or no owned fact changed>`
 
 ## Scope confirmation
 
 - [ ] No unrelated dependency, fallback package, architecture, asset, workflow or infrastructure change was added.
 - [ ] Evidence refers to the final head commit.
+- [ ] Canonical documentation owned by this change is current, or no canonical document was affected.
 - [ ] The branch is ready for strict review and merge; this PR is not a development workspace.

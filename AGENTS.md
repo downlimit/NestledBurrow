@@ -1,30 +1,66 @@
+<!-- audience: codex -->
 # Codex operating rules
 
-These rules apply to every task in this repository.
+## Audience and entry contract
+
+This file is the mandatory repository contract for Codex implementation tasks.
+
+For a routine task, read in this order:
+
+1. the direct task prompt;
+2. `AGENTS.md`;
+3. only source files, tests and configuration directly relevant to the task.
+
+Do **not** read `PROJECT.md`, `REVIEW.md` or `LIBRARY.md` by default.
+
+- Read `PROJECT.md` only when the direct prompt explicitly says that product history or a strategic decision is required.
+- Read `LIBRARY.md` only when the location of the relevant system is genuinely unclear.
+- Read `REVIEW.md` only when the direct prompt explicitly asks for reviewer-process work; normal implementation delivery is fully specified here and in the PR template.
+- Read a file from `tasks/` only when the direct prompt explicitly names it.
+- Read `ASSETS.md` when the task adds, replaces, selects or audits external assets.
+
+The direct prompt is the task contract. Do not expand its scope by mining unrelated project history.
 
 ## Before editing
 
-1. Read the direct task prompt first. If it names a file in `tasks/`, read that file as the detailed task contract. A routine task does not require a task file.
-2. Read `PROJECT.md`, `LIBRARY.md` and the files directly related to the task.
-3. Run `git fetch --prune` and verify that the task branch starts from the current `origin/main`.
-4. Use the single task branch already supplied by Codex, or the one explicit branch named in the prompt/task file. Never push task work directly to `main` and never create an additional remote branch.
-5. Read `REVIEW.md` before preparing the pull request and follow its report contract.
+1. Run `git fetch --prune`.
+2. Verify that the supplied task branch starts from current `origin/main`.
+3. Work only in the single supplied task branch.
+4. Never push ordinary task work directly to `main`.
+5. Never create or push an additional remote branch.
+6. Inspect the relevant existing implementation before choosing an architecture.
 
 ## Task entry modes
 
-The default path for normal short iterations is a self-contained direct prompt from the main chat.
+### Routine direct prompt
 
-- Treat the direct prompt as the task contract when no task file is named.
-- Do not create a task file, issue, planning document or preparatory PR merely to formalize a routine implementation request.
-- In the absence of a task-specific lifecycle section, use the normal defaults: current `main`, one ephemeral remote branch, no direct push to `main`, exactly one final PR after applicable validation, and automatic head-branch deletion after merge.
-- A dedicated task file is appropriate only when the main chat explicitly chooses it for large, high-risk, multi-stage, resumable or repeatedly reused work where a durable contract materially reduces risk.
-- When implementation changes make canonical project documentation stale, update the relevant existing documentation in the same implementation PR. Do not require a separate documentation PR before coding.
+This is the default for normal iterations.
+
+- Do not create a task file, issue, planning document or preparatory PR.
+- Use current `main`, one ephemeral branch and one final PR.
+- Treat the prompt as complete unless a real product ambiguity prevents correct implementation.
+
+### Explicit durable task file
+
+Use only when the prompt names a `tasks/*.md` file.
+
+A durable task file is reserved for large, high-risk, multi-stage, resumable or repeatedly reused work where repository persistence materially reduces risk.
+
+## Scope discipline
+
+- Deliver the observable result requested by the prompt.
+- Prefer the smallest architecture that cleanly supports the current use cases.
+- Do not invent future mechanics, frameworks or generalized systems not exercised by the task.
+- Do not add unrelated refactors, dependencies, assets, workflows, compatibility layers or infrastructure.
+- Do not weaken existing tests or validation to make a local environment pass.
+- Stop for clarification only when a product, visual or priority choice materially changes the user-facing result.
+- Technical implementation details are Codex responsibilities unless the prompt explicitly constrains them.
 
 ## Mandatory validation
 
 A task is not complete because the code compiles.
 
-Before creating a `code` or `visual/runtime` PR, run:
+For `code` or `visual/runtime` changes, run:
 
 ```bash
 npm ci
@@ -32,161 +68,145 @@ python -m pip install -r requirements-dev.txt
 npm run check
 ```
 
-For a documentation-only task, do not install dependencies or run the full application check solely to fill a report. Inspect the complete diff, confirm that no executable, asset, dependency or workflow file changed, and let the normal PR workflow run when configured.
+For a documentation-only change:
 
-For any visual, animation, input, layout or runtime change, also launch the game and inspect the actual result in a browser:
+- inspect the complete diff;
+- confirm that no executable, asset, dependency or workflow file changed;
+- run `npm run check:docs` when available;
+- let the normal PR workflow perform repository validation;
+- do not install runtime or visual dependencies solely to pad the report.
+
+Never report an unavailable or unperformed check as passed. Record the exact limitation.
+
+### Runtime and visual inspection
+
+For visual, animation, input, layout, camera, fullscreen, resize or other interactive changes, also launch the game:
 
 ```bash
 npm run dev -- --host 0.0.0.0
 ```
 
-Verify every changed state, not only that the page opens. At minimum, visual gameplay changes must be checked at the native logical game size and at a mobile/coarse-pointer viewport when touch behavior is involved.
+Inspect every changed state, not only initial page load. Check the native logical game size and a mobile/coarse-pointer viewport whenever touch behavior is involved.
 
-Never report an unavailable or unperformed check as passed. Record the exact limitation in the PR description.
+### Movement, joystick and animation
 
-### Dependency and environment integrity
+When applicable, explicitly verify:
 
-A local network, proxy, package-index or browser-install failure does not authorize changing the repository merely to make the local environment pass.
-
-- Do not vendor a fake or partial replacement for a missing dependency.
-- Do not add fallback packages, compatibility modules, generated binaries, dependency changes, workflow changes or test bypasses unless the task explicitly requires them.
-- Do not alter canonical validation scripts because a local install failed.
-- Run every check that remains possible, report the limitation, and let the canonical GitHub Actions environment validate the unchanged dependency setup.
-- Any genuine dependency or CI repair must be a deliberate, separately reviewed part of the task scope.
-
-For player movement, joystick or animation changes, explicitly verify:
-
-- idle after input is released;
+- idle after release;
 - walk up, down, left and right;
-- sprite facing matches movement direction;
-- diagonal movement does not increase speed;
-- keyboard and mobile joystick still work;
-- dragging the active joystick pointer outside the canvas does not interrupt input while capture remains active;
-- release outside the canvas, cancellation, blur and lost-touch/lost-capture states do not leave movement stuck;
-- room and world boundaries remain correct.
+- facing matches movement;
+- diagonal input does not increase speed;
+- keyboard and mobile joystick both work;
+- the active joystick pointer continues outside the canvas;
+- loss of pointer capture does not terminate ownership when the global fallback should continue it;
+- matching release outside the canvas resets movement;
+- cancellation, blur, hidden document and fullscreen transitions do not leave stuck movement;
+- world and room collision boundaries remain correct.
 
-For fullscreen, resize or screen-space UI changes, explicitly verify:
+### Fullscreen, resize and screen-space UI
 
-- enter and exit through every supported path;
+When applicable, explicitly verify:
+
+- enter and exit through supported paths;
 - state and icon synchronization after system exit or `Esc`;
 - integer zoom and crisp pixels after resize/fullscreen transitions;
 - desktop and mobile/coarse-pointer layouts;
-- HUD or DOM UI does not trigger gameplay input.
+- HUD input does not activate gameplay controls.
 
-For room, world or tile changes, explicitly verify:
+### Room, world and tile changes
 
-- the intended floor and outdoor ground tiles fill their areas;
-- horizontal and vertical walls use the intended tiles;
-- all corners and wall bands connect and face the correct direction;
-- doors or openings are genuinely traversable;
+When applicable, explicitly verify:
+
+- floor and outdoor ground fill intended areas;
+- wall directions, corners and bands use correct tiles;
+- doors and openings are genuinely traversable;
 - no unrelated sprites appear;
 - pixels remain crisp;
-- every generated preview artifact is the intended result.
+- generated preview artifacts represent the intended result.
+
+## Dependency and environment integrity
+
+A local network, proxy, package-index, browser-install or dependency failure does not authorize repository changes outside the task.
+
+- Do not vendor a fake or partial dependency replacement.
+- Do not add fallback packages, generated binaries or compatibility modules.
+- Do not alter canonical validation scripts to bypass the failure.
+- Run every remaining possible check and report the limitation.
+- Let the unchanged GitHub Actions environment perform clean validation.
+- A genuine dependency or CI repair must be explicit task scope.
 
 ## Review-efficient delivery
 
-Prepare work so the main-chat review can be strict without unnecessary repeated CI cycles or notification mail.
-
-- Develop in the single task branch without an open pull request.
-- Complete implementation, self-review, browser inspection and all known repairs before creating the PR.
-- Run the validation applicable to the actual review class and risk before creating the PR.
-- Create exactly one final PR after the branch is ready for review. Do not use draft PRs, closing/reopening, or repeated PR creation as a development or notification-suppression mechanism.
-- Use `.github/pull_request_template.md` and classify the PR as `docs`, `code` or `visual/runtime`.
-- Do not knowingly open a PR with obvious defects merely because automated checks pass.
-- Batch related final corrections before asking for review; avoid one push per small defect.
+- Develop without an open PR.
+- Finish implementation, self-review, browser inspection and known repairs first.
+- Batch related corrections instead of pushing one commit per small defect.
+- Create exactly one final PR after applicable validation.
+- Do not use draft PRs, close/reopen cycles or replacement PRs as a development mechanism.
 - Keep one coherent implementation concern per PR when `main` can remain usable between stages.
-- Do not combine unrelated architecture, gameplay, visual, dependency and infrastructure changes unless the user explicitly requests the combined change and one PR is the clearest delivery unit.
-- State every manual-test limitation explicitly. A missing browser, mobile device or coarse-pointer runtime is not a passed check.
-- Ensure preview artifacts and the PR report refer to the final head commit.
+- Do not knowingly open a PR with obvious defects merely because automated checks pass.
+- Ensure all evidence and artifacts refer to the final head SHA.
 
-When a visual choice is ambiguous, stop before production integration and provide labeled numbered options for user approval. This applies especially to wall corners, transitions, directional animation frames and visually similar tiles. Do not substitute a guessed transform for an unverified source tile.
+Use `.github/pull_request_template.md`. Keep only sections applicable to the actual risk.
 
-## Proportional process
+## Documentation boundaries
 
-Process, validation and reporting must be proportional to the real risk of the change. Use the lightest workflow that still provides enough evidence for a safe review.
+Codex should not carry the virtual lead's full context merely to keep documentation current.
 
-- A `docs` change normally needs a complete diff inspection, scope confirmation and the repository's automatic CI only. It does not need runtime inspection, preview downloads or locally installed application dependencies unless the documentation directly affects executable tooling.
-- A small `code` change needs the relevant targeted tests plus the canonical repository check. Do not invent visual review, device matrices or extra artifacts when rendered behavior cannot change.
-- A `visual/runtime` change receives the full applicable browser, viewport, interaction and artifact review.
-- A routine task normally starts from one direct prompt and proceeds directly to implementation. Do not insert a task-file PR, issue or planning PR between the user's vision and the implementation branch.
-- Do not create a new design document, task document, issue, report table, checklist, test harness, workflow, compatibility layer or artifact merely to make the process look complete.
-- Create or expand process infrastructure only when the task explicitly requires it, it materially reduces a real recurring risk, or it will be reused.
-- Prefer updating an existing canonical document over creating a parallel document with overlapping information.
-- Delete non-applicable sections from reports instead of filling them with repeated `N/A` explanations.
-- Do not repeat the same evidence in the prompt/task file, PR body, review comment and final response. Put each fact in the shortest canonical place needed by its audience.
-- When a task file is justified, it may be brief. Include only constraints that change implementation or review behavior; do not restate all repository-wide rules already present in `AGENTS.md` and `REVIEW.md`.
+- Do not edit `PROJECT.md` or `REVIEW.md` unless the direct prompt explicitly changes lead context, product strategy or reviewer process.
+- Update `LIBRARY.md` only when important files, entry points or canonical addresses are added, removed, renamed or materially reassigned.
+- Update `ASSETS.md` only when external asset sources, licensing, hashes or asset policy change.
+- Update `AGENTS.md` only when the task explicitly changes Codex operating rules.
+- Do not write future or unverified behavior as already shipped.
+- The main ChatGPT reviewer owns the final documentation-drift check and may repair canonical docs in the same branch before merge.
 
 ## Branch lifecycle
 
-When a dedicated implementation task file is used, it must contain a `Git lifecycle` section based on `tasks/TEMPLATE.md`. Routine direct-prompt tasks use the normal lifecycle defaults from this document and do not require a task file. Historical completed task files do not need to be rewritten solely for metadata consistency.
-
-- Normal tasks use exactly one remote task branch. Temporary local branches and worktrees are allowed but must never be pushed to `origin`.
-- Never push ordinary task work directly to `main`.
-- Normal task branches are `ephemeral`. GitHub automatic head-branch deletion handles them after merge.
-- Do not try to delete the active task branch from inside the implementation task. After merge, the main chat verifies automatic deletion; any branch that remains is handled by the dedicated cleanup task.
-- A task may mark a branch `persistent` only for an explicit release, archive or long-lived integration purpose.
-- Persistent branches must use `release/`, `archive/` or `keep/`, include a written reason, and have repository-side deletion protection before they are relied upon.
+- Ordinary tasks use exactly one ephemeral remote branch.
+- GitHub automatic head-branch deletion handles it after merge.
+- Do not delete the active task branch from inside the implementation task.
+- Do not modify repository rulesets, branch protection, settings or tokens.
+- Do not request broader administrative access merely to finish a normal task.
 - Never delete or rewrite `main`, `release/*`, `archive/*` or `keep/*`.
-- Never modify branch protection, rulesets, repository settings or access tokens as part of a normal implementation task. Administrative changes require an explicit separate task and existing administrative authorization.
-- Never ask for a broader administrative token merely to finish a normal code task.
-- Never delete a branch with an open pull request.
-- A branch from a closed unmerged PR may be deleted only after verifying that its useful changes were merged elsewhere, explicitly superseded, or intentionally abandoned.
-- Do not perform mass branch cleanup as a side effect of an implementation task. Cleanup requires `tasks/branch-cleanup.md` or another dedicated maintenance task.
-- Before cleanup, inspect remote branches, unique commits, associated PR state and any deployment/protection role. Report the exact preserved and deleted sets.
-- If branch status is ambiguous or deletion permission is unavailable, preserve it and report the blocker instead of guessing or weakening protection.
+- Persistent branches are exceptional and require an explicit durable task contract, approved prefix and repository-side protection.
+- Do not perform branch cleanup as a side effect of implementation work.
 
 ## Pixel-grid protocol
 
-All world art drawn from the same source pixel grid must use one visual pixel size.
+All world art on the same source pixel grid must use one visual pixel size.
 
-- Do not assign separate display scales to the player, room, outdoor ground or props when their source assets share the same 16×16 grid.
-- Prefer native-size world assets and one shared logical render grid over independently scaled sprites.
-- The displayed canvas must be an integer multiple of the logical game resolution. Letterboxing is acceptable; fractional canvas scaling is not.
-- Use nearest-neighbor rendering only: `pixelArt: true`, `antialias: false`, `roundPixels: true` and `image-rendering: pixelated`.
-- Camera following must not introduce subpixel sampling. Camera scroll and follow results must be rounded to the logical pixel grid.
-- A visual change must be checked at two or more different viewport sizes. Confirm that one source pixel remains one consistently sized square block within each viewport.
-- Automated checks must reject reintroduction of independent world-art scale constants or fractional display zoom.
-
-UI may use its own typography and dimensions, but it must remain screen-space UI and must not change the world-art pixel scale.
+- Do not independently scale player, environment or props that share the 16×16 grid.
+- Prefer native-size world assets and one logical render grid.
+- The displayed canvas must use integer zoom; letterboxing is acceptable.
+- Use nearest-neighbor rendering: `pixelArt: true`, `antialias: false`, `roundPixels: true`, `image-rendering: pixelated`.
+- Camera follow and scroll must not introduce subpixel sampling.
+- Check visual changes at two or more viewport sizes.
+- UI may use separate screen-space dimensions but must not alter world-art scale.
 
 ## Third-party spritesheet protocol
 
-Never select production assets by guessing raw spritesheet frame indexes.
+Never select production frames by guessing raw numeric indexes.
 
-Before integrating a spritesheet pack:
-
-1. Read the pack metadata, tile dimensions, margin and spacing.
-2. Prefer standalone source PNG files when the pack provides them.
-3. Generate a labeled contact sheet for every source frame when a sheet must be inspected.
-4. Render supplied sample maps when available to confirm how related tiles are assembled.
-5. Select frames only after visual inspection.
-6. For semantically ambiguous frames, obtain explicit user approval of the numbered choices before integration.
-7. Centralize selected frames behind semantic configuration names; gameplay behavior must not contain unexplained numeric indexes.
-8. For large or ambiguous source sheets, extract selected art into semantically named standalone files or a compact semantic atlas.
-9. A compact author-provided canonical sheet may be loaded directly only when its grid is verified, selected frames are centralized in one configuration module, the source is documented in `ASSETS.md`, and the rendered preview is visually approved.
-10. Record source pack, sheet geometry, selected frame rectangles or indexes and asset hashes in canonical documentation or a manifest.
-11. Pin or otherwise verify the pixel output of approved visual previews when the layout becomes a stable production baseline.
-
-When an atlas, layout or world composition changes, `npm run check` must generate the relevant preview artifacts. The PR workflow must upload the same preview for inspection before merge.
+1. Read source metadata, tile dimensions, margins and spacing.
+2. Prefer standalone named PNG files when available.
+3. Generate a labeled contact sheet when a sheet must be inspected.
+4. Render author examples when available.
+5. Obtain user approval for semantically ambiguous frames.
+6. Centralize approved selections behind semantic names.
+7. Record source, geometry, selected rectangles/indexes and hashes in `ASSETS.md` or a canonical manifest when applicable.
+8. Ensure visual previews from the final head are available before merge.
 
 ## Completion report
 
-Use the shortest report that contains the evidence applicable to the task's review class and risk.
+Use the shortest report that contains applicable evidence.
 
-Every report must identify:
+Always identify:
 
 - review class and concise scope;
 - work branch, lifecycle and final head SHA;
 - whether additional remote branches were created;
-- validation performed and any real limitation.
+- validation performed;
+- real limitations.
 
-Include runtime states, viewport sizes, screenshots, preview artifacts, asset choices and infrastructure changes only when they apply. Documentation-only and small low-risk tasks should not contain long lists of irrelevant `not applicable` fields.
+Include runtime states, viewports, devices, artifacts, asset choices, dependency changes or infrastructure changes only when they apply.
 
-Do not claim that a visual/runtime task is complete, and do not update `PROJECT.md` as completed, when the runtime result was not inspected. If browser inspection is unavailable, state that clearly and leave the task for strict review instead of presenting it as fully verified.
-
-## Scope
-
-- Do not invent the next game mechanic.
-- Do not add dependencies, architecture, compatibility layers, fallback packages or infrastructure unrelated to the task.
-- Do not commit generated artifacts unless the repository explicitly tracks them or the task requires them.
-- Preserve the existing build-id and `pages/live` publication flow unless the task explicitly changes it.
+Do not claim a visual/runtime task is complete when its changed runtime behavior was not inspected. Open the final PR for strict review and state the limitation honestly.
