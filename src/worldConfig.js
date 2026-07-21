@@ -5,7 +5,6 @@ export const WORLD_COLUMNS = 64;
 export const WORLD_ROWS = 48;
 export const WORLD_WIDTH = WORLD_COLUMNS * TILE_SIZE;
 export const WORLD_HEIGHT = WORLD_ROWS * TILE_SIZE;
-export const PLAYER_SPEED = 87;
 
 export const BASIC_VILLAGE_ASSET_PATH = "assets/third-party/basic-village";
 export const OUTDOOR_TEXTURE_KEY = "basic-village-outdoor";

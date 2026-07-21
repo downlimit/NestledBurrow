@@ -1,7 +1,7 @@
-import { PLAYER_SPEED } from "./worldConfig.js";
+import { getActorProfile } from "./actorProfiles.js";
 
 export const DEFAULT_MOVEMENT_CONFIG = Object.freeze({
-  maxSpeed: PLAYER_SPEED,
+  maxSpeed: getActorProfile("player").movement.maxSpeed,
   acceleration: 520,
   brakingDeceleration: 620,
   reverseAcceleration: 760,

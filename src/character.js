@@ -7,13 +7,7 @@ import {
   stepCharacterMovement,
 } from "./characterMovement.js";
 import { moveWithCollision } from "./movement.js";
-import {
-  FACING_HYSTERESIS,
-  PLAYER_FOOT_DEPTH,
-  PLAYER_FOOT_WIDTH,
-  PLAYER_FRAMES,
-  PLAYER_IDLE_FRAME_INDEX,
-} from "./visualConfig.js";
+import { getActorProfile } from "./actorProfiles.js";
 
 export function createCharacter(scene, options) {
   return new Character(scene, options);
@@ -27,21 +21,25 @@ export class Character {
       spawn,
       controller,
       movementConfig,
-      animationPrefix = "character",
-      frames = PLAYER_FRAMES,
-      idleFrameIndex = PLAYER_IDLE_FRAME_INDEX,
-      footWidth = PLAYER_FOOT_WIDTH,
-      footDepth = PLAYER_FOOT_DEPTH,
+      actorProfile = getActorProfile("player"),
+      animationPrefix = actorProfile.visual.animationPrefix,
+      frames = actorProfile.visual.frames,
+      idleFrameIndex = actorProfile.visual.idleFrameIndex,
+      footWidth = actorProfile.visual.footWidth,
+      footDepth = actorProfile.visual.footDepth,
+      facingHysteresis = actorProfile.visual.facingHysteresis,
     },
   ) {
     this.id = id;
     this.controller = controller;
+    this.actorProfile = actorProfile;
     this.movementConfig = movementConfig;
     this.animationPrefix = animationPrefix;
     this.frames = frames;
     this.idleFrameIndex = idleFrameIndex;
     this.footWidth = footWidth;
     this.footDepth = footDepth;
+    this.facingHysteresis = facingHysteresis;
     this.lastFacing = "down";
     this.movement = createMovementState();
     this.lastBlockedAxes = { x: false, y: false };
@@ -97,7 +95,7 @@ export class Character {
   updateFacing(direction) {
     const absX = Math.abs(direction.x);
     const absY = Math.abs(direction.y);
-    if ((absX === 0 && absY === 0) || Math.abs(absX - absY) <= FACING_HYSTERESIS) return;
+    if ((absX === 0 && absY === 0) || Math.abs(absX - absY) <= this.facingHysteresis) return;
     this.lastFacing =
       absX > absY
         ? direction.x > 0
@@ -121,14 +119,4 @@ export class Character {
       this.sprite.anims.play(key);
     }
   }
-}
-
-export function createNpcMovementConfig(playerConfig) {
-  return {
-    ...playerConfig,
-    acceleration: playerConfig.acceleration / 2,
-    brakingDeceleration: playerConfig.brakingDeceleration / 2,
-    reverseAcceleration: playerConfig.reverseAcceleration / 2,
-    turnDeceleration: playerConfig.turnDeceleration / 2,
-  };
 }

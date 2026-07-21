@@ -72,8 +72,8 @@ export function isMoving(state, config = DEFAULT_MOVEMENT_CONFIG) {
   return movementSpeed(state) >= config.movingSpeedThreshold;
 }
 
-export function createRuntimeMovementConfig(overrides = {}) {
-  return sanitizeMovementConfig(overrides);
+export function createRuntimeMovementConfig(overrides = {}, base = DEFAULT_MOVEMENT_CONFIG) {
+  return sanitizeMovementConfig(overrides, base);
 }
 
 function deltaSeconds(deltaMs, config) {

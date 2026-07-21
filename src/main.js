@@ -13,7 +13,12 @@ import {
   renderFullscreenIcon,
 } from "./hud.js";
 import { createRuntimeMovementConfig } from "./characterMovement.js";
-import { createCharacter, createNpcMovementConfig } from "./character.js";
+import {
+  ACTOR_PROFILE_IDS,
+  createDebugMovementConfigFromPolicy,
+  getActorProfile,
+} from "./actorProfiles.js";
+import { createCharacter } from "./character.js";
 import { createPatrolController, createPlayerController } from "./controllers.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
@@ -31,10 +36,6 @@ import {
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
 import { NPCS } from "./npcConfig.js";
-import {
-  PLAYER_FRAMES,
-  WALK_FRAME_RATE,
-} from "./visualConfig.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 
@@ -48,7 +49,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   preload() {
-    Object.values(PLAYER_FRAMES)
+    Object.values(getActorProfile(ACTOR_PROFILE_IDS.player).visual.frames)
       .flat()
       .forEach((frame) => this.load.image(frame, `${PLAYER_ASSET_URL}/${frame}.png`));
 
@@ -93,44 +94,77 @@ class WorldScene extends Phaser.Scene {
   }
 
   createCharacterAnimations() {
-    Object.entries(PLAYER_FRAMES).forEach(([facing, frames]) => {
-      this.anims.create({
-        key: `character-walk-${facing}`,
-        frames: frames.map((key) => ({ key })),
-        frameRate: WALK_FRAME_RATE,
-        repeat: -1,
+    const uniqueVisualProfiles = new Set(
+      Object.values(ACTOR_PROFILE_IDS).map((id) => getActorProfile(id).visual),
+    );
+    for (const visual of uniqueVisualProfiles) {
+      Object.entries(visual.frames).forEach(([facing, frames]) => {
+        const key = `${visual.animationPrefix}-walk-${facing}`;
+        if (this.anims.exists(key)) return;
+        this.anims.create({
+          key,
+          frames: frames.map((key) => ({ key })),
+          frameRate: visual.walkFrameRate,
+          repeat: -1,
+        });
       });
-    });
+    }
   }
 
   createCharacters() {
+    const playerProfile = getActorProfile(ACTOR_PROFILE_IDS.player);
     const debugOverrides = loadMovementDebugConfig({ enabled: this.movementDebugEnabled });
-    this.movementConfig = createRuntimeMovementConfig(debugOverrides);
-    this.npcMovementConfig = createNpcMovementConfig(this.movementConfig);
+    this.movementConfig = createRuntimeMovementConfig(debugOverrides, playerProfile.movement);
+    this.npcMovementConfigs = [];
     this.playerCharacter = createCharacter(this, {
       id: "player",
       spawn: this.worldLayout.spawn,
       controller: createPlayerController({ getInputDirection: () => this.getMovementVector() }),
       movementConfig: this.movementConfig,
+      actorProfile: playerProfile,
     });
     this.player = this.playerCharacter.sprite;
     this.characters = [
       this.playerCharacter,
-      ...NPCS.map((npc) =>
-        createCharacter(this, {
+      ...NPCS.map((npc) => {
+        const actorProfile = getActorProfile(npc.profileId);
+        return createCharacter(this, {
           id: npc.id,
           spawn: npc.spawn,
           controller: createPatrolController(npc.patrol),
-          movementConfig: this.npcMovementConfig,
-        }),
-      ),
+          movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
+          actorProfile,
+        });
+      }),
     ];
     this.cameras.main.startFollow(this.player, true, 1, 1);
   }
 
+  createNpcRuntimeMovementConfig(profile) {
+    if (!this.movementDebugEnabled) {
+      return createRuntimeMovementConfig(profile.movement, profile.movement);
+    }
+
+    const config = createRuntimeMovementConfig(
+      createDebugMovementConfigFromPolicy(profile, this.movementConfig),
+      profile.movement,
+    );
+    this.npcMovementConfigs.push({ profileId: profile.id, movementConfig: config });
+    return config;
+  }
+
   syncNpcMovementConfig() {
-    if (!this.npcMovementConfig) return;
-    Object.assign(this.npcMovementConfig, createNpcMovementConfig(this.movementConfig));
+    if (!this.npcMovementConfigs) return;
+    for (const npcConfig of this.npcMovementConfigs) {
+      const profile = getActorProfile(npcConfig.profileId);
+      Object.assign(
+        npcConfig.movementConfig,
+        createRuntimeMovementConfig(
+          createDebugMovementConfigFromPolicy(profile, this.movementConfig),
+          profile.movement,
+        ),
+      );
+    }
   }
 
   createInput() {
