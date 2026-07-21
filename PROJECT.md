@@ -93,12 +93,15 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 ## Текущее опубликованное состояние
 
 - Единый непрерывный top-down мир на CC0-тайлах Basic Village.
-- Игрок и два патрулирующих NPC используют одну композиционную `Character`-сущность с общими движением, collision foot box, facing, анимацией и depth sorting.
+- Игрок и два патрулирующих NPC используют общий `Character`-агрегат, состоящий из независимого от Phaser `CharacterMotor` и Phaser-представления `CharacterVisual`.
+- `CharacterSystem` хранит персонажей по стабильным ID, сохраняет порядок создания, централизованно обновляет их, выдаёт runtime-free snapshots и предоставляет зарегистрированный player sprite для камеры.
 - Явные неизменяемые actor profiles `player` и `villager` являются каноническими источниками production movement и visual параметров; runtime-конфигурации персонажей создаются отдельными mutable-копиями.
-- Player и patrol controllers возвращают нормализованный `ControllerCommand` с `moveDirection`, `aimDirection` и actions; `Character` передаёт контроллеру изолированный snapshot своего состояния.
+- Player и patrol controllers возвращают нормализованный `ControllerCommand` с `moveDirection`, `aimDirection` и actions; `CharacterMotor` передаёт контроллеру изолированный замороженный snapshot своего состояния.
 - Домашний NPC патрулирует замкнутый loop-маршрут внутри дома; уличный NPC ходит по ping-pong-маршруту вдоль дорожки.
 - Villager имеет ту же максимальную скорость, что и игрок, но явно заданные вдвое меньшие acceleration, braking, reverse acceleration и turn deceleration.
 - Collision resolver получает `bounds`, `cellSize` и blocking query через collision environment и не зависит от глобальных размеров единственной карты.
+- Добавлен минимальный JSON-сериализуемый `GameSessionState` для world/player/entity IDs, flags и состояния диалога; он пока не подключён к Phaser runtime.
+- Добавлены неизменяемые interaction-target descriptors и чистый детерминированный выбор лучшей цели по radius, facing, priority, distance и ID; UI и запуск диалога в runtime остаются следующей интеграцией.
 - Legacy Kenney room/world конфигурация и неиспользуемые атласы удалены; Basic Village остаётся каноническим runtime-окружением.
 - Все три персонажа временно используют совместимые CC0-ассеты Kenney.
 - Velocity-based движение с разгоном, торможением, разворотом и collision foot box.
