@@ -1,0 +1,90 @@
+name: PR38 one-time repair
+
+on:
+  push:
+    branches:
+      - codex-5pbkzy
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex-5pbkzy
+          fetch-depth: 0
+
+      - name: Apply consolidated pointer ownership repair
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('src/main.js')
+          main = main_path.read_text()
+
+          replacements = [
+              (
+                  '''    document.addEventListener("pointermove", this.onNativePointerMove, { capture: true, passive: false });\n    document.addEventListener("pointerup", this.onNativePointerUp, { capture: true, passive: false });\n    document.addEventListener("pointercancel", this.onNativePointerCancel, { capture: true, passive: false });\n''',
+                  '',
+              ),
+              (
+                  '''  handleJoystickPointerMove(pointer) {\n    if (pointer.id === this.activeJoystickPointerId) this.updateJoystick(pointer);\n  }\n''',
+                  '''  handleJoystickPointerMove(pointer) {\n    if (this.activeDomPointerId !== null) return;\n    if (pointer.id === this.activeJoystickPointerId) this.updateJoystick(pointer);\n  }\n''',
+              ),
+              (
+                  '''  hasActivePointerCapture() {\n    const canvas = this.game.canvas;\n    return (\n      this.activeDomPointerId !== null &&\n      this.joystickPointerCaptured &&\n      (!canvas.hasPointerCapture || canvas.hasPointerCapture(this.activeDomPointerId))\n    );\n  }\n\n''',
+                  '',
+              ),
+              (
+                  '''  handleJoystickPointerUp(pointer) {\n    if (pointer.id === this.activeJoystickPointerId) this.resetJoystick();\n  }\n''',
+                  '''  handleJoystickPointerUp(pointer) {\n    if (this.activeDomPointerId !== null) return;\n    if (pointer.id === this.activeJoystickPointerId) this.resetJoystick();\n  }\n''',
+              ),
+              (
+                  '''    document.removeEventListener("pointermove", this.onNativePointerMove, { capture: true });\n    document.removeEventListener("pointerup", this.onNativePointerUp, { capture: true });\n    document.removeEventListener("pointercancel", this.onNativePointerCancel, { capture: true });\n''',
+                  '',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in main:
+                  raise SystemExit(f'Expected main.js block not found:\n{old}')
+              main = main.replace(old, new, 1)
+
+          main_path.write_text(main)
+
+          check_path = Path('scripts/check-input.mjs')
+          check = check_path.read_text()
+          import_line = 'import assert from "node:assert/strict";\n'
+          if 'import { readFileSync } from "node:fs";' not in check:
+              check = check.replace(
+                  import_line,
+                  import_line + 'import { readFileSync } from "node:fs";\n',
+                  1,
+              )
+
+          marker = 'console.log("input checks passed");\n'
+          assertions = '''const mainSource = readFileSync("src/main.js", "utf8");\nassert(\n  mainSource.includes("handleJoystickPointerMove(pointer) {\\n    if (this.activeDomPointerId !== null) return;"),\n  "Phaser pointermove cannot compete with an active native DOM pointer",\n);\nassert(\n  mainSource.includes("handleJoystickPointerUp(pointer) {\\n    if (this.activeDomPointerId !== null) return;"),\n  "Phaser pointerup cannot reset a different native pointer with a colliding internal id",\n);\nassert(\n  !mainSource.includes('document.addEventListener("pointermove", this.onNativePointerMove'),\n  "native fallback is registered once on window rather than processed twice through window and document",\n);\n\n'''
+          if assertions not in check:
+              if marker not in check:
+                  raise SystemExit('Input test completion marker not found')
+              check = check.replace(marker, assertions + marker, 1)
+          check_path.write_text(check)
+          PY
+
+          rm .github/workflows/pr38-one-time-repair.yml
+          npm ci
+          npm run check:input
+
+      - name: Commit repaired final branch
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/main.js scripts/check-input.mjs .github/workflows/pr38-one-time-repair.yml
+          git commit -m "Fix native pointer ownership edge cases"
+          git push origin HEAD:codex-5pbkzy
