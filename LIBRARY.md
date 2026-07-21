@@ -5,21 +5,33 @@
 ## Как пользоваться картой
 
 - Основной чат сначала читает `PROJECT.md`, затем `REVIEW.md` перед проверкой pull request.
-- Codex сначала читает `AGENTS.md`, затем эту карту и только после этого открывает адреса, необходимые для задачи.
+- Codex сначала читает задачу, `AGENTS.md`, затем эту карту и только после этого открывает адреса, необходимые для работы.
 
 ## Управление проектом
 
 ### `PROJECT.md`
 
-Текущее положение проекта, цель, следующий шаг, блокеры и действующие решения.
+Текущее положение проекта, цель, следующий шаг, блокеры, рабочий цикл и действующие решения.
 
 ### `REVIEW.md`
 
-Канонический протокол проверки, исправления, merge и публикации pull request.
+Канонический протокол проверки, пакетного исправления, merge, публикации и проверки удаления временной ветки pull request.
 
 ### `AGENTS.md`
 
-Обязательные правила работы Codex: подготовка, self-test, runtime-проверка, работа с ассетами и формат отчёта.
+Обязательные правила работы Codex: одна удалённая ветка, self-test, runtime-проверка, контроль зависимостей, работа с ассетами и формат отчёта.
+
+### `tasks/TEMPLATE.md`
+
+Канонический шаблон новых задач: Git lifecycle, цель, требования, validation, границы scope и финальная доставка.
+
+### `tasks/branch-cleanup.md`
+
+Отдельная maintenance-задача безопасного удаления старых remote-веток. Не создаёт ветку, не изменяет файлы и сохраняет защищённые, активные, persistent, deployment-related и неоднозначные ветки.
+
+### `.github/pull_request_template.md`
+
+Стандартный доказательный отчёт финального PR: review class, Git lifecycle, команды, runtime-состояния, артефакты, ограничения и подтверждение отсутствия несвязанного scope creep.
 
 ### `ASSETS.md`
 
@@ -29,11 +41,15 @@
 
 ### `src/main.js`
 
-Phaser-сцена непрерывного мира: Basic Village, игрок, камера, анимации, клавиатура, джойстик и debug-панель движения по `?movementDebug=1`.
+Phaser-сцена непрерывного мира: Basic Village, игрок, камера, анимации, клавиатура, динамический мобильный джойстик, fullscreen-кнопка и debug-панель движения по `?movementDebug=1`.
 
 ### `src/input.js`
 
-Каноническая логика клавиатурного и мобильного ввода: joystick dead zone, аналоговая сила и ограничение длины входного вектора.
+Каноническая логика мобильного ввода: поддержка touch/coarse pointer, активация в левой половине, runtime-центр динамического джойстика, clamp базы, dead zone, аналоговая сила и ограничение длины входного вектора.
+
+### `src/fullscreen.js`
+
+Чистый helper стандартного Fullscreen API: проверка поддержки, определение состояния по `document.fullscreenElement`, безопасный вход/выход и обработка rejected Promise.
 
 ### `src/movementConfig.js`
 
@@ -63,7 +79,11 @@ Foot-box collision, world bounds и axis-separated sliding без Phaser Physics
 
 ### `scripts/check-input.mjs`
 
-Проверки ввода и мобильного джойстика.
+Проверки dynamic-center джойстика: левая/правая половина, clamp центра, dead zone, аналоговая сила, ownership одного pointer и reset-состояния.
+
+### `scripts/check-fullscreen.mjs`
+
+Mock-проверки Fullscreen API helper: supported state, вход, выход, active state и безопасное отклонение запроса.
 
 ### `scripts/check-movement.mjs`
 
@@ -86,27 +106,35 @@ Foot-box collision, world bounds и axis-separated sliding без Phaser Physics
 - `artifacts/camera-outdoor.png`
 - `artifacts/top-wall-detail.png`
 
+Использует канонические Python-зависимости из `requirements-dev.txt`. Локальная ошибка установки не должна приводить к добавлению самодельной замены Pillow или другого пакета.
+
 ### `scripts/audit-spritesheet.py`
 
 Инструмент аудита новых spritesheet: геометрия, кадры, CSV, SHA-256 и contact sheets.
 
 ### `requirements-dev.txt`
 
-Python-зависимости визуальных проверок.
+Канонические Python-зависимости визуальных проверок.
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора input/movement/visual/world/preview проверок.
+Команды запуска, сборки и полного набора input/fullscreen/movement/visual/world/preview проверок.
 
 ## Инфраструктура
 
 ### `.github/workflows/pr-check.yml`
 
-Проверяет финальный PR и загружает world preview. PR открывается только после завершения работы в ветке, чтобы не создавать промежуточные CI-письма.
+Проверяет финальный PR и загружает world preview. PR открывается только после завершения работы в одной временной ветке, чтобы не создавать промежуточные CI-письма.
 
 ### `.github/workflows/deploy-pages.yml`
 
-Публикует GitHub Pages, создаёт `/version.json` и выставляет `pages/live`.
+Публикует GitHub Pages через Actions artifact, создаёт `/version.json`, проверяет фактически опубликованный SHA и выставляет `pages/live`. Отдельная `gh-pages` deployment-ветка сейчас не используется.
+
+### Настройки GitHub
+
+- `main` защищён от удаления и force-push.
+- Automatic head-branch deletion удаляет обычные временные ветки после merge.
+- Persistent `release/*`, `archive/*` и `keep/*` должны дополнительно получить repository-side deletion protection до использования.
 
 ## Legacy
 
@@ -115,6 +143,6 @@ Python-зависимости визуальных проверок.
 ## Правила развития карты
 
 - Новая самостоятельная область знаний получает один канонический адрес.
-- Факты не дублируются между документами.
+- Факты не дублируются без необходимости между документами.
 - Пустые разделы «на будущее» не создаются.
 - При добавлении, переименовании или удалении адреса обновляется эта карта.
