@@ -113,13 +113,15 @@ hasAll(
   prWorkflow,
   [
     "types:",
-    "synchronize",
-    "ready_for_review",
+    "- opened",
+    "- ready_for_review",
     "cancel-in-progress: true",
     "if: github.event.pull_request.draft == false",
   ],
   ".github/workflows/pr-check.yml",
 );
+assert(!prWorkflow.includes("- synchronize"), ".github/workflows/pr-check.yml must not run CI on every PR branch push");
+assert(!prWorkflow.includes("- reopened"), ".github/workflows/pr-check.yml must require an explicit ready-for-review transition after reopening");
 
 hasAll(
   library,
@@ -154,4 +156,4 @@ hasAll(
   ".github/pull_request_template.md",
 );
 
-console.log("documentation contracts passed: risk-based Project, Lead, Integrator, Codex and anti-spam PR rules are aligned");
+console.log("documentation contracts passed: risk-based Project, Lead, Integrator, Codex and explicit PR validation triggers are aligned");
