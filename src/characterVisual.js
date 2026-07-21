@@ -55,7 +55,7 @@ export class CharacterVisual {
     if (!isMoving(movementState, movementConfig)) {
       this.sprite.anims.stop();
       const idleFrame = this.frames[this.lastFacing][this.idleFrameIndex];
-      if (this.sprite.texture.key !== idleFrame) this.sprite.setTexture(idleFrame);
+      this.sprite.setTexture(idleFrame);
       return;
     }
 

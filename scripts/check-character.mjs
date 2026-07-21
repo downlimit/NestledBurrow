@@ -134,10 +134,10 @@ assert.equal(playerProfile.visual.idleFrameIndex, PLAYER_IDLE_FRAME_INDEX, "play
 assert.equal(villagerProfile.visual.facingHysteresis, FACING_HYSTERESIS, "villager keeps facing hysteresis");
 
 const customFrames = Object.freeze({
-  down: Object.freeze(["custom-down"]),
-  up: Object.freeze(["custom-up"]),
-  left: Object.freeze(["custom-left"]),
-  right: Object.freeze(["custom-right"]),
+  down: Object.freeze(["custom-down", "custom-down-step-a", "custom-down-step-b"]),
+  up: Object.freeze(["custom-up", "custom-up-step-a", "custom-up-step-b"]),
+  left: Object.freeze(["custom-left", "custom-left-step-a", "custom-left-step-b"]),
+  right: Object.freeze(["custom-right", "custom-right-step-a", "custom-right-step-b"]),
 });
 const fakeSprite = {
   x: 0,
@@ -211,6 +211,24 @@ assert.equal(visual.lastFacing, "right", "CharacterVisual updates cardinal facin
 assert.deepEqual(visual.sprite.anims.played.at(-1), "character-walk-right", "CharacterVisual preserves walk animation keys");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.equal(visual.sprite.texture.key, "custom-right", "CharacterVisual selects the matching idle frame");
+for (const [facing, frames] of Object.entries(customFrames)) {
+  visual.lastFacing = facing;
+  for (const frameAtStop of frames) {
+    visual.sprite.texture.key = frameAtStop;
+    visual.sprite.anims.isPlaying = true;
+    visual.sprite.anims.currentAnim = { key: `${visual.animationPrefix}-walk-${facing}` };
+    visual.update(
+      { position: { x: 7, y: 9 }, facingDirection: { x: 0, y: 0 } },
+      { velocity: { x: 0, y: 0 } },
+      DEFAULT_MOVEMENT_CONFIG,
+    );
+    assert.equal(
+      visual.sprite.texture.key,
+      frames[0],
+      `CharacterVisual returns ${facing} to neutral from ${frameAtStop}`,
+    );
+  }
+}
 visual.destroy();
 visual.destroy();
 assert.equal(visual.sprite.destroyCount, 1, "CharacterVisual destroy is idempotent");

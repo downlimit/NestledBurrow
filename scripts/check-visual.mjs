@@ -103,10 +103,10 @@ for (const asset of officialAssets) {
 
 assert.deepEqual(PLAYER_FRAMES.left, ["tile_0266", "tile_0293", "tile_0320"]);
 assert.deepEqual(PLAYER_FRAMES.right, ["tile_0269", "tile_0296", "tile_0323"]);
-assert.equal(PLAYER_IDLE_FRAME_INDEX, 2, "idle uses the neutral source frame");
+assert.equal(PLAYER_IDLE_FRAME_INDEX, 0, "idle uses the neutral source frame at index 0");
 assert.deepEqual(
   PLAYER_WALK_FRAME_SEQUENCE,
-  [0, PLAYER_IDLE_FRAME_INDEX, 1, PLAYER_IDLE_FRAME_INDEX],
+  [1, PLAYER_IDLE_FRAME_INDEX, 2, PLAYER_IDLE_FRAME_INDEX],
   "walk cadence is stepA, neutral, stepB, neutral",
 );
 
@@ -128,9 +128,9 @@ for (const [facing, sourceFrames] of Object.entries(PLAYER_FRAMES)) {
   assert.deepEqual(
     animationFrames,
     [
-      sourceFrames[0],
-      sourceFrames[PLAYER_IDLE_FRAME_INDEX],
       sourceFrames[1],
+      sourceFrames[PLAYER_IDLE_FRAME_INDEX],
+      sourceFrames[2],
       sourceFrames[PLAYER_IDLE_FRAME_INDEX],
     ],
     `${facing} animation follows stepA, neutral, stepB, neutral`,
