@@ -11,7 +11,7 @@ on:
       - ready_for_review
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pr-check-${{ github.event.pull_request.number }}
@@ -19,31 +19,19 @@ concurrency:
 
 jobs:
   build:
-    name: Finalize Fan-in
+    name: Validate
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR head
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Update canonical documentation
-        run: |
-          node scripts/finalize-fanin-docs.mjs
-          rm scripts/finalize-fanin-docs.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Document localized persistent quest loop"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -60,6 +48,38 @@ jobs:
 
       - name: Run project checks
         run: npm run check
+
+      - name: Upload world previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-previews-pr-${{ github.event.pull_request.number }}
+          path: |
+            artifacts/world-overview.png
+            artifacts/camera-indoor.png
+            artifacts/camera-outdoor.png
+            artifacts/top-wall-detail.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  browser:
+    name: Browser E2E
+    needs: build
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -82,18 +102,5 @@ jobs:
         with:
           name: playwright-artifacts-pr-${{ github.event.pull_request.number }}
           path: test-results
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload world previews
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: world-previews-pr-${{ github.event.pull_request.number }}
-          path: |
-            artifacts/world-overview.png
-            artifacts/camera-indoor.png
-            artifacts/camera-outdoor.png
-            artifacts/top-wall-detail.png
           if-no-files-found: warn
           retention-days: 7
