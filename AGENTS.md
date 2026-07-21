@@ -4,11 +4,21 @@ These rules apply to every task in this repository.
 
 ## Before editing
 
-1. Read the task file first, including its `Git lifecycle` section.
+1. Read the direct task prompt first. If it names a file in `tasks/`, read that file as the detailed task contract. A routine task does not require a task file.
 2. Read `PROJECT.md`, `LIBRARY.md` and the files directly related to the task.
 3. Run `git fetch --prune` and verify that the task branch starts from the current `origin/main`.
-4. Use the single task branch already supplied by Codex, or the one explicit branch named in the task. Never push task work directly to `main` and never create an additional remote branch.
+4. Use the single task branch already supplied by Codex, or the one explicit branch named in the prompt/task file. Never push task work directly to `main` and never create an additional remote branch.
 5. Read `REVIEW.md` before preparing the pull request and follow its report contract.
+
+## Task entry modes
+
+The default path for normal short iterations is a self-contained direct prompt from the main chat.
+
+- Treat the direct prompt as the task contract when no task file is named.
+- Do not create a task file, issue, planning document or preparatory PR merely to formalize a routine implementation request.
+- In the absence of a task-specific lifecycle section, use the normal defaults: current `main`, one ephemeral remote branch, no direct push to `main`, exactly one final PR after applicable validation, and automatic head-branch deletion after merge.
+- A dedicated task file is appropriate only when the main chat explicitly chooses it for large, high-risk, multi-stage, resumable or repeatedly reused work where a durable contract materially reduces risk.
+- When implementation changes make canonical project documentation stale, update the relevant existing documentation in the same implementation PR. Do not require a separate documentation PR before coding.
 
 ## Mandatory validation
 
@@ -51,7 +61,8 @@ For player movement, joystick or animation changes, explicitly verify:
 - sprite facing matches movement direction;
 - diagonal movement does not increase speed;
 - keyboard and mobile joystick still work;
-- cancellation, blur and lost-touch states do not leave movement stuck;
+- dragging the active joystick pointer outside the canvas does not interrupt input while capture remains active;
+- release outside the canvas, cancellation, blur and lost-touch/lost-capture states do not leave movement stuck;
 - room and world boundaries remain correct.
 
 For fullscreen, resize or screen-space UI changes, explicitly verify:
@@ -60,7 +71,7 @@ For fullscreen, resize or screen-space UI changes, explicitly verify:
 - state and icon synchronization after system exit or `Esc`;
 - integer zoom and crisp pixels after resize/fullscreen transitions;
 - desktop and mobile/coarse-pointer layouts;
-- DOM UI does not trigger gameplay input.
+- HUD or DOM UI does not trigger gameplay input.
 
 For room, world or tile changes, explicitly verify:
 
@@ -84,7 +95,7 @@ Prepare work so the main-chat review can be strict without unnecessary repeated 
 - Do not knowingly open a PR with obvious defects merely because automated checks pass.
 - Batch related final corrections before asking for review; avoid one push per small defect.
 - Keep one coherent implementation concern per PR when `main` can remain usable between stages.
-- Do not combine unrelated architecture, gameplay, visual, dependency and infrastructure changes.
+- Do not combine unrelated architecture, gameplay, visual, dependency and infrastructure changes unless the user explicitly requests the combined change and one PR is the clearest delivery unit.
 - State every manual-test limitation explicitly. A missing browser, mobile device or coarse-pointer runtime is not a passed check.
 - Ensure preview artifacts and the PR report refer to the final head commit.
 
@@ -97,16 +108,17 @@ Process, validation and reporting must be proportional to the real risk of the c
 - A `docs` change normally needs a complete diff inspection, scope confirmation and the repository's automatic CI only. It does not need runtime inspection, preview downloads or locally installed application dependencies unless the documentation directly affects executable tooling.
 - A small `code` change needs the relevant targeted tests plus the canonical repository check. Do not invent visual review, device matrices or extra artifacts when rendered behavior cannot change.
 - A `visual/runtime` change receives the full applicable browser, viewport, interaction and artifact review.
+- A routine task normally starts from one direct prompt and proceeds directly to implementation. Do not insert a task-file PR, issue or planning PR between the user's vision and the implementation branch.
 - Do not create a new design document, task document, issue, report table, checklist, test harness, workflow, compatibility layer or artifact merely to make the process look complete.
 - Create or expand process infrastructure only when the task explicitly requires it, it materially reduces a real recurring risk, or it will be reused.
 - Prefer updating an existing canonical document over creating a parallel document with overlapping information.
 - Delete non-applicable sections from reports instead of filling them with repeated `N/A` explanations.
-- Do not repeat the same evidence in the task file, PR body, review comment and final response. Put each fact in the shortest canonical place needed by its audience.
-- A task file may be brief. Include only constraints that change implementation or review behavior; do not restate all repository-wide rules already present in `AGENTS.md` and `REVIEW.md`.
+- Do not repeat the same evidence in the prompt/task file, PR body, review comment and final response. Put each fact in the shortest canonical place needed by its audience.
+- When a task file is justified, it may be brief. Include only constraints that change implementation or review behavior; do not restate all repository-wide rules already present in `AGENTS.md` and `REVIEW.md`.
 
 ## Branch lifecycle
 
-Every new implementation task file must contain a `Git lifecycle` section based on `tasks/TEMPLATE.md`. Historical completed task files do not need to be rewritten solely for metadata consistency.
+When a dedicated implementation task file is used, it must contain a `Git lifecycle` section based on `tasks/TEMPLATE.md`. Routine direct-prompt tasks use the normal lifecycle defaults from this document and do not require a task file. Historical completed task files do not need to be rewritten solely for metadata consistency.
 
 - Normal tasks use exactly one remote task branch. Temporary local branches and worktrees are allowed but must never be pushed to `origin`.
 - Never push ordinary task work directly to `main`.
@@ -164,7 +176,7 @@ Use the shortest report that contains the evidence applicable to the task's revi
 Every report must identify:
 
 - review class and concise scope;
-- task branch, lifecycle and final head SHA;
+- work branch, lifecycle and final head SHA;
 - whether additional remote branches were created;
 - validation performed and any real limitation.
 
