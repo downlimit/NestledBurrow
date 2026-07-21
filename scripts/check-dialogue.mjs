@@ -11,6 +11,13 @@ assert.deepEqual(definition.lines, ["HELLO THERE.", "THE VILLAGE IS QUIET TODAY.
 assert.equal(definition.lines.length, 3, "dialogue has exactly three lines");
 assert.equal(getDialogueDefinition(definition.id), definition, "lookup returns canonical definition");
 assert.throws(() => getDialogueDefinition("missing"), /Unknown dialogue definition ID: missing/, "unknown dialogue IDs fail clearly");
+for (const inheritedId of ["__proto__", "constructor", "toString"]) {
+  assert.throws(
+    () => getDialogueDefinition(inheritedId),
+    new RegExp(`Unknown dialogue definition ID: ${inheritedId}`),
+    `inherited object key ${inheritedId} is not treated as a dialogue definition`,
+  );
+}
 assert(Object.isFrozen(definition), "definition is immutable");
 assert(Object.isFrozen(definition.lines), "definition lines are immutable");
 assert.throws(() => { definition.lines.push("NOPE"); }, TypeError, "line array cannot mutate");
