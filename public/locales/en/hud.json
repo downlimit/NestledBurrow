@@ -6,7 +6,7 @@
   },
   "language": {
     "toggle": "Switch language",
-    "currentNext": "{{current}} / {{next}}"
+    "currentNext": "{current} / {next}"
   },
   "interaction": {
     "talk": "Talk",

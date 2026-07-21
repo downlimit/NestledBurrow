@@ -6,7 +6,7 @@
   },
   "language": {
     "toggle": "Сменить язык",
-    "currentNext": "{{current}} / {{next}}"
+    "currentNext": "{current} / {next}"
   },
   "interaction": {
     "talk": "Говорить",

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { DIALOGUE_DEFINITIONS } from "../src/dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "../src/interactionConfig.js";
@@ -53,4 +54,19 @@ for (const file of ["src/dialogueConfig.js", "src/interactionConfig.js", "src/in
     assert(!text.includes(literal), `${file} has no user-facing English literal ${literal}`);
   }
 }
+const rubikFontPath = "public/assets/fonts/rubik/Rubik-Regular.ttf";
+const rubikLicensePath = "public/assets/fonts/rubik/OFL.txt";
+assert(existsSync(rubikFontPath), "Rubik runtime font is committed");
+assert(existsSync(rubikLicensePath), "Rubik OFL license is committed beside the font");
+assert.equal(
+  createHash("sha256").update(readFileSync(rubikFontPath)).digest("hex"),
+  "a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235",
+  "Rubik runtime font hash matches the validated asset",
+);
+for (const locale of SUPPORTED_LOCALES) {
+  const hud = read(locale, "hud");
+  assert.equal(hud.language.currentNext, "{current} / {next}", `${locale} language label uses ICU placeholders`);
+  assert(!hud.language.currentNext.includes("{{"), `${locale} language label does not use disabled i18next interpolation`);
+}
+
 console.log("localization checks passed");
