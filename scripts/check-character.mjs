@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCharacter, createNpcMovementConfig } from "../src/character.js";
+import { createCharacter } from "../src/character.js";
 import { createControllerCommand } from "../src/controllerCommand.js";
 import {
   BLOCKED_WAYPOINT_ADVANCE_MS,
@@ -11,20 +11,108 @@ import {
   WAYPOINT_TOLERANCE,
 } from "../src/controllers.js";
 import { DEFAULT_MOVEMENT_CONFIG } from "../src/movementConfig.js";
+import {
+  ACTOR_PROFILE_IDS,
+  ACTOR_PROFILES,
+  createDebugMovementConfigFromPolicy,
+  getActorProfile,
+} from "../src/actorProfiles.js";
 import { moveWithCollision } from "../src/movement.js";
 import { NPCS } from "../src/npcConfig.js";
-import { PLAYER_FOOT_DEPTH, PLAYER_FOOT_WIDTH } from "../src/visualConfig.js";
+import {
+  FACING_HYSTERESIS,
+  PLAYER_FOOT_DEPTH,
+  PLAYER_FOOT_WIDTH,
+  PLAYER_FRAMES,
+  PLAYER_IDLE_FRAME_INDEX,
+} from "../src/visualConfig.js";
 import { createWorldLayout } from "../src/worldLayout.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
 const characterSource = fs.readFileSync(path.join(root, "src/character.js"), "utf8");
+const worldConfigSource = fs.readFileSync(path.join(root, "src/worldConfig.js"), "utf8");
 
 assert(/createCharacter\(this, \{\s*id: "player"/s.test(mainSource), "player is created through Character");
-assert(/NPCS\.map\(\(npc\) =>\s*createCharacter\(this/s.test(mainSource), "NPCs are created through Character");
+assert(/actorProfile: playerProfile/.test(mainSource), "player is created with the player actor profile");
+assert(/NPCS\.map\(\(npc\) => \{[\s\S]*return createCharacter\(this/s.test(mainSource), "NPCs are created through Character");
+assert(/const actorProfile = getActorProfile\(npc\.profileId\)/.test(mainSource), "NPC profiles are looked up from NPC config");
+assert(/actorProfile,/.test(mainSource), "NPCs are created with their configured actor profiles");
 assert(!/updatePlayerAnimation|updatePlayerDepth|updateLastFacing/.test(mainSource), "WorldScene does not keep player-only movement/animation helpers");
 assert(/moveWithCollision/.test(characterSource), "Character uses world collision");
+assert(!/PLAYER_SPEED/.test(worldConfigSource), "worldConfig does not export player speed");
+assert(!/createNpcMovementConfig/.test(characterSource), "legacy NPC movement helper is removed");
 assert(/startFollow\(this\.player, true, 1, 1\)/.test(mainSource), "camera target remains the player sprite");
+
+
+const playerProfile = getActorProfile(ACTOR_PROFILE_IDS.player);
+const villagerProfile = getActorProfile(ACTOR_PROFILE_IDS.villager);
+assert.equal(playerProfile.id, "player", "player profile has a stable ID");
+assert.equal(villagerProfile.id, "villager", "villager profile has a stable ID");
+assert.equal(ACTOR_PROFILES.player, playerProfile, "player profile is registered by stable ID");
+assert.equal(ACTOR_PROFILES.villager, villagerProfile, "villager profile is registered by stable ID");
+assert(Object.isFrozen(playerProfile), "player profile is immutable");
+assert(Object.isFrozen(playerProfile.movement), "player movement profile is immutable");
+assert(Object.isFrozen(playerProfile.visual), "player visual profile is immutable");
+assert(Object.isFrozen(villagerProfile), "villager profile is immutable");
+assert.deepEqual(playerProfile.movement, DEFAULT_MOVEMENT_CONFIG, "default movement comes from the player profile values");
+assert.deepEqual(villagerProfile.movement, {
+  maxSpeed: 87,
+  acceleration: 260,
+  brakingDeceleration: 310,
+  reverseAcceleration: 380,
+  turnDeceleration: 210,
+  facingTurnSpeed: 10,
+  movingSpeedThreshold: 2,
+  maxDeltaMs: 50,
+}, "villager production movement values are explicit");
+assert.throws(
+  () => getActorProfile("missing"),
+  /Unknown actor profile ID: missing/,
+  "unknown profile IDs fail clearly instead of falling back",
+);
+for (const npc of NPCS) {
+  assert.equal(npc.profileId, ACTOR_PROFILE_IDS.villager, `${npc.id} uses the villager profile`);
+}
+const playerRuntime = { ...playerProfile.movement };
+const villagerRuntime = { ...villagerProfile.movement };
+playerRuntime.acceleration = 999;
+assert.equal(villagerRuntime.acceleration, 260, "villager runtime config does not depend on player runtime config");
+assert.notEqual(playerRuntime, villagerRuntime, "player and NPC movement configs are separate objects");
+assert.equal(villagerProfile.movement.acceleration, 260, "runtime changes do not mutate villager production data");
+const debugVillagerRuntime = createDebugMovementConfigFromPolicy(villagerProfile, {
+  maxSpeed: 100,
+  acceleration: 600,
+  brakingDeceleration: 700,
+  reverseAcceleration: 800,
+  turnDeceleration: 500,
+  facingTurnSpeed: 12,
+  movingSpeedThreshold: 4,
+  maxDeltaMs: 60,
+});
+assert.deepEqual(debugVillagerRuntime, {
+  maxSpeed: 100,
+  acceleration: 300,
+  brakingDeceleration: 350,
+  reverseAcceleration: 400,
+  turnDeceleration: 250,
+  facingTurnSpeed: 12,
+  movingSpeedThreshold: 4,
+  maxDeltaMs: 60,
+}, "debug-only villager policy scales player debug values explicitly");
+assert.deepEqual(
+  createDebugMovementConfigFromPolicy(villagerProfile, DEFAULT_MOVEMENT_CONFIG),
+  villagerProfile.movement,
+  "reset debug config restores the original villager runtime values",
+);
+assert.equal(playerProfile.visual.animationPrefix, "character", "player keeps the character animation prefix");
+assert.equal(villagerProfile.visual.animationPrefix, "character", "villager keeps the character animation prefix");
+assert.equal(playerProfile.visual.frames, PLAYER_FRAMES, "player keeps existing visual frames");
+assert.equal(villagerProfile.visual.frames, PLAYER_FRAMES, "villager keeps existing visual frames");
+assert.equal(playerProfile.visual.footWidth, PLAYER_FOOT_WIDTH, "player keeps the existing foot width");
+assert.equal(villagerProfile.visual.footDepth, PLAYER_FOOT_DEPTH, "villager keeps the existing foot depth");
+assert.equal(playerProfile.visual.idleFrameIndex, PLAYER_IDLE_FRAME_INDEX, "player keeps idle frame index");
+assert.equal(villagerProfile.visual.facingHysteresis, FACING_HYSTERESIS, "villager keeps facing hysteresis");
 
 const customFrames = Object.freeze({
   down: Object.freeze(["custom-down"]),
@@ -106,12 +194,6 @@ assert.deepEqual(playerWithOptions.getCommand({ id: "player" }, 16), {
   aimDirection: { x: 1, y: 0 },
   actions: { interact: true, primary: true, secondary: false },
 }, "optional player aim and actions pass through as a normalized command");
-
-const npcConfig = createNpcMovementConfig(DEFAULT_MOVEMENT_CONFIG);
-assert.equal(npcConfig.maxSpeed, DEFAULT_MOVEMENT_CONFIG.maxSpeed, "NPC max speed equals player max speed");
-for (const key of ["acceleration", "brakingDeceleration", "reverseAcceleration", "turnDeceleration"]) {
-  assert.equal(npcConfig[key], DEFAULT_MOVEMENT_CONFIG[key] / 2, `${key} is half the player value`);
-}
 
 const loop = createPatrolController({
   mode: "loop",
@@ -224,4 +306,4 @@ for (const npc of NPCS) {
   }
 }
 
-console.log("character checks passed: shared configurable Character, NPC tuning, patrol routes, blocked fallback, tolerance, collision and player camera target.");
+console.log("character checks passed: actor profiles, shared configurable Character, NPC tuning, patrol routes, blocked fallback, tolerance, collision and player camera target.");

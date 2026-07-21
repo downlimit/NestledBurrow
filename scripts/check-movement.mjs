@@ -7,6 +7,7 @@ import {
   movementSpeed,
   stepCharacterMovement,
 } from "../src/characterMovement.js";
+import { getActorProfile } from "../src/actorProfiles.js";
 import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "../src/movementConfig.js";
 
 const config = { ...DEFAULT_MOVEMENT_CONFIG };
@@ -100,6 +101,26 @@ assert.equal(createRuntimeMovementConfig({ maxDeltaMs: 9999 }).maxDeltaMs, 250);
 assert.equal(
   createRuntimeMovementConfig({ acceleration: Number.NaN }).acceleration,
   DEFAULT_MOVEMENT_CONFIG.acceleration,
+);
+const playerProfile = getActorProfile("player");
+assert.equal(
+  DEFAULT_MOVEMENT_CONFIG,
+  playerProfile.movement,
+  "default movement is the canonical immutable player profile object",
+);
+const villagerProfile = getActorProfile("villager");
+const villagerRuntime = createRuntimeMovementConfig(villagerProfile.movement, villagerProfile.movement);
+assert.deepEqual(
+  villagerRuntime,
+  villagerProfile.movement,
+  "production villager runtime config clones explicit villager values",
+);
+assert.notEqual(villagerRuntime, villagerProfile.movement, "runtime movement config is a mutable clone");
+villagerRuntime.acceleration = 111;
+assert.equal(
+  villagerProfile.movement.acceleration,
+  260,
+  "mutating runtime config does not mutate production profile",
 );
 
 function stepMany(initial, input, milliseconds, activeConfig = config) {
