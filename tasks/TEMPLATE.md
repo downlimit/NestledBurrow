@@ -1,6 +1,6 @@
-# Task: <short title>
+# Optional task-file template: <short title>
 
-<!-- Keep the task proportional to its risk. Include only constraints that change implementation or review behavior. Do not restate repository-wide rules already defined in AGENTS.md and REVIEW.md. Remove optional sections that add no useful information. -->
+<!-- Routine iterations should use one self-contained direct Codex prompt and proceed straight to implementation. Create a file from this template only when the work is large, high-risk, multi-stage, resumable or repeatedly reused and a durable repository contract materially reduces risk. Do not create a preparatory PR solely to deliver a task file. Keep the task proportional to its risk, include only constraints that change implementation or review behavior, and do not restate repository-wide rules already defined in AGENTS.md and REVIEW.md. Remove optional sections that add no useful information. -->
 
 ## Git lifecycle
 
@@ -58,4 +58,4 @@ A local dependency, proxy, browser-install or package-index failure must be repo
 
 ## Delivery
 
-Finish implementation, self-review and applicable validation before opening exactly one final PR from the single task branch. Use the adaptive `.github/pull_request_template.md`; keep only sections relevant to the task. Do not create a draft PR, replacement PR, additional remote branch or close/reopen cycle as a development mechanism. Do not delete the active task branch; GitHub handles ephemeral branch deletion after merge and the main chat verifies it.
+Finish implementation, self-review and applicable validation before opening exactly one final PR from the single task branch. Use the adaptive `.github/pull_request_template.md`; keep only sections relevant to the task. Do not create a draft PR, replacement PR, additional remote branch or close/reopen cycle as a development mechanism. Do not delete the active task branch; GitHub handles ephemeral branch deletion after merge and the main chat verifies it. Update stale canonical documentation in this same implementation PR when required by the delivered behavior.
