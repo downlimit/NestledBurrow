@@ -1,0 +1,90 @@
+name: One-time stale branch cleanup
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  cleanup:
+    if: github.repository == 'downlimit/NestledBurrow'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Delete confirmed stale branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branches=(
+            "feature/player-movement-reviewed"
+            "feature/basic-village-direct"
+            "codex/-player-movement"
+            "feature/basic-village-tileset"
+            "codex/-player-movement.md"
+            "agent/player-movement-task"
+            "tools/rapid-iteration-atlas"
+            "docs/review-optimization-protocol"
+            "feature/continuous-world-camera"
+            "chore/desktop-zero-terminal-workflow"
+            "chore/desktop-codex-handoff"
+            "chore/continuous-world-camera-task"
+            "fix/verified-kenney-room-clean"
+            "fix/verified-kenney-room"
+            "chore/asset-pipeline-task"
+            "audit/kenney-room-pack"
+            "fix/replace-bad-room-art"
+            "fix/pixel-room-qa"
+            "codex/-task.md"
+          )
+
+          deleted=0
+          already_absent=0
+
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
+              echo "Deleting ${branch}"
+              git push origin --delete "${branch}"
+              deleted=$((deleted + 1))
+            else
+              echo "Already absent: ${branch}"
+              already_absent=$((already_absent + 1))
+            fi
+          done
+
+          echo "Deleted: ${deleted}"
+          echo "Already absent: ${already_absent}"
+
+      - name: Publish cleanup status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${JOB_STATUS}" == "success" ]]; then
+            state="success"
+            description="Confirmed stale branches deleted"
+          else
+            state="failure"
+            description="Stale branch cleanup failed"
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            --data "{\"state\":\"${state}\",\"context\":\"maintenance/branch-cleanup\",\"description\":\"${description}\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions\"}"
