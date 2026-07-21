@@ -1,15 +1,6 @@
 import { getActorProfile } from "./actorProfiles.js";
 
-export const DEFAULT_MOVEMENT_CONFIG = Object.freeze({
-  maxSpeed: getActorProfile("player").movement.maxSpeed,
-  acceleration: 520,
-  brakingDeceleration: 620,
-  reverseAcceleration: 760,
-  turnDeceleration: 420,
-  facingTurnSpeed: 10,
-  movingSpeedThreshold: 2,
-  maxDeltaMs: 50,
-});
+export const DEFAULT_MOVEMENT_CONFIG = getActorProfile("player").movement;
 
 export const MOVEMENT_TUNING_FIELDS = Object.freeze([
   Object.freeze({ key: "maxSpeed", min: 0, max: 300, step: 1 }),
