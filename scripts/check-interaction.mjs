@@ -56,6 +56,24 @@ const ensured = ensureSessionEntity(state, "npc-a");
 assert.equal(ensureSessionEntity(state, "npc-a"), ensured, "ensureSessionEntity is idempotent");
 assert.equal(getSessionEntity(state, "missing"), null, "getSessionEntity does not create unknown entities");
 assert.deepEqual(Object.keys(state.entities), ["player", "npc-a"], "unknown get leaves entities unchanged");
+
+const reservedIdState = createGameSessionState({
+  playerId: "constructor",
+  initialEntityIds: ["__proto__", "toString"],
+});
+assert.equal(getSessionEntity(reservedIdState, "constructor").id, "constructor", "prototype-name player ID is stored as own entity data");
+assert.equal(getSessionEntity(reservedIdState, "__proto__").id, "__proto__", "__proto__ entity ID is stored as own entity data");
+assert.equal(getSessionEntity(reservedIdState, "toString").id, "toString", "inherited-name entity ID is stored as own entity data");
+assert.equal(Object.getPrototypeOf(reservedIdState.entities), Object.prototype, "reserved entity IDs do not mutate the entities prototype");
+setSessionFlag(reservedIdState, "__proto__", true);
+setSessionFlag(reservedIdState, "constructor", false);
+assert.equal(getSessionFlag(reservedIdState, "__proto__"), true, "__proto__ session flag round-trips as data");
+assert.equal(getSessionFlag(reservedIdState, "constructor"), false, "constructor session flag round-trips as data");
+assert.equal(Object.getPrototypeOf(reservedIdState.flags), Object.prototype, "reserved session flags do not mutate the flags prototype");
+setEntityFlag(reservedIdState, "__proto__", "constructor", true);
+assert.equal(getEntityFlag(reservedIdState, "__proto__", "constructor"), true, "reserved entity flag IDs round-trip as data");
+assert.deepEqual(JSON.parse(JSON.stringify(reservedIdState)), reservedIdState, "reserved IDs survive session JSON round-trip");
+
 assert.equal(setSessionFlag(state, "met-npc", true), true, "global flag setter returns value");
 assert.equal(getSessionFlag(state, "met-npc"), true, "global flag reads true");
 assert.equal(getSessionFlag(state, "unknown-flag"), false, "missing global flag reads false");
@@ -113,6 +131,16 @@ assert.throws(() => createInteractionTarget({ ...baseTarget, requiresFacing: "ye
 assert.throws(() => createInteractionTarget({ ...baseTarget, facingDotThreshold: 2 }), /facingDotThreshold/, "facing threshold validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, prompt: "" }), /prompt/, "prompt validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, payload: [] }), /plain serializable/, "payload validates plain object");
+assert.throws(() => createInteractionTarget({ ...baseTarget, payload: { nested: new Map([["key", "value"]]) } }), /plain objects/, "nested Map payloads are rejected instead of being silently erased");
+assert.throws(() => createInteractionTarget({ ...baseTarget, payload: { createdAt: new Date() } }), /plain objects/, "nested class instances are rejected instead of changing shape");
+assert.throws(() => createInteractionTarget({ ...baseTarget, payload: { score: Number.NaN } }), /finite JSON numbers/, "non-finite payload numbers are rejected instead of becoming null");
+const sparsePayload = { values: [] };
+sparsePayload.values.length = 1;
+assert.throws(() => createInteractionTarget({ ...baseTarget, payload: sparsePayload }), /sparse arrays/, "sparse payload arrays are rejected instead of becoming null entries");
+const circularPayload = {};
+circularPayload.self = circularPayload;
+assert.throws(() => createInteractionTarget({ ...baseTarget, payload: circularPayload }), /circular references/, "circular payloads fail clearly");
+
 const source = { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } };
 assert.equal(findBestInteractionTarget(source, [baseTarget]).targetId, "talk-home-npc", "target inside radius is selected");
 assert.equal(findBestInteractionTarget(source, [createInteractionTarget({ ...baseTarget, id: "far", position: { x: 17, y: 0 } })]), null, "target outside radius is ignored");
