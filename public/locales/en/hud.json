@@ -12,5 +12,11 @@
     "talk": "Talk",
     "next": "Next",
     "close": "Close"
+  },
+  "progress": {
+    "newGame": "New game",
+    "confirmNewGame": "Erase saved quest progress and begin again?",
+    "confirm": "Start over",
+    "cancel": "Cancel"
   }
 }
