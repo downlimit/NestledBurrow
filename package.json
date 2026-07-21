@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "npm run check:docs && npm run check:input && npm run check:fullscreen && npm run check:hud && npm run check:movement && npm run check:visual && npm run check:world && npm run check:room-preview && npm run build",
+    "check": "npm run check:docs && npm run check:input && npm run check:fullscreen && npm run check:hud && npm run check:movement && npm run check:character && npm run check:visual && npm run check:world && npm run check:room-preview && npm run build",
     "check:docs": "node scripts/check-doc-contracts.mjs",
     "check:input": "node scripts/check-input.mjs",
     "check:movement": "node scripts/check-movement.mjs",
@@ -15,7 +15,8 @@
     "check:world": "node scripts/check-world.mjs",
     "check:room-preview": "python scripts/check-room-preview.py",
     "check:fullscreen": "node scripts/check-fullscreen.mjs",
-    "check:hud": "node scripts/check-hud.mjs"
+    "check:hud": "node scripts/check-hud.mjs",
+    "check:character": "node scripts/check-character.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

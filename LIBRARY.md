@@ -60,13 +60,25 @@
 
 ### `src/main.js`
 
-Phaser-сцена непрерывного мира: создание мира и игрока, камера, клавиатура, мобильный джойстик, screen-space HUD и debug-панель движения по `?movementDebug=1`.
+Phaser-сцена непрерывного мира: создание мира, координация `Character`-сущностей, камера игрока, клавиатура, мобильный джойстик, screen-space HUD и debug-панель движения по `?movementDebug=1`.
+
+### `src/character.js`
+
+Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting. Также формирует NPC movement config с той же максимальной скоростью и вдвое меньшими acceleration/deceleration параметрами.
+
+### `src/controllers.js`
+
+Контроллеры направления: `PlayerController` получает клавиатурный/joystick input, `PatrolController` ведёт NPC по loop или ping-pong waypoint-маршрутам и обрабатывает tolerance/blocked-waypoint fallback.
+
+### `src/npcConfig.js`
+
+Декларативные spawn-точки и маршруты домашнего loop-NPC и уличного ping-pong-NPC.
 
 ### `src/input.js`
 
 Чистая логика мобильного ввода: touch/coarse-pointer detection, зона активации, runtime-центр джойстика, clamp, dead zone, аналоговая сила и ограничение входного вектора.
 
-Native event ownership, глобальный fallback после выхода за canvas и lifecycle listeners пока координируются в `src/main.js`.
+Native event ownership, глобальный fallback после выхода за canvas и lifecycle listeners координируются в `src/main.js`.
 
 ### `src/fullscreen.js`
 
@@ -122,6 +134,10 @@ Bitmap glyph coverage, build label, pixel placement, fullscreen hit area и от
 
 Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked axes, aim, tuning limits и delta cap.
 
+### `scripts/check-character.mjs`
+
+Проверяет использование общей `Character`-фабрики игроком и NPC, половинные NPC acceleration/deceleration параметры, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
+
 ### `scripts/check-visual.mjs`
 
 Pixel grid, Basic Village hashes, spritesheet loading, integer zoom, camera и character frames.
@@ -139,7 +155,7 @@ World layout, doorway, collision, sliding, anti-tunneling и bounds.
 - `artifacts/camera-outdoor.png`
 - `artifacts/top-wall-detail.png`
 
-Использует зависимости из `requirements-dev.txt`; локальная ошибка установки не разрешает самодельную замену Pillow.
+Indoor/outdoor camera previews включают соответствующего NPC. Использует зависимости из `requirements-dev.txt`; локальная ошибка установки не разрешает самодельную замену Pillow.
 
 ### `scripts/audit-spritesheet.py`
 
@@ -151,7 +167,7 @@ World layout, doorway, collision, sliding, anti-tunneling и bounds.
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора documentation/input/fullscreen/HUD/movement/visual/world/preview проверок.
+Команды запуска, сборки и полного набора documentation/input/fullscreen/HUD/movement/character/visual/world/preview проверок.
 
 ## Инфраструктура
 

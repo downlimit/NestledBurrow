@@ -25,6 +25,7 @@ DOOR_Y = HOUSE_Y + HOUSE_ROWS - 1
 ASSET_ROOT = ROOT / "public" / "assets" / "third-party"
 VILLAGE_ROOT = ASSET_ROOT / "basic-village"
 PLAYER_PATH = ASSET_ROOT / "kenney" / "player" / "tile_0267.png"
+NPC_PATH = PLAYER_PATH
 
 OUTPUTS = {
     "worldOverview": ROOT / "artifacts" / "world-overview.png",
@@ -58,6 +59,11 @@ TREES = [
     (8, 33, 2),
     (51, 34, 0),
 ]
+
+NPC_POSITIONS = {
+    "home": ((HOUSE_X + 6) * TILE_SIZE + TILE_SIZE // 2, (HOUSE_Y + 5) * TILE_SIZE + TILE_SIZE - 2),
+    "street": ((DOOR_LEFT + 1) * TILE_SIZE + TILE_SIZE // 2, (DOOR_Y + 5) * TILE_SIZE + TILE_SIZE - 2),
+}
 
 
 def load_sheet(filename: str) -> Image.Image:
@@ -133,15 +139,24 @@ def render_world() -> Image.Image:
     return world
 
 
-def camera_view(world: Image.Image, center: tuple[int, int], player: Image.Image) -> Image.Image:
+def draw_character(view: Image.Image, sprite: Image.Image, position: tuple[int, int], scroll_x: int, scroll_y: int) -> None:
+    x, y = position
+    view.alpha_composite(sprite, (x - scroll_x - sprite.width // 2, y - scroll_y - sprite.height))
+
+
+def camera_view(
+    world: Image.Image,
+    center: tuple[int, int],
+    player: Image.Image,
+    characters: list[tuple[Image.Image, tuple[int, int]]],
+) -> Image.Image:
     center_x, center_y = center
     scroll_x = min(max(round(center_x - GAME_WIDTH / 2), 0), WORLD_WIDTH - GAME_WIDTH)
     scroll_y = min(max(round(center_y - GAME_HEIGHT / 2), 0), WORLD_HEIGHT - GAME_HEIGHT)
     view = world.crop((scroll_x, scroll_y, scroll_x + GAME_WIDTH, scroll_y + GAME_HEIGHT))
-    view.alpha_composite(
-        player,
-        (center_x - scroll_x - player.width // 2, center_y - scroll_y - player.height),
-    )
+    for sprite, position in sorted(characters, key=lambda item: item[1][1]):
+        draw_character(view, sprite, position, scroll_x, scroll_y)
+    draw_character(view, player, center, scroll_x, scroll_y)
     return view
 
 
@@ -152,6 +167,7 @@ def pixel_hash(image: Image.Image) -> str:
 def main() -> None:
     world = render_world()
     player = Image.open(PLAYER_PATH).convert("RGBA")
+    npc = Image.open(NPC_PATH).convert("RGBA")
     spawn = (
         (HOUSE_X + HOUSE_COLUMNS // 2) * TILE_SIZE + TILE_SIZE // 2,
         (HOUSE_Y + 8) * TILE_SIZE + TILE_SIZE - 2,
@@ -177,8 +193,8 @@ def main() -> None:
 
     generated = {
         "worldOverview": world,
-        "cameraIndoor": camera_view(world, spawn, player),
-        "cameraOutdoor": camera_view(world, outdoor_target, player),
+        "cameraIndoor": camera_view(world, spawn, player, [(npc, NPC_POSITIONS["home"])]),
+        "cameraOutdoor": camera_view(world, outdoor_target, player, [(npc, NPC_POSITIONS["street"])]),
         "topWallDetail": house_detail,
     }
 
