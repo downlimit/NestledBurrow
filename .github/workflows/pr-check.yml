@@ -46,12 +46,8 @@ jobs:
         run: |
           npm install --package-lock-only --ignore-scripts
           mkdir -p public/assets/fonts/rubik
-          curl --fail --location --retry 3 \
-            https://raw.githubusercontent.com/googlefonts/rubik/main/old/version-2/fonts/ttf/Rubik-Regular.ttf \
-            --output public/assets/fonts/rubik/Rubik-Regular.ttf
-          curl --fail --location --retry 3 \
-            https://raw.githubusercontent.com/googlefonts/rubik/main/OFL.txt \
-            --output public/assets/fonts/rubik/OFL.txt
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/googlefonts/rubik/main/old/version-2/fonts/ttf/Rubik-Regular.ttf --output public/assets/fonts/rubik/Rubik-Regular.ttf
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/googlefonts/rubik/main/OFL.txt --output public/assets/fonts/rubik/OFL.txt
           python -m pip install --disable-pip-version-check fonttools
           python - <<'PY'
           import hashlib
@@ -68,8 +64,8 @@ jobs:
           missing = [character for character in required if ord(character) not in codepoints]
           if missing:
               raise SystemExit(f"Rubik glyph validation failed: {missing}")
-          digest = hashlib.sha256(font_path.read_bytes()).hexdigest()
           expected = "a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235"
+          digest = hashlib.sha256(font_path.read_bytes()).hexdigest()
           if digest != expected:
               raise SystemExit(f"Unexpected Rubik SHA-256: {digest}")
 
@@ -79,46 +75,35 @@ jobs:
               data["language"]["currentNext"] = "{current} / {next}"
               path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-          assets = Path("ASSETS.md")
-          text = assets.read_text(encoding="utf-8")
-          heading = "## Rubik Regular font"
-          replacement = '''## Rubik Regular font
-
-- **Source:** official `googlefonts/rubik` project, archived version-2 file `old/version-2/fonts/ttf/Rubik-Regular.ttf`.
-- **License:** SIL Open Font License 1.1, committed as `public/assets/fonts/rubik/OFL.txt`.
-- **Runtime file:** `public/assets/fonts/rubik/Rubik-Regular.ttf`.
-- **SHA-256:** `a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235`.
-- **Glyph validation:** fontTools cmap inspection confirmed representative Latin and Cyrillic coverage: `AaZzАаЯяЁё`.
-- **Integrity check:** `scripts/check-localization.mjs` requires the committed font, license and exact SHA-256.
-'''
-          prefix = text.split(heading, 1)[0].rstrip()
-          assets.write_text(prefix + "\n\n" + replacement, encoding="utf-8")
-
           check = Path("scripts/check-localization.mjs")
           source = check.read_text(encoding="utf-8")
-          source = source.replace('import assert from "node:assert/strict";\n', 'import assert from "node:assert/strict";\nimport { createHash } from "node:crypto";\n')
+          if 'import { createHash } from "node:crypto";' not in source:
+              source = source.replace('import assert from "node:assert/strict";\n', 'import assert from "node:assert/strict";\nimport { createHash } from "node:crypto";\n')
           source = source.replace('import { readFileSync, readdirSync } from "node:fs";', 'import { existsSync, readFileSync, readdirSync } from "node:fs";')
-          guard = '''\nconst rubikFontPath = "public/assets/fonts/rubik/Rubik-Regular.ttf";
-const rubikLicensePath = "public/assets/fonts/rubik/OFL.txt";
-assert(existsSync(rubikFontPath), "Rubik runtime font is committed");
-assert(existsSync(rubikLicensePath), "Rubik OFL license is committed beside the font");
-assert.equal(
-  createHash("sha256").update(readFileSync(rubikFontPath)).digest("hex"),
-  "a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235",
-  "Rubik runtime font hash matches the validated asset",
-);
-for (const locale of SUPPORTED_LOCALES) {
-  const hud = read(locale, "hud");
-  assert.equal(hud.language.currentNext, "{current} / {next}", `${locale} language label uses ICU placeholders`);
-  assert(!hud.language.currentNext.includes("{{"), `${locale} language label does not use disabled i18next interpolation`);
-}
-'''
-          source = source.replace('\nconsole.log("localization checks passed");', guard + '\nconsole.log("localization checks passed");')
+          marker = 'console.log("localization checks passed");'
+          if 'const rubikFontPath' not in source:
+              guard_lines = [
+                  'const rubikFontPath = "public/assets/fonts/rubik/Rubik-Regular.ttf";',
+                  'const rubikLicensePath = "public/assets/fonts/rubik/OFL.txt";',
+                  'assert(existsSync(rubikFontPath), "Rubik runtime font is committed");',
+                  'assert(existsSync(rubikLicensePath), "Rubik OFL license is committed beside the font");',
+                  'assert.equal(',
+                  '  createHash("sha256").update(readFileSync(rubikFontPath)).digest("hex"),',
+                  '  "a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235",',
+                  '  "Rubik runtime font hash matches the validated asset",',
+                  ');',
+                  'for (const locale of SUPPORTED_LOCALES) {',
+                  '  const hud = read(locale, "hud");',
+                  '  assert.equal(hud.language.currentNext, "{current} / {next}", `${locale} language label uses ICU placeholders`);',
+                  '  assert(!hud.language.currentNext.includes("{{"), `${locale} language label does not use disabled i18next interpolation`);',
+                  '}',
+              ]
+              source = source.replace(marker, "\n".join(guard_lines) + "\n\n" + marker)
           check.write_text(source, encoding="utf-8")
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json ASSETS.md scripts/check-localization.mjs public/locales/en/hud.json public/locales/ru/hud.json public/assets/fonts/rubik
+          git add package-lock.json scripts/check-localization.mjs public/locales/en/hud.json public/locales/ru/hud.json public/assets/fonts/rubik
           git commit -m "Repair localization dependencies and bundled font"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
