@@ -56,7 +56,7 @@ export class CharacterMotor {
   }
 
   createControllerContext() {
-    return {
+    return Object.freeze({
       id: this.id,
       profileId: this.profileId,
       position: { x: this.position.x, y: this.position.y },
@@ -65,7 +65,7 @@ export class CharacterMotor {
       aimDirection: { x: this.movement.aimDirection.x, y: this.movement.aimDirection.y },
       blockedAxes: { x: this.lastBlockedAxes.x, y: this.lastBlockedAxes.y },
       speed: this.speed,
-    };
+    });
   }
 
   getSnapshot() {
