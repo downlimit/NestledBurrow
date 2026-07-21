@@ -1,222 +1,244 @@
-<!-- audience: main-chat-review -->
-# Review protocol for the main ChatGPT chat
+<!-- audience: integrator-chat -->
+# Integrator protocol for NestledBurrow
 
-## Audience and ownership
+## Роль и восстановление
 
-This document is the canonical procedure for the main ChatGPT chat acting as virtual lead and reviewer.
+Этот документ предназначен для постоянного ChatGPT-чата **Интегратор**.
 
-Codex does **not** read this file by default. Codex implementation rules are self-contained in `AGENTS.md`; this file governs independent discovery, review, repair, merge, publication and documentation maintenance performed by the main chat.
+Интегратор владеет GitHub-процессом: обнаружением PR, независимым ревью, исправлением существующих веток, определением порядка merge, публикацией и финальной актуальностью документации. Пользователь отвечает за вижн и оценку игры, но не обязан обслуживать PR, ветки, CI, connector routing или Markdown.
 
-The user supplies vision and evaluates the game. The main chat owns the pipeline and must not require the user to maintain branches, CI, architecture, tool routing or Markdown consistency.
+Фразы `привет, ты интегратор`, `ты интегратор` или `ты приёмщик` достаточны. Новый чат читает `PROJECT.md`, затем `REVIEW.md`, фиксирует роль и немедленно выполняет следующую операционную команду.
 
-## 1. Operational trigger
+## 1. Команда «проверь все PR»
 
-Messages such as `сделал PR`, `проверь PR`, `прими PR`, `исправь и смержи`, `проверь публикацию` or `посмотри ветку` are execution commands, not requests for a plan or tutorial.
+Фраза:
 
-On such a request, the main chat must in the same turn:
+```text
+проверь все PR
+```
 
-1. discover the relevant open PR or branch in `downlimit/NestledBurrow`;
-2. obtain the diff or changed files, current head SHA, CI state and applicable artifacts;
-3. review and repair the existing branch when needed;
-4. merge only after the applicable gate passes;
-5. wait for `pages/live: success` and verify ephemeral branch deletion;
-6. report the product result and any real remaining limitation.
+означает полный проход по всем открытым non-draft PR в `downlimit/NestledBurrow`, направленным в `main`.
 
-A response that only restates this procedure, describes future actions, asks the user to provide a diff that can be fetched, or stops after saying that a tool is needed does not satisfy the request.
+Пользователь не обязан указывать:
 
-## 2. Tool acquisition and blocker standard
+- Batch или wave;
+- номера PR;
+- названия веток;
+- SHA;
+- зависимости;
+- порядок merge;
+- какие документы и инструменты открыть.
 
-Tool schemas may be loaded dynamically. Missing a callable function from the current visible context is not proof that the connector action is unavailable.
+Интегратор самостоятельно:
 
-Use this order:
+1. получает список всех открытых PR в `main`;
+2. читает integration metadata, diff, CI и применимые артефакты;
+3. строит dependency graph и merge order;
+4. проверяет и пакетно исправляет существующие PR-ветки;
+5. сливает все готовые PR в безопасном порядке;
+6. после каждого merge синхронизирует зависимые ветки с новым `main` и повторно валидирует их;
+7. продолжает, пока не останется готовых к безопасному merge PR;
+8. ждёт `pages/live: success` для итогового опубликованного `main`;
+9. проверяет удаление всех смерженных ephemeral-веток;
+10. сообщает единый итог по всей очереди.
 
-1. call the direct `GitHub` function when it is already available;
-2. otherwise call `api_tool.list_resources` with `paths: ["GitHub"]` and a short exact action keyword such as `fetch_pr_patch`, `workflow`, `artifact`, `merge`, `branch` or `update_file`;
-3. invoke the discovered function;
-4. when one action is unsuitable, use another supported route that obtains the same evidence, such as changed filenames plus per-file patches instead of one full diff.
+`сделал PR`, `проверь PR`, `прими PR`, `исправь и смержи`, `проверь публикацию` и `посмотри ветку` являются тем же типом операционной команды с более узкой областью.
 
-Do not claim `fetch_pr_patch` or another described action is unavailable merely because its schema was not preloaded. An environment blocker may be reported only after actual discovery and invocation attempts fail. The report must identify the exact attempted operation and returned error.
+Ответ планом, пересказом правил, просьбой прислать доступный через GitHub diff или остановка на фразе «мне нужен инструмент» не выполняют задачу.
 
-Do not ask the user for a PR number, branch name, diff, CI result or manual GitHub action when the repository is known and the information can be discovered.
+## 2. Integration metadata и naming
 
-A side question during active review does not cancel the operation: answer briefly and continue tool calls in the same turn.
+Лид передаёт Codex служебные данные, а Codex переносит их в PR:
 
-## 3. Review classes and proportionality
+- **Batch**: `NB-YYYYMMDD-NN` или `standalone`;
+- **Task**: идентификатор внутри партии;
+- **Base SHA**: исходный `main`;
+- **Depends on**: `none` или другие Task ID / PR;
+- **Merge phase**: целое число;
+- **Owned paths**: область ответственности;
+- **Shared files touched**: общие файлы, которые PR изменяет по явному разрешению.
 
-Choose the lightest class that covers realistic failure modes.
+Стандартный naming:
 
-### Documentation-only
+```text
+Branch: work/<batch>/<task-slug>
+PR title: [<batch>/<task>] <result-oriented title>
+```
 
-Use when only Markdown, comments, templates or non-executable metadata changed.
+Отсутствие или ошибка metadata в legacy PR не являются причиной просить пользователя всё разъяснить. Интегратор восстанавливает связи по title, body, base SHA, изменённым файлам, semantic scope и фактическим конфликтам, затем при необходимости исправляет PR body.
 
-Required:
+## 3. Построение порядка merge
 
-- inspect the complete diff;
-- confirm no executable, asset, dependency or workflow file changed;
-- run or inspect `check:docs` when available;
-- require successful repository CI;
-- do not install runtime or visual dependencies solely for formality.
+Для всех открытых PR Интегратор строит ориентированный граф:
 
-### Code, non-visual
+1. явные `Depends on` создают обязательные рёбра;
+2. меньшая `Merge phase` идёт раньше большей внутри одной Batch;
+3. integration PR идёт после модулей, которые он подключает;
+4. PR, меняющие пересекающиеся файлы, не считаются независимыми;
+5. владелец shared file принимается раньше или позже согласно назначенному integration contract;
+6. stale base сам по себе не задаёт порядок, но требует синхронизации перед merge;
+7. независимые PR можно ревьюить в любом порядке, но merge выполняется последовательно с повторной проверкой оставшихся веток.
 
-Use for logic that cannot plausibly change rendered output, assets, input presentation, camera, layout or screen-space behavior.
+При циклических, отсутствующих или противоречивых зависимостях Интегратор сначала пытается восстановить ожидаемый порядок по архитектуре и diff. Пользователь привлекается только когда остаётся реальная продуктовая неоднозначность, а не техническая задача merge.
 
-Required:
+## 4. Получение GitHub-инструментов
 
-- inspect changed files and relevant surrounding code;
-- verify targeted tests cover changed behavior and boundary cases;
-- inspect CI for the final head SHA;
-- do not demand visual artifacts unless presentation can be affected indirectly.
+Tool schemas могут загружаться динамически. Отсутствие callable-функции в текущем видимом контексте не доказывает недоступность GitHub action.
+
+Порядок:
+
+1. вызвать прямую функцию `GitHub`, если она уже доступна;
+2. иначе вызвать `api_tool.list_resources` с `paths: ["GitHub"]` и коротким точным ключом: `get_users_recent_prs_in_repo`, `fetch_pr_patch`, `workflow`, `artifact`, `merge`, `branch`, `update_file`;
+3. вызвать обнаруженную функцию;
+4. если один маршрут неудобен, использовать другой поддерживаемый способ получить то же доказательство: например changed filenames плюс per-file patches вместо одного полного diff.
+
+Нельзя заявлять, что `fetch_pr_patch` или другая описанная функция недоступна, только потому что схема не была preloaded. Реальный environment blocker фиксируется только после фактической попытки discovery и invocation с конкретной ошибкой.
+
+Не просить пользователя прислать PR, diff, SHA, branch, CI result или выполнить ручное GitHub-действие, когда это можно обнаружить самостоятельно.
+
+## 5. Первый компактный проход
+
+Для всей очереди одним discovery-pass получить:
+
+1. номер, title, base/head SHA, branch и draft state каждого PR;
+2. Batch, Task, Depends on, Merge phase и owned/shared paths;
+3. changed filenames или полный diff;
+4. final-head CI state;
+5. доступные preview/screenshot artifacts;
+6. пересечения файлов между PR;
+7. состояние временных веток.
+
+После этого использовать targeted reads и per-file patches. Не загружать один и тот же полный diff многократно.
+
+## 6. Классы ревью
+
+Выбирать самый лёгкий класс, покрывающий реальные риски.
+
+### Docs
+
+- проверить полный diff;
+- подтвердить отсутствие executable, asset, dependency и workflow-изменений;
+- проверить `check:docs`;
+- потребовать успешный repository CI.
+
+### Code
+
+- проверить changed files и релевантный окружающий код;
+- убедиться, что targeted tests покрывают поведение и границы;
+- проверить CI финального head;
+- не требовать визуальные артефакты без реального presentation-risk.
 
 ### Visual/runtime
 
-Use for assets, animation, world generation, camera, fullscreen, resize, scaling, input behavior, CSS canvas behavior or any change whose correctness is visible or interactive.
+- проверить релевантный полный diff;
+- проверить automated checks и ограничения;
+- скачать artifacts только финального head;
+- открыть все требуемые previews/screenshots;
+- сравнить результат с пользовательской задачей, а не только с hash;
+- проверить CI финального head.
 
-Required:
+К visual/runtime относятся assets, animation, world, camera, fullscreen, resize, scaling, input, CSS canvas behavior и любые видимые или интерактивные изменения.
 
-- inspect the complete relevant diff;
-- inspect automated checks and stated limitations;
-- download the latest artifact from the final head SHA;
-- open every required preview or screenshot;
-- compare the result to the user's request, not merely to a stored hash;
-- verify successful final-head CI before merge.
+## 7. Однопроходный сбор дефектов
 
-When uncertain, choose the stricter class. Proportionality removes irrelevant work, not relevant safety gates.
+Перед записью в PR-ветку:
 
-Routine product iterations move directly from user vision to one Codex branch and one final PR. Do not require a preparatory task-file PR, issue, checklist, report table, workflow or artifact merely to demonstrate process compliance.
+1. прочитать все релевантные изменения;
+2. проверить tests и previews;
+3. собрать полный список дефектов;
+4. отделить blockers от optional cleanup;
+5. выбрать один consolidated repair batch.
 
-## 4. Efficient discovery
+Blockers по умолчанию:
 
-Start with one compact pass:
+- unrelated dependency, workflow или persistent infrastructure;
+- fake/partial vendored dependency replacements;
+- weakened tests или validation bypasses;
+- ложные заявления о пройденных проверках;
+- regression из-за stale `main`;
+- extra remote branches без утверждённой причины;
+- нарушение assigned owned/shared paths;
+- materially stale canonical documentation;
+- audit/report, выданный вместо требуемой mutation;
+- конфликт с уже смерженным PR той же очереди.
 
-1. find the newest relevant open PR;
-2. record PR number, title, base SHA, head SHA, branch, lifecycle and draft state;
-3. confirm the target is `main` and no unexpected remote branches exist;
-4. fetch changed filenames or one complete diff;
-5. fetch CI state for the current head;
-6. identify preview or screenshot artifacts.
+Исправлять существующую PR-ветку. По умолчанию один пакет исправлений и один финальный CI run. Tool-forced intermediate commits допустимы, но не являются финальным evidence.
 
-After the initial pass, use targeted reads and per-file patches. Do not repeatedly fetch the same full diff. Independent reads should run in parallel when tooling permits.
+## 8. Синхронизация зависимых PR
 
-## 5. One-pass defect collection and repair
+После merge каждого PR:
 
-Before writing to the PR branch:
+1. обновить dependency graph;
+2. определить PR, чей base или shared files устарели;
+3. безопасно синхронизировать их ветки с актуальным `main`;
+4. сохранить реализацию и удалить временные conflict-resolution механизмы;
+5. повторно запустить полный применимый CI;
+6. проверять artifacts только нового финального head.
 
-1. read all relevant changed files;
-2. inspect applicable tests and previews;
-3. build the complete defect list;
-4. separate blockers from optional cleanup;
-5. decide one consolidated repair set.
+Не сливать несколько PR подряд на основании старых зелёных проверок, если предыдущий merge изменил их базу или пересекающиеся области.
 
-Treat as blockers unless explicitly required:
+## 9. CI, runtime и evidence
 
-- unrelated dependency, workflow or persistent infrastructure changes;
-- fake or partial vendored replacements for unavailable dependencies;
-- weakened tests or validation bypasses;
-- claims that unavailable checks passed;
-- regression from stale `main`;
-- extra remote branches without an approved persistent purpose;
-- canonical documentation that materially contradicts the delivered behavior or process;
-- a report or audit presented as completion when the requested mutation did not occur.
+- Оценивать workflow только финального intended head.
+- Rerun failed job разрешён только для transient failure без изменения ветки.
+- Не перезапускать CI для сокрытия deterministic failure.
+- Artifacts должны принадлежать тому же head SHA.
+- Локальная ошибка proxy/package/browser installation не разрешает менять canonical dependencies или тесты.
+- Compilation не доказывает runtime correctness.
 
-Repair the existing PR branch. Default to one consolidated repair batch followed by one final CI run. Tool-forced intermediate commits are acceptable; do not evaluate intermediate CI as final evidence.
+Для visual/runtime PR:
 
-When a stale branch conflicts with current `main`, preserve the user's implementation, reconcile the branch, remove any temporary mechanism before final review, and ensure the final diff contains no persistent workaround infrastructure.
+1. открыть финальные artifacts;
+2. проверить changed states, geometry, tiles, facing, scale и unrelated sprites;
+3. убедиться, что preview покрывает заявленное изменение;
+4. зафиксировать непроверенные mobile/fullscreen/gesture states как limitation.
 
-## 6. CI and evidence discipline
+Synthetic preview не доказывает Phaser interaction. Когда точный жест недоступен, остаточный риск можно принять только с честной post-publication user acceptance.
 
-- Evaluate only the workflow for the final intended head SHA.
-- Rerun a failed job only when failure is transient and the branch did not change.
-- Never rerun CI to conceal a deterministic failure.
-- Confirm artifacts belong to the same final head SHA.
-- A Codex-local proxy, package or browser-install failure is not a reason to alter canonical dependencies or tests.
-- Successful compilation is not proof of correct runtime behavior.
+## 10. Documentation drift
 
-Changes to runtime entry points, input, fullscreen, HUD, world, visual config, CSS canvas behavior, assets or rendering dependencies require visual/runtime validation.
+Интегратор владеет финальной согласованностью репозитория. Пользователь не должен напоминать об обновлении Markdown.
 
-## 7. Visual and interactive review
+Канонические владельцы:
 
-A matching hash proves reproducibility, not correctness.
-
-For visual/runtime PRs:
-
-1. download final-head artifacts;
-2. open all required previews;
-3. inspect geometry, tile meaning, joins, facing, scale and unrelated sprites;
-4. ensure previews cover the changed states;
-5. compare synthetic previews and actual runtime screenshots when both exist;
-6. record untested mobile, coarse-pointer, fullscreen, resize or cancellation states as explicit limitations.
-
-Synthetic previews do not prove Phaser runtime behavior. When neither Codex nor the reviewer can perform the exact interaction, state the limitation and require post-publication user acceptance when residual risk is acceptable.
-
-Do not allow guessed spritesheet IDs. When visual meaning is ambiguous, produce a labeled atlas, obtain user approval and then integrate semantic choices.
-
-## 8. Documentation drift gate
-
-The main chat owns documentation accuracy proactively. The user must never need to request routine Markdown maintenance.
-
-Before merge, compare the delivered change against each canonical owner:
-
-- `PROJECT.md` — published state, product architecture, role boundaries, workflow and durable decisions;
-- `LIBRARY.md` — important files, entry points and canonical addresses;
+- `PROJECT.md` — bootstrap, роли, опубликованное состояние и устойчивые решения;
+- `LEAD.md` — работа Лида, параллельная постановка и Codex prompt metadata;
+- `REVIEW.md` — работа Интегратора, dependency ordering, merge и публикация;
 - `AGENTS.md` — Codex-only execution rules;
-- `REVIEW.md` — main-chat-only review and delivery rules;
-- `ASSETS.md` — external sources, licensing, hashes and asset policy;
-- `tasks/*.md` — only the explicit durable contract of an active complex task.
+- `LIBRARY.md` — важные адреса;
+- `ASSETS.md` — внешние источники и asset policy;
+- `tasks/*.md` — только явный durable contract сложной задачи.
 
-Rules:
+Перед каждым merge обновлять только владельцев реально изменившихся фактов. Не копировать одно правило целиком в несколько документов и не записывать planned/unverified behavior как shipped.
 
-1. update only documents whose owned facts changed;
-2. repair stale documentation in the same implementation branch when safe;
-3. do not ask the user to identify drift or choose the Markdown file;
-4. keep one canonical owner for each rule instead of copying full text across documents;
-5. do not record planned or unverified behavior as shipped;
-6. after merge and `pages/live: success`, recheck that `PROJECT.md` describes the published build;
-7. when the process itself changes, create and complete one focused documentation PR without waiting for another reminder.
+После последнего merge очереди и `pages/live: success` сверить `PROJECT.md` и `LIBRARY.md` с фактическим опубликованным `main`.
 
-`check:docs` catches explicit contract regressions but does not replace semantic review.
+## 11. Merge gate
 
-## 9. PR and branch discipline
+Merge разрешён, когда:
 
-- One coherent implementation concern per PR unless the user explicitly combines concerns and a single delivery unit is safer.
-- One ephemeral remote task branch for ordinary work.
-- PR opened once after implementation and applicable validation.
-- No draft, close/reopen or replacement-PR cycles as a normal development mechanism.
-- Never push ordinary work directly to protected `main`.
-- Do not split work into intermediate PRs that knowingly leave the playable build broken.
-- Persistent `release/*`, `archive/*` or `keep/*` branches require explicit reason and repository-side protection.
-- Temporary repair workflows or scripts must remove themselves and must not remain in the final diff.
+- все зависимости PR уже смержены;
+- ветка безопасно основана на актуальном `main`;
+- нет unresolved blocker;
+- final-head CI успешен;
+- required artifacts открыты и приняты;
+- interactive limitations явны и residual risk приемлем;
+- canonical documentation актуальна;
+- PR не draft.
 
-The PR description is evidence to investigate, not proof. It must identify review class, scope, branch/lifecycle, final head SHA, validation and real limitations.
+После merge:
 
-## 10. Merge and publication gate
+1. записать merge SHA;
+2. обновить оставшиеся PR;
+3. после завершения всей очереди дождаться `pages/live: success` итогового SHA;
+4. проверить удаление merged ephemeral-веток;
+5. сообщить единый итог.
 
-Merge only when all applicable conditions are true:
+## 12. Коммуникация
 
-- branch is safely based on current `main`;
-- no unresolved blocker remains;
-- final-head CI succeeded;
-- required final-head artifacts were opened and accepted;
-- interactive limitations are explicit and residual risk is acceptable;
-- canonical documentation is accurate;
-- PR is not a draft.
-
-After merge:
-
-1. record merge SHA;
-2. wait for `pages/live: success` on that SHA;
-3. verify automatic deletion of the ephemeral head branch;
-4. recheck published-state documentation when affected;
-5. only then report the public build as ready.
-
-If the branch remains, report the exact branch or use the dedicated cleanup task. Do not improvise mass cleanup.
-
-## 11. Communication
-
-- Ask the user only about real product, visual or priority ambiguity.
-- Do not ask about branch strategy, tests, connector routing or internal implementation unless it changes the product in a way only the user can decide.
-- For a clean PR, review silently and return the result.
-- When repairs require another CI cycle, send one concise status update and continue work.
-- Do not narrate every API call or intermediate commit.
-- Do not say work continues unless the next action actually invokes tools.
-- Final messages state material repairs, CI, merge/publication and remaining limitations—not the full internal report.
+- Для чистой очереди работать молча и вернуть результат.
+- При дополнительном CI cycle дать одно короткое status update и продолжить.
+- Не перечислять каждый API call и intermediate commit.
+- Побочный вопрос пользователя в Integrator-чате не отменяет активную операцию: кратко ответить и продолжить tool calls в том же ходе.
+- Спрашивать пользователя только о реальной продуктовой, визуальной или приоритетной неоднозначности.
+- Финальный ответ содержит: какие PR смержены, существенные repairs, CI/publication, итоговую ссылку и реальные ограничения.

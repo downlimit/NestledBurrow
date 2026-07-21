@@ -2,12 +2,22 @@
 
 <!-- Use this file only when work is large, high-risk, multi-stage, resumable or repeatedly reused and a durable repository contract materially reduces risk. Routine iterations use one self-contained direct Codex prompt and no preparatory task PR. Include only task-specific constraints; do not restate repository-wide rules from AGENTS.md. Remove optional sections that add no value. -->
 
+## Integration metadata
+
+- Batch: `<NB-YYYYMMDD-NN / standalone>`
+- Task: `<id>`
+- Base SHA: `<sha>`
+- Depends on: `<none / task ids>`
+- Merge phase: `<integer>`
+- Owned paths: `<paths>`
+- Shared files allowed: `<none / paths>`
+
 ## Git lifecycle
 
-- Base branch: current `main`
+- Base branch: current `main` or the explicit Base SHA above
 - Direct push to `main`: `no`
 - Remote branches allowed: `1`
-- Work branch: use the single branch supplied by Codex
+- Work branch: `work/<batch>/<task-slug>`
 - Lifecycle: `ephemeral`
 - Create PR: `yes` — exactly once, after implementation and applicable validation
 - Delete task branch after merge: `yes` — handled by GitHub automatic head-branch deletion
@@ -43,7 +53,8 @@ Optional only when genuinely needed:
 - `LIBRARY.md` — when the relevant area cannot be located efficiently;
 - `ASSETS.md` — when external assets are involved;
 - `PROJECT.md` — only when this task explicitly depends on product history or a strategic decision;
-- `REVIEW.md` — only when the task itself changes reviewer process.
+- `LEAD.md` — only when the task changes Lead workflow;
+- `REVIEW.md` — only when the task changes Integrator workflow.
 
 ## Requirements
 
@@ -66,6 +77,6 @@ A local dependency, proxy, browser-install or package-index failure must be repo
 
 ## Delivery
 
-Finish implementation, self-review and applicable validation before opening exactly one final PR from the single task branch. Use `.github/pull_request_template.md` and keep only applicable sections. Do not create a draft, replacement PR, additional remote branch or close/reopen cycle as a development mechanism. GitHub handles ephemeral branch deletion after merge; the main chat verifies it.
+Finish implementation, self-review and applicable validation before opening exactly one final PR from the single task branch. Use the supplied PR title and `.github/pull_request_template.md`. Do not create a draft, replacement PR, additional remote branch or close/reopen cycle as a development mechanism.
 
-Do not update lead-only process documents merely for formality. Update `LIBRARY.md` or `ASSETS.md` only when their owned facts changed; the main ChatGPT reviewer owns the final documentation-drift gate.
+Do not update shared Lead/Integrator process documents merely for formality. Respect Owned paths and Shared files allowed. The Integrator owns final dependency ordering, documentation drift, merge and publication.
