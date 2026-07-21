@@ -42,7 +42,7 @@
 
 ### `ARCHITECTURE.md`
 
-Каноническая архитектурная оценка runtime-проекта, подтверждённые направления развития и приоритетная очередь. Лид открывает документ перед постановкой архитектурных задач и сверяет его с фактическим `main`.
+Каноническая архитектурная оценка runtime-проекта, подтверждённые направления развития, уже реализованные архитектурные шаги и оставшаяся приоритетная очередь. Лид открывает документ перед постановкой архитектурных задач и сверяет его с фактическим `main`.
 
 ### `REVIEW.md`
 
@@ -72,15 +72,19 @@
 
 ### `src/main.js`
 
-Phaser-сцена непрерывного мира: создание мира, координация `Character`-сущностей, камера игрока, клавиатура, мобильный джойстик, screen-space HUD и debug-панель движения по `?movementDebug=1`.
+Phaser composition root непрерывного мира: создаёт мир и `Character`-сущности, связывает клавиатуру, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD, вызывает update и уничтожает runtime-компоненты.
 
 ### `src/character.js`
 
-Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting. Также формирует NPC movement config с той же максимальной скоростью и вдвое меньшими acceleration/deceleration параметрами.
+Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, collision footprint, facing, animation и depth sorting. Формирует изолированный controller snapshot и применяет нормализованный `ControllerCommand`. Также формирует NPC movement config с той же максимальной скоростью и вдвое меньшими acceleration/deceleration параметрами.
+
+### `src/controllerCommand.js`
+
+Каноническая форма команды персонажа: нормализованные `moveDirection`, optional `aimDirection` и boolean actions `interact`, `primary`, `secondary`.
 
 ### `src/controllers.js`
 
-Контроллеры направления: `PlayerController` получает клавиатурный/joystick input, `PatrolController` ведёт NPC по loop или ping-pong waypoint-маршрутам и обрабатывает tolerance/blocked-waypoint fallback.
+`PlayerController` и `PatrolController` возвращают общий `ControllerCommand`. Player получает input/aim/actions callbacks; patrol ведёт NPC по loop или ping-pong waypoint-маршрутам и обрабатывает tolerance/blocked-waypoint fallback.
 
 ### `src/npcConfig.js`
 
@@ -90,7 +94,13 @@ Phaser-сцена непрерывного мира: создание мира, 
 
 Чистая логика мобильного ввода: touch/coarse-pointer detection, зона активации, runtime-центр джойстика, clamp, dead zone, аналоговая сила и ограничение входного вектора.
 
-Native event ownership, глобальный fallback после выхода за canvas и lifecycle listeners координируются в `src/main.js`.
+### `src/mobileJoystick.js`
+
+Runtime-компонент мобильного джойстика: Phaser/native/window listeners, one-pointer ownership, pointer capture и fallback, HUD exclusion, safety reset, графика, direction state и полный cleanup.
+
+### `src/movementDebugPanel.js`
+
+Опциональная DOM-панель по `?movementDebug=1`: tuning inputs, нормализация, `localStorage`, reset/copy, runtime status, async clipboard lifecycle и cleanup.
 
 ### `src/fullscreen.js`
 
@@ -132,7 +142,11 @@ Foot-box collision, world bounds и axis-separated sliding без Phaser Physics
 
 ### `scripts/check-input.mjs`
 
-Проверки dynamic joystick: activation, clamp, dead zone, analog strength, one-pointer ownership, HUD exclusion, drag за пределами canvas, lost-capture fallback и reset states.
+Проверяет чистую joystick math и production `MobileJoystick`: activation, clamp, dead zone, analog strength, one-pointer ownership, HUD exclusion, drag за пределами canvas, lost-capture fallback, matching release и cleanup listeners.
+
+### `scripts/check-runtime-components.mjs`
+
+Contract checks для `MobileJoystick` и `MovementDebugPanel`: support detection, native/Phaser pointer lifecycle, safety resets, listener cleanup, tuning/persistence/reset/copy/status, idempotent destroy и завершение async clipboard после уничтожения панели.
 
 ### `scripts/check-fullscreen.mjs`
 
@@ -140,7 +154,7 @@ Mock-проверки Fullscreen API helper.
 
 ### `scripts/check-hud.mjs`
 
-Bitmap glyph coverage, build label, pixel placement, fullscreen hit area и отделение HUD input от джойстика.
+Bitmap glyph coverage, build label, pixel placement, fullscreen hit area и передача HUD exclusion в `MobileJoystick`.
 
 ### `scripts/check-movement.mjs`
 
@@ -148,7 +162,7 @@ Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked
 
 ### `scripts/check-character.mjs`
 
-Проверяет использование общей `Character`-фабрики игроком и NPC, половинные NPC acceleration/deceleration параметры, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
+Проверяет общий `ControllerCommand`, sanitization/defaults, player aim/actions, изоляцию controller snapshot, общую `Character`-фабрику игрока и NPC, половинные NPC acceleration/deceleration параметры, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
 
 ### `scripts/check-visual.mjs`
 
@@ -179,7 +193,7 @@ Indoor/outdoor camera previews включают соответствующего
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора documentation/input/fullscreen/HUD/movement/character/visual/world/preview проверок.
+Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/visual/world/preview проверок.
 
 ## Инфраструктура
 

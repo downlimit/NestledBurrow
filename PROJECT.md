@@ -94,12 +94,14 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 
 - Единый непрерывный top-down мир на CC0-тайлах Basic Village.
 - Игрок и два патрулирующих NPC используют одну композиционную `Character`-сущность с общими движением, collision foot box, facing, анимацией и depth sorting.
+- Player и patrol controllers возвращают нормализованный `ControllerCommand` с `moveDirection`, `aimDirection` и actions; `Character` передаёт контроллеру изолированный snapshot своего состояния.
 - Домашний NPC патрулирует замкнутый loop-маршрут внутри дома; уличный NPC ходит по ping-pong-маршруту вдоль дорожки.
 - NPC имеют ту же максимальную скорость, что и игрок, но вдвое меньшие acceleration, braking, reverse acceleration и turn deceleration.
 - Все три персонажа временно используют совместимые CC0-ассеты Kenney.
 - Velocity-based движение с разгоном, торможением, разворотом и collision foot box.
-- Клавиатурное управление и динамический мобильный джойстик.
-- Активный native pointer продолжает управлять джойстиком после выхода за canvas и потери pointer capture через глобальный `window` fallback; matching `pointerup`/`pointercancel` и safety-события корректно сбрасывают ввод.
+- Клавиатурное управление и динамический мобильный джойстик объединяются в единый нормализованный movement vector.
+- `MobileJoystick` владеет Phaser/native/window pointer lifecycle, capture/fallback, safety reset, графикой и cleanup; активный pointer продолжает управлять после выхода за canvas и потери capture.
+- `MovementDebugPanel` владеет опциональной DOM-панелью tuning, persistence, reset/copy, status и cleanup; `WorldScene` остаётся composition root.
 - Камера следует только за игроком с целочисленным pixel-grid рендером.
 - В Phaser HUD находятся пиксельный идентификатор сборки и кнопка fullscreen.
 - GitHub Pages публикует только проверенный `main`; статус `pages/live` подтверждает фактически доступный SHA.

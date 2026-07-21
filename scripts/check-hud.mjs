@@ -31,6 +31,7 @@ assert(!main.includes("createFullscreenButton"), "legacy DOM fullscreen helper w
 assert(!main.includes("build:"), "DOM/browser-font build label text was removed");
 assert(main.includes("drawBitmapText"), "scene renders build identifier with bitmap HUD text");
 assert(main.includes("drawFullscreenIcon"), "scene renders fullscreen control in Phaser HUD");
-assert(main.includes("this.isHudPointer(pointer)"), "HUD pointers are excluded before joystick ownership");
+assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "fullscreen hit area is passed to MobileJoystick as an exclusion callback");
+assert(!main.includes("isHudPointer(pointer)"), "scene no longer exposes the legacy pointer-shaped HUD check");
 
 console.log("hud checks passed");
