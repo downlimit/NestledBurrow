@@ -29,11 +29,11 @@ const playerMovementProfile = deepFreeze({
 });
 
 const villagerMovementProfile = deepFreeze({
-  maxSpeed: 87,
-  acceleration: 260,
-  brakingDeceleration: 310,
-  reverseAcceleration: 380,
-  turnDeceleration: 210,
+  maxSpeed: 29,
+  acceleration: 87,
+  brakingDeceleration: 103,
+  reverseAcceleration: 127,
+  turnDeceleration: 70,
   facingTurnSpeed: 10,
   movingSpeedThreshold: 2,
   maxDeltaMs: 50,
@@ -57,11 +57,14 @@ export const ACTOR_PROFILES = deepFreeze({
     debugMovementTuningPolicy: {
       sourceProfileId: ACTOR_PROFILE_IDS.player,
       fieldScales: {
-        maxSpeed: 1,
-        acceleration: 0.5,
-        brakingDeceleration: 0.5,
-        reverseAcceleration: 0.5,
-        turnDeceleration: 0.5,
+        maxSpeed: villagerMovementProfile.maxSpeed / playerMovementProfile.maxSpeed,
+        acceleration: villagerMovementProfile.acceleration / playerMovementProfile.acceleration,
+        brakingDeceleration:
+          villagerMovementProfile.brakingDeceleration / playerMovementProfile.brakingDeceleration,
+        reverseAcceleration:
+          villagerMovementProfile.reverseAcceleration / playerMovementProfile.reverseAcceleration,
+        turnDeceleration:
+          villagerMovementProfile.turnDeceleration / playerMovementProfile.turnDeceleration,
         facingTurnSpeed: 1,
         movingSpeedThreshold: 1,
         maxDeltaMs: 1,

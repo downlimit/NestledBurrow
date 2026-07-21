@@ -10,6 +10,7 @@ import { createControllerCommand } from "../src/controllerCommand.js";
 import {
   BLOCKED_WAYPOINT_ADVANCE_MS,
   PATROL_MODE_LOOP,
+  PATROL_MODE_PING_PONG,
   createPatrolController,
   createPlayerController,
   WAYPOINT_TOLERANCE,
@@ -66,11 +67,11 @@ assert(Object.isFrozen(playerProfile.visual), "player visual profile is immutabl
 assert(Object.isFrozen(villagerProfile), "villager profile is immutable");
 assert.deepEqual(playerProfile.movement, DEFAULT_MOVEMENT_CONFIG, "default movement comes from the player profile values");
 assert.deepEqual(villagerProfile.movement, {
-  maxSpeed: 87,
-  acceleration: 260,
-  brakingDeceleration: 310,
-  reverseAcceleration: 380,
-  turnDeceleration: 210,
+  maxSpeed: 29,
+  acceleration: 87,
+  brakingDeceleration: 103,
+  reverseAcceleration: 127,
+  turnDeceleration: 70,
   facingTurnSpeed: 10,
   movingSpeedThreshold: 2,
   maxDeltaMs: 50,
@@ -86,9 +87,13 @@ for (const npc of NPCS) {
 const playerRuntime = { ...playerProfile.movement };
 const villagerRuntime = { ...villagerProfile.movement };
 playerRuntime.acceleration = 999;
-assert.equal(villagerRuntime.acceleration, 260, "villager runtime config does not depend on player runtime config");
+assert.equal(villagerRuntime.acceleration, 87, "villager runtime config does not depend on player runtime config");
 assert.notEqual(playerRuntime, villagerRuntime, "player and NPC movement configs are separate objects");
-assert.equal(villagerProfile.movement.acceleration, 260, "runtime changes do not mutate villager production data");
+assert.equal(villagerProfile.movement.acceleration, 87, "runtime changes do not mutate villager production data");
+assert(
+  villagerProfile.movement.maxSpeed <= playerProfile.movement.maxSpeed / 3 + 1,
+  "villager is noticeably slower than the player",
+);
 const debugVillagerRuntime = createDebugMovementConfigFromPolicy(villagerProfile, {
   maxSpeed: 100,
   acceleration: 600,
@@ -100,19 +105,24 @@ const debugVillagerRuntime = createDebugMovementConfigFromPolicy(villagerProfile
   maxDeltaMs: 60,
 });
 assert.deepEqual(debugVillagerRuntime, {
-  maxSpeed: 100,
-  acceleration: 300,
-  brakingDeceleration: 350,
-  reverseAcceleration: 400,
-  turnDeceleration: 250,
+  maxSpeed: 100 * (29 / 87),
+  acceleration: 600 * (87 / 520),
+  brakingDeceleration: 700 * (103 / 620),
+  reverseAcceleration: 800 * (127 / 760),
+  turnDeceleration: 500 * (70 / 420),
   facingTurnSpeed: 12,
   movingSpeedThreshold: 4,
   maxDeltaMs: 60,
-}, "debug-only villager policy scales player debug values explicitly");
+}, "debug-only villager policy preserves production proportions instead of player speed");
 assert.deepEqual(
   createDebugMovementConfigFromPolicy(villagerProfile, DEFAULT_MOVEMENT_CONFIG),
   villagerProfile.movement,
   "reset debug config restores the original villager runtime values",
+);
+assert.deepEqual(
+  createDebugMovementConfigFromPolicy(villagerProfile, playerProfile.movement),
+  villagerProfile.movement,
+  "debug-derived villager config matches production profile",
 );
 assert.equal(playerProfile.visual.animationPrefix, "character", "player keeps the character animation prefix");
 assert.equal(villagerProfile.visual.animationPrefix, "character", "villager keeps the character animation prefix");
@@ -312,6 +322,84 @@ unrelatedAxisBlock.getCommand(
 );
 assert.equal(unrelatedAxisBlock.currentWaypointIndex, 1, "an unrelated blocked axis does not skip a valid waypoint");
 
+
+const noWaitPatrol = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  tolerance: 1,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }],
+});
+const noWaitCommand = noWaitPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 16);
+assert.equal(noWaitPatrol.currentWaypointIndex, 2, "waypoint without waitMs behaves like waitMs 0");
+assert(noWaitCommand.moveDirection.x > 0, "waitMs 0 waypoint does not create a long stop");
+
+const explicitZeroWaitPatrol = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  tolerance: 1,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0, waitMs: 0 }, { x: 20, y: 0 }],
+});
+const zeroWaitCommand = explicitZeroWaitPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 16);
+assert.equal(explicitZeroWaitPatrol.currentWaypointIndex, 2, "explicit waitMs 0 waypoint advances immediately");
+assert(zeroWaitCommand.moveDirection.x > 0, "explicit waitMs 0 waypoint does not idle intentionally");
+
+const waitingPatrol = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  tolerance: 1,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0, waitMs: 100 }, { x: 20, y: 0 }],
+});
+assert.deepEqual(
+  waitingPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 16).moveDirection,
+  { x: 0, y: 0 },
+  "wait waypoint returns idle when reached",
+);
+assert.equal(waitingPatrol.currentWaypointIndex, 1, "waiting waypoint holds its index while timer runs");
+assert.deepEqual(
+  waitingPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 50).moveDirection,
+  { x: 0, y: 0 },
+  "wait waypoint keeps idling before the wait elapses",
+);
+const afterWaitCommand = waitingPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 50);
+assert.equal(waitingPatrol.currentWaypointIndex, 2, "patrol advances when wait completes");
+assert(afterWaitCommand.moveDirection.x > 0, "patrol resumes movement after wait completes");
+
+let pauseDuringWait = false;
+const waitPausedPatrol = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  tolerance: 1,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0, waitMs: 100 }, { x: 20, y: 0 }],
+  isPaused: () => pauseDuringWait,
+});
+waitPausedPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 16);
+pauseDuringWait = true;
+waitPausedPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: { x: true } }, 500);
+assert.equal(waitPausedPatrol.currentWaypointIndex, 1, "dialog pause freezes waypoint wait timer and blocked timer");
+pauseDuringWait = false;
+assert.deepEqual(
+  waitPausedPatrol.getCommand({ position: { x: 10, y: 0 }, blockedAxes: {} }, 50).moveDirection,
+  { x: 0, y: 0 },
+  "resumed patrol continues the same wait after dialog closes",
+);
+assert.equal(waitPausedPatrol.currentWaypointIndex, 1, "paused wait did not elapse while dialog was open");
+
+const blockedWaitSkip = createPatrolController({
+  mode: PATROL_MODE_LOOP,
+  tolerance: 1,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0, waitMs: 3000 }, { x: 20, y: 0 }],
+});
+blockedWaitSkip.getCommand({ position: { x: 0, y: 0 }, blockedAxes: { x: true } }, BLOCKED_WAYPOINT_ADVANCE_MS);
+assert.equal(blockedWaitSkip.currentWaypointIndex, 2, "blocked fallback skips the blocked waypoint without applying its wait");
+const blockedSkipCommand = blockedWaitSkip.getCommand({ position: { x: 0, y: 0 }, blockedAxes: {} }, 16);
+assert(blockedSkipCommand.moveDirection.x > 0, "blocked fallback continues toward the next waypoint without artificial idle");
+
+const pingPongWaitSkip = createPatrolController({
+  mode: PATROL_MODE_PING_PONG,
+  tolerance: 1,
+  waypoints: [{ x: 0, y: 0 }, { x: 10, y: 0, waitMs: 3000 }, { x: 20, y: 0 }],
+});
+pingPongWaitSkip.getCommand({ position: { x: 0, y: 0 }, blockedAxes: { x: true } }, BLOCKED_WAYPOINT_ADVANCE_MS);
+assert.equal(pingPongWaitSkip.currentWaypointIndex, 2, "ping-pong order survives blocked fallback to the end waypoint");
+pingPongWaitSkip.getCommand({ position: { x: 20, y: 0 }, blockedAxes: {} }, 16);
+assert.equal(pingPongWaitSkip.currentWaypointIndex, 1, "ping-pong reverses normally after blocked fallback");
+
 let capturedContext;
 const mutatingController = {
   getCommand(context) {
@@ -343,6 +431,45 @@ assert.equal(snapshotCharacter.movement.velocity.x, 0, "mutating snapshot veloci
 assert.equal(snapshotCharacter.lastBlockedAxes.x, false, "mutating snapshot blockedAxes does not mutate Character collision state");
 assert(snapshotCharacter.movement.aimDirection.x > 0.9, "Character passes explicit aim to movement core");
 assert.equal(snapshotCharacter.movement.desiredDirection.x, 0, "movement can differ from explicit aim");
+
+
+const homeNpc = NPCS.find((npc) => npc.id === "home-npc");
+const streetNpc = NPCS.find((npc) => npc.id === "street-npc");
+assert(homeNpc, "home NPC exists");
+assert(streetNpc, "street NPC exists");
+
+function routeStats(npc) {
+  const points = npc.patrol.waypoints;
+  return {
+    points,
+    waiting: points.filter((waypoint) => waypoint.waitMs >= 2000 && waypoint.waitMs <= 3000),
+    passThrough: points.filter((waypoint) => (waypoint.waitMs ?? 0) === 0),
+    uniqueX: new Set(points.map((waypoint) => waypoint.x)).size,
+    uniqueY: new Set(points.map((waypoint) => waypoint.y)).size,
+  };
+}
+
+function isSimpleRectangle(points) {
+  const uniqueX = new Set(points.map((waypoint) => waypoint.x));
+  const uniqueY = new Set(points.map((waypoint) => waypoint.y));
+  if (uniqueX.size !== 2 || uniqueY.size !== 2 || points.length !== 4) return false;
+  return points.every((waypoint) => uniqueX.has(waypoint.x) && uniqueY.has(waypoint.y));
+}
+
+const homeRoute = routeStats(homeNpc);
+assert(homeRoute.points.length >= 5, "home NPC route has at least five points");
+assert(homeRoute.passThrough.length >= 2, "home NPC route includes pass-through waypoints");
+assert(homeRoute.waiting.length >= 2 && homeRoute.waiting.length <= 4, "home NPC route includes meaningful waits");
+assert(homeRoute.uniqueX > 2 && homeRoute.uniqueY > 2, "home NPC route moves among different house areas");
+assert(!isSimpleRectangle(homeRoute.points), "home NPC route is not the previous simple rectangle");
+
+const streetRoute = routeStats(streetNpc);
+assert(streetRoute.points.length >= 6, "street NPC route has at least six points");
+assert(streetRoute.passThrough.length >= 2, "street NPC route includes pass-through waypoints");
+assert(streetRoute.waiting.length >= 2 && streetRoute.waiting.length <= 4, "street NPC route includes meaningful waits");
+assert(streetRoute.uniqueX > 1 && streetRoute.uniqueY > 1, "street NPC route changes both X and Y");
+assert(!(streetRoute.uniqueX === 1 && streetNpc.patrol.mode === PATROL_MODE_PING_PONG), "street NPC route is not the previous vertical ping-pong line");
+assert(!isSimpleRectangle(streetRoute.points), "street NPC route is not a simple rectangle");
 
 for (const npc of NPCS) {
   assert.equal(
