@@ -72,7 +72,7 @@
 
 ### `src/main.js`
 
-Phaser composition root непрерывного мира: создаёт мир и `Character`-сущности по actor profiles, связывает клавиатуру, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD, вызывает update и уничтожает runtime-компоненты.
+Phaser composition root непрерывного мира: создаёт layout, `CharacterSystem`, персонажей по actor profiles, связывает клавиатуру, `MobileJoystick`, `MovementDebugPanel`, камеру, fullscreen и screen-space HUD, вызывает system update и уничтожает runtime-компоненты.
 
 ### `src/actorProfiles.js`
 
@@ -80,7 +80,19 @@ Phaser composition root непрерывного мира: создаёт мир
 
 ### `src/character.js`
 
-Переиспользуемая композиционная сущность игрока и NPC: sprite, movement state/config, actor-profile visual defaults, collision footprint, facing, animation и depth sorting. Формирует изолированный controller snapshot и применяет нормализованный `ControllerCommand`.
+Совместимый aggregate игрока и NPC: создаёт `CharacterMotor` и `CharacterVisual`, связывает motor update с visual update и делегирует прежние getters для sprite, movement, collision footprint, facing и profile data.
+
+### `src/characterMotor.js`
+
+Runtime-free motor персонажа: stable ID/profile ID, controller, plain position, movement state/config, collision footprint, blocked axes, movement/collision integration, замороженный controller context и immutable snapshots без Phaser refs.
+
+### `src/characterVisual.js`
+
+Phaser-представление персонажа: sprite, actor-profile visual defaults, cardinal facing hysteresis, walk/idle animation selection, depth sorting, position sync из motor snapshot и idempotent destroy.
+
+### `src/characterSystem.js`
+
+Stable-ID insertion-ordered registry персонажей: add/lookup/require, ordered update через общий collision environment, runtime-free snapshots и lifecycle destroy. Duplicate IDs и required unknown IDs завершаются явной ошибкой.
 
 ### `src/controllerCommand.js`
 
@@ -93,6 +105,14 @@ Phaser composition root непрерывного мира: создаёт мир
 ### `src/npcConfig.js`
 
 Декларативные profile ID, spawn-точки и маршруты домашнего loop-NPC и уличного ping-pong-NPC.
+
+### `src/gameSessionState.js`
+
+Минимальная plain JSON-сериализуемая session-модель: version, current world, player/entity IDs, global/entity flags и dialogue state. Предоставляет создание/lookup entities, flag operations и start/advance/close dialogue без runtime ссылок. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+
+### `src/interaction.js`
+
+Immutable interaction-target descriptors и чистый выбор лучшей доступной цели по radius, facing, priority, distance и stable ID tie-break. Payload defensively клонируется как строгий JSON-like graph: только plain objects, dense arrays и JSON primitives без non-finite numbers, class instances или cycles.
 
 ### `src/input.js`
 
@@ -170,7 +190,11 @@ Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked
 
 ### `scripts/check-character.mjs`
 
-Проверяет actor profile registry и immutability, explicit villager production/debug values, NPC profile wiring, общий `ControllerCommand`, player aim/actions, изоляцию controller snapshot, общую `Character`-фабрику игрока и NPC, loop/ping-pong переходы, waypoint tolerance, walkable маршруты, world collision и player-only camera target.
+Проверяет actor profiles, controller command/snapshot isolation, `CharacterMotor` movement/collision/snapshots, `CharacterVisual` facing/animation/depth/destroy, aggregate compatibility, `CharacterSystem` registry/order/update/snapshots/lifecycle, NPC patrols и WorldScene integration.
+
+### `scripts/check-interaction.mjs`
+
+Проверяет canonical session shape, entity/flag/dialogue operations, reserved IDs, JSON round-trip, immutable interaction descriptors, strict payload validation, defensive copying, radius/facing filtering и deterministic priority/distance/ID ranking.
 
 ### `scripts/check-visual.mjs`
 
@@ -201,7 +225,7 @@ Indoor/outdoor camera previews включают соответствующего
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/visual/world/preview проверок.
+Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/interaction/visual/world/preview проверок.
 
 ## Инфраструктура
 
