@@ -2,7 +2,6 @@ import { createInteractionTarget, findBestInteractionTarget } from "./interactio
 import {
   advanceDialogue,
   isDialogueActive as isSessionDialogueActive,
-  setEntityFlag,
   startDialogue,
 } from "./gameSessionState.js";
 
@@ -11,11 +10,13 @@ export function createInteractionRuntime({
   characterSystem,
   interactionDefinitions,
   getDialogueDefinition,
+  resolveDialogueId,
+  completeDialogue,
+  onPersistentMutation,
   presenter,
 }) {
   let destroyed = false;
   let currentCandidate = null;
-  let activeEntityId = null;
 
   function update({ actions = {} } = {}) {
     if (destroyed) return;
@@ -28,7 +29,6 @@ export function createInteractionRuntime({
       return;
     }
 
-    activeEntityId = null;
     currentCandidate = findCandidate();
     if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
     else presenter?.hidePrompt?.();
@@ -49,12 +49,22 @@ export function createInteractionRuntime({
     return findBestInteractionTarget(player, targets);
   }
 
+  function resolveCandidateDialogueId(candidate) {
+    const fixedDialogueId = candidate.payload?.dialogueId;
+    if (fixedDialogueId) return fixedDialogueId;
+
+    const resolverId = candidate.payload?.dialogueResolverId;
+    if (!resolverId || typeof resolveDialogueId !== "function") {
+      throw new Error(`Interaction ${candidate.targetId} cannot resolve a dialogue ID`);
+    }
+    return resolveDialogueId(resolverId, sessionState, candidate.entityId);
+  }
+
   function startCandidateDialogue(candidate) {
     if (candidate.kind !== "dialogue") return;
-    const dialogueId = candidate.payload?.dialogueId;
+    const dialogueId = resolveCandidateDialogueId(candidate);
     const definition = getDialogueDefinition(dialogueId);
     startDialogue(sessionState, { targetId: candidate.entityId, dialogueId: definition.id });
-    activeEntityId = candidate.entityId;
     currentCandidate = null;
     presenter?.hidePrompt?.();
     showCurrentDialogueLine();
@@ -67,19 +77,22 @@ export function createInteractionRuntime({
     presenter?.showDialogue?.({
       speakerKey: definition.speakerKey,
       line: definition.lines[lineIndex],
-      continuePromptKey: lineIndex >= definition.lines.length - 1 ? "hud:interaction.close" : "hud:interaction.next",
+      continuePromptKey:
+        lineIndex >= definition.lines.length - 1
+          ? "hud:interaction.close"
+          : "hud:interaction.next",
     });
   }
 
   function advanceActiveDialogue() {
-    const { targetId, dialogueId } = sessionState.dialogue;
+    const { dialogueId } = sessionState.dialogue;
     const definition = getDialogueDefinition(dialogueId);
     const result = advanceDialogue(sessionState, definition.lines.length);
     if (result.status === "closed") {
-      if (dialogueId === "home-npc-greeting") {
-        setEntityFlag(sessionState, targetId, "greeted", true);
+      const completion = completeDialogue?.(sessionState, dialogueId);
+      if (completion?.status === "updated") {
+        onPersistentMutation?.({ dialogueId, completion });
       }
-      activeEntityId = null;
       currentCandidate = null;
       presenter?.hideDialogue?.();
       presenter?.hidePrompt?.();
@@ -90,11 +103,21 @@ export function createInteractionRuntime({
 
   return {
     update,
-    isDialogueActive() { return !destroyed && isSessionDialogueActive(sessionState); },
-    isEntityInActiveDialogue(entityId) {
-      return !destroyed && isSessionDialogueActive(sessionState) && sessionState.dialogue.targetId === entityId;
+    isDialogueActive() {
+      return !destroyed && isSessionDialogueActive(sessionState);
     },
-    getCurrentCandidate() { return currentCandidate ? { ...currentCandidate, payload: { ...currentCandidate.payload } } : null; },
+    isEntityInActiveDialogue(entityId) {
+      return (
+        !destroyed &&
+        isSessionDialogueActive(sessionState) &&
+        sessionState.dialogue.targetId === entityId
+      );
+    },
+    getCurrentCandidate() {
+      return currentCandidate
+        ? { ...currentCandidate, payload: { ...currentCandidate.payload } }
+        : null;
+    },
     refresh() {
       if (destroyed) return;
       if (isSessionDialogueActive(sessionState)) showCurrentDialogueLine();
@@ -104,7 +127,6 @@ export function createInteractionRuntime({
       if (destroyed) return;
       destroyed = true;
       currentCandidate = null;
-      activeEntityId = null;
       presenter?.hidePrompt?.();
       presenter?.hideDialogue?.();
       presenter = null;
