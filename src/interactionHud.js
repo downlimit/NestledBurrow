@@ -7,7 +7,14 @@ import {
   measureBitmapText,
 } from "./hud.js";
 
-const PROMPT_RECT = Object.freeze({ x: 10, y: GAME_HEIGHT - 34, width: 76, height: 24 });
+const PROMPT_WIDTH = 76;
+const PROMPT_RIGHT_MARGIN = 10;
+const PROMPT_RECT = Object.freeze({
+  x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - PROMPT_WIDTH,
+  y: GAME_HEIGHT - 34,
+  width: PROMPT_WIDTH,
+  height: 24,
+});
 const DIALOGUE_RECT = Object.freeze({ x: 8, y: GAME_HEIGHT - 58, width: GAME_WIDTH - 16, height: 50 });
 const DIALOGUE_ACTION_RECT = Object.freeze({ x: GAME_WIDTH - 74, y: GAME_HEIGHT - 34, width: 66, height: 28 });
 

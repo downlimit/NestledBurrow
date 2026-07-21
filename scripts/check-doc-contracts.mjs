@@ -25,18 +25,14 @@ hasAll(
     "проверь все PR",
     "LEAD.md",
     "REVIEW.md",
-    "api_tool.list_resources",
-    "Полное ревью не должно блокировать чат Лида",
+    "Fast lane используется по умолчанию",
+    "Полное ревью не должно блокировать Lead-чат",
   ],
   "PROJECT.md",
 );
 assert(
   /для роли Лид[^\n]*`LEAD\.md`/.test(project) && /для роли Интегратор[^\n]*`REVIEW\.md`/.test(project),
   "PROJECT.md must route both roles to their contracts",
-);
-assert(
-  /описания функции[^\n]*не является ограничением среды/.test(project),
-  "PROJECT.md must reject false tool-unavailability claims",
 );
 
 hasAll(
@@ -45,18 +41,25 @@ hasAll(
     "<!-- audience: lead-chat -->",
     "постоянного ChatGPT-чата **Лид**",
     "проверь все PR",
-    "NB-YYYYMMDD-NN",
+    "Fast lane — режим по умолчанию",
+    "Strict lane — только по реальному риску",
+    "одна задача",
+    "одна ветка",
+    "один финальный PR",
+    "fetch_file",
+    "Полный clone допустим только",
+    "Integration metadata",
     "Depends on",
     "Merge phase",
     "Owned paths",
-    "Shared files",
-    "fan-out / fan-in",
-    "Пользователь не обязан управлять партиями, идентификаторами или зависимостями",
-    "По умолчанию Лид **не клонирует весь репозиторий**",
-    "fetch_file",
-    "Полный clone допустим только когда он действительно необходим",
+    "Shared files allowed",
+    "Fan-out/fan-in используется только при реальном конфликте",
   ],
   "LEAD.md",
+);
+assert(
+  lead.includes("Не требуется автоматически включать:") && lead.includes("Batch/Task ID"),
+  "LEAD.md must keep routine fast-lane metadata optional",
 );
 
 hasAll(
@@ -66,15 +69,19 @@ hasAll(
     "постоянного ChatGPT-чата **Интегратор**",
     "проверь все PR",
     "всем открытым non-draft PR",
-    "dependency graph",
-    "merge order",
-    "legacy PR",
-    "после каждого merge синхронизирует зависимые ветки",
+    "Fast lane — по умолчанию",
+    "Strict lane — только по реальному риску",
+    "targeted reads и per-file patches",
+    "final-head CI",
+    "Независимый PR не обязан ребейзиться",
     "api_tool.list_resources",
-    "fetch_pr_patch",
-    "Побочный вопрос пользователя в Integrator-чате не отменяет активную операцию",
+    "Побочный вопрос пользователя не отменяет активную операцию",
   ],
   "REVIEW.md",
+);
+assert(
+  review.includes("Отсутствие полной Integration metadata в обычном самостоятельном PR не является дефектом"),
+  "REVIEW.md must not make strict metadata mandatory for routine PRs",
 );
 
 hasAll(
@@ -82,7 +89,10 @@ hasAll(
   [
     "<!-- audience: codex -->",
     "Do **not** read `PROJECT.md`, `LEAD.md`, `REVIEW.md` or `LIBRARY.md` by default.",
+    "## Task entry modes",
+    "### Routine direct prompt",
     "## Integration metadata",
+    "When these fields are present:",
     "Batch",
     "Base SHA",
     "Depends on",
@@ -127,4 +137,4 @@ hasAll(
   ".github/pull_request_template.md",
 );
 
-console.log("documentation contracts passed: project bootstrap, Lead, Integrator and Codex roles are separated");
+console.log("documentation contracts passed: risk-based Project, Lead, Integrator and Codex roles are aligned");
