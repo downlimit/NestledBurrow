@@ -109,6 +109,7 @@ assert.equal(
   "default movement is the canonical immutable player profile object",
 );
 const villagerProfile = getActorProfile("villager");
+const villagerProductionAcceleration = villagerProfile.movement.acceleration;
 const villagerRuntime = createRuntimeMovementConfig(villagerProfile.movement, villagerProfile.movement);
 assert.deepEqual(
   villagerRuntime,
@@ -119,7 +120,7 @@ assert.notEqual(villagerRuntime, villagerProfile.movement, "runtime movement con
 villagerRuntime.acceleration = 111;
 assert.equal(
   villagerProfile.movement.acceleration,
-  260,
+  villagerProductionAcceleration,
   "mutating runtime config does not mutate production profile",
 );
 

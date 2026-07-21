@@ -31,6 +31,7 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
   let index = 1;
   let direction = 1;
   let blockedMs = 0;
+  let waitRemainingMs = 0;
 
   return {
     kind: "patrol",
@@ -42,6 +43,14 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
       if (isPaused?.()) {
         return createControllerCommand({ moveDirection: IDLE_DIRECTION });
       }
+      if (waitRemainingMs > 0) {
+        waitRemainingMs = Math.max(0, waitRemainingMs - deltaMs);
+        if (waitRemainingMs > 0) {
+          return createControllerCommand({ moveDirection: IDLE_DIRECTION });
+        }
+        advanceWaypoint();
+      }
+
       const position = context.position;
       const waypoint = waypoints[index];
       const dx = waypoint.x - position.x;
@@ -53,7 +62,15 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
         (Boolean(blockedAxes.y) && Math.abs(dy) > tolerance);
       blockedMs = blockedTowardWaypoint ? blockedMs + deltaMs : 0;
 
-      if (distance <= tolerance || blockedMs >= BLOCKED_WAYPOINT_ADVANCE_MS) {
+      if (distance <= tolerance) {
+        const waitMs = getWaypointWaitMs(waypoint);
+        blockedMs = 0;
+        if (waitMs > 0) {
+          waitRemainingMs = waitMs;
+          return createControllerCommand({ moveDirection: IDLE_DIRECTION });
+        }
+        advanceWaypoint();
+      } else if (blockedMs >= BLOCKED_WAYPOINT_ADVANCE_MS) {
         advanceWaypoint();
         blockedMs = 0;
       }
@@ -71,6 +88,10 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
     },
     advanceForTest: advanceWaypoint,
   };
+
+  function getWaypointWaitMs(waypoint) {
+    return Number.isFinite(waypoint.waitMs) && waypoint.waitMs > 0 ? waypoint.waitMs : 0;
+  }
 
   function advanceWaypoint() {
     if (mode === PATROL_MODE_LOOP) {
