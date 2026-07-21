@@ -11,7 +11,7 @@ on:
       - ready_for_review
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pr-check-${{ github.event.pull_request.number }}
@@ -24,8 +24,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -33,21 +35,41 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Capture npm ci diagnostics
+      - name: Regenerate lockfile from package manifest
         run: |
-          mkdir -p artifacts/npm-ci
-          set +e
-          npm ci > artifacts/npm-ci/npm-ci.log 2>&1
-          status=$?
-          cat artifacts/npm-ci/npm-ci.log
-          echo "exit_code=$status" > artifacts/npm-ci/status.txt
-          exit $status
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Regenerate localization dependency lockfile"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
-      - name: Upload npm ci diagnostics
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install visual check dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Run project checks
+        run: npm run check
+
+      - name: Upload world previews
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: npm-ci-diagnostics-pr-${{ github.event.pull_request.number }}
-          path: artifacts/npm-ci
-          if-no-files-found: error
+          name: world-previews-pr-${{ github.event.pull_request.number }}
+          path: |
+            artifacts/world-overview.png
+            artifacts/camera-indoor.png
+            artifacts/camera-outdoor.png
+            artifacts/top-wall-detail.png
+          if-no-files-found: warn
           retention-days: 7
