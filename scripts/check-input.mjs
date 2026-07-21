@@ -15,13 +15,20 @@ function near(actual, expected, message) {
 }
 
 function simulateJoystick() {
+  const canvasRect = { left: 40, top: 30, width: GAME_WIDTH * 2, height: GAME_HEIGHT * 2 };
   const state = {
     activePointerId: null,
     center: null,
     vector: { x: 0, y: 0 },
     knob: null,
     captured: false,
+    globalFallback: false,
   };
+
+  const canvasPointFromNativeEvent = (event) => ({
+    x: (event.clientX - canvasRect.left) * (GAME_WIDTH / canvasRect.width),
+    y: (event.clientY - canvasRect.top) * (GAME_HEIGHT / canvasRect.height),
+  });
 
   const reset = () => {
     state.activePointerId = null;
@@ -29,37 +36,46 @@ function simulateJoystick() {
     state.vector = { x: 0, y: 0 };
     state.knob = null;
     state.captured = false;
+    state.globalFallback = false;
   };
 
-  const down = (pointer) => {
+  const down = (event) => {
+    const point = canvasPointFromNativeEvent(event);
     if (state.activePointerId !== null) return;
-    if (isPointInRect(pointer.x, pointer.y, FULLSCREEN_HIT_AREA)) return;
-    if (!isInsideJoystickActivation(pointer.x, pointer.y)) return;
-    state.activePointerId = pointer.id;
-    state.center = clampJoystickCenter(pointer.x, pointer.y);
+    if (isPointInRect(point.x, point.y, FULLSCREEN_HIT_AREA)) return;
+    if (!isInsideJoystickActivation(point.x, point.y)) return;
+    state.activePointerId = event.pointerId;
+    state.center = clampJoystickCenter(point.x, point.y);
     state.vector = { x: 0, y: 0 };
     state.knob = { ...state.center };
     state.captured = true;
   };
 
-  const move = (pointer) => {
-    if (pointer.id !== state.activePointerId) return;
-    const joystick = getJoystickState(pointer.x, pointer.y, state.center);
+  const move = (event) => {
+    if (event.pointerId !== state.activePointerId) return;
+    const point = canvasPointFromNativeEvent(event);
+    const joystick = getJoystickState(point.x, point.y, state.center);
     state.vector = { x: joystick.movementX, y: joystick.movementY };
     state.knob = { x: joystick.knobX, y: joystick.knobY };
   };
 
-  const up = (pointer) => {
-    if (pointer.id === state.activePointerId) reset();
+  const up = (event) => {
+    if (event.pointerId === state.activePointerId) reset();
   };
 
   const boundaryLeave = () => {
-    if (!state.captured) reset();
+    // Native pointerleave / Phaser gameout are boundary notifications only.
+  };
+
+  const lostPointerCapture = (event) => {
+    if (event.pointerId !== state.activePointerId) return;
+    state.captured = false;
+    state.globalFallback = true;
   };
 
   const safetyReset = () => reset();
 
-  return { state, down, move, up, boundaryLeave, safetyReset, reset };
+  return { state, down, move, up, boundaryLeave, lostPointerCapture, safetyReset, reset };
 }
 
 assert.equal(isTouchJoystickSupported({ maxTouchPoints: 1, coarsePointer: false }), true);
@@ -87,28 +103,42 @@ const offsetB = getJoystickState(centerB.x + 10, centerB.y, centerB);
 assert.deepEqual({ x: offsetA.movementX, y: offsetA.movementY }, { x: offsetB.movementX, y: offsetB.movementY }, "different runtime centers produce independent equivalent vectors");
 
 const joystick = simulateJoystick();
-joystick.down({ id: 99, x: GAME_WIDTH - 20, y: 12 });
+joystick.down({ pointerId: 99, clientX: 40 + (GAME_WIDTH - 20) * 2, clientY: 30 + 12 * 2 });
 assert.equal(joystick.state.activePointerId, null, "HUD pointer does not capture joystick");
-joystick.down({ id: 1, x: 80, y: 90 });
+joystick.down({ pointerId: 1, clientX: 40 + 80 * 2, clientY: 30 + 90 * 2 });
 assert.equal(joystick.state.activePointerId, 1, "left-half press captures joystick");
 assert.deepEqual(joystick.state.center, { x: 80, y: 90 });
 assert.deepEqual(joystick.state.vector, { x: 0, y: 0 }, "activation itself does not move");
-joystick.move({ id: 1, x: -200, y: GAME_HEIGHT + 160 });
+joystick.move({ pointerId: 1, clientX: 40 - 200 * 2, clientY: 30 + (GAME_HEIGHT + 160) * 2 });
 near(Math.hypot(joystick.state.vector.x, joystick.state.vector.y), 1, "captured movement beyond canvas remains clamped and non-zero");
 assert(Math.hypot(joystick.state.knob.x - joystick.state.center.x, joystick.state.knob.y - joystick.state.center.y) <= JOYSTICK.maxOffset + 1e-12, "external movement clamps visual knob");
 joystick.boundaryLeave();
 assert.equal(joystick.state.activePointerId, 1, "boundary leave does not reset while pointer is captured");
-joystick.down({ id: 2, x: 60, y: 90 });
+joystick.down({ pointerId: 2, clientX: 40 + 60 * 2, clientY: 30 + 90 * 2 });
 assert.equal(joystick.state.activePointerId, 1, "second finger cannot take over");
-joystick.up({ id: 2 });
+joystick.up({ pointerId: 2 });
 assert.equal(joystick.state.activePointerId, 1, "lifting another finger does not reset");
-joystick.up({ id: 1 });
+joystick.up({ pointerId: 1 });
 assert.deepEqual(joystick.state.vector, { x: 0, y: 0 }, "pointerup resets movement");
 assert.equal(joystick.state.center, null, "pointerup hides joystick center");
 
+joystick.reset();
+joystick.down({ pointerId: 7, clientX: 40 + 80 * 2, clientY: 30 + 90 * 2 });
+joystick.boundaryLeave();
+joystick.lostPointerCapture({ pointerId: 7 });
+assert.equal(joystick.state.activePointerId, 7, "lostpointercapture keeps active joystick ownership");
+assert.equal(joystick.state.globalFallback, true, "lostpointercapture switches to global pointer tracking");
+joystick.move({ pointerId: 7, clientX: 40 + (GAME_WIDTH + 300) * 2, clientY: 30 - 220 * 2 });
+near(Math.hypot(joystick.state.vector.x, joystick.state.vector.y), 1, "window pointermove far beyond canvas keeps clamped non-zero input");
+assert(Math.hypot(joystick.state.knob.x - joystick.state.center.x, joystick.state.knob.y - joystick.state.center.y) <= JOYSTICK.maxOffset + 1e-12, "window pointermove beyond canvas clamps visual knob");
+joystick.up({ pointerId: 7 });
+assert.equal(joystick.state.activePointerId, null, "window pointerup after capture loss clears active pointer");
+assert.deepEqual(joystick.state.vector, { x: 0, y: 0 }, "window pointerup after capture loss stops movement");
+assert.equal(joystick.state.center, null, "window pointerup after capture loss hides joystick");
+
 for (const reason of ["pointerupoutside", "pointercancel", "window blur", "visibilitychange hidden", "fullscreenchange"]) {
-  joystick.down({ id: 3, x: 80, y: 90 });
-  joystick.move({ id: 3, x: 100, y: 90 });
+  joystick.down({ pointerId: 3, clientX: 40 + 80 * 2, clientY: 30 + 90 * 2 });
+  joystick.move({ pointerId: 3, clientX: 40 + 100 * 2, clientY: 30 + 90 * 2 });
   joystick.safetyReset();
   assert.equal(joystick.state.activePointerId, null, `${reason} clears active pointer`);
   assert.deepEqual(joystick.state.vector, { x: 0, y: 0 }, `${reason} stops joystick movement`);

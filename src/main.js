@@ -286,10 +286,12 @@ class WorldScene extends Phaser.Scene {
     this.onVisibilityChange = () => {
       if (document.hidden) this.resetJoystick();
     };
+    this.onNativePointerDown = (event) => this.handleNativePointerDown(event);
     this.onNativePointerMove = (event) => this.handleNativePointerMove(event);
     this.onNativePointerUp = (event) => this.handleNativePointerUp(event);
     this.onNativePointerCancel = (event) => this.handleNativePointerEnd(event);
-    this.onNativeLostPointerCapture = (event) => this.handleNativePointerEnd(event);
+    this.onNativeLostPointerCapture = (event) => this.handleNativeLostPointerCapture(event);
+    this.onNativePointerBoundaryLeave = () => this.handleJoystickBoundaryLeave();
     this.onNativeTouchCancel = (event) => this.handleNativeTouchCancel(event);
     this.onFullscreenChange = () => {
       this.resetJoystick();
@@ -344,27 +346,56 @@ class WorldScene extends Phaser.Scene {
     this.input.on("pointerout", this.handleJoystickBoundaryLeave, this);
 
     const canvas = this.game.canvas;
-    canvas.addEventListener("pointermove", this.onNativePointerMove);
-    canvas.addEventListener("pointerup", this.onNativePointerUp);
-    canvas.addEventListener("pointercancel", this.onNativePointerCancel);
+    canvas.addEventListener("pointerdown", this.onNativePointerDown, { capture: true, passive: false });
     canvas.addEventListener("lostpointercapture", this.onNativeLostPointerCapture);
+    canvas.addEventListener("pointerleave", this.onNativePointerBoundaryLeave);
     canvas.addEventListener("touchcancel", this.onNativeTouchCancel, { passive: true });
+    window.addEventListener("pointermove", this.onNativePointerMove, { capture: true, passive: false });
+    window.addEventListener("pointerup", this.onNativePointerUp, { capture: true, passive: false });
+    window.addEventListener("pointercancel", this.onNativePointerCancel, { capture: true, passive: false });
+    document.addEventListener("pointermove", this.onNativePointerMove, { capture: true, passive: false });
+    document.addEventListener("pointerup", this.onNativePointerUp, { capture: true, passive: false });
+    document.addEventListener("pointercancel", this.onNativePointerCancel, { capture: true, passive: false });
   }
 
   handleJoystickPointerDown(pointer) {
+    if (this.isHudPointer(pointer)) return;
+    this.startJoystickPointer({
+      joystickPointerId: pointer.id,
+      domPointerId: typeof pointer.event?.pointerId === "number" ? pointer.event.pointerId : null,
+      touchIdentifier: pointer.wasTouch ? pointer.identifier : null,
+      x: pointer.x,
+      y: pointer.y,
+      event: pointer.event,
+    });
+  }
+
+  handleNativePointerDown(event) {
+    const point = this.canvasPointFromNativeEvent(event);
+    this.startJoystickPointer({
+      joystickPointerId: event.pointerId,
+      domPointerId: event.pointerId,
+      touchIdentifier: null,
+      x: point.x,
+      y: point.y,
+      event,
+    });
+  }
+
+  startJoystickPointer({ joystickPointerId, domPointerId, touchIdentifier, x, y, event }) {
     if (
       this.activeJoystickPointerId !== null ||
-      this.isHudPointer(pointer) ||
-      !isInsideJoystickActivation(pointer.x, pointer.y)
+      this.isHudPointer({ x, y }) ||
+      !isInsideJoystickActivation(x, y)
     ) {
       return;
     }
-    this.activeJoystickPointerId = pointer.id;
-    this.activeDomPointerId =
-      typeof pointer.event?.pointerId === "number" ? pointer.event.pointerId : null;
-    this.activeTouchIdentifier = pointer.wasTouch ? pointer.identifier : null;
-    this.captureJoystickPointer(pointer);
-    this.joystickCenter = clampJoystickCenter(pointer.x, pointer.y);
+    this.activeJoystickPointerId = joystickPointerId;
+    this.activeDomPointerId = domPointerId;
+    this.activeTouchIdentifier = touchIdentifier;
+    this.preventActivePointerDefault(event);
+    this.captureJoystickPointer();
+    this.joystickCenter = clampJoystickCenter(x, y);
     this.joystickBase?.setPosition(this.joystickCenter.x, this.joystickCenter.y).setVisible(true);
     this.joystickKnob?.setPosition(this.joystickCenter.x, this.joystickCenter.y).setVisible(true);
   }
@@ -374,10 +405,10 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleJoystickBoundaryLeave() {
-    if (!this.hasActivePointerCapture()) this.resetJoystick();
+    // Boundary transitions are expected while the active finger crosses canvas letterboxing.
   }
 
-  captureJoystickPointer(pointer) {
+  captureJoystickPointer() {
     const canvas = this.game.canvas;
     if (this.activeDomPointerId === null || !canvas.setPointerCapture) return;
     try {
@@ -406,13 +437,8 @@ class WorldScene extends Phaser.Scene {
   }
 
   handleNativePointerMove(event) {
-    if (
-      this.activeJoystickPointerId === null ||
-      this.activeDomPointerId === null ||
-      event.pointerId !== this.activeDomPointerId
-    ) {
-      return;
-    }
+    if (!this.isActiveDomPointer(event)) return;
+    this.preventActivePointerDefault(event);
     this.updateJoystick(this.canvasPointFromNativeEvent(event));
   }
 
@@ -420,18 +446,30 @@ class WorldScene extends Phaser.Scene {
     this.handleNativePointerEnd(event);
   }
 
+  handleNativeLostPointerCapture(event) {
+    if (this.isActiveDomPointer(event)) this.joystickPointerCaptured = false;
+  }
+
   handleJoystickPointerUp(pointer) {
     if (pointer.id === this.activeJoystickPointerId) this.resetJoystick();
   }
 
   handleNativePointerEnd(event) {
-    if (
+    if (!this.isActiveDomPointer(event)) return;
+    this.preventActivePointerDefault(event);
+    this.resetJoystick();
+  }
+
+  isActiveDomPointer(event) {
+    return (
       this.activeJoystickPointerId !== null &&
       this.activeDomPointerId !== null &&
       event.pointerId === this.activeDomPointerId
-    ) {
-      this.resetJoystick();
-    }
+    );
+  }
+
+  preventActivePointerDefault(event) {
+    if (event?.cancelable) event.preventDefault();
   }
 
   handleNativeTouchCancel(event) {
@@ -482,11 +520,16 @@ class WorldScene extends Phaser.Scene {
     this.input.off("gameout", this.handleJoystickBoundaryLeave, this);
     this.input.off("pointerout", this.handleJoystickBoundaryLeave, this);
     const canvas = this.game.canvas;
-    canvas.removeEventListener("pointermove", this.onNativePointerMove);
-    canvas.removeEventListener("pointerup", this.onNativePointerUp);
-    canvas.removeEventListener("pointercancel", this.onNativePointerCancel);
+    canvas.removeEventListener("pointerdown", this.onNativePointerDown, { capture: true });
     canvas.removeEventListener("lostpointercapture", this.onNativeLostPointerCapture);
+    canvas.removeEventListener("pointerleave", this.onNativePointerBoundaryLeave);
     canvas.removeEventListener("touchcancel", this.onNativeTouchCancel);
+    window.removeEventListener("pointermove", this.onNativePointerMove, { capture: true });
+    window.removeEventListener("pointerup", this.onNativePointerUp, { capture: true });
+    window.removeEventListener("pointercancel", this.onNativePointerCancel, { capture: true });
+    document.removeEventListener("pointermove", this.onNativePointerMove, { capture: true });
+    document.removeEventListener("pointerup", this.onNativePointerUp, { capture: true });
+    document.removeEventListener("pointercancel", this.onNativePointerCancel, { capture: true });
     this.resetJoystick();
     this.movementDebugPanel?.remove();
     this.movementDebugPanel = null;
