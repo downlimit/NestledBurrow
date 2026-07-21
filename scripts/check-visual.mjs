@@ -3,7 +3,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLAYER_FRAMES, PLAYER_IDLE_FRAME_INDEX } from "../src/visualConfig.js";
+import {
+  PLAYER_FRAMES,
+  PLAYER_IDLE_FRAME_INDEX,
+  PLAYER_WALK_FRAME_SEQUENCE,
+} from "../src/visualConfig.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
@@ -99,10 +103,52 @@ for (const asset of officialAssets) {
 
 assert.deepEqual(PLAYER_FRAMES.left, ["tile_0266", "tile_0293", "tile_0320"]);
 assert.deepEqual(PLAYER_FRAMES.right, ["tile_0269", "tile_0296", "tile_0323"]);
-assert.equal(PLAYER_IDLE_FRAME_INDEX, 0);
-const playerFrames = Object.values(PLAYER_FRAMES).flat();
-assert.equal(new Set(playerFrames).size, playerFrames.length, "player frame keys are unique");
-for (const frame of playerFrames) {
+assert.equal(PLAYER_IDLE_FRAME_INDEX, 2, "idle uses the neutral source frame");
+assert.deepEqual(
+  PLAYER_WALK_FRAME_SEQUENCE,
+  [0, PLAYER_IDLE_FRAME_INDEX, 1, PLAYER_IDLE_FRAME_INDEX],
+  "walk cadence is stepA, neutral, stepB, neutral",
+);
+
+const preloadTextureKeys = Object.values(PLAYER_FRAMES).flat();
+assert.equal(
+  new Set(preloadTextureKeys).size,
+  preloadTextureKeys.length,
+  "preload texture keys do not contain duplicates",
+);
+assert(/const playerTextureKeys = new Set/.test(mainSource), "preload deduplicates texture keys before loader registration");
+assert(/PLAYER_WALK_FRAME_SEQUENCE\.map/.test(mainSource), "runtime animations use the complete walk frame sequence");
+
+for (const [facing, sourceFrames] of Object.entries(PLAYER_FRAMES)) {
+  assert.equal(sourceFrames.length, 3, `${facing} keeps three source texture frames`);
+  const animationFrames = PLAYER_WALK_FRAME_SEQUENCE.map(
+    (frameIndex) => sourceFrames[frameIndex],
+  );
+  assert.equal(animationFrames.length, 4, `${facing} animation has four frames`);
+  assert.deepEqual(
+    animationFrames,
+    [
+      sourceFrames[0],
+      sourceFrames[PLAYER_IDLE_FRAME_INDEX],
+      sourceFrames[1],
+      sourceFrames[PLAYER_IDLE_FRAME_INDEX],
+    ],
+    `${facing} animation follows stepA, neutral, stepB, neutral`,
+  );
+  assert.equal(
+    animationFrames[1],
+    animationFrames[3],
+    `${facing} neutral repeats in phases 2 and 4`,
+  );
+  assert.notEqual(animationFrames[0], animationFrames[2], `${facing} step frames differ`);
+  assert.equal(
+    sourceFrames[PLAYER_IDLE_FRAME_INDEX],
+    animationFrames[1],
+    `${facing} idle frame is neutral`,
+  );
+}
+
+for (const frame of preloadTextureKeys) {
   assert.deepEqual(readPngDimensions(path.join(playerDirectory, `${frame}.png`)), {
     width: 16,
     height: 16,
@@ -110,5 +156,5 @@ for (const frame of playerFrames) {
 }
 
 console.log(
-  "Visual checks passed: legacy room sources/public atlases removed, Basic Village hashes, native 16px grid, integer zoom, rounded camera follow and player frames.",
+  "Visual checks passed: legacy room sources/public atlases removed, Basic Village hashes, native 16px grid, integer zoom, rounded camera follow and four-phase player walk cadence.",
 );

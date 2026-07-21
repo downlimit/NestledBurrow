@@ -44,6 +44,7 @@ import { createInteractionRuntime } from "./interactionRuntime.js";
 import { createInteractionHud } from "./interactionHud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
+import { PLAYER_WALK_FRAME_SEQUENCE } from "./visualConfig.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const PLAYER_ASSET_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney/player`;
@@ -55,9 +56,10 @@ class WorldScene extends Phaser.Scene {
   }
 
   preload() {
-    Object.values(getActorProfile(ACTOR_PROFILE_IDS.player).visual.frames)
-      .flat()
-      .forEach((frame) => this.load.image(frame, `${PLAYER_ASSET_URL}/${frame}.png`));
+    const playerTextureKeys = new Set(
+      Object.values(getActorProfile(ACTOR_PROFILE_IDS.player).visual.frames).flat(),
+    );
+    playerTextureKeys.forEach((frame) => this.load.image(frame, `${PLAYER_ASSET_URL}/${frame}.png`));
 
     const sheet = { frameWidth: TILE_SIZE, frameHeight: TILE_SIZE };
     this.load.spritesheet(OUTDOOR_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${OUTDOOR_IMAGE_PATH}`, sheet);
@@ -111,7 +113,9 @@ class WorldScene extends Phaser.Scene {
         if (this.anims.exists(key)) return;
         this.anims.create({
           key,
-          frames: frames.map((key) => ({ key })),
+          frames: PLAYER_WALK_FRAME_SEQUENCE.map((frameIndex) => ({
+            key: frames[frameIndex],
+          })),
           frameRate: visual.walkFrameRate,
           repeat: -1,
         });
