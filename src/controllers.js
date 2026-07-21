@@ -3,7 +3,6 @@ export const PATROL_MODE_PING_PONG = "ping-pong";
 
 export const WAYPOINT_TOLERANCE = 4;
 export const BLOCKED_WAYPOINT_ADVANCE_MS = 450;
-const BLOCKED_SPEED_THRESHOLD = 1;
 const IDLE_DIRECTION = Object.freeze({ x: 0, y: 0 });
 
 export function createPlayerController({ getInputDirection }) {
@@ -38,9 +37,11 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
       const dx = waypoint.x - position.x;
       const dy = waypoint.y - position.y;
       const distance = Math.hypot(dx, dy);
-      const blocked = Boolean(character?.lastBlockedAxes?.x || character?.lastBlockedAxes?.y);
-      const speed = character?.speed ?? 0;
-      blockedMs = blocked && speed <= BLOCKED_SPEED_THRESHOLD ? blockedMs + deltaMs : 0;
+      const blockedAxes = character?.lastBlockedAxes ?? {};
+      const blockedTowardWaypoint =
+        (Boolean(blockedAxes.x) && Math.abs(dx) > tolerance) ||
+        (Boolean(blockedAxes.y) && Math.abs(dy) > tolerance);
+      blockedMs = blockedTowardWaypoint ? blockedMs + deltaMs : 0;
 
       if (distance <= tolerance || blockedMs >= BLOCKED_WAYPOINT_ADVANCE_MS) {
         advanceWaypoint();
