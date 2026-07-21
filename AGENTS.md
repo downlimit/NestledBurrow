@@ -11,11 +11,12 @@ For a routine task, read in this order:
 2. `AGENTS.md`;
 3. only source files, tests and configuration directly relevant to the task.
 
-Do **not** read `PROJECT.md`, `REVIEW.md` or `LIBRARY.md` by default.
+Do **not** read `PROJECT.md`, `LEAD.md`, `REVIEW.md` or `LIBRARY.md` by default.
 
-- Read `PROJECT.md` only when the direct prompt explicitly says that product history or a strategic decision is required.
+- Read `PROJECT.md` only when the direct prompt explicitly requires product history or a strategic decision.
+- Read `LEAD.md` only when the direct prompt explicitly changes Lead workflow or task-orchestration rules.
+- Read `REVIEW.md` only when the direct prompt explicitly changes Integrator workflow; normal implementation delivery is fully specified here and in the PR template.
 - Read `LIBRARY.md` only when the location of the relevant system is genuinely unclear.
-- Read `REVIEW.md` only when the direct prompt explicitly asks for reviewer-process work; normal implementation delivery is fully specified here and in the PR template.
 - Read a file from `tasks/` only when the direct prompt explicitly names it.
 - Read `ASSETS.md` when the task adds, replaces, selects or audits external assets.
 
@@ -24,11 +25,12 @@ The direct prompt is the task contract. Do not expand its scope by mining unrela
 ## Before editing
 
 1. Run `git fetch --prune`.
-2. Verify that the supplied task branch starts from current `origin/main`.
+2. Verify that the supplied task branch starts from the prompt's Base SHA or current `origin/main` for a standalone task.
 3. Work only in the single supplied task branch.
 4. Never push ordinary task work directly to `main`.
 5. Never create or push an additional remote branch.
 6. Inspect the relevant existing implementation before choosing an architecture.
+7. Respect `Owned paths` and `Shared files allowed` from the prompt.
 
 ## Task entry modes
 
@@ -37,7 +39,7 @@ The direct prompt is the task contract. Do not expand its scope by mining unrela
 This is the default for normal iterations.
 
 - Do not create a task file, issue, planning document or preparatory PR.
-- Use current `main`, one ephemeral branch and one final PR.
+- Use the supplied ephemeral branch and exactly one final PR.
 - Treat the prompt as complete unless a real product ambiguity prevents correct implementation.
 
 ### Explicit durable task file
@@ -45,6 +47,35 @@ This is the default for normal iterations.
 Use only when the prompt names a `tasks/*.md` file.
 
 A durable task file is reserved for large, high-risk, multi-stage, resumable or repeatedly reused work where repository persistence materially reduces risk.
+
+## Integration metadata
+
+The Lead may supply coordination fields for standalone or parallel work:
+
+```text
+Integration metadata
+- Batch: <NB-YYYYMMDD-NN or standalone>
+- Task: <id>
+- Base SHA: <sha>
+- Depends on: <none or task ids / PRs>
+- Merge phase: <integer>
+- Branch: work/<batch>/<task-slug>
+- PR title: [<batch>/<task>] <result-oriented title>
+- Owned paths: <paths>
+- Shared files allowed: <paths or none>
+```
+
+When these fields are present:
+
+- use the exact supplied branch and PR title;
+- copy the metadata into `.github/pull_request_template.md`;
+- do not modify files outside `Owned paths` except files explicitly listed in `Shared files allowed`;
+- do not opportunistically edit shared entry points, canonical docs, package files or workflows owned by another parallel task;
+- do not implement dependencies named in `Depends on`; consume them only when they are already present in the supplied base;
+- if the supplied base does not contain a required dependency, stop and report the exact mismatch instead of reimplementing it;
+- do not ask the user to manage Batch, Task or merge order.
+
+For a routine non-parallel task, use `Batch: standalone` when requested. Missing metadata does not authorize extra scope.
 
 ## Scope discipline
 
@@ -55,6 +86,7 @@ A durable task file is reserved for large, high-risk, multi-stage, resumable or 
 - Do not weaken existing tests or validation to make a local environment pass.
 - Stop for clarification only when a product, visual or priority choice materially changes the user-facing result.
 - Technical implementation details are Codex responsibilities unless the prompt explicitly constrains them.
+- A parallel task must remain useful and testable without secretly integrating sibling tasks through shared files it does not own.
 
 ## Mandatory validation
 
@@ -146,23 +178,26 @@ A local network, proxy, package-index, browser-install or dependency failure doe
 - Do not knowingly open a PR with obvious defects merely because automated checks pass.
 - Ensure all evidence and artifacts refer to the final head SHA.
 
-Use `.github/pull_request_template.md`. Keep only sections applicable to the actual risk.
+Use the exact PR title from Integration metadata when supplied. Use `.github/pull_request_template.md` and keep only sections applicable to the actual risk.
 
 ## Documentation boundaries
 
-Codex should not carry the virtual lead's full context merely to keep documentation current.
+Codex should not carry the Lead or Integrator's full context merely to keep documentation current.
 
-- Do not edit `PROJECT.md` or `REVIEW.md` unless the direct prompt explicitly changes lead context, product strategy or reviewer process.
-- Update `LIBRARY.md` only when important files, entry points or canonical addresses are added, removed, renamed or materially reassigned.
+- Do not edit `PROJECT.md`, `LEAD.md` or `REVIEW.md` unless the direct prompt explicitly changes their owned process or product facts.
+- Update `LIBRARY.md` only when important files, entry points or canonical addresses are added, removed, renamed or materially reassigned and the prompt grants access to that shared file.
 - Update `ASSETS.md` only when external asset sources, licensing, hashes or asset policy change.
 - Update `AGENTS.md` only when the task explicitly changes Codex operating rules.
 - Do not write future or unverified behavior as already shipped.
-- The main ChatGPT reviewer owns the final documentation-drift check and may repair canonical docs in the same branch before merge.
+- The Integrator owns the final documentation-drift check and may repair canonical docs in the same branch before merge.
+
+Parallel implementation PRs normally do not edit Lead/Integrator documents. A later integration step or the Integrator updates shared canonical context after actual delivery.
 
 ## Branch lifecycle
 
 - Ordinary tasks use exactly one ephemeral remote branch.
-- GitHub automatic head-branch deletion handles it after merge.
+- When the prompt supplies `work/<batch>/<task-slug>`, use it exactly.
+- GitHub automatic head-branch deletion handles the branch after merge.
 - Do not delete the active task branch from inside the implementation task.
 - Do not modify repository rulesets, branch protection, settings or tokens.
 - Do not request broader administrative access merely to finish a normal task.
@@ -202,6 +237,7 @@ Use the shortest report that contains applicable evidence.
 Always identify:
 
 - review class and concise scope;
+- Integration metadata, including Batch, Task, Base SHA, Depends on and Merge phase;
 - work branch, lifecycle and final head SHA;
 - whether additional remote branches were created;
 - validation performed;
@@ -209,4 +245,4 @@ Always identify:
 
 Include runtime states, viewports, devices, artifacts, asset choices, dependency changes or infrastructure changes only when they apply.
 
-Do not claim a visual/runtime task is complete when its changed runtime behavior was not inspected. Open the final PR for strict review and state the limitation honestly.
+Do not claim a visual/runtime task is complete when its changed runtime behavior was not inspected. Open the final PR for strict Integrator review and state the limitation honestly.
