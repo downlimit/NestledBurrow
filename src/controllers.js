@@ -1,3 +1,5 @@
+import { createControllerCommand } from "./controllerCommand.js";
+
 export const PATROL_MODE_LOOP = "loop";
 export const PATROL_MODE_PING_PONG = "ping-pong";
 
@@ -5,11 +7,15 @@ export const WAYPOINT_TOLERANCE = 4;
 export const BLOCKED_WAYPOINT_ADVANCE_MS = 450;
 const IDLE_DIRECTION = Object.freeze({ x: 0, y: 0 });
 
-export function createPlayerController({ getInputDirection }) {
+export function createPlayerController({ getInputDirection, getAimDirection, getActions }) {
   return {
     kind: "player",
-    getDirection() {
-      return getInputDirection();
+    getCommand(context, deltaMs) {
+      return createControllerCommand({
+        moveDirection: getInputDirection(context, deltaMs),
+        aimDirection: getAimDirection?.(context, deltaMs),
+        actions: getActions?.(context, deltaMs),
+      });
     },
   };
 }
@@ -32,12 +38,13 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
     get currentWaypointIndex() {
       return index;
     },
-    getDirection(position, character, deltaMs) {
+    getCommand(context, deltaMs) {
+      const position = context.position;
       const waypoint = waypoints[index];
       const dx = waypoint.x - position.x;
       const dy = waypoint.y - position.y;
       const distance = Math.hypot(dx, dy);
-      const blockedAxes = character?.lastBlockedAxes ?? {};
+      const blockedAxes = context.blockedAxes ?? {};
       const blockedTowardWaypoint =
         (Boolean(blockedAxes.x) && Math.abs(dx) > tolerance) ||
         (Boolean(blockedAxes.y) && Math.abs(dy) > tolerance);
@@ -52,8 +59,12 @@ export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_T
       const nextDx = next.x - position.x;
       const nextDy = next.y - position.y;
       const nextDistance = Math.hypot(nextDx, nextDy);
-      if (nextDistance <= tolerance) return IDLE_DIRECTION;
-      return { x: nextDx / nextDistance, y: nextDy / nextDistance };
+      if (nextDistance <= tolerance) {
+        return createControllerCommand({ moveDirection: IDLE_DIRECTION });
+      }
+      return createControllerCommand({
+        moveDirection: { x: nextDx / nextDistance, y: nextDy / nextDistance },
+      });
     },
     advanceForTest: advanceWaypoint,
   };
