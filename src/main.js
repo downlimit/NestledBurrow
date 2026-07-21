@@ -9,6 +9,16 @@ import {
 } from "./input.js";
 import { isFullscreenActive, isFullscreenSupported, toggleFullscreen } from "./fullscreen.js";
 import {
+  BUILD_LABEL,
+  FULLSCREEN_HIT_AREA,
+  compactBuildLabel,
+  drawBitmapText,
+  drawFullscreenIcon,
+  isPointInRect,
+  measureBitmapText,
+  renderFullscreenIcon,
+} from "./hud.js";
+import {
   applyBlockedAxes,
   createMovementState,
   createRuntimeMovementConfig,
@@ -74,9 +84,8 @@ class WorldScene extends Phaser.Scene {
     this.createPlayer();
     this.createInput();
     this.createMovementDebugPanel();
-    this.createBuildLabel();
+    this.createHud();
     this.attachSceneListeners();
-    this.createFullscreenButton();
     this.createJoystick();
     this.syncIntegerZoom();
   }
@@ -238,48 +247,38 @@ class WorldScene extends Phaser.Scene {
     ].join("\n");
   }
 
-  createBuildLabel() {
-    this.add
-      .text(GAME_WIDTH - 28, 4, `build: ${BUILD_ID}`, {
-        fontFamily: "system-ui, sans-serif",
-        fontSize: "7px",
-        color: "#f2eadc",
-      })
-      .setOrigin(1, 0)
-      .setAlpha(0.7)
-      .setDepth(10000)
-      .setScrollFactor(0);
-  }
-
-  createFullscreenButton() {
+  createHud() {
     this.gameContainer = document.getElementById("game");
+    const label = compactBuildLabel(BUILD_ID);
+    const labelWidth = measureBitmapText(label);
+    drawBitmapText(this, BUILD_LABEL.x - labelWidth, BUILD_LABEL.y, label);
+
     if (!isFullscreenSupported(this.gameContainer)) return;
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "fullscreen-toggle";
-    button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    button.addEventListener("click", () => {
+    this.fullscreenHud = drawFullscreenIcon(
+      this,
+      isFullscreenActive(document, this.gameContainer),
+    );
+    this.fullscreenHud.hit.on("pointerdown", (pointer, _localX, _localY, event) => {
+      event?.stopPropagation?.();
+      pointer.event?.stopPropagation?.();
       void toggleFullscreen({ documentRef: document, element: this.gameContainer }).then(() => {
-        this.updateFullscreenButton();
+        this.updateFullscreenHud();
         this.syncIntegerZoom();
       });
     });
-
-    this.gameContainer.append(button);
-    this.fullscreenButton = button;
-    this.updateFullscreenButton();
   }
 
-  updateFullscreenButton() {
-    if (!this.fullscreenButton) return;
-    const active = isFullscreenActive(document, this.gameContainer);
-    this.fullscreenButton.setAttribute(
-      "aria-label",
-      active ? "Выйти из полноэкранного режима" : "Открыть полноэкранный режим",
+  updateFullscreenHud() {
+    if (!this.fullscreenHud) return;
+    renderFullscreenIcon(
+      this.fullscreenHud.graphics,
+      isFullscreenActive(document, this.gameContainer),
     );
-    this.fullscreenButton.title = active ? "Выйти из полноэкранного режима" : "Полноэкранный режим";
-    this.fullscreenButton.dataset.fullscreen = active ? "exit" : "enter";
+  }
+
+  isHudPointer(pointer) {
+    return isPointInRect(pointer.x, pointer.y, FULLSCREEN_HIT_AREA);
   }
 
   attachSceneListeners() {
@@ -287,13 +286,15 @@ class WorldScene extends Phaser.Scene {
     this.onVisibilityChange = () => {
       if (document.hidden) this.resetJoystick();
     };
+    this.onNativePointerMove = (event) => this.handleNativePointerMove(event);
+    this.onNativePointerUp = (event) => this.handleNativePointerUp(event);
     this.onNativePointerCancel = (event) => this.handleNativePointerEnd(event);
     this.onNativeLostPointerCapture = (event) => this.handleNativePointerEnd(event);
     this.onNativeTouchCancel = (event) => this.handleNativeTouchCancel(event);
     this.onFullscreenChange = () => {
       this.resetJoystick();
       this.syncIntegerZoom();
-      this.updateFullscreenButton();
+      this.updateFullscreenHud();
     };
 
     window.addEventListener("blur", this.onWindowBlur);
@@ -314,6 +315,7 @@ class WorldScene extends Phaser.Scene {
     this.activeJoystickPointerId = null;
     this.activeDomPointerId = null;
     this.activeTouchIdentifier = null;
+    this.joystickPointerCaptured = false;
     this.joystickVector = { x: 0, y: 0 };
 
     const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
@@ -338,22 +340,30 @@ class WorldScene extends Phaser.Scene {
     this.input.on("pointermove", this.handleJoystickPointerMove, this);
     this.input.on("pointerup", this.handleJoystickPointerUp, this);
     this.input.on("pointerupoutside", this.handleJoystickPointerUp, this);
-    this.input.on("gameout", this.resetJoystick, this);
+    this.input.on("gameout", this.handleJoystickBoundaryLeave, this);
+    this.input.on("pointerout", this.handleJoystickBoundaryLeave, this);
 
     const canvas = this.game.canvas;
+    canvas.addEventListener("pointermove", this.onNativePointerMove);
+    canvas.addEventListener("pointerup", this.onNativePointerUp);
     canvas.addEventListener("pointercancel", this.onNativePointerCancel);
     canvas.addEventListener("lostpointercapture", this.onNativeLostPointerCapture);
     canvas.addEventListener("touchcancel", this.onNativeTouchCancel, { passive: true });
   }
 
   handleJoystickPointerDown(pointer) {
-    if (this.activeJoystickPointerId !== null || !isInsideJoystickActivation(pointer.x, pointer.y)) {
+    if (
+      this.activeJoystickPointerId !== null ||
+      this.isHudPointer(pointer) ||
+      !isInsideJoystickActivation(pointer.x, pointer.y)
+    ) {
       return;
     }
     this.activeJoystickPointerId = pointer.id;
     this.activeDomPointerId =
       typeof pointer.event?.pointerId === "number" ? pointer.event.pointerId : null;
     this.activeTouchIdentifier = pointer.wasTouch ? pointer.identifier : null;
+    this.captureJoystickPointer(pointer);
     this.joystickCenter = clampJoystickCenter(pointer.x, pointer.y);
     this.joystickBase?.setPosition(this.joystickCenter.x, this.joystickCenter.y).setVisible(true);
     this.joystickKnob?.setPosition(this.joystickCenter.x, this.joystickCenter.y).setVisible(true);
@@ -361,6 +371,53 @@ class WorldScene extends Phaser.Scene {
 
   handleJoystickPointerMove(pointer) {
     if (pointer.id === this.activeJoystickPointerId) this.updateJoystick(pointer);
+  }
+
+  handleJoystickBoundaryLeave() {
+    if (!this.hasActivePointerCapture()) this.resetJoystick();
+  }
+
+  captureJoystickPointer(pointer) {
+    const canvas = this.game.canvas;
+    if (this.activeDomPointerId === null || !canvas.setPointerCapture) return;
+    try {
+      canvas.setPointerCapture(this.activeDomPointerId);
+      this.joystickPointerCaptured = true;
+    } catch {
+      this.joystickPointerCaptured = false;
+    }
+  }
+
+  hasActivePointerCapture() {
+    const canvas = this.game.canvas;
+    return (
+      this.activeDomPointerId !== null &&
+      this.joystickPointerCaptured &&
+      (!canvas.hasPointerCapture || canvas.hasPointerCapture(this.activeDomPointerId))
+    );
+  }
+
+  canvasPointFromNativeEvent(event) {
+    const rect = this.game.canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * (GAME_WIDTH / rect.width),
+      y: (event.clientY - rect.top) * (GAME_HEIGHT / rect.height),
+    };
+  }
+
+  handleNativePointerMove(event) {
+    if (
+      this.activeJoystickPointerId === null ||
+      this.activeDomPointerId === null ||
+      event.pointerId !== this.activeDomPointerId
+    ) {
+      return;
+    }
+    this.updateJoystick(this.canvasPointFromNativeEvent(event));
+  }
+
+  handleNativePointerUp(event) {
+    this.handleNativePointerEnd(event);
   }
 
   handleJoystickPointerUp(pointer) {
@@ -393,9 +450,18 @@ class WorldScene extends Phaser.Scene {
   }
 
   resetJoystick() {
+    const capturedPointerId = this.activeDomPointerId;
+    if (capturedPointerId !== null && this.joystickPointerCaptured) {
+      try {
+        this.game.canvas.releasePointerCapture?.(capturedPointerId);
+      } catch {
+        // The browser may already have released capture after pointerup/cancel/lostcapture.
+      }
+    }
     this.activeJoystickPointerId = null;
     this.activeDomPointerId = null;
     this.activeTouchIdentifier = null;
+    this.joystickPointerCaptured = false;
     this.joystickVector = { x: 0, y: 0 };
     this.joystickCenter = null;
     this.joystickBase?.setVisible(false);
@@ -413,8 +479,11 @@ class WorldScene extends Phaser.Scene {
     this.input.off("pointermove", this.handleJoystickPointerMove, this);
     this.input.off("pointerup", this.handleJoystickPointerUp, this);
     this.input.off("pointerupoutside", this.handleJoystickPointerUp, this);
-    this.input.off("gameout", this.resetJoystick, this);
+    this.input.off("gameout", this.handleJoystickBoundaryLeave, this);
+    this.input.off("pointerout", this.handleJoystickBoundaryLeave, this);
     const canvas = this.game.canvas;
+    canvas.removeEventListener("pointermove", this.onNativePointerMove);
+    canvas.removeEventListener("pointerup", this.onNativePointerUp);
     canvas.removeEventListener("pointercancel", this.onNativePointerCancel);
     canvas.removeEventListener("lostpointercapture", this.onNativeLostPointerCapture);
     canvas.removeEventListener("touchcancel", this.onNativeTouchCancel);
@@ -422,8 +491,9 @@ class WorldScene extends Phaser.Scene {
     this.movementDebugPanel?.remove();
     this.movementDebugPanel = null;
     this.movementDebugStatus = null;
-    this.fullscreenButton?.remove();
-    this.fullscreenButton = null;
+    this.fullscreenHud?.hit.destroy();
+    this.fullscreenHud?.graphics.destroy();
+    this.fullscreenHud = null;
   }
 
   update(_time, delta) {

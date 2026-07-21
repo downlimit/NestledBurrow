@@ -2,7 +2,7 @@
 
 This document is the canonical operating procedure for the main ChatGPT chat when it reviews Codex pull requests, repairs them, merges them and verifies publication.
 
-The goal is to keep review strict without wasting time on repeated full CI cycles, duplicate GitHub reads, branch clutter or visual ambiguity that should have been resolved before implementation.
+The goal is to keep review strict without wasting time on repeated full CI cycles, duplicate GitHub reads, branch clutter, preparatory task PRs or visual ambiguity that should have been resolved before implementation.
 
 ## 1. Review classes
 
@@ -52,11 +52,14 @@ Review effort, evidence and reporting must be proportional to the real risk of t
 - Use the lightest review class that fully covers the ways the change can fail.
 - Do not demand runtime screenshots, device matrices, preview artifacts or local dependency installation for a documentation-only change.
 - Do not turn a small non-visual code change into a visual review unless it can plausibly alter presentation or interaction.
+- Routine product iterations should move directly from the user's vision to one Codex implementation branch and one final PR. Do not require a task-file PR, issue or planning PR as a gate before implementation.
+- A dedicated task file is justified only for large, high-risk, multi-stage, resumable or repeatedly reused work where a durable contract materially reduces risk.
+- When implementation makes existing canonical documentation stale, prefer updating it inside the same implementation PR instead of creating a preparatory documentation PR.
 - Do not create an issue, design document, checklist, report table, test harness, workflow or artifact merely to demonstrate process compliance.
 - New process infrastructure is justified only when it materially reduces a recurring risk or will be reused.
 - Prefer one canonical document over overlapping documents that repeat the same facts.
 - In PR reports, omit non-applicable sections instead of producing long `N/A` lists.
-- Do not repeat the same evidence across the task file, PR body, review comment and final user response.
+- Do not repeat the same evidence across the prompt/task file, PR body, review comment and final user response.
 - Safety gates remain strict for high-risk changes; proportionality means removing irrelevant work, not skipping relevant validation.
 
 ## 2. Efficient discovery
@@ -64,7 +67,7 @@ Review effort, evidence and reporting must be proportional to the real risk of t
 Start with one compact discovery pass:
 
 1. Find the newest open PR.
-2. Record PR number, title, base SHA, head SHA, task branch, lifecycle, draft state and changed-file count.
+2. Record PR number, title, base SHA, head SHA, work branch, lifecycle, draft state and changed-file count.
 3. Confirm that the PR targets `main` and that no unexpected extra remote branch was created for the task.
 4. Fetch the changed filename list or one complete diff.
 5. Fetch CI state for the current head SHA.
@@ -121,7 +124,7 @@ The preferred repository architecture is:
 - both jobs running in parallel;
 - path-aware skipping of the visual job for documentation-only or clearly non-visual PRs.
 
-Path filtering must remain conservative. Changes to `src/main.js`, `src/input.js`, `src/fullscreen.js`, `src/world*`, `src/roomLayout.js`, `src/visualConfig.js`, `src/style.css`, `public/assets/**`, visual scripts or rendering dependencies require visual/runtime validation.
+Path filtering must remain conservative. Changes to `src/main.js`, `src/input.js`, `src/fullscreen.js`, `src/hud.js`, `src/world*`, `src/roomLayout.js`, `src/visualConfig.js`, `src/style.css`, `public/assets/**`, visual scripts or rendering dependencies require visual/runtime validation.
 
 ## 5. Visual and interactive review protocol
 
@@ -168,6 +171,7 @@ Runtime code must continue to use semantic names. Raw source IDs belong in the a
 
 Prefer one coherent implementation concern per PR.
 
+- The main chat normally gives Codex one self-contained direct prompt. A separate task-file PR is not part of the standard path.
 - Ordinary task work must stay on one ephemeral remote branch.
 - The PR must be opened once, after implementation and applicable local validation are complete.
 - Do not use drafts, close/reopen cycles or multiple replacement PRs as a normal development workflow.
@@ -175,6 +179,7 @@ Prefer one coherent implementation concern per PR.
 - Do not push ordinary task repairs directly to protected `main`.
 - Large changes should be split only when each part leaves `main` usable and testable.
 - Do not split a task into intermediate PRs that knowingly leave the playable build broken.
+- Do not create a preparatory documentation PR merely to hand Codex its own specification. Use a direct prompt, or commit a justified durable task file as part of a genuinely documentation-centered or broader implementation change.
 - A PR that simultaneously changes assets, camera, collision, input, dependencies, CI and documentation is high-risk and must be reviewed through the visual/runtime path.
 
 Persistent `release/*`, `archive/*` or `keep/*` branches require an explicit reason and repository-side deletion protection. The reviewer must not assume that a name alone provides protection.
@@ -186,7 +191,7 @@ The PR description must use `.github/pull_request_template.md`, but keep only se
 Every report must state:
 
 - review class and concise scope;
-- task branch, lifecycle and final head SHA;
+- work branch, lifecycle and final head SHA;
 - whether the PR was opened once and whether additional remote branches were created;
 - validation performed and any real limitation.
 
@@ -216,8 +221,10 @@ After merge:
 
 ## 10. Communication timing
 
-Do not leave the user waiting without context during an unusually long review.
+The user supplies vision and evaluates the game. The main chat owns architecture, Git, review and delivery and should not force the user to operate the pipeline manually.
 
+- Ask the user only about real product, visual or priority ambiguity that materially changes the result.
+- Do not ask the user to choose branch strategy, test architecture or internal implementation details unless that choice changes product behavior or risk in a way only the user can decide.
 - For a quick clean PR, review silently and return the result.
 - When repair and a repeated CI cycle are required, send one concise status message stating that defects were found and final CI is running.
 - Do not narrate every API call or intermediate commit.
