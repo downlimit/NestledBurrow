@@ -79,3 +79,36 @@ canvas {
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
+
+#game {
+  position: relative;
+}
+
+.fullscreen-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  color: #f2eadc;
+  background: rgb(23 23 36 / 72%);
+  border: 1px solid rgb(242 234 220 / 55%);
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+
+.fullscreen-toggle::before {
+  width: 14px;
+  height: 14px;
+  content: "";
+  border: 2px solid currentColor;
+  clip-path: polygon(0 0, 45% 0, 45% 18%, 18% 18%, 18% 45%, 0 45%, 0 0, 55% 0, 100% 0, 100% 45%, 82% 45%, 82% 18%, 55% 18%, 55% 0, 100% 55%, 100% 100%, 55% 100%, 55% 82%, 82% 82%, 82% 55%, 100% 55%, 45% 100%, 0 100%, 0 55%, 18% 55%, 18% 82%, 45% 82%, 45% 100%);
+}
+
+.fullscreen-toggle[data-fullscreen="exit"]::before {
+  transform: rotate(180deg) scale(0.82);
+}

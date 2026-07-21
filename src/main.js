@@ -2,10 +2,12 @@ import Phaser from "phaser";
 import "./style.css";
 import {
   JOYSTICK,
+  clampJoystickCenter,
   getJoystickState,
   isInsideJoystickActivation,
   isTouchJoystickSupported,
 } from "./input.js";
+import { isFullscreenActive, isFullscreenSupported, toggleFullscreen } from "./fullscreen.js";
 import {
   applyBlockedAxes,
   createMovementState,
@@ -74,6 +76,7 @@ class WorldScene extends Phaser.Scene {
     this.createMovementDebugPanel();
     this.createBuildLabel();
     this.attachSceneListeners();
+    this.createFullscreenButton();
     this.createJoystick();
     this.syncIntegerZoom();
   }
@@ -237,7 +240,7 @@ class WorldScene extends Phaser.Scene {
 
   createBuildLabel() {
     this.add
-      .text(GAME_WIDTH - 4, 4, `build: ${BUILD_ID}`, {
+      .text(GAME_WIDTH - 28, 4, `build: ${BUILD_ID}`, {
         fontFamily: "system-ui, sans-serif",
         fontSize: "7px",
         color: "#f2eadc",
@@ -248,6 +251,37 @@ class WorldScene extends Phaser.Scene {
       .setScrollFactor(0);
   }
 
+  createFullscreenButton() {
+    this.gameContainer = document.getElementById("game");
+    if (!isFullscreenSupported(this.gameContainer)) return;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "fullscreen-toggle";
+    button.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button.addEventListener("click", () => {
+      void toggleFullscreen({ documentRef: document, element: this.gameContainer }).then(() => {
+        this.updateFullscreenButton();
+        this.syncIntegerZoom();
+      });
+    });
+
+    this.gameContainer.append(button);
+    this.fullscreenButton = button;
+    this.updateFullscreenButton();
+  }
+
+  updateFullscreenButton() {
+    if (!this.fullscreenButton) return;
+    const active = isFullscreenActive(document, this.gameContainer);
+    this.fullscreenButton.setAttribute(
+      "aria-label",
+      active ? "Выйти из полноэкранного режима" : "Открыть полноэкранный режим",
+    );
+    this.fullscreenButton.title = active ? "Выйти из полноэкранного режима" : "Полноэкранный режим";
+    this.fullscreenButton.dataset.fullscreen = active ? "exit" : "enter";
+  }
+
   attachSceneListeners() {
     this.onWindowBlur = () => this.resetJoystick();
     this.onVisibilityChange = () => {
@@ -256,9 +290,15 @@ class WorldScene extends Phaser.Scene {
     this.onNativePointerCancel = (event) => this.handleNativePointerEnd(event);
     this.onNativeLostPointerCapture = (event) => this.handleNativePointerEnd(event);
     this.onNativeTouchCancel = (event) => this.handleNativeTouchCancel(event);
+    this.onFullscreenChange = () => {
+      this.resetJoystick();
+      this.syncIntegerZoom();
+      this.updateFullscreenButton();
+    };
 
     window.addEventListener("blur", this.onWindowBlur);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.sceneListenersAttached = true;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroySceneListeners, this);
@@ -282,15 +322,17 @@ class WorldScene extends Phaser.Scene {
     }
 
     this.joystickBase = this.add
-      .circle(JOYSTICK.centerX, JOYSTICK.centerY, JOYSTICK.baseRadius, 0xd9c18f, 0.22)
+      .circle(0, 0, JOYSTICK.baseRadius, 0xd9c18f, 0.22)
       .setStrokeStyle(1, 0xf2eadc, 0.32)
       .setDepth(9000)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setVisible(false);
     this.joystickKnob = this.add
-      .circle(JOYSTICK.centerX, JOYSTICK.centerY, JOYSTICK.knobRadius, 0xf2eadc, 0.55)
+      .circle(0, 0, JOYSTICK.knobRadius, 0xf2eadc, 0.55)
       .setStrokeStyle(1, 0xffffff, 0.65)
       .setDepth(9001)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setVisible(false);
 
     this.input.on("pointerdown", this.handleJoystickPointerDown, this);
     this.input.on("pointermove", this.handleJoystickPointerMove, this);
@@ -312,7 +354,9 @@ class WorldScene extends Phaser.Scene {
     this.activeDomPointerId =
       typeof pointer.event?.pointerId === "number" ? pointer.event.pointerId : null;
     this.activeTouchIdentifier = pointer.wasTouch ? pointer.identifier : null;
-    this.updateJoystick(pointer);
+    this.joystickCenter = clampJoystickCenter(pointer.x, pointer.y);
+    this.joystickBase?.setPosition(this.joystickCenter.x, this.joystickCenter.y).setVisible(true);
+    this.joystickKnob?.setPosition(this.joystickCenter.x, this.joystickCenter.y).setVisible(true);
   }
 
   handleJoystickPointerMove(pointer) {
@@ -342,7 +386,8 @@ class WorldScene extends Phaser.Scene {
   }
 
   updateJoystick(pointer) {
-    const state = getJoystickState(pointer.x, pointer.y);
+    if (!this.joystickCenter) return;
+    const state = getJoystickState(pointer.x, pointer.y, this.joystickCenter);
     this.joystickVector = { x: state.movementX, y: state.movementY };
     this.joystickKnob?.setPosition(state.knobX, state.knobY);
   }
@@ -352,7 +397,9 @@ class WorldScene extends Phaser.Scene {
     this.activeDomPointerId = null;
     this.activeTouchIdentifier = null;
     this.joystickVector = { x: 0, y: 0 };
-    this.joystickKnob?.setPosition(JOYSTICK.centerX, JOYSTICK.centerY);
+    this.joystickCenter = null;
+    this.joystickBase?.setVisible(false);
+    this.joystickKnob?.setVisible(false);
   }
 
   destroySceneListeners() {
@@ -360,6 +407,7 @@ class WorldScene extends Phaser.Scene {
     this.sceneListenersAttached = false;
     window.removeEventListener("blur", this.onWindowBlur);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.input.off("pointerdown", this.handleJoystickPointerDown, this);
     this.input.off("pointermove", this.handleJoystickPointerMove, this);
@@ -374,6 +422,8 @@ class WorldScene extends Phaser.Scene {
     this.movementDebugPanel?.remove();
     this.movementDebugPanel = null;
     this.movementDebugStatus = null;
+    this.fullscreenButton?.remove();
+    this.fullscreenButton = null;
   }
 
   update(_time, delta) {
