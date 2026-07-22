@@ -1,0 +1,56 @@
+name: Apply Integrator Efficiency Rule
+
+on:
+  push:
+    branches:
+      - process/integrator-review-efficiency
+
+permissions:
+  contents: write
+
+jobs:
+  update-review-contract:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: process/integrator-review-efficiency
+
+      - name: Update REVIEW.md
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("REVIEW.md")
+          text = path.read_text(encoding="utf-8")
+          marker = "- Локальная ошибка proxy/package/browser installation не разрешает менять canonical dependencies или ослаблять проверки.\n\n### Pure code"
+          replacement = """- Локальная ошибка proxy/package/browser installation не разрешает менять canonical dependencies или ослаблять проверки.
+
+### Достаточность и темп
+
+- Сначала определить один реальный недоказанный риск. Отсутствие прямого теста каждого внутреннего перехода само по себе не требует нового E2E.
+- Для одного риска достаточно одного сильного применимого доказательства: существующего targeted test, существующего runtime artifact/smoke или одного нового теста. Не собирать одновременно artifact, новый E2E и ручную проверку без отдельной причины.
+- Новый mandatory check добавляется только когда непокрытый риск material, повторяемый или regression-prone и существующий suite действительно не способен его поймать.
+- После mutation по умолчанию нужен один final-head CI run. Статус одного run проверяется по смысловым фазам: запуск, завершение `Validate`, завершение зависимых jobs. Не делать серию одинаковых polling-вызовов внутри одной фазы без нового состояния от GitHub.
+- Пока CI выполняется, Интегратор либо завершает оставшийся targeted review, либо не создаёт искусственную активность. Частый polling не повышает качество доказательства.
+- Зелёный final-head CI, чистый targeted review и достаточное применимое evidence закрывают merge gate. Нулевая неопределённость не требуется; небольшой residual risk допустим, если он честно обозначен и не затрагивает critical contract.
+- Не расширять repair документацией, тестами или инфраструктурой, которые не нужны для конкретного blocker. Исправление должно быть минимальным и консолидированным.
+
+### Pure code"""
+          if marker not in text:
+              raise SystemExit("REVIEW.md insertion marker not found")
+          text = text.replace(marker, replacement, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit documentation update
+        run: |
+          rm .github/workflows/apply-integrator-efficiency.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add REVIEW.md .github/workflows/apply-integrator-efficiency.yml
+          git commit -m "Keep Integrator review proportionate"
+          git push origin HEAD:process/integrator-review-efficiency
