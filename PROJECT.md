@@ -77,8 +77,11 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - Единый непрерывный top-down мир на CC0-тайлах Basic Village.
 - Игрок и два патрулирующих NPC используют общий `Character`-агрегат из независимого от Phaser `CharacterMotor` и Phaser-представления `CharacterVisual`.
 - `CharacterSystem` хранит персонажей по стабильным ID, централизованно обновляет их и выдаёт runtime-free snapshots.
-- Неизменяемые actor profiles `player` и `villager` являются каноническими источниками movement и visual параметров; runtime-конфигурации создаются отдельными mutable-копиями.
+- Неизменяемые actor profiles `player` и `villager` являются каноническими источниками movement-параметров; runtime-конфигурации создаются отдельными mutable-копиями.
+- Отдельный immutable registry visual profiles независимо назначает внешний вид: player использует исходные отдельные Kenney PNG, home NPC — зелёно-бирюзовый spritesheet, street NPC — сине-бордовый spritesheet. Все три имеют отдельные animation prefixes и общий нормализованный frame-reference contract.
+- Walk cycle использует `step A → neutral → step B → neutral`; после остановки любой персонаж явно возвращается в neutral frame текущего направления.
 - Player и patrol controllers возвращают нормализованный `ControllerCommand` с movement, aim и actions.
+- NPC двигаются примерно втрое медленнее игрока, используют естественные multi-point loop-маршруты, pass-through точки и остановки по 2–3 секунды.
 - Collision resolver получает bounds, cell size и blocking query через явный environment contract.
 - `GameSessionState` хранит JSON-сериализуемые player/NPC entities, durable flags и transient dialogue state без Phaser/runtime references.
 - Версионированный save envelope сохраняет только устойчивый прогресс, безопасно восстанавливается после повреждённого/неподдерживаемого save и не смешивает язык с игровым состоянием.
@@ -89,12 +92,17 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - `InteractionHud` рисует Unicode prompt/dialogue panel и отделяет touch interaction от мобильного джойстика.
 - Клавиатура и динамический мобильный джойстик объединяются в единый нормализованный movement vector; desktop/mobile Chromium E2E покрывает язык, quest flow, reload persistence и reset.
 - `MobileJoystick` и `MovementDebugPanel` сохраняют самостоятельное lifecycle ownership; `WorldScene` остаётся composition root.
-- Камера следует за игроком с целочисленным pixel-grid рендером; GitHub Pages публикует только проверенный `main`.
-- GitHub Pages публикует только проверенный `main`; `pages/live` подтверждает фактически доступный SHA.
+- Камера следует за игроком с целочисленным pixel-grid рендером; GitHub Pages публикует только проверенный `main`, а `pages/live` подтверждает фактически доступный SHA.
 
 ## Текущая цель
 
 Максимально ускорять получение играбельного результата и продуктового знания, сохраняя зрелые архитектурные границы там, где они уже доказали пользу.
+
+Ближайший продуктовый вектор после локализованного persistent mini-quest и визуального разделения персонажей:
+
+1. взаимодействие с объектом, отличным от NPC;
+2. zones/triggers и переход между двумя пространствами;
+3. разделение world definition/runtime/renderer только по фактической потребности этого перехода.
 
 Приоритет отдаётся коротким законченным vertical slices, а не рефакторингу ради будущей универсальности и не процессной церемонии ради самой церемонии.
 
