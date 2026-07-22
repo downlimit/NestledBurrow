@@ -218,6 +218,16 @@ Blockers:
 
 Исправлять существующую PR-ветку. По умолчанию один пакет исправлений и один финальный CI run после mutation.
 
+### Repair lifecycle без CI-спама
+
+- Если открытый non-draft PR требует хотя бы одной записи в head-ветку, до первой mutation перевести его в draft.
+- Пока собираются и применяются repairs, PR остаётся draft. Все кодовые, тестовые, документационные и metadata-исправления выполняются до единственного перехода `ready_for_review`.
+- `ready_for_review` используется один раз для intended final head и запускает единственную каноническую final-head проверку.
+- После перехода в ready не писать в ветку без нового реального blocker. Если mutation всё же нужна, сначала снова перевести PR в draft.
+- Событие `synchronize` остаётся safety net против непроверенной смены non-draft head, но не является нормальным способом запускать серию repair CI.
+- Не создавать временные, саморедактирующие или branch-specific workflow-файлы для изменения PR-ветки, обхода connector limitations или запуска документационного repair. Workflow/config — strict-risk production surface.
+- Не чередовать `ready → push → failure → repair` несколькими мелкими коммитами. Несколько уведомлений о failed/cancelled runs одной Integrator-repair ветки считаются process defect.
+
 ## 9. CI и evidence
 
 - Оценивать CI только intended final head PR.
