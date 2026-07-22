@@ -115,9 +115,10 @@ export const CHARACTER_VISUAL_PROFILES = deepFreeze({
 });
 
 export function getCharacterVisualProfile(profileId) {
-  const profile = CHARACTER_VISUAL_PROFILES[profileId];
-  if (!profile) throw new Error(`Unknown character visual profile ID: ${String(profileId)}`);
-  return profile;
+  if (!Object.hasOwn(CHARACTER_VISUAL_PROFILES, profileId)) {
+    throw new Error(`Unknown character visual profile ID: ${String(profileId)}`);
+  }
+  return CHARACTER_VISUAL_PROFILES[profileId];
 }
 
 export function toPhaserFrame(frameReference) {
