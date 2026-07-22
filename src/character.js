@@ -1,4 +1,5 @@
 import { getActorProfile } from "./actorProfiles.js";
+import { CHARACTER_VISUAL_PROFILE_IDS, getCharacterVisualProfile } from "./characterVisualProfiles.js";
 import { createCharacterMotor } from "./characterMotor.js";
 import { createCharacterVisual } from "./characterVisual.js";
 
@@ -15,12 +16,13 @@ export class Character {
       controller,
       movementConfig,
       actorProfile = getActorProfile("player"),
-      animationPrefix = actorProfile.visual.animationPrefix,
-      frames = actorProfile.visual.frames,
-      idleFrameIndex = actorProfile.visual.idleFrameIndex,
-      footWidth = actorProfile.visual.footWidth,
-      footDepth = actorProfile.visual.footDepth,
-      facingHysteresis = actorProfile.visual.facingHysteresis,
+      visualProfile = actorProfile.visual ?? getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.player),
+      animationPrefix = visualProfile.animationPrefix,
+      frames = visualProfile.frames,
+      idleFrameIndex = visualProfile.idleFrameIndex,
+      footWidth = visualProfile.footWidth,
+      footDepth = visualProfile.footDepth,
+      facingHysteresis = visualProfile.facingHysteresis,
     },
   ) {
     this.motor = createCharacterMotor({
@@ -34,7 +36,7 @@ export class Character {
     });
     this.visual = createCharacterVisual(scene, {
       spawn,
-      actorProfile,
+      visualProfile,
       animationPrefix,
       frames,
       idleFrameIndex,

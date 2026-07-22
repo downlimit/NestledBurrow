@@ -76,7 +76,11 @@ Phaser composition root непрерывного мира: создаёт layout
 
 ### `src/actorProfiles.js`
 
-Канонический registry неизменяемых actor profiles. Сейчас содержит стабильные ID `player` и `villager`, явные production movement/visual значения, строгий lookup и debug-only policy для синхронизации villager tuning с player debug config без зависимости production данных от mutable runtime state.
+Канонический registry неизменяемых actor profiles. Сейчас содержит стабильные ID `player` и `villager`, явные production movement значения, строгий lookup и debug-only policy для синхронизации villager tuning с player debug config без зависимости production данных от mutable runtime state.
+
+### `src/characterVisualProfiles.js`
+
+Канонический registry неизменяемых visual profiles персонажей. Разделяет player image frames и NPC spritesheet descriptors, stable visual IDs, animation prefixes, frame-reference mapping, collision footprint presentation values и helpers для Phaser texture/frame boundary.
 
 ### `src/character.js`
 
@@ -88,7 +92,7 @@ Runtime-free motor персонажа: stable ID/profile ID, controller, plain p
 
 ### `src/characterVisual.js`
 
-Phaser-представление персонажа: sprite, actor-profile visual defaults, cardinal facing hysteresis, walk/idle animation selection, depth sorting, position sync из motor snapshot и idempotent destroy.
+Phaser-представление персонажа: sprite, resolved visual profile, cardinal facing hysteresis, walk/idle animation selection через normalized frame references, depth sorting, position sync из motor snapshot и idempotent destroy.
 
 ### `src/characterSystem.js`
 
@@ -250,7 +254,7 @@ Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked
 
 ### `scripts/check-visual.mjs`
 
-Проверяет удаление legacy room sources/atlases, pixel grid, Basic Village hashes, spritesheet loading, integer zoom, camera и активные character frames.
+Проверяет удаление legacy room sources/atlases, pixel grid, Basic Village hashes, NPC visual manifest contract, visual profile registry, spritesheet loading, integer zoom, camera и активные character frames.
 
 ### `scripts/check-world.mjs`
 

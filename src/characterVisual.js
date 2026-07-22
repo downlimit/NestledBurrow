@@ -1,27 +1,31 @@
 import { isMoving } from "./characterMovement.js";
-import { getActorProfile } from "./actorProfiles.js";
+import { applyFrameReference } from "./characterVisualProfiles.js";
 
 export class CharacterVisual {
   constructor(
     scene,
     {
       spawn,
-      actorProfile = getActorProfile("player"),
-      animationPrefix = actorProfile.visual.animationPrefix,
-      frames = actorProfile.visual.frames,
-      idleFrameIndex = actorProfile.visual.idleFrameIndex,
-      facingHysteresis = actorProfile.visual.facingHysteresis,
+      visualProfile,
+      animationPrefix = visualProfile.animationPrefix,
+      frames = visualProfile.frames,
+      idleFrameIndex = visualProfile.idleFrameIndex,
+      facingHysteresis = visualProfile.facingHysteresis,
     },
   ) {
-    this.actorProfile = actorProfile;
-    this.visualProfile = actorProfile.visual;
+    this.visualProfile = visualProfile;
     this.animationPrefix = animationPrefix;
     this.frames = frames;
     this.idleFrameIndex = idleFrameIndex;
     this.facingHysteresis = facingHysteresis;
     this.lastFacing = "down";
     this.sprite = scene.add
-      .sprite(spawn.x, spawn.y, this.frames.down[this.idleFrameIndex])
+      .sprite(
+        spawn.x,
+        spawn.y,
+        this.frames.down[this.idleFrameIndex].textureKey,
+        this.frames.down[this.idleFrameIndex].frame,
+      )
       .setOrigin(0.5, 1);
     this.updateDepth();
   }
@@ -55,7 +59,7 @@ export class CharacterVisual {
     if (!isMoving(movementState, movementConfig)) {
       this.sprite.anims.stop();
       const idleFrame = this.frames[this.lastFacing][this.idleFrameIndex];
-      this.sprite.setTexture(idleFrame);
+      applyFrameReference(this.sprite, idleFrame);
       return;
     }
 
