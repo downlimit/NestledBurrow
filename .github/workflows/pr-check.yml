@@ -29,13 +29,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download and identify source bytes
+      - name: Download source bytes
         shell: bash
         run: |
           set -euo pipefail
-          source_url="https://cdn1.suno.ai/61639bec-b15a-4926-bb3e-6834e72db917.mp3"
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://cdn1.suno.ai/61639bec-b15a-4926-bb3e-6834e72db917.mp3" \
+            --output "$RUNNER_TEMP/sunlit-save-point.mp3"
+
+      - name: Upload source diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunlit-save-point-cdn-source
+          path: ${{ runner.temp }}/sunlit-save-point.mp3
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Validate exact attachment bytes
+        shell: bash
+        run: |
+          set -euo pipefail
           temp_file="$RUNNER_TEMP/sunlit-save-point.mp3"
-          curl --fail --location --retry 3 --retry-all-errors "$source_url" --output "$temp_file"
           actual_size="$(stat -c '%s' "$temp_file")"
           actual_sha="$(sha256sum "$temp_file" | cut -d' ' -f1)"
           echo "Downloaded size: $actual_size"
