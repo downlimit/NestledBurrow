@@ -11,6 +11,11 @@
 - [ ] `visual/runtime`
 - [ ] `strict-risk`
 
+## Git lifecycle
+
+- Work branch: `<branch>`
+- Final head SHA: `<sha>`
+
 ## Validation
 
 <!-- List only checks and inspections relevant to the actual change. Use PASS, FAIL or NOT RUN with a brief reason. PR CI supplies the canonical full repository suite. -->
