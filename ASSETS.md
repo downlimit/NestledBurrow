@@ -29,7 +29,7 @@ This project uses only the listed third-party assets in the playable prototype. 
 - **Author:** Kenney
 - **Official source page:** https://kenney.nl/assets/rpg-urban-pack
 - **License:** CC0 1.0 Universal
-- **Used parts:** one small ordinary human character with walk and idle frames for down, up, left, and right movement.
+- **Original player selection:** one small ordinary human character with walk and idle frames for down, up, left and right movement.
 - **Source files selected from archive:**
   - `Tiles/tile_0266.png`
   - `Tiles/tile_0267.png`
@@ -43,7 +43,7 @@ This project uses only the listed third-party assets in the playable prototype. 
   - `Tiles/tile_0321.png`
   - `Tiles/tile_0322.png`
   - `Tiles/tile_0323.png`
-- **Final project paths:**
+- **Original player runtime paths:**
   - `public/assets/third-party/kenney/player/tile_0266.png`
   - `public/assets/third-party/kenney/player/tile_0267.png`
   - `public/assets/third-party/kenney/player/tile_0268.png`
@@ -56,6 +56,24 @@ This project uses only the listed third-party assets in the playable prototype. 
   - `public/assets/third-party/kenney/player/tile_0321.png`
   - `public/assets/third-party/kenney/player/tile_0322.png`
   - `public/assets/third-party/kenney/player/tile_0323.png`
+
+### NPC palette-variant skins
+
+The home and street NPC sheets are project-authored palette variants derived from the committed Kenney player frames above. Pixel geometry, transparency and animation poses are unchanged; only the palette is changed. CC0 permits these adaptations.
+
+- **Home NPC sheet:** `public/assets/third-party/kenney/home-npc/character.png`
+  - 48×64 PNG; 3 columns × 4 rows of 16×16 frames.
+  - SHA-256: `8d33da9b389e77b0c27417d9d1ab326c0e7e67e6a0605896b1d6810e01e29ee1`.
+  - Visual palette: green headwear and teal clothing.
+- **Street NPC sheet:** `public/assets/third-party/kenney/street-npc/character.png`
+  - 48×64 PNG; 3 columns × 4 rows of 16×16 frames.
+  - SHA-256: `a07760963a248bbe78b6d858448f620e6f13999e59b55170de277f5d94576b02`.
+  - Visual palette: blue headwear and burgundy clothing.
+- **Canonical frame manifest:** `public/assets/third-party/kenney/npc-visual-profiles.manifest.json`.
+- **Sheet columns:** `neutral`, `step-a`, `step-b`.
+- **Sheet rows:** `down`, `left`, `right`, `up`.
+- **Walk cadence:** `step-a → neutral → step-b → neutral`.
+- **Binary delivery:** the two runtime PNG files are committed before the code-only NPC reskin task; Codex must consume these paths and must not create or replace binary assets in that task.
 
 ## Legacy Kenney environment integration
 

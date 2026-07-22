@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "license": "CC0-1.0",
+  "source": "Kenney RPG Urban Pack player frames already committed in the repository",
+  "frameWidth": 16,
+  "frameHeight": 16,
+  "sheetColumns": [
+    "neutral",
+    "step-a",
+    "step-b"
+  ],
+  "sheetRows": [
+    "down",
+    "left",
+    "right",
+    "up"
+  ],
+  "profiles": {
+    "home-npc": {
+      "sheetPath": "assets/third-party/kenney/home-npc/character.png",
+      "textureKey": "kenney-home-npc",
+      "sha256": "8d33da9b389e77b0c27417d9d1ab326c0e7e67e6a0605896b1d6810e01e29ee1",
+      "frames": {
+        "down": [0, 1, 2],
+        "left": [3, 4, 5],
+        "right": [6, 7, 8],
+        "up": [9, 10, 11]
+      }
+    },
+    "street-npc": {
+      "sheetPath": "assets/third-party/kenney/street-npc/character.png",
+      "textureKey": "kenney-street-npc",
+      "sha256": "a07760963a248bbe78b6d858448f620e6f13999e59b55170de277f5d94576b02",
+      "frames": {
+        "down": [0, 1, 2],
+        "left": [3, 4, 5],
+        "right": [6, 7, 8],
+        "up": [9, 10, 11]
+      }
+    }
+  },
+  "walkFrameSequence": [1, 0, 2, 0],
+  "idleFrameIndex": 0
+}
