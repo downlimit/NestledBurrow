@@ -50,10 +50,6 @@ hasAll(
     "fetch_file",
     "Полный clone допустим только",
     "Integration metadata",
-    "Depends on",
-    "Merge phase",
-    "Owned paths",
-    "Shared files allowed",
     "Fan-out/fan-in используется только при реальном конфликте",
   ],
   "LEAD.md",
@@ -76,7 +72,6 @@ hasAll(
     "final-head CI",
     "Независимый PR не обязан ребейзиться",
     "api_tool.list_resources",
-    "Побочный вопрос пользователя не отменяет активную операцию",
   ],
   "REVIEW.md",
 );
@@ -90,24 +85,27 @@ hasAll(
   [
     "<!-- audience: codex -->",
     "Do **not** read `PROJECT.md`, `LEAD.md`, `REVIEW.md` or `LIBRARY.md` by default.",
-    "## Task entry modes",
-    "### Routine direct prompt",
-    "## Integration metadata",
-    "When these fields are present:",
-    "Batch",
-    "Base SHA",
-    "Depends on",
-    "Merge phase",
-    "Owned paths",
-    "Shared files allowed",
-    "Develop without an open PR.",
-    "Do not push diagnostic or incremental repair commits to an open non-draft PR.",
+    "## Creative fast lane",
+    "use one ephemeral branch and one final PR",
+    "targeted checks",
+    "PR CI run the canonical full repository suite",
+    "## Integration metadata is optional",
+    "Routine independent work does not require Batch",
+    "copy the metadata into the PR body, never into `.github/pull_request_template.md`",
+    "## Risk-based validation",
+    "### Fast lane",
+    "### Strict lane",
+    "Create exactly one final non-draft PR",
     "one consolidated corrective push",
-    "the ready transition is the single intended final CI trigger",
+    "Include Integration metadata only when the prompt supplied it",
   ],
   "AGENTS.md",
 );
 assert(!agents.includes("Read `PROJECT.md`, `LIBRARY.md`"), "AGENTS.md must not restore blanket context loading");
+assert(
+  !agents.includes("Always identify:\n\n- review class and concise scope;\n- Integration metadata"),
+  "AGENTS.md must not require strict metadata in every completion report",
+);
 
 hasAll(
   prWorkflow,
@@ -142,16 +140,18 @@ hasAll(
 hasAll(
   prTemplate,
   [
-    "# Integration metadata",
-    "Batch",
-    "Base SHA",
-    "Depends on",
-    "Merge phase",
-    "Owned paths",
-    "Shared files touched",
-    "Canonical documentation owned by this change is current",
+    "Fast lane is the default",
+    "# Scope",
+    "# Review class",
+    "## Validation",
+    "PR CI supplies the canonical full repository suite",
+    "## Integration metadata (optional)",
+    "Routine independent PRs delete this section",
+    "ready for Integrator review and merge",
   ],
   ".github/pull_request_template.md",
 );
+assert(!prTemplate.includes("Required for implementation PRs"), "PR template must not require strict metadata for routine work");
+assert(!prTemplate.includes("strict Integrator review"), "PR template must not classify every PR as strict");
 
-console.log("documentation contracts passed: risk-based Project, Lead, Integrator, Codex and anti-spam PR rules are aligned");
+console.log("documentation contracts passed: creative fast lane is the default and strict ceremony is risk-triggered");
