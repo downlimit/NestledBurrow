@@ -59,6 +59,7 @@ jobs:
             artifacts/camera-indoor.png
             artifacts/camera-outdoor.png
             artifacts/top-wall-detail.png
+            artifacts/character-diagonal-contact-sheet.png
           if-no-files-found: warn
           retention-days: 7
 
