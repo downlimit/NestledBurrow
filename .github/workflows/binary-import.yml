@@ -1,0 +1,56 @@
+name: Reconstruct staged binary
+
+on:
+  push:
+    branches:
+      - "asset-import/**"
+    paths:
+      - ".binary-import/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: binary-import-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconstruct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out import branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Reconstruct and validate binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(find .binary-import -mindepth 2 -maxdepth 2 -type f -name manifest.json | sort)
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "No staged binary manifests found" >&2
+            exit 1
+          fi
+
+          for manifest in "${manifests[@]}"; do
+            node scripts/reconstruct-binary-import.mjs "$(dirname "$manifest")"
+          done
+
+      - name: Commit real binary files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Reconstruction produced no repository changes" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Reconstruct staged binary assets"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
