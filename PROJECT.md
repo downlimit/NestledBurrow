@@ -78,8 +78,9 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - Игрок и два патрулирующих NPC используют общий `Character`-агрегат из независимого от Phaser `CharacterMotor` и Phaser-представления `CharacterVisual`.
 - `CharacterSystem` хранит персонажей по стабильным ID, централизованно обновляет их и выдаёт runtime-free snapshots.
 - Неизменяемые actor profiles `player` и `villager` являются каноническими источниками movement-параметров; runtime-конфигурации создаются отдельными mutable-копиями.
-- Отдельный immutable registry visual profiles независимо назначает внешний вид: player использует исходные отдельные Kenney PNG, home NPC — зелёно-бирюзовый spritesheet, street NPC — сине-бордовый spritesheet. Все три имеют отдельные animation prefixes и общий нормализованный frame-reference contract.
-- Walk cycle использует `step A → neutral → step B → neutral`; после остановки любой персонаж явно возвращается в neutral frame текущего направления.
+- Отдельный immutable registry visual profiles независимо назначает внешний вид: player использует исходные cardinal Kenney PNG и утверждённый diagonal spritesheet, home NPC — зелёно-бирюзовые cardinal/diagonal sheets, street NPC — сине-бордовые cardinal/diagonal sheets. Все три имеют отдельные animation prefixes и общий нормализованный frame-reference contract.
+- Чистый восьмисекторный quantizer выбирает cardinal или diagonal facing по плавно поворачивающемуся motor direction, удерживает направление у границы через hysteresis и сохраняет последнее направление после остановки.
+- Walk cycle использует `step A → neutral → step B → neutral`; после остановки любой персонаж явно возвращается в neutral frame текущего из восьми направлений.
 - Player и patrol controllers возвращают нормализованный `ControllerCommand` с movement, aim и actions.
 - NPC двигаются примерно втрое медленнее игрока. Северный `home-npc` использует замкнутый многоточечный `loop`; южный `street-npc` проходит творческий многоточечный `ping-pong` вперёд и по тому же списку назад. Оба маршрута содержат pass-through точки без остановки и смысловые точки отдыха по 2–3 секунды.
 - Collision resolver получает bounds, cell size и blocking query через явный environment contract.
@@ -90,7 +91,7 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - EN/RU локализация построена на i18next, ICU namespaces и локально поставляемом Rubik с проверенным Latin/Cyrillic coverage; язык меняет уже видимые HUD/dialogue строки.
 - `GameHud` владеет build label, fullscreen, language toggle и локализованным `NEW GAME`; сброс удаляет quest progress, но сохраняет языковую preference.
 - `InteractionHud` рисует Unicode prompt/dialogue panel и отделяет touch interaction от мобильного джойстика.
-- Клавиатура и динамический мобильный джойстик объединяются в единый нормализованный movement vector; desktop/mobile Chromium E2E покрывает язык, quest flow, reload persistence и reset.
+- Клавиатура и динамический мобильный джойстик объединяются в единый нормализованный movement vector; desktop/mobile Chromium E2E покрывает язык, quest flow, reload persistence, reset и live-проверку диагонального facing с сохранением направления после остановки.
 - `MobileJoystick` и `MovementDebugPanel` сохраняют самостоятельное lifecycle ownership; `WorldScene` остаётся composition root.
 - Камера следует за игроком с целочисленным pixel-grid рендером; GitHub Pages публикует только проверенный `main`, а `pages/live` подтверждает фактически доступный SHA.
 
