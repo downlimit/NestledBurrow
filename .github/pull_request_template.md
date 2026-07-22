@@ -1,66 +1,56 @@
-<!-- Keep only applicable sections. Routine work may come directly from a self-contained Codex prompt; no task file is required. Delete empty or not-applicable sections instead of filling them with bureaucracy. -->
+<!-- Fast lane is the default. Keep the report short and delete optional sections that do not apply. Integration metadata is only for strict, dependent or parallel work. -->
 
-# Integration metadata
+# Scope
 
-<!-- Required for implementation PRs. Use `standalone` and `none` when the PR has no parallel dependencies. These fields let the Integrator process every open PR from one `проверь все PR` command. -->
-
-- Batch: `<NB-YYYYMMDD-NN / standalone>`
-- Task: `<id / standalone>`
-- Base SHA: `<sha>`
-- Depends on: `<none / task ids / PR numbers>`
-- Merge phase: `<integer>`
-- Owned paths: `<paths>`
-- Shared files touched: `<none / explicitly allowed paths>`
+<!-- State the single observable result delivered by this PR. -->
 
 # Review class
 
 - [ ] `docs`
 - [ ] `code`
 - [ ] `visual/runtime`
-
-## Scope
-
-<!-- State the single coherent result delivered by this PR. -->
-
-## Git lifecycle
-
-- Base branch: `main`
-- Work branch: `<branch>`
-- Final head SHA: `<sha>`
-- Lifecycle: `ephemeral` / `persistent`
-- PR opened once after implementation and validation: `yes` / `no`
-- Additional remote branches created: `none` / `<explain>`
+- [ ] `strict-risk`
 
 ## Validation
 
-<!-- List only checks relevant to the actual risk. Use PASS, FAIL or NOT RUN with a short reason. Never describe an unavailable check as passed. -->
+<!-- List only checks and inspections relevant to the actual change. Use PASS, FAIL or NOT RUN with a brief reason. PR CI supplies the canonical full repository suite. -->
 
-- `<command or inspection>` — `PASS / FAIL / NOT RUN`
+- `<targeted command, build or inspection>` — `PASS / FAIL / NOT RUN`
 
 ## Runtime inspection
 
-<!-- Required only for visual/runtime or indirectly presentation-sensitive changes. Delete when not applicable. -->
+<!-- Optional. Keep only for changed visual or interactive behavior. Describe changed states, not the complete historical behavior matrix. -->
 
-- States inspected: `<list>`
-- Viewports/devices inspected: `<list>`
-- Preview or screenshot artifacts inspected: `<list>`
-- User-approved asset/frame choices: `<list>`
+- Changed states inspected: `<list>`
+- Relevant viewports/devices: `<list>`
+- Evidence or residual risk: `<list>`
 
 ## Limitations
 
-<!-- Keep only real limitations. Delete when there are none. -->
+<!-- Optional. Keep only real limitations or residual risks. -->
+
+## Integration metadata (optional)
+
+<!-- Keep only for strict, dependent or parallel work. Routine independent PRs delete this section. -->
+
+- Batch: `<NB-YYYYMMDD-NN>`
+- Task: `<id>`
+- Base SHA: `<sha>`
+- Depends on: `<none / task ids / PR numbers>`
+- Merge phase: `<integer>`
+- Owned paths: `<paths>`
+- Shared files touched: `<none / explicitly allowed paths>`
 
 ## Canonical documentation
 
-<!-- State only documents whose owned facts changed. The Integrator performs the final semantic drift check. -->
+<!-- Optional. Keep only when an owned durable fact changed. Do not create a routine documentation follow-up PR. -->
 
-- Updated: `<PROJECT.md / LEAD.md / LIBRARY.md / AGENTS.md / REVIEW.md / ASSETS.md / none>`
-- Reason: `<brief reason or no owned fact changed>`
+- Updated: `<documents / none>`
+- Reason: `<brief reason>`
 
 ## Scope confirmation
 
-- [ ] No unrelated dependency, fallback package, architecture, asset, workflow or infrastructure change was added.
-- [ ] Changes stay within Owned paths and explicitly allowed Shared files.
-- [ ] Evidence refers to the final head commit.
-- [ ] Canonical documentation owned by this change is current, or no canonical document was affected.
-- [ ] The branch is ready for strict Integrator review and merge; this PR is not a development workspace.
+- [ ] No unrelated dependency, architecture, asset, workflow or infrastructure change was added.
+- [ ] Applicable evidence refers to the final head commit.
+- [ ] Material canonical documentation is current, or no durable fact changed.
+- [ ] The branch is ready for Integrator review and merge; this PR is not a development workspace.
