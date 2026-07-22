@@ -21,15 +21,7 @@
 
 означает полный проход по всем открытым non-draft PR в `downlimit/NestledBurrow`, направленным в `main`.
 
-Пользователь не обязан указывать:
-
-- Batch или wave;
-- номера PR;
-- ветки;
-- SHA;
-- зависимости;
-- порядок merge;
-- документы и инструменты.
+Пользователь не обязан указывать Batch, номера PR, ветки, SHA, зависимости, порядок merge, документы или инструменты.
 
 Интегратор самостоятельно:
 
@@ -52,13 +44,7 @@
 
 Цель Интегратора — быстро доставлять корректный полезный результат, а не максимизировать количество проверочных действий.
 
-Качество обеспечивается сочетанием:
-
-- автоматических проверок;
-- targeted diff review;
-- проверки архитектурных границ и scope;
-- runtime evidence только для поведения, которое нельзя доказать pure tests;
-- итоговой проверки объединённого `main`.
+Качество обеспечивается сочетанием автоматических проверок, targeted diff review, проверки архитектурных границ и scope, runtime evidence только для поведения, которое нельзя доказать pure tests, и итоговой проверки объединённого `main`.
 
 Не нужно вручную повторять то, что уже надёжно доказал CI, или автоматически превращать каждый PR в high-risk integration exercise.
 
@@ -70,7 +56,7 @@
 2. changed filenames и достаточный diff;
 3. явные dependencies и пересечения файлов;
 4. final-head CI state;
-5. доступные artifacts только когда есть presentation-risk;
+5. artifacts только когда есть presentation-risk;
 6. наличие material documentation drift.
 
 После этого использовать targeted reads и per-file patches. Не загружать один и тот же полный diff многократно.
@@ -81,22 +67,15 @@
 
 ### Fast lane — по умолчанию
 
-Подходит для:
-
-- локальной gameplay/UI/content итерации;
-- config change;
-- исправления бага с ограниченным regression radius;
-- pure-code логики с targeted tests;
-- локального refactor без смены владельца состояния;
-- документации без executable изменений.
+Подходит для локальной gameplay/UI/content итерации, config change, ограниченного bug fix, pure-code логики с targeted tests, локального refactor без смены владельца состояния и документации без executable изменений.
 
 Fast-lane review:
 
 1. проверить diff и окружающий код только в затронутой области;
 2. убедиться, что scope соответствует заявленному результату;
-3. подтвердить успешный CI final head;
+3. подтвердить успешный final-head CI;
 4. проверить новые или изменённые targeted tests;
-5. выполнить или открыть runtime smoke/artifact только если меняется видимое/интерактивное поведение;
+5. открыть runtime smoke/artifact только если меняется видимое или интерактивное поведение;
 6. исправить blockers одним consolidated batch;
 7. merge без дополнительной церемонии.
 
@@ -114,28 +93,13 @@ Fast-lane review:
 - массовую mutation данных или файлов;
 - изменение, где failure трудно заметить после merge.
 
-Strict-lane review дополнительно включает:
-
-- явный dependency/merge graph;
-- проверку critical invariants;
-- синхронизацию с актуальным `main`, когда предыдущий merge меняет dependency или shared contract;
-- повторный CI после такой синхронизации;
-- требуемые artifacts/manual validation;
-- material documentation update изменившегося контракта.
+Strict-lane review дополнительно включает dependency/merge graph, проверку critical invariants, синхронизацию с актуальным `main`, когда это влияет на доказательство, повторный CI после такой синхронизации, необходимые artifacts/manual validation и material documentation update изменившегося контракта.
 
 Сам размер diff не делает PR strict автоматически. Важен regression radius и стоимость незамеченной ошибки.
 
 ## 5. Integration metadata и naming
 
-Для зависимых или параллельных задач могут использоваться:
-
-- **Batch**;
-- **Task**;
-- **Base SHA**;
-- **Depends on**;
-- **Merge phase**;
-- **Owned paths**;
-- **Shared files touched**.
+Для зависимых или параллельных задач могут использоваться Batch, Task, Base SHA, Depends on, Merge phase, Owned paths и Shared files touched.
 
 Стандартный naming:
 
@@ -164,24 +128,11 @@ PR title: [<batch>/<task>] <result-oriented title>
 
 **Независимый PR не обязан ребейзиться и полностью перепроверяться только потому, что другой независимый PR уже смержен.**
 
-Можно сохранить существующий зелёный final-head CI и merge PR без дополнительного sync, если одновременно верно:
+Можно сохранить существующий зелёный final-head CI и merge PR без дополнительного sync, если changed files не пересекаются, предыдущий merge не изменил используемый contract/dependency/build/workflow, GitHub не сообщает conflict, branch protection не требует обновления и review не выявил интеграционного риска.
 
-- changed files не пересекаются;
-- предыдущий merge не изменил используемый contract, dependency, build config или workflow;
-- GitHub не сообщает conflict;
-- branch protection не требует обновления;
-- review не выявил интеграционного риска.
+После такой очереди совместимость подтверждается полным CI итогового `main`.
 
-После принятия такой очереди совместимость подтверждается полным CI итогового `main`.
-
-Обязательная синхронизация и повторный CI требуются, если:
-
-- PR зависит от уже смерженного PR;
-- затронуты shared files или contracts;
-- предыдущий merge изменил package/workflow/build/runtime entry point;
-- возник conflict;
-- branch protection требует актуальную базу;
-- риск классифицирован как strict и старая база влияет на доказательство корректности.
+Синхронизация и повторный CI обязательны, если PR зависит от уже смерженного PR, затронуты shared files/contracts, предыдущий merge изменил package/workflow/build/runtime entry point, возник conflict, branch protection требует актуальную базу или strict-риск делает старую базу недостаточной.
 
 Не создавать временные merge/rebase PR и не выполнять механическую синхронизацию без причины.
 
@@ -207,14 +158,7 @@ Blockers:
 - licensing violation;
 - material documentation, утверждающая неверное shipped state.
 
-Не являются blockers сами по себе:
-
-- отсутствие необязательной metadata;
-- stale base независимого disjoint PR;
-- stylistic preference без влияния на поддержку;
-- optional cleanup;
-- отсутствие visual artifact у pure-code PR;
-- отсутствие отдельного documentation PR.
+Не являются blockers сами по себе отсутствие необязательной metadata, stale base независимого disjoint PR, stylistic preference, optional cleanup, отсутствие visual artifact у pure-code PR или отсутствие отдельного documentation PR.
 
 Исправлять существующую PR-ветку. По умолчанию один пакет исправлений и один финальный CI run после mutation.
 
@@ -227,22 +171,23 @@ Blockers:
 - Не повторять вручную unit-level проверки без сигнала о недостаточности теста.
 - Локальная ошибка proxy/package/browser installation не разрешает менять canonical dependencies или ослаблять проверки.
 
+### Достаточность и темп
+
+- Сначала определить один реальный недоказанный риск. Отсутствие прямого теста каждого внутреннего перехода само по себе не требует нового E2E.
+- Для одного риска достаточно одного сильного применимого доказательства: существующего targeted test, существующего runtime artifact/smoke или одного нового теста. Не собирать одновременно artifact, новый E2E и ручную проверку без отдельной причины.
+- Новый mandatory check добавляется только когда непокрытый риск material, повторяемый или regression-prone и существующий suite действительно не способен его поймать.
+- После mutation по умолчанию нужен один final-head CI run. Статус одного run проверяется по смысловым фазам: запуск, завершение `Validate`, завершение зависимых jobs. Не делать серию одинаковых polling-вызовов внутри одной фазы без нового состояния от GitHub.
+- Пока CI выполняется, Интегратор либо завершает оставшийся targeted review, либо не создаёт искусственную активность. Частый polling не повышает качество доказательства.
+- Зелёный final-head CI, чистый targeted review и достаточное применимое evidence закрывают merge gate. Нулевая неопределённость не требуется; небольшой residual risk допустим, если он честно обозначен и не затрагивает critical contract.
+- Не расширять repair документацией, тестами или инфраструктурой, которые не нужны для конкретного blocker. Исправление должно быть минимальным и консолидированным.
+
 ### Pure code
 
-Достаточно:
-
-- targeted tests;
-- diff review;
-- repository CI.
+Достаточно targeted tests, diff review и repository CI.
 
 ### Visual/runtime
 
-Проверить только изменившиеся состояния:
-
-- открыть artifact или preview финального head, если он существует;
-- проверить geometry, scale, facing, input, HUD или другой фактически изменённый аспект;
-- не требовать screenshots всех старых состояний;
-- честно обозначить mobile/fullscreen/gesture limitation, если точный жест недоступен.
+Проверить только изменившиеся состояния: открыть artifact или preview финального head, если он существует, и проверить geometry, scale, facing, input, HUD или другой фактически изменённый аспект. Не требовать screenshots всех старых состояний.
 
 Synthetic preview не доказывает Phaser interaction. Остаточный риск допустим при небольшом scope, зелёном CI и явной post-publication user acceptance.
 
@@ -258,23 +203,13 @@ Synthetic preview не доказывает Phaser interaction. Остаточн
 - `AGENTS.md` — Codex-only execution rules;
 - `LIBRARY.md` — важные адреса;
 - `ASSETS.md` — asset policy;
-- `tasks/*.md` — только durable contract действительно сложной задачи.
+- `tasks/*.md` — durable contract действительно сложной задачи.
 
-Документация обновляется, когда изменились:
-
-- shipped behavior, которое должно восстанавливать новый чат;
-- публичная архитектурная граница;
-- владелец состояния или contract;
-- roadmap;
-- устойчивый процесс.
+Документация обновляется, когда изменились shipped behavior, публичная архитектурная граница, владелец состояния/contract, roadmap или устойчивый процесс.
 
 Не обновлять документы из-за переименования локального helper, внутренней формы теста или временной реализации без долговременного значения.
 
-Предпочтительный порядок:
-
-1. включить docs в тот же implementation/integration PR;
-2. либо обновить один раз в последнем PR значимой волны;
-3. отдельный DOC PR создавать только когда implementation уже смержена без подходящего владельца или документация сама является задачей.
+Предпочтительный порядок: docs в том же implementation/integration PR, один раз в последнем PR значимой волны или отдельный DOC PR только когда документация сама является задачей либо implementation уже смержена без подходящего владельца.
 
 Отдельный DOC PR после каждого небольшого merge запрещён как стандартный workflow.
 
@@ -282,25 +217,11 @@ Synthetic preview не доказывает Phaser interaction. Остаточн
 
 ### Fast lane
 
-Merge разрешён, когда:
-
-- PR не draft;
-- нет dependency/conflict blocker;
-- scope соответствует задаче;
-- final-head CI успешен;
-- targeted review не выявил blocker;
-- применимый runtime evidence проверен либо residual risk явно мал и принят;
-- документация не утверждает materially неверное состояние.
+Merge разрешён, когда PR не draft, нет dependency/conflict blocker, scope соответствует задаче, final-head CI успешен, targeted review не выявил blocker, применимый runtime evidence достаточен и документация не утверждает materially неверное состояние.
 
 ### Strict lane
 
-Дополнительно требуется:
-
-- все dependencies смержены;
-- ветка синхронизирована с relevant актуальным `main`;
-- critical invariants подтверждены;
-- required artifacts/manual checks выполнены;
-- material contract documentation актуальна.
+Дополнительно требуется: все dependencies смержены, ветка синхронизирована с relevant актуальным `main`, critical invariants подтверждены, required artifacts/manual checks выполнены и material contract documentation актуальна.
 
 После всей очереди:
 
