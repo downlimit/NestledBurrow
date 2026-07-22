@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  PLAYER_DIAGONAL_FRAMES,
+  PLAYER_DIAGONAL_TEXTURE_KEY,
   PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
   PLAYER_WALK_FRAME_SEQUENCE,
@@ -67,7 +69,7 @@ const officialAssets = [
 ];
 
 
-assert.equal(npcManifest.version, 1, "NPC visual manifest keeps version 1");
+assert.equal(npcManifest.version, 2, "NPC visual manifest schema is version 2 for cardinal plus diagonal resources");
 assert.equal(npcManifest.frameWidth, 16, "NPC visual manifest frame width is 16");
 assert.equal(npcManifest.frameHeight, 16, "NPC visual manifest frame height is 16");
 assert.deepEqual(npcManifest.walkFrameSequence, PLAYER_WALK_FRAME_SEQUENCE, "NPC manifest walk cadence matches runtime cadence");
@@ -138,34 +140,78 @@ assert(/kenney"\s*\/\s*"player/.test(roomPreviewSource), "room preview uses acti
 assert(!/kenney-room|kenney-world-extension|public\/room|public\/world/.test(roomPreviewSource), "room preview does not use removed legacy atlases");
 
 
+const expectedFacings = ["right", "down-right", "down", "down-left", "left", "up-left", "up", "up-right"];
+const expectedDiagonalHashes = new Map([
+  ["assets/third-party/kenney/player/diagonal.png", "402d12e53f0620cb7079ac51e134d398af4824267133e899b12af541535effe9"],
+  ["assets/third-party/kenney/home-npc/diagonal.png", "a54cd5b5d2398f6032c26d4284b0b7f612c838a48cc90ebda57c8adfddffd759"],
+  ["assets/third-party/kenney/street-npc/diagonal.png", "9f7f352a5627f3b5f6166f8d95685c4ad308f0941b72a670cd410a7f34df9164"],
+]);
+for (const [relativePath, expectedHash] of expectedDiagonalHashes) {
+  const filePath = path.join(root, "public", relativePath);
+  assert(fs.existsSync(filePath), `${relativePath} exists`);
+  assert.deepEqual(readPngDimensions(filePath), { width: 48, height: 64 }, `${relativePath} dimensions are 48x64`);
+  assert.equal(sha256(filePath), expectedHash, `${relativePath} approved hash matches`);
+}
+
+for (const profile of [playerVisual, homeVisual, streetVisual]) {
+  assert.deepEqual(Object.keys(profile.frames).sort(), [...expectedFacings].sort(), `${profile.id} contains exactly eight facing directions`);
+  assert.equal(profile.walkFrameSequence.join(","), "1,0,2,0", `${profile.id} walk cadence is shared`);
+  for (const facing of expectedFacings) {
+    assert.equal(profile.frames[facing].length, 3, `${profile.id} ${facing} has three normalized frame references`);
+    for (const frameReference of profile.frames[facing]) {
+      assert.equal(typeof frameReference.textureKey, "string", `${profile.id} ${facing} frame has a texture key`);
+      assert(Object.hasOwn(frameReference, "frame"), `${profile.id} ${facing} frame keeps normalized frame field`);
+    }
+    assert.deepEqual(
+      profile.walkFrameSequence.map((frameIndex) => profile.frames[facing][frameIndex]),
+      [profile.frames[facing][1], profile.frames[facing][0], profile.frames[facing][2], profile.frames[facing][0]],
+      `${profile.id} ${facing} walk cadence is step-a, neutral, step-b, neutral`,
+    );
+    assert.equal(profile.frames[facing][profile.idleFrameIndex], profile.frames[facing][0], `${profile.id} ${facing} idle uses neutral`);
+  }
+}
+
+const allTextureKeys = new Set();
+for (const profile of [playerVisual, homeVisual, streetVisual]) {
+  for (const resource of profile.resources) {
+    if (resource.type === "images") {
+      for (const frame of resource.frames) {
+        assert(!allTextureKeys.has(frame.textureKey), `${frame.textureKey} is unique`);
+        allTextureKeys.add(frame.textureKey);
+      }
+    } else {
+      assert(!allTextureKeys.has(resource.textureKey), `${resource.textureKey} is unique`);
+      allTextureKeys.add(resource.textureKey);
+    }
+  }
+}
+
 const npcVisualAssets = [
   { id: CHARACTER_VISUAL_PROFILE_IDS.homeNpc, profile: homeVisual, manifest: npcManifest.profiles["home-npc"] },
   { id: CHARACTER_VISUAL_PROFILE_IDS.streetNpc, profile: streetVisual, manifest: npcManifest.profiles["street-npc"] },
 ];
 for (const { id, profile, manifest } of npcVisualAssets) {
-  const resource = profile.resources[0];
-  const filePath = path.join(root, "public", resource.path);
-  assert.equal(resource.type, "spritesheet", `${id} uses a spritesheet resource`);
-  assert.equal(resource.path, manifest.sheetPath, `${id} sheet path matches manifest`);
-  assert.equal(resource.textureKey, manifest.textureKey, `${id} texture key matches manifest`);
-  assert.equal(resource.frameWidth, npcManifest.frameWidth, `${id} frame width matches manifest`);
-  assert.equal(resource.frameHeight, npcManifest.frameHeight, `${id} frame height matches manifest`);
-  assert.deepEqual(readPngDimensions(filePath), { width: 48, height: 64 }, `${id} sheet dimensions are 48x64`);
-  assert.equal(sha256(filePath), manifest.sha256, `${id} sheet hash matches manifest`);
-  assert.equal((48 / resource.frameWidth) * (64 / resource.frameHeight), 12, `${id} sheet contains exactly 12 frames`);
-  for (const [facing, manifestFrames] of Object.entries(manifest.frames)) {
-    assert.equal(profile.frames[facing].length, 3, `${id} ${facing} has three directional frames`);
-    assert.deepEqual(profile.frames[facing].map((frame) => frame.frame), manifestFrames, `${id} ${facing} mapping matches manifest`);
-    assert.deepEqual(
-      profile.walkFrameSequence.map((frameIndex) => profile.frames[facing][frameIndex].frame),
-      [manifestFrames[1], manifestFrames[0], manifestFrames[2], manifestFrames[0]],
-      `${id} ${facing} walk cadence is step-a, neutral, step-b, neutral`,
-    );
-    assert.equal(profile.frames[facing][profile.idleFrameIndex].frame, manifestFrames[0], `${id} ${facing} idle uses neutral`);
+  for (const sheetKind of ["cardinal", "diagonal"]) {
+    const manifestResource = manifest.resources[sheetKind];
+    const manifestFrames = npcManifest.sheets[sheetKind].frames;
+    const resource = profile.resources.find((entry) => entry.textureKey === manifestResource.textureKey);
+    assert(resource, `${id} has ${sheetKind} resource from manifest`);
+    assert.equal(resource.type, "spritesheet", `${id} ${sheetKind} uses a spritesheet resource`);
+    assert.equal(resource.path, manifestResource.sheetPath, `${id} ${sheetKind} sheet path matches manifest`);
+    assert.equal(resource.frameWidth, npcManifest.frameWidth, `${id} ${sheetKind} frame width matches manifest`);
+    assert.equal(resource.frameHeight, npcManifest.frameHeight, `${id} ${sheetKind} frame height matches manifest`);
+    assert.deepEqual(readPngDimensions(path.join(root, "public", resource.path)), { width: 48, height: 64 }, `${id} ${sheetKind} sheet dimensions are 48x64`);
+    assert.equal(sha256(path.join(root, "public", resource.path)), manifestResource.sha256, `${id} ${sheetKind} sheet hash matches manifest`);
+    for (const [facing, frames] of Object.entries(manifestFrames)) {
+      assert.deepEqual(profile.frames[facing].map((frame) => frame.frame), frames, `${id} ${facing} ${sheetKind} mapping matches manifest`);
+      assert(profile.frames[facing].every((frame) => frame.textureKey === resource.textureKey), `${id} ${facing} uses ${sheetKind} texture key`);
+    }
   }
 }
-assert.equal(playerVisual.resources[0].type, "images", "player uses separate image resources");
+assert.equal(playerVisual.resources[0].type, "images", "player keeps separate image resources for cardinals");
 assert.equal(playerVisual.resources[0].path, "assets/third-party/kenney/player", "player keeps existing player asset directory");
+assert.equal(playerVisual.resources[1].textureKey, PLAYER_DIAGONAL_TEXTURE_KEY, "player diagonal resource uses the configured texture key");
+assert.deepEqual(playerVisual.frames["down-left"].map((frame) => frame.frame), PLAYER_DIAGONAL_FRAMES["down-left"], "player down-left diagonal mapping matches approved indices");
 
 for (const asset of officialAssets) {
   assert.deepEqual(readPngDimensions(asset.path), asset.dimensions);

@@ -1,5 +1,7 @@
 import {
   FACING_HYSTERESIS,
+  PLAYER_DIAGONAL_FRAMES,
+  PLAYER_DIAGONAL_TEXTURE_KEY,
   PLAYER_FOOT_DEPTH,
   PLAYER_FOOT_WIDTH,
   PLAYER_FRAMES,
@@ -15,11 +17,17 @@ export const CHARACTER_VISUAL_PROFILE_IDS = Object.freeze({
 });
 
 const PLAYER_ASSET_PATH = "assets/third-party/kenney/player";
-const NPC_WALK_FRAMES = Object.freeze({
+const NPC_CARDINAL_WALK_FRAMES = Object.freeze({
   down: Object.freeze([0, 1, 2]),
   left: Object.freeze([3, 4, 5]),
   right: Object.freeze([6, 7, 8]),
   up: Object.freeze([9, 10, 11]),
+});
+const DIAGONAL_WALK_FRAMES = Object.freeze({
+  "down-left": Object.freeze([0, 1, 2]),
+  "down-right": Object.freeze([3, 4, 5]),
+  "up-left": Object.freeze([6, 7, 8]),
+  "up-right": Object.freeze([9, 10, 11]),
 });
 
 function imageFrame(textureKey) {
@@ -40,12 +48,16 @@ function mapImageFrames(frames) {
 }
 
 function mapSpritesheetFrames(textureKey, frames) {
-  return deepFreeze(Object.fromEntries(
+  return Object.fromEntries(
     Object.entries(frames).map(([facing, frameNumbers]) => [
       facing,
       frameNumbers.map((frame) => sheetFrame(textureKey, frame)),
     ]),
-  ));
+  );
+}
+
+function mergeFrameMaps(...frameMaps) {
+  return deepFreeze(Object.assign({}, ...frameMaps));
 }
 
 const playerResourceKeys = Object.freeze([...new Set(Object.values(PLAYER_FRAMES).flat())]);
@@ -63,8 +75,18 @@ export const CHARACTER_VISUAL_PROFILES = deepFreeze({
           fileName: `${textureKey}.png`,
         })),
       },
+      {
+        type: "spritesheet",
+        textureKey: PLAYER_DIAGONAL_TEXTURE_KEY,
+        path: `${PLAYER_ASSET_PATH}/diagonal.png`,
+        frameWidth: 16,
+        frameHeight: 16,
+      },
     ],
-    frames: mapImageFrames(PLAYER_FRAMES),
+    frames: mergeFrameMaps(
+      mapImageFrames(PLAYER_FRAMES),
+      mapSpritesheetFrames(PLAYER_DIAGONAL_TEXTURE_KEY, PLAYER_DIAGONAL_FRAMES),
+    ),
     idleFrameIndex: PLAYER_IDLE_FRAME_INDEX,
     walkFrameSequence: PLAYER_WALK_FRAME_SEQUENCE,
     footWidth: PLAYER_FOOT_WIDTH,
@@ -83,8 +105,18 @@ export const CHARACTER_VISUAL_PROFILES = deepFreeze({
         frameWidth: 16,
         frameHeight: 16,
       },
+      {
+        type: "spritesheet",
+        textureKey: "kenney-home-npc-diagonal",
+        path: "assets/third-party/kenney/home-npc/diagonal.png",
+        frameWidth: 16,
+        frameHeight: 16,
+      },
     ],
-    frames: mapSpritesheetFrames("kenney-home-npc", NPC_WALK_FRAMES),
+    frames: mergeFrameMaps(
+      mapSpritesheetFrames("kenney-home-npc", NPC_CARDINAL_WALK_FRAMES),
+      mapSpritesheetFrames("kenney-home-npc-diagonal", DIAGONAL_WALK_FRAMES),
+    ),
     idleFrameIndex: 0,
     walkFrameSequence: PLAYER_WALK_FRAME_SEQUENCE,
     footWidth: PLAYER_FOOT_WIDTH,
@@ -103,8 +135,18 @@ export const CHARACTER_VISUAL_PROFILES = deepFreeze({
         frameWidth: 16,
         frameHeight: 16,
       },
+      {
+        type: "spritesheet",
+        textureKey: "kenney-street-npc-diagonal",
+        path: "assets/third-party/kenney/street-npc/diagonal.png",
+        frameWidth: 16,
+        frameHeight: 16,
+      },
     ],
-    frames: mapSpritesheetFrames("kenney-street-npc", NPC_WALK_FRAMES),
+    frames: mergeFrameMaps(
+      mapSpritesheetFrames("kenney-street-npc", NPC_CARDINAL_WALK_FRAMES),
+      mapSpritesheetFrames("kenney-street-npc-diagonal", DIAGONAL_WALK_FRAMES),
+    ),
     idleFrameIndex: 0,
     walkFrameSequence: PLAYER_WALK_FRAME_SEQUENCE,
     footWidth: PLAYER_FOOT_WIDTH,

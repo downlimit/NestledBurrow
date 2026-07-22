@@ -1,4 +1,5 @@
 import { isMoving } from "./characterMovement.js";
+import { quantizeCharacterFacing } from "./characterFacing.js";
 import { applyFrameReference } from "./characterVisualProfiles.js";
 
 export class CharacterVisual {
@@ -42,17 +43,7 @@ export class CharacterVisual {
   }
 
   updateFacing(direction) {
-    const absX = Math.abs(direction.x);
-    const absY = Math.abs(direction.y);
-    if ((absX === 0 && absY === 0) || Math.abs(absX - absY) <= this.facingHysteresis) return;
-    this.lastFacing =
-      absX > absY
-        ? direction.x > 0
-          ? "right"
-          : "left"
-        : direction.y > 0
-          ? "down"
-          : "up";
+    this.lastFacing = quantizeCharacterFacing(direction, this.lastFacing, this.facingHysteresis);
   }
 
   updateAnimation(movementState, movementConfig) {
