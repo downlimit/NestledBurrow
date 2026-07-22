@@ -75,11 +75,11 @@ The home and street NPC sheets are project-authored palette variants derived fro
 - **Walk cadence:** `step-a → neutral → step-b → neutral`.
 - **Binary delivery:** the two runtime PNG files are committed before the code-only NPC reskin task; Codex must consume these paths and must not create or replace binary assets in that task.
 
-### Approved 8-direction diagonal extension
+### Active 8-direction diagonal extension
 
 The diagonal frames are project-authored derivatives of the committed Kenney character. They were produced through deterministic pixel-grid editing after direct visual approval; generative image output is not accepted as a runtime source for this 16×16 character family.
 
-- **Canonical pipeline:** hand-author the two left-facing 3/4 pose families on the exact 16×16 grid → mirror them for the right-facing directions → derive NPC variants through an exact palette remap from the committed cardinal sheets → generate a nearest-neighbor contact sheet → obtain visual approval → import binaries → integrate runtime behavior separately.
+- **Canonical pipeline:** hand-author the two left-facing 3/4 pose families on the exact 16×16 grid → mirror them for the right-facing directions → derive NPC variants through an exact palette remap from the committed cardinal sheets → generate a nearest-neighbor contact sheet → obtain visual approval → import binaries unchanged → integrate them through immutable visual profiles.
 - **Reproducible builder:** `scripts/build-character-diagonals.py`.
 - **Required non-mutating audit:** `scripts/check-character-diagonals.py`; it regenerates into an isolated temporary root, validates RGBA geometry and every frame, compares exact bytes and approved SHA-256 values, and emits `artifacts/character-diagonal-contact-sheet.png`.
 - **Sheet geometry:** 48×64 PNG; 3 columns × 4 rows of 16×16 frames.
@@ -92,7 +92,7 @@ The diagonal frames are project-authored derivatives of the committed Kenney cha
   - SHA-256: `a54cd5b5d2398f6032c26d4284b0b7f612c838a48cc90ebda57c8adfddffd759`.
 - **Street NPC diagonal sheet:** `public/assets/third-party/kenney/street-npc/diagonal.png`
   - SHA-256: `9f7f352a5627f3b5f6166f8d95685c4ad308f0941b72a670cd410a7f34df9164`.
-- **Runtime integration boundary:** the three approved PNG files are imported before the code task. Runtime integration must consume them unchanged and must not regenerate, recolor or replace the approved pixels.
+- **Runtime integration:** player, home NPC and street NPC preload their approved diagonal sheets declaratively. The eight-sector facing quantizer selects cardinal or diagonal frame references without regenerating, recoloring or replacing the approved pixels.
 
 ## Legacy Kenney environment integration
 

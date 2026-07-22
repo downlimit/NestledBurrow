@@ -36,6 +36,7 @@ import {
   getCharacterVisualProfile,
 } from "../src/characterVisualProfiles.js";
 import { createWorldLayout } from "../src/worldLayout.js";
+import { CHARACTER_FACINGS, quantizeCharacterFacing } from "../src/characterFacing.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
@@ -157,6 +158,10 @@ const customFrames = Object.freeze({
   up: Object.freeze([{ textureKey: "custom-up", frame: undefined }, { textureKey: "custom-up-step-a", frame: undefined }, { textureKey: "custom-up-step-b", frame: undefined }]),
   left: Object.freeze([{ textureKey: "custom-left", frame: undefined }, { textureKey: "custom-left-step-a", frame: undefined }, { textureKey: "custom-left-step-b", frame: undefined }]),
   right: Object.freeze([{ textureKey: "custom-right", frame: undefined }, { textureKey: "custom-right-step-a", frame: undefined }, { textureKey: "custom-right-step-b", frame: undefined }]),
+  "down-right": Object.freeze([{ textureKey: "custom-down-right", frame: undefined }, { textureKey: "custom-down-right-step-a", frame: undefined }, { textureKey: "custom-down-right-step-b", frame: undefined }]),
+  "down-left": Object.freeze([{ textureKey: "custom-down-left", frame: undefined }, { textureKey: "custom-down-left-step-a", frame: undefined }, { textureKey: "custom-down-left-step-b", frame: undefined }]),
+  "up-left": Object.freeze([{ textureKey: "custom-up-left", frame: undefined }, { textureKey: "custom-up-left-step-a", frame: undefined }, { textureKey: "custom-up-left-step-b", frame: undefined }]),
+  "up-right": Object.freeze([{ textureKey: "custom-up-right", frame: undefined }, { textureKey: "custom-up-right-step-a", frame: undefined }, { textureKey: "custom-up-right-step-b", frame: undefined }]),
 });
 const customVisualProfile = Object.freeze({
   animationPrefix: "custom",
@@ -199,6 +204,33 @@ assert.equal(configurableCharacter.footDepth, 7, "Character collision depth is c
 assert.equal(configurableCharacter.frames, customFrames, "Character animation frames are configurable");
 
 
+const sectorCenters = [
+  ["right", { x: 1, y: 0 }],
+  ["down-right", { x: 1, y: 1 }],
+  ["down", { x: 0, y: 1 }],
+  ["down-left", { x: -1, y: 1 }],
+  ["left", { x: -1, y: 0 }],
+  ["up-left", { x: -1, y: -1 }],
+  ["up", { x: 0, y: -1 }],
+  ["up-right", { x: 1, y: -1 }],
+];
+assert.deepEqual(CHARACTER_FACINGS, sectorCenters.map(([facing]) => facing), "character facings use the required eight-sector order");
+for (const [facing, direction] of sectorCenters) {
+  assert.equal(quantizeCharacterFacing(direction, "down", FACING_HYSTERESIS), facing, `${facing} center quantizes to itself`);
+}
+for (let index = 0; index < CHARACTER_FACINGS.length; index += 1) {
+  const current = CHARACTER_FACINGS[index];
+  const next = CHARACTER_FACINGS[(index + 1) % CHARACTER_FACINGS.length];
+  const boundary = (index + 0.5) * Math.PI / 4;
+  assert.equal(quantizeCharacterFacing({ x: Math.cos(boundary - 0.001), y: Math.sin(boundary - 0.001) }, "down", 0), current, `${current}/${next} lower boundary side is ${current}`);
+  assert.equal(quantizeCharacterFacing({ x: Math.cos(boundary + 0.001), y: Math.sin(boundary + 0.001) }, "down", 0), next, `${current}/${next} upper boundary side is ${next}`);
+  assert.equal(quantizeCharacterFacing({ x: Math.cos(boundary), y: Math.sin(boundary) }, "up", 0), quantizeCharacterFacing({ x: Math.cos(boundary), y: Math.sin(boundary) }, "up", 0), `${current}/${next} exact boundary is deterministic`);
+  assert.equal(quantizeCharacterFacing({ x: Math.cos(boundary + FACING_HYSTERESIS / 2), y: Math.sin(boundary + FACING_HYSTERESIS / 2) }, current, FACING_HYSTERESIS), current, `${current} hysteresis holds inside margin`);
+  assert.equal(quantizeCharacterFacing({ x: Math.cos(boundary + FACING_HYSTERESIS + 0.001), y: Math.sin(boundary + FACING_HYSTERESIS + 0.001) }, current, FACING_HYSTERESIS), next, `${current} hysteresis releases outside margin`);
+}
+assert.equal(quantizeCharacterFacing({ x: 0, y: 0 }, "up-left", FACING_HYSTERESIS), "up-left", "zero vector preserves last facing");
+assert.equal(quantizeCharacterFacing({ x: Math.cos(-Math.PI / 8 - 0.001), y: Math.sin(-Math.PI / 8 - 0.001) }, "right", 0), "up-right", "wrap-around lower side enters up-right");
+assert.equal(quantizeCharacterFacing({ x: Math.cos(-Math.PI / 8 + 0.001), y: Math.sin(-Math.PI / 8 + 0.001) }, "up", 0), "right", "wrap-around upper side enters right");
 
 const layout = createWorldLayout();
 
@@ -230,10 +262,13 @@ assert.deepEqual(visual.sprite.origin, { x: 0.5, y: 1 }, "CharacterVisual preser
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 0.7, y: 0.6 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.deepEqual({ x: visual.sprite.x, y: visual.sprite.y }, { x: 7, y: 9 }, "CharacterVisual synchronizes sprite position");
 assert.equal(visual.sprite.depth, 509, "CharacterVisual keeps depth sorting as 500 plus rounded y");
-assert.equal(visual.lastFacing, "down", "CharacterVisual keeps facing hysteresis for near-diagonal input");
+assert.equal(visual.lastFacing, "down-right", "CharacterVisual uses diagonal facing for diagonal input");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 20, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.equal(visual.lastFacing, "right", "CharacterVisual updates cardinal facing outside hysteresis");
 assert.deepEqual(visual.sprite.anims.played.at(-1), "custom-walk-right", "CharacterVisual preserves walk animation keys");
+visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 1 } }, { velocity: { x: 20, y: 20 } }, DEFAULT_MOVEMENT_CONFIG);
+assert.equal(visual.lastFacing, "down-right", "CharacterVisual updates to diagonal facing");
+assert.deepEqual(visual.sprite.anims.played.at(-1), "custom-walk-down-right", "CharacterVisual starts the matching diagonal animation key");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.equal(visual.sprite.texture.key, "custom-right", "CharacterVisual selects the matching idle frame");
 for (const [facing, frames] of Object.entries(customFrames)) {

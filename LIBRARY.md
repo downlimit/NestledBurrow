@@ -66,7 +66,7 @@
 
 ### `ASSETS.md`
 
-Канонический список внешних ассетов. Basic Village зафиксирован как основной набор окружения.
+Канонический список внешних ассетов. Basic Village зафиксирован как основной набор окружения; Kenney character section хранит hashes, deterministic diagonal builder/audit и активный eight-direction runtime boundary.
 
 ## Runtime
 
@@ -80,7 +80,7 @@ Phaser composition root непрерывного мира: создаёт layout
 
 ### `src/characterVisualProfiles.js`
 
-Канонический registry неизменяемых visual profiles персонажей. Разделяет player image frames и NPC spritesheet descriptors, stable visual IDs, animation prefixes, frame-reference mapping, collision footprint presentation values и helpers для Phaser texture/frame boundary.
+Канонический registry неизменяемых visual profiles персонажей. Объединяет player cardinal images с diagonal spritesheet и cardinal/diagonal NPC sheets, stable visual IDs, уникальные texture/animation keys, normalized eight-facing frame-reference mapping, collision footprint presentation values и helpers для Phaser texture/frame boundary.
 
 ### `src/character.js`
 
@@ -90,9 +90,13 @@ Phaser composition root непрерывного мира: создаёт layout
 
 Runtime-free motor персонажа: stable ID/profile ID, controller, plain position, movement state/config, collision footprint, blocked axes, movement/collision integration, замороженный controller context и immutable snapshots без Phaser refs.
 
+### `src/characterFacing.js`
+
+Чистый восьмисекторный quantizer visual facing: фиксированный clockwise порядок cardinal/diagonal направлений, угловая нормализация с wrap-around и history-aware hysteresis вокруг текущего сектора.
+
 ### `src/characterVisual.js`
 
-Phaser-представление персонажа: sprite, resolved visual profile, cardinal facing hysteresis, walk/idle animation selection через normalized frame references, depth sorting, position sync из motor snapshot и idempotent destroy.
+Phaser-представление персонажа: sprite, resolved visual profile, eight-sector facing quantization/hysteresis, walk/idle animation selection через normalized frame references, сохранение последнего направления после остановки, depth sorting, position sync из motor snapshot и idempotent destroy.
 
 ### `src/characterSystem.js`
 
@@ -164,7 +168,7 @@ Runtime-компонент мобильного джойстика: Phaser/nativ
 
 ### `src/movementDebugPanel.js`
 
-Опциональная DOM-панель по `?movementDebug=1`: tuning inputs, нормализация, `localStorage`, reset/copy, runtime status, async clipboard lifecycle и cleanup.
+Опциональная DOM-панель по `?movementDebug=1`: tuning inputs, нормализация, `localStorage`, reset/copy, runtime status включая eight-direction facing, async clipboard lifecycle и cleanup.
 
 ### `src/fullscreen.js`
 
@@ -192,7 +196,7 @@ Foot-box collision и axis-separated sliding по переданному collisi
 
 ### `src/visualConfig.js`
 
-Активные кадры персонажа, foot box, facing hysteresis и скорость анимации. Legacy room exports удалены.
+Активные cardinal/diagonal character frames, diagonal texture key, foot box, angular facing hysteresis и скорость анимации. Legacy room exports удалены.
 
 ### `src/worldConfig.js`
 
@@ -234,7 +238,7 @@ Namespace/key parity, non-empty translations, ICU samples, locale normalization,
 
 ### `playwright.config.js` и `tests/e2e/localized-loop.spec.js`
 
-Desktop/mobile Chromium evidence для locale detection/persistence, полного quest flow, reload save, localized `NEW GAME` и mobile touch dialogue start.
+Desktop/mobile Chromium evidence для locale detection/persistence, полного quest flow, reload save, localized `NEW GAME`, mobile touch dialogue start и live keyboard smoke диагонального facing с idle preservation.
 
 ### `scripts/check-movement.mjs`
 
@@ -242,7 +246,7 @@ Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked
 
 ### `scripts/check-character.mjs`
 
-Проверяет actor profiles, controller command/snapshot isolation, `CharacterMotor` movement/collision/snapshots, `CharacterVisual` facing/animation/depth/destroy, aggregate compatibility, `CharacterSystem` registry/order/update/snapshots/lifecycle, NPC patrols, dialogue pause policy и WorldScene integration.
+Проверяет actor profiles, controller command/snapshot isolation, `CharacterMotor` movement/collision/snapshots, чистый eight-sector quantizer с wrap-around/hysteresis, `CharacterVisual` diagonal facing/animation/depth/destroy, aggregate compatibility, `CharacterSystem` registry/order/update/snapshots/lifecycle, NPC patrols, dialogue pause policy и WorldScene integration.
 
 ### `scripts/check-interaction.mjs`
 
@@ -252,9 +256,13 @@ Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked
 
 Проверяет immutable dialogue/interaction config, strict dialogue lookup включая inherited object keys, dynamic target positions, approach/facing/prompt, start/advance/close lifecycle, selected-NPC pause, completion flag, replay, session JSON round-trip и idempotent runtime destroy.
 
+### `scripts/check-character-diagonals.py`
+
+Неразрушающий asset audit: изолированно пересобирает player/home/street diagonal sheets, проверяет RGBA 48×64, все 36 непустых кадров, exact committed bytes/SHA-256 и генерирует nearest-neighbor contact sheet.
+
 ### `scripts/check-visual.mjs`
 
-Проверяет удаление legacy room sources/atlases, pixel grid, Basic Village hashes, NPC visual manifest contract, visual profile registry, spritesheet loading, integer zoom, camera и активные character frames.
+Проверяет удаление legacy room sources/atlases, pixel grid, Basic Village hashes, schema v2 cardinal/diagonal NPC manifest, все восемь frame maps, уникальность texture keys, approved diagonal hashes, declarative resources, integer zoom и camera contract.
 
 ### `scripts/check-world.mjs`
 
@@ -281,13 +289,13 @@ Indoor/outdoor camera previews включают соответствующего
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/interaction/dialogue/visual/world/preview проверок.
+Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/character-diagonals/interaction/dialogue/visual/world/preview проверок.
 
 ## Инфраструктура
 
 ### `.github/workflows/pr-check.yml`
 
-Проверяет финальный PR и загружает world previews.
+Проверяет финальный PR и загружает world previews и diagonal contact sheet.
 
 ### `.github/workflows/deploy-pages.yml`
 
