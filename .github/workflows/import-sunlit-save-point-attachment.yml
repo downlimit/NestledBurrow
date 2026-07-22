@@ -1,0 +1,60 @@
+name: Import Sunlit Save Point attachment
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".binary-import/sunlit-save-point/manifest.json"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: import-sunlit-save-point-attachment
+  cancel-in-progress: true
+
+jobs:
+  import:
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'asset-import/sunlit-save-point'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact asset branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download and validate exact attachment bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_url="https://cdn1.suno.ai/61639bec-b15a-4926-bb3e-6834e72db917.mp3"
+          target="public/assets/audio/music/sunlit-save-point.mp3"
+          temp_file="$(mktemp)"
+          trap 'rm -f "$temp_file"' EXIT
+
+          curl --fail --location --retry 3 --retry-all-errors "$source_url" --output "$temp_file"
+          test "$(stat -c '%s' "$temp_file")" = "3977087"
+          echo "502dfd51bcfa7908becd39f604a6c73d868d9742fd3d1207c985cb9482627a91  $temp_file" | sha256sum --check --strict
+          file "$temp_file" | grep -qiE 'MPEG|Audio'
+
+          mkdir -p "$(dirname "$target")"
+          mv "$temp_file" "$target"
+          rm -rf .binary-import
+
+      - name: Commit verified MP3 to asset branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Import Sunlit Save Point music"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
