@@ -81,7 +81,7 @@ Codex не читает `PROJECT.md`, `LEAD.md` или `REVIEW.md` по умол
 - Отдельный immutable registry visual profiles независимо назначает внешний вид: player использует исходные отдельные Kenney PNG, home NPC — зелёно-бирюзовый spritesheet, street NPC — сине-бордовый spritesheet. Все три имеют отдельные animation prefixes и общий нормализованный frame-reference contract.
 - Walk cycle использует `step A → neutral → step B → neutral`; после остановки любой персонаж явно возвращается в neutral frame текущего направления.
 - Player и patrol controllers возвращают нормализованный `ControllerCommand` с movement, aim и actions.
-- NPC двигаются примерно втрое медленнее игрока, используют естественные multi-point loop-маршруты, pass-through точки и остановки по 2–3 секунды.
+- NPC двигаются примерно втрое медленнее игрока. Северный `home-npc` использует замкнутый многоточечный `loop`; южный `street-npc` проходит творческий многоточечный `ping-pong` вперёд и по тому же списку назад. Оба маршрута содержат pass-through точки без остановки и смысловые точки отдыха по 2–3 секунды.
 - Collision resolver получает bounds, cell size и blocking query через явный environment contract.
 - `GameSessionState` хранит JSON-сериализуемые player/NPC entities, durable flags и transient dialogue state без Phaser/runtime references.
 - Версионированный save envelope сохраняет только устойчивый прогресс, безопасно восстанавливается после повреждённого/неподдерживаемого save и не смешивает язык с игровым состоянием.

@@ -33,7 +33,7 @@ export const NPCS = Object.freeze([
     visualProfileId: CHARACTER_VISUAL_PROFILE_IDS.streetNpc,
     spawn: point(DOOR_LEFT + 1, DOOR_Y + 5),
     patrol: Object.freeze({
-      mode: "loop",
+      mode: "ping-pong",
       waypoints: Object.freeze([
         point(DOOR_LEFT + 1, DOOR_Y + 5, 2200),
         point(DOOR_LEFT + 1, DOOR_Y + 7),
@@ -41,7 +41,7 @@ export const NPCS = Object.freeze([
         point(DOOR_LEFT - 1, DOOR_Y + 11),
         point(DOOR_LEFT + 2, DOOR_Y + 12, 2400),
         point(DOOR_LEFT + 4, DOOR_Y + 9),
-        point(DOOR_LEFT + 2, DOOR_Y + 6),
+        point(DOOR_LEFT + 2, DOOR_Y + 6, 2200),
       ]),
     }),
   }),
