@@ -80,7 +80,8 @@ The home and street NPC sheets are project-authored palette variants derived fro
 The diagonal frames are project-authored derivatives of the committed Kenney character. They were produced through deterministic pixel-grid editing after direct visual approval; generative image output is not accepted as a runtime source for this 16×16 character family.
 
 - **Canonical pipeline:** hand-author the two left-facing 3/4 pose families on the exact 16×16 grid → mirror them for the right-facing directions → derive NPC variants through an exact palette remap from the committed cardinal sheets → generate a nearest-neighbor contact sheet → obtain visual approval → import binaries → integrate runtime behavior separately.
-- **Reproducible builder and audit:** `scripts/build-character-diagonals.py`.
+- **Reproducible builder:** `scripts/build-character-diagonals.py`.
+- **Required non-mutating audit:** `scripts/check-character-diagonals.py`; it regenerates into an isolated temporary root, validates RGBA geometry and every frame, compares exact bytes and approved SHA-256 values, and emits `artifacts/character-diagonal-contact-sheet.png`.
 - **Sheet geometry:** 48×64 PNG; 3 columns × 4 rows of 16×16 frames.
 - **Columns:** `neutral`, `step-a`, `step-b`.
 - **Rows:** `down-left`, `down-right`, `up-left`, `up-right`.
