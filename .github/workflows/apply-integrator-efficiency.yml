@@ -1,23 +1,25 @@
 name: Apply Integrator Efficiency Rule
 
 on:
-  push:
+  pull_request:
     branches:
-      - process/integrator-review-efficiency
+      - main
+    types:
+      - opened
 
 permissions:
   contents: write
 
 jobs:
   update-review-contract:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.draft == true && github.head_ref == 'process/integrator-review-efficiency'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
         with:
-          ref: process/integrator-review-efficiency
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Update REVIEW.md
         run: |
@@ -42,8 +44,7 @@ jobs:
 ### Pure code"""
           if marker not in text:
               raise SystemExit("REVIEW.md insertion marker not found")
-          text = text.replace(marker, replacement, 1)
-          path.write_text(text, encoding="utf-8")
+          path.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
           PY
 
       - name: Commit documentation update
@@ -53,4 +54,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add REVIEW.md .github/workflows/apply-integrator-efficiency.yml
           git commit -m "Keep Integrator review proportionate"
-          git push origin HEAD:process/integrator-review-efficiency
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
