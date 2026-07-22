@@ -4,24 +4,36 @@ async function boot(page) {
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
 }
+
 async function bridge(page, expression, argument) {
   return page.evaluate(({ expression, argument }) => {
     const api = window.__NESTLED_BURROW_E2E__;
-    return api[expression](argument);
+    const method = api?.[expression];
+    if (typeof method !== "function") return undefined;
+    return method(argument);
   }, { expression, argument });
 }
+
+async function pressInteract(page) {
+  await page.keyboard.down("KeyE");
+  await page.waitForTimeout(50);
+  await page.keyboard.up("KeyE");
+}
+
 async function placeNear(page, entityId) {
   await bridge(page, "placePlayerNear", entityId);
-  await expect.poll(() => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getInteractionState().candidate?.entityId)).toBe(entityId);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(entityId);
 }
+
 async function completeDialogue(page, entityId) {
   await placeNear(page, entityId);
-  await page.keyboard.press("KeyE");
-  await expect.poll(() => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getInteractionState().dialogueActive)).toBe(true);
-  while (await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getInteractionState().dialogueActive)) {
-    await page.keyboard.press("KeyE");
+  await pressInteract(page);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.dialogueActive ?? false).toBe(true);
+  while ((await bridge(page, "getInteractionState"))?.dialogueActive) {
+    await pressInteract(page);
   }
 }
+
 async function clickLogical(page, x, y) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
@@ -56,7 +68,6 @@ test("localized quest progress persists and New Game keeps language", async ({ p
   await clickLogical(page, 24, 18);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ newGameConfirming: true });
   await clickLogical(page, 92, 111);
-  await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: {} });
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
 });
@@ -71,7 +82,7 @@ test("mobile touch starts a Russian dialogue without joystick capture", async ({
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
   await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
-  await expect.poll(() => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getInteractionState().dialogueActive)).toBe(true);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.dialogueActive ?? false).toBe(true);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   expect(pageErrors).toEqual([]);
 });
