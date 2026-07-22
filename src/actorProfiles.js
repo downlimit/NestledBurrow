@@ -1,21 +1,8 @@
-import {
-  FACING_HYSTERESIS,
-  PLAYER_FOOT_DEPTH,
-  PLAYER_FOOT_WIDTH,
-  PLAYER_FRAMES,
-  PLAYER_IDLE_FRAME_INDEX,
-  WALK_FRAME_RATE,
-} from "./visualConfig.js";
+import { CHARACTER_VISUAL_PROFILE_IDS, getCharacterVisualProfile } from "./characterVisualProfiles.js";
 
-export const SHARED_CHARACTER_VISUAL_PROFILE = deepFreeze({
-  animationPrefix: "character",
-  frames: PLAYER_FRAMES,
-  idleFrameIndex: PLAYER_IDLE_FRAME_INDEX,
-  footWidth: PLAYER_FOOT_WIDTH,
-  footDepth: PLAYER_FOOT_DEPTH,
-  facingHysteresis: FACING_HYSTERESIS,
-  walkFrameRate: WALK_FRAME_RATE,
-});
+export const SHARED_CHARACTER_VISUAL_PROFILE = getCharacterVisualProfile(
+  CHARACTER_VISUAL_PROFILE_IDS.player,
+);
 
 const playerMovementProfile = deepFreeze({
   maxSpeed: 87,

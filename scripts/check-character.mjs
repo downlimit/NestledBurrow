@@ -28,9 +28,13 @@ import {
   FACING_HYSTERESIS,
   PLAYER_FOOT_DEPTH,
   PLAYER_FOOT_WIDTH,
-  PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
 } from "../src/visualConfig.js";
+import {
+  CHARACTER_VISUAL_PROFILE_IDS,
+  CHARACTER_VISUAL_PROFILES,
+  getCharacterVisualProfile,
+} from "../src/characterVisualProfiles.js";
 import { createWorldLayout } from "../src/worldLayout.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,9 +45,11 @@ const worldConfigSource = fs.readFileSync(path.join(root, "src/worldConfig.js"),
 assert(/createCharacterSystem\(\{ collisionEnvironment: this\.worldLayout \}\)/.test(mainSource), "WorldScene creates a CharacterSystem after layout creation");
 assert(/createCharacter\(this, \{\s*id: "player"/s.test(mainSource), "player is created through Character");
 assert(/actorProfile: playerProfile/.test(mainSource), "player is created with the player actor profile");
+assert(/visualProfile: playerVisualProfile/.test(mainSource), "player is created with the player visual profile");
 assert(/for \(const npc of NPCS\)/.test(mainSource), "NPCs are registered through stable creation order");
 assert(/const actorProfile = getActorProfile\(npc\.profileId\)/.test(mainSource), "NPC profiles are looked up from NPC config");
 assert(/actorProfile,/.test(mainSource), "NPCs are created with their configured actor profiles");
+assert(/visualProfile,/.test(mainSource), "NPCs are created with their configured visual profiles");
 assert(!/updatePlayerAnimation|updatePlayerDepth|updateLastFacing/.test(mainSource), "WorldScene does not keep player-only movement/animation helpers");
 assert(!/moveWithCollision/.test(characterSource), "Character delegates world collision to CharacterMotor");
 assert(!/PLAYER_SPEED/.test(worldConfigSource), "worldConfig does not export player speed");
@@ -124,20 +130,41 @@ assert.deepEqual(
   villagerProfile.movement,
   "debug-derived villager config matches production profile",
 );
-assert.equal(playerProfile.visual.animationPrefix, "character", "player keeps the character animation prefix");
-assert.equal(villagerProfile.visual.animationPrefix, "character", "villager keeps the character animation prefix");
-assert.equal(playerProfile.visual.frames, PLAYER_FRAMES, "player keeps existing visual frames");
-assert.equal(villagerProfile.visual.frames, PLAYER_FRAMES, "villager keeps existing visual frames");
-assert.equal(playerProfile.visual.footWidth, PLAYER_FOOT_WIDTH, "player keeps the existing foot width");
-assert.equal(villagerProfile.visual.footDepth, PLAYER_FOOT_DEPTH, "villager keeps the existing foot depth");
-assert.equal(playerProfile.visual.idleFrameIndex, PLAYER_IDLE_FRAME_INDEX, "player keeps idle frame index");
-assert.equal(villagerProfile.visual.facingHysteresis, FACING_HYSTERESIS, "villager keeps facing hysteresis");
+const playerVisual = getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.player);
+const homeVisual = getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.homeNpc);
+const streetVisual = getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.streetNpc);
+assert.equal(playerProfile.visual, playerVisual, "actor profile keeps player visual only as a compatibility default");
+assert.equal(villagerProfile.visual, playerVisual, "villager movement profile does not define a unique NPC visual default");
+assert(Object.isFrozen(CHARACTER_VISUAL_PROFILES), "visual profile registry is immutable");
+assert(Object.isFrozen(homeVisual.frames.down[0]), "nested visual frame descriptors are immutable");
+assert.equal(playerVisual.animationPrefix, "player", "player has a distinct animation prefix");
+assert.equal(homeVisual.animationPrefix, "home-npc", "home NPC has a distinct animation prefix");
+assert.equal(streetVisual.animationPrefix, "street-npc", "street NPC has a distinct animation prefix");
+assert.equal(new Set([playerVisual.animationPrefix, homeVisual.animationPrefix, streetVisual.animationPrefix]).size, 3, "animation prefixes are unique");
+assert.equal(playerVisual.footWidth, PLAYER_FOOT_WIDTH, "player keeps the existing foot width");
+assert.equal(homeVisual.footDepth, PLAYER_FOOT_DEPTH, "home NPC keeps the existing foot depth");
+assert.equal(playerVisual.idleFrameIndex, PLAYER_IDLE_FRAME_INDEX, "player keeps idle frame index");
+assert.equal(streetVisual.facingHysteresis, FACING_HYSTERESIS, "street NPC keeps facing hysteresis");
+assert.throws(() => getCharacterVisualProfile("missing"), /Unknown character visual profile ID: missing/, "unknown visual profile IDs fail clearly");
+
+for (const npc of NPCS) {
+  if (npc.id === "home-npc") assert.equal(npc.visualProfileId, CHARACTER_VISUAL_PROFILE_IDS.homeNpc, "home NPC chooses the home visual profile");
+  if (npc.id === "street-npc") assert.equal(npc.visualProfileId, CHARACTER_VISUAL_PROFILE_IDS.streetNpc, "street NPC chooses the street visual profile");
+}
 
 const customFrames = Object.freeze({
-  down: Object.freeze(["custom-down", "custom-down-step-a", "custom-down-step-b"]),
-  up: Object.freeze(["custom-up", "custom-up-step-a", "custom-up-step-b"]),
-  left: Object.freeze(["custom-left", "custom-left-step-a", "custom-left-step-b"]),
-  right: Object.freeze(["custom-right", "custom-right-step-a", "custom-right-step-b"]),
+  down: Object.freeze([{ textureKey: "custom-down", frame: undefined }, { textureKey: "custom-down-step-a", frame: undefined }, { textureKey: "custom-down-step-b", frame: undefined }]),
+  up: Object.freeze([{ textureKey: "custom-up", frame: undefined }, { textureKey: "custom-up-step-a", frame: undefined }, { textureKey: "custom-up-step-b", frame: undefined }]),
+  left: Object.freeze([{ textureKey: "custom-left", frame: undefined }, { textureKey: "custom-left-step-a", frame: undefined }, { textureKey: "custom-left-step-b", frame: undefined }]),
+  right: Object.freeze([{ textureKey: "custom-right", frame: undefined }, { textureKey: "custom-right-step-a", frame: undefined }, { textureKey: "custom-right-step-b", frame: undefined }]),
+});
+const customVisualProfile = Object.freeze({
+  animationPrefix: "custom",
+  frames: customFrames,
+  idleFrameIndex: 0,
+  footWidth: 11,
+  footDepth: 7,
+  facingHysteresis: 0.25,
 });
 const fakeSprite = {
   x: 0,
@@ -147,12 +174,13 @@ const fakeSprite = {
   setOrigin() { return this; },
   setDepth() { return this; },
   setPosition(x, y) { this.x = x; this.y = y; return this; },
-  setTexture(key) { this.texture.key = key; return this; },
+  setTexture(key, frame) { this.texture.key = key; this.texture.frame = frame; return this; },
 };
 const fakeScene = {
   add: {
-    sprite(x, y, texture) {
+    sprite(x, y, texture, frame) {
       assert.equal(texture, "custom-down", "custom Character frames select the configured idle texture");
+      assert.equal(frame, undefined, "custom Character image frames do not pass a frame number");
       fakeSprite.x = x;
       fakeSprite.y = y;
       return fakeSprite;
@@ -164,10 +192,7 @@ const configurableCharacter = createCharacter(fakeScene, {
   spawn: { x: 4, y: 8 },
   controller: { getCommand: () => createControllerCommand() },
   movementConfig: DEFAULT_MOVEMENT_CONFIG,
-  frames: customFrames,
-  idleFrameIndex: 0,
-  footWidth: 11,
-  footDepth: 7,
+  visualProfile: customVisualProfile,
 });
 assert.equal(configurableCharacter.footWidth, 11, "Character collision width is configurable");
 assert.equal(configurableCharacter.footDepth, 7, "Character collision depth is configurable");
@@ -195,11 +220,11 @@ const visualSprite = {
   setOrigin(x, y) { this.origin = { x, y }; return this; },
   setDepth(depth) { this.depth = depth; return this; },
   setPosition(x, y) { this.x = x; this.y = y; return this; },
-  setTexture(key) { this.texture.key = key; return this; },
+  setTexture(key, frame) { this.texture.key = key; this.texture.frame = frame; return this; },
   destroy() { this.destroyCount += 1; },
 };
-const visualScene = { add: { sprite(x, y, texture) { visualSprite.x = x; visualSprite.y = y; visualSprite.texture.key = texture; return visualSprite; } } };
-const visual = createCharacterVisual(visualScene, { spawn: { x: 2, y: 3 }, actorProfile: playerProfile, frames: customFrames, idleFrameIndex: 0, facingHysteresis: 0.25 });
+const visualScene = { add: { sprite(x, y, texture, frame) { visualSprite.x = x; visualSprite.y = y; visualSprite.texture.key = texture; visualSprite.texture.frame = frame; return visualSprite; } } };
+const visual = createCharacterVisual(visualScene, { spawn: { x: 2, y: 3 }, visualProfile: customVisualProfile });
 assert.equal(visual.sprite.texture.key, "custom-down", "CharacterVisual creates the sprite with the configured idle frame");
 assert.deepEqual(visual.sprite.origin, { x: 0.5, y: 1 }, "CharacterVisual preserves sprite origin");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 0.7, y: 0.6 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
@@ -208,13 +233,13 @@ assert.equal(visual.sprite.depth, 509, "CharacterVisual keeps depth sorting as 5
 assert.equal(visual.lastFacing, "down", "CharacterVisual keeps facing hysteresis for near-diagonal input");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 20, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.equal(visual.lastFacing, "right", "CharacterVisual updates cardinal facing outside hysteresis");
-assert.deepEqual(visual.sprite.anims.played.at(-1), "character-walk-right", "CharacterVisual preserves walk animation keys");
+assert.deepEqual(visual.sprite.anims.played.at(-1), "custom-walk-right", "CharacterVisual preserves walk animation keys");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.equal(visual.sprite.texture.key, "custom-right", "CharacterVisual selects the matching idle frame");
 for (const [facing, frames] of Object.entries(customFrames)) {
   visual.lastFacing = facing;
   for (const frameAtStop of frames) {
-    visual.sprite.texture.key = frameAtStop;
+    visual.sprite.texture.key = frameAtStop.textureKey;
     visual.sprite.anims.isPlaying = true;
     visual.sprite.anims.currentAnim = { key: `${visual.animationPrefix}-walk-${facing}` };
     visual.update(
@@ -224,8 +249,8 @@ for (const [facing, frames] of Object.entries(customFrames)) {
     );
     assert.equal(
       visual.sprite.texture.key,
-      frames[0],
-      `CharacterVisual returns ${facing} to neutral from ${frameAtStop}`,
+      frames[0].textureKey,
+      `CharacterVisual returns ${facing} to neutral from ${frameAtStop.textureKey}`,
     );
   }
 }

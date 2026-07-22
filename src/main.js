@@ -42,10 +42,13 @@ import { createLocalization } from "./localization/index.js";
 import { RUBIK_FONT_KEY, RUBIK_FONT_PATH } from "./localization/font.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
-import { PLAYER_WALK_FRAME_SEQUENCE } from "./visualConfig.js";
+import {
+  CHARACTER_VISUAL_PROFILE_IDS,
+  getCharacterVisualProfile,
+  toPhaserFrame,
+} from "./characterVisualProfiles.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
-const PLAYER_ASSET_URL = `${import.meta.env.BASE_URL}assets/third-party/kenney/player`;
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
 const FONT_ASSET_URL = `${import.meta.env.BASE_URL}${RUBIK_FONT_PATH}`;
 
@@ -57,15 +60,48 @@ class WorldScene extends Phaser.Scene {
 
   preload() {
     this.load.font(RUBIK_FONT_KEY, FONT_ASSET_URL, "truetype");
-    const playerTextureKeys = new Set(
-      Object.values(getActorProfile(ACTOR_PROFILE_IDS.player).visual.frames).flat(),
-    );
-    playerTextureKeys.forEach((frame) => this.load.image(frame, `${PLAYER_ASSET_URL}/${frame}.png`));
+    this.getUsedCharacterVisualProfiles().forEach((visualProfile) => {
+      this.preloadCharacterVisualProfile(visualProfile);
+    });
 
     const sheet = { frameWidth: TILE_SIZE, frameHeight: TILE_SIZE };
     this.load.spritesheet(OUTDOOR_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${OUTDOOR_IMAGE_PATH}`, sheet);
     this.load.spritesheet(HOUSE_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${HOUSE_IMAGE_PATH}`, sheet);
     this.load.spritesheet(TREES_TEXTURE_KEY, `${VILLAGE_ASSET_URL}/${TREES_IMAGE_PATH}`, sheet);
+  }
+
+
+  getUsedCharacterVisualProfiles() {
+    return new Map([
+      [
+        CHARACTER_VISUAL_PROFILE_IDS.player,
+        getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.player),
+      ],
+      ...NPCS.map((npc) => [npc.visualProfileId, getCharacterVisualProfile(npc.visualProfileId)]),
+    ]).values();
+  }
+
+  preloadCharacterVisualProfile(visualProfile) {
+    for (const resource of visualProfile.resources) {
+      if (resource.type === "images") {
+        for (const frame of resource.frames) {
+          this.load.image(
+            frame.textureKey,
+            `${import.meta.env.BASE_URL}${resource.path}/${frame.fileName}`,
+          );
+        }
+        continue;
+      }
+      if (resource.type === "spritesheet") {
+        this.load.spritesheet(
+          resource.textureKey,
+          `${import.meta.env.BASE_URL}${resource.path}`,
+          { frameWidth: resource.frameWidth, frameHeight: resource.frameHeight },
+        );
+        continue;
+      }
+      throw new Error(`Unknown character visual resource type: ${resource.type}`);
+    }
   }
 
   create() {
@@ -106,18 +142,13 @@ class WorldScene extends Phaser.Scene {
   }
 
   createCharacterAnimations() {
-    const uniqueVisualProfiles = new Set(
-      Object.values(ACTOR_PROFILE_IDS).map((id) => getActorProfile(id).visual),
-    );
-    for (const visual of uniqueVisualProfiles) {
+    for (const visual of this.getUsedCharacterVisualProfiles()) {
       Object.entries(visual.frames).forEach(([facing, frames]) => {
         const key = `${visual.animationPrefix}-walk-${facing}`;
         if (this.anims.exists(key)) return;
         this.anims.create({
           key,
-          frames: PLAYER_WALK_FRAME_SEQUENCE.map((frameIndex) => ({
-            key: frames[frameIndex],
-          })),
+          frames: visual.walkFrameSequence.map((frameIndex) => toPhaserFrame(frames[frameIndex])),
           frameRate: visual.walkFrameRate,
           repeat: -1,
         });
@@ -127,6 +158,7 @@ class WorldScene extends Phaser.Scene {
 
   createCharacters() {
     const playerProfile = getActorProfile(ACTOR_PROFILE_IDS.player);
+    const playerVisualProfile = getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.player);
     const debugOverrides = loadMovementDebugConfig({ enabled: this.movementDebugEnabled });
     this.movementConfig = createRuntimeMovementConfig(debugOverrides, playerProfile.movement);
     this.npcMovementConfigs = [];
@@ -139,10 +171,12 @@ class WorldScene extends Phaser.Scene {
       }),
       movementConfig: this.movementConfig,
       actorProfile: playerProfile,
+      visualProfile: playerVisualProfile,
     });
     this.characterSystem.add(this.playerCharacter);
     for (const npc of NPCS) {
       const actorProfile = getActorProfile(npc.profileId);
+      const visualProfile = getCharacterVisualProfile(npc.visualProfileId);
       this.characterSystem.add(createCharacter(this, {
         id: npc.id,
         spawn: npc.spawn,
@@ -152,6 +186,7 @@ class WorldScene extends Phaser.Scene {
         }),
         movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
         actorProfile,
+        visualProfile,
       }));
     }
     this.player = this.characterSystem.require("player").sprite;
