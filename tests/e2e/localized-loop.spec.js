@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-async function boot(page) {
-  await page.goto("./");
+async function boot(page, target = "./") {
+  await page.goto(target);
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
 }
 
@@ -70,6 +70,31 @@ test("localized quest progress persists and New Game keeps language", async ({ p
   await clickLogical(page, 92, 111);
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: {} });
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
+});
+
+test("desktop keyboard selects and preserves diagonal runtime facing", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "desktop keyboard smoke only");
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await boot(page, "./?movementDebug=1");
+  const status = page.locator(".movement-debug-status");
+
+  await page.keyboard.down("KeyW");
+  await page.keyboard.down("KeyD");
+  await expect(status).toContainText("facing up-right");
+  await page.keyboard.up("KeyD");
+  await page.keyboard.up("KeyW");
+  await expect(status).toContainText("speed 0.0");
+  await expect(status).toContainText("facing up-right");
+
+  await page.keyboard.down("KeyS");
+  await page.keyboard.down("KeyA");
+  await expect(status).toContainText("facing down-left");
+  await page.keyboard.up("KeyA");
+  await page.keyboard.up("KeyS");
+  await expect(status).toContainText("speed 0.0");
+  await expect(status).toContainText("facing down-left");
+  expect(pageErrors).toEqual([]);
 });
 
 test("mobile touch starts a Russian dialogue without joystick capture", async ({ page }, testInfo) => {
