@@ -14,83 +14,100 @@ For a routine task, read in this order:
 Do **not** read `PROJECT.md`, `LEAD.md`, `REVIEW.md` or `LIBRARY.md` by default.
 
 - Read `PROJECT.md` only when the direct prompt explicitly requires product history or a strategic decision.
-- Read `LEAD.md` only when the direct prompt explicitly changes Lead workflow or task-orchestration rules.
-- Read `REVIEW.md` only when the direct prompt explicitly changes Integrator workflow; normal implementation delivery is fully specified here and in the PR template.
+- Read `LEAD.md` only when the direct prompt explicitly changes Lead workflow or task orchestration.
+- Read `REVIEW.md` only when the direct prompt explicitly changes Integrator workflow.
 - Read `LIBRARY.md` only when the location of the relevant system is genuinely unclear.
 - Read a file from `tasks/` only when the direct prompt explicitly names it.
 - Read `ASSETS.md` when the task adds, replaces, selects or audits external assets.
 
-The direct prompt is the task contract. Do not expand its scope by mining unrelated project history.
+The direct prompt is the task contract. Do not expand scope by mining unrelated project history.
+
+## Creative fast lane
+
+Routine gameplay, UI, content, configuration, local refactors and bounded bug fixes use the creative fast lane by default.
+
+The objective is to deliver one observable result quickly enough for product evaluation while preserving proven architectural boundaries.
+
+For a routine task:
+
+- use one ephemeral branch and one final PR;
+- implement the smallest clean solution for the current use case;
+- use targeted checks for the changed contract and a production build;
+- inspect the changed runtime states when behavior or presentation changes;
+- leave the canonical full repository suite to PR CI unless the task risk requires it locally;
+- do not create task files, preparatory PRs, integration waves or documentation-only follow-ups.
+
+A small explicitly reported residual runtime risk is acceptable for an easily reversible creative iteration when targeted checks and final PR CI are green. Never conceal that risk or claim an unperformed inspection.
 
 ## Before editing
 
 1. Run `git fetch --prune`.
-2. Verify that the supplied task branch starts from the prompt's Base SHA or current `origin/main` for a standalone task.
+2. Verify that the supplied task branch starts from the prompt's Base SHA when one is supplied, otherwise from current `origin/main`.
 3. Work only in the single supplied task branch.
 4. Never push ordinary task work directly to `main`.
 5. Never create or push an additional remote branch.
-6. Inspect the relevant existing implementation before choosing an architecture.
-7. Respect `Owned paths` and `Shared files allowed` from the prompt.
-8. When the task adds or replaces binary assets, complete the binary asset delivery preflight below before implementing dependent code.
+6. Inspect the relevant implementation before choosing an architecture.
+7. Respect explicit scope boundaries and any supplied owned/shared paths.
+8. Complete binary delivery preflight before implementing code that depends on new or replaced binaries.
 
 ## Binary asset delivery preflight
 
-A task that adds or replaces PNG, JPG, WebP, font, audio, archive or another binary file must prove its delivery path before implementation begins.
+A task that adds or replaces PNG, JPG, WebP, font, audio, archive or another binary file must prove its delivery path before dependent implementation begins.
 
 Before editing dependent code:
 
-1. identify every required new or replaced binary path;
+1. identify every required binary path;
 2. verify whether each file is already committed in the supplied base;
-3. verify that the current execution environment and repository policy permit the actual binary files to be staged, committed, pushed to the supplied branch and included in a PR;
-4. verify that PR creation remains available after those binary commits;
-5. only then start code, config, tests and documentation that reference the assets.
+3. verify that the execution environment and repository policy permit the actual files to be staged, committed, pushed and included in a PR;
+4. verify that PR creation remains available after the binary commit;
+5. only then implement code, config, tests and documentation that reference the assets.
 
-A generic statement that Git normally supports binaries is not proof that the current Codex/tooling path can deliver them.
-
-If binary delivery is blocked or uncertain:
-
-- stop immediately before implementing binary-dependent code;
-- report the exact blocked file types and paths;
-- do not spend the task implementing references to assets that cannot be delivered;
-- do not claim the task is substantially complete;
-- do not create a code-only PR that claims the missing visual result;
-- wait for a binary-capable import step or a revised task that uses files already present in the repository.
+If delivery is blocked or uncertain, stop before implementing binary-dependent code and report the exact blocked paths. Do not create a code-only PR that claims the missing visual result.
 
 Forbidden workarounds:
 
-- base64 text files committed instead of the required runtime binaries;
+- base64 text files instead of runtime binaries;
 - ZIP archives when runtime expects separate files;
-- fake text extensions or reconstructed placeholder assets;
-- code or `ASSETS.md` entries that reference files absent from the branch;
-- using unrelated existing assets while claiming they are the requested new variants.
+- fake text extensions or reconstructed placeholders;
+- references or asset records for absent files;
+- unrelated existing assets presented as the requested variants.
 
-When the prompt states that binaries were pre-imported, verify their exact paths, dimensions and hashes in the supplied base before using them.
+When binaries were pre-imported, verify their exact paths, dimensions and hashes before use. A binary task is complete only when runtime files, references, applicable source/license records and validation evidence are delivered together.
 
-A binary-asset task is deliverable only when the final branch contains the actual runtime files, code references, applicable license/source records and validation evidence together.
-
-## Task entry modes
+## Task modes
 
 ### Routine direct prompt
 
-This is the default for normal iterations.
+This is the default mode.
 
-- Do not create a task file, issue, planning document or preparatory PR.
-- Use the supplied ephemeral branch and exactly one final PR.
 - Treat the prompt as complete unless a real product ambiguity prevents correct implementation.
+- Do not create an issue, task file, planning document or preparatory PR.
+- Deliver exactly one coherent observable result in one final PR.
 
-### Explicit durable task file
+### Strict or coordinated task
 
-Use only when the prompt names a `tasks/*.md` file.
+Use strict handling only when the task affects at least one of these areas:
 
-A durable task file is reserved for large, high-risk, multi-stage, resumable or repeatedly reused work where repository persistence materially reduces risk.
+- central state ownership or architectural boundaries;
+- movement, collision or input contracts with broad regression radius;
+- persistence, serialization schema or migrations;
+- dependencies, workflows, deployment or security-sensitive configuration;
+- external assets and licensing;
+- shared registries or entry points changed by parallel work;
+- several dependent PRs whose merge order matters;
+- a change whose failure is difficult to detect after merge.
 
-## Integration metadata
+A durable `tasks/*.md` contract is reserved for large, high-risk, multi-stage, resumable or repeatedly reused work and must be explicitly named by the prompt.
 
-The Lead may supply coordination fields for standalone or parallel work:
+## Integration metadata is optional
+
+Routine independent work does not require Batch, Task, Merge phase, Owned paths or dependency metadata.
+
+The Lead may supply coordination fields for strict or parallel work:
 
 ```text
 Integration metadata
-- Batch: <NB-YYYYMMDD-NN or standalone>
+- Batch: <NB-YYYYMMDD-NN>
 - Task: <id>
 - Base SHA: <sha>
 - Depends on: <none or task ids / PRs>
@@ -104,31 +121,46 @@ Integration metadata
 When these fields are present:
 
 - use the exact supplied branch and PR title;
-- copy the metadata into `.github/pull_request_template.md`;
-- do not modify files outside `Owned paths` except files explicitly listed in `Shared files allowed`;
-- do not opportunistically edit shared entry points, canonical docs, package files or workflows owned by another parallel task;
-- do not implement dependencies named in `Depends on`; consume them only when they are already present in the supplied base;
-- if the supplied base does not contain a required dependency, stop and report the exact mismatch instead of reimplementing it;
-- do not ask the user to manage Batch, Task or merge order.
+- copy the metadata into the PR body, never into `.github/pull_request_template.md`;
+- do not modify files outside owned paths except explicitly allowed shared files;
+- do not reimplement named dependencies;
+- stop and report an exact base/dependency mismatch when the supplied base lacks a required dependency;
+- do not ask the user to manage metadata or merge order.
 
-For a routine non-parallel task, use `Batch: standalone` when requested. Missing metadata does not authorize extra scope.
+Missing metadata never authorizes extra scope.
 
 ## Scope discipline
 
 - Deliver the observable result requested by the prompt.
-- Prefer the smallest architecture that cleanly supports the current use cases.
-- Do not invent future mechanics, frameworks or generalized systems not exercised by the task.
+- Prefer the smallest architecture that cleanly supports current use cases.
+- Do not invent future mechanics, frameworks or generalized systems without a second real use case.
 - Do not add unrelated refactors, dependencies, assets, workflows, compatibility layers or infrastructure.
-- Do not weaken existing tests or validation to make a local environment pass.
-- Stop for clarification only when a product, visual or priority choice materially changes the user-facing result.
-- Technical implementation details are Codex responsibilities unless the prompt explicitly constrains them.
-- A parallel task must remain useful and testable without secretly integrating sibling tasks through shared files it does not own.
+- Do not weaken tests or validation because of a local environment failure.
+- Ask for clarification only when a product, visual or priority choice materially changes the user-facing result.
+- Technical implementation details remain Codex responsibilities unless explicitly constrained.
+- Parallel work must remain useful and testable without secretly integrating sibling tasks through unowned shared files.
 
-## Mandatory validation
+## Risk-based validation
 
-A task is not complete because the code compiles.
+A task is not complete because the code compiles. Validation depth follows actual regression risk.
 
-For `code` or `visual/runtime` changes, run:
+### Fast lane
+
+For routine code, gameplay, UI, content or configuration work:
+
+1. run the targeted checks that exercise the changed contract;
+2. run `npm run build`;
+3. inspect the complete diff;
+4. launch and inspect changed runtime states when behavior or presentation changes;
+5. let PR CI run the canonical full repository suite.
+
+Run `npm ci` when dependencies are not already installed or package files changed. Run the full local `npm run check` when it is practical and materially reduces risk, but do not duplicate a reliable full PR CI merely as ceremony.
+
+A deterministic failure in an applicable targeted check or build blocks PR creation.
+
+### Strict lane
+
+For strict-risk changes, run the complete local validation path when the environment permits:
 
 ```bash
 npm ci
@@ -136,127 +168,88 @@ python -m pip install -r requirements-dev.txt
 npm run check
 ```
 
-For a documentation-only change:
+Also run any targeted migration, dependency, workflow, asset or integration checks required by the changed contract.
+
+### Documentation-only
 
 - inspect the complete diff;
 - confirm that no executable, asset, dependency or workflow file changed;
 - run `npm run check:docs` when available;
-- let the normal PR workflow perform repository validation;
-- do not install runtime or visual dependencies solely to pad the report.
+- let PR CI perform repository validation;
+- do not install runtime or visual dependencies solely to expand the report.
 
 Never report an unavailable or unperformed check as passed. Record the exact limitation.
 
-### Runtime and visual inspection
+## Runtime and visual inspection
 
-For visual, animation, input, layout, camera, fullscreen, resize or other interactive changes, also launch the game:
+For visual, animation, input, layout, camera, fullscreen, resize or other interactive changes, launch the game:
 
 ```bash
 npm run dev -- --host 0.0.0.0
 ```
 
-Inspect every changed state, not only initial page load. Check the native logical game size and a mobile/coarse-pointer viewport whenever touch behavior is involved.
+Inspect every changed state rather than the complete historical behavior matrix. Check the native logical size and a mobile/coarse-pointer viewport only when the task affects touch or responsive behavior.
 
-### Movement, joystick and animation
-
-When applicable, explicitly verify:
-
-- idle after release;
-- walk up, down, left and right;
-- facing matches movement;
-- diagonal input does not increase speed;
-- keyboard and mobile joystick both work;
-- the active joystick pointer continues outside the canvas;
-- loss of pointer capture does not terminate ownership when the global fallback should continue it;
-- matching release outside the canvas resets movement;
-- cancellation, blur, hidden document and fullscreen transitions do not leave stuck movement;
-- world and room collision boundaries remain correct.
-
-### Fullscreen, resize and screen-space UI
-
-When applicable, explicitly verify:
-
-- enter and exit through supported paths;
-- state and icon synchronization after system exit or `Esc`;
-- integer zoom and crisp pixels after resize/fullscreen transitions;
-- desktop and mobile/coarse-pointer layouts;
-- HUD input does not activate gameplay controls.
-
-### Room, world and tile changes
-
-When applicable, explicitly verify:
-
-- floor and outdoor ground fill intended areas;
-- wall directions, corners and bands use correct tiles;
-- doors and openings are genuinely traversable;
-- no unrelated sprites appear;
-- pixels remain crisp;
-- generated preview artifacts represent the intended result.
+When applicable, verify the exact changed aspects of movement, joystick, animation, fullscreen, resize, screen-space UI, world geometry or tile composition. Existing unaffected states need no repeated manual inspection unless the change has a credible regression path into them.
 
 ## Dependency and environment integrity
 
-A local network, proxy, package-index, browser-install or dependency failure does not authorize repository changes outside the task.
+A local network, proxy, package-index, browser-install or dependency failure does not authorize unrelated repository changes.
 
-- Do not vendor a fake or partial dependency replacement.
+- Do not vendor fake or partial dependencies.
 - Do not add fallback packages, generated binaries or compatibility modules.
-- Do not alter canonical validation scripts to bypass the failure.
-- Run every remaining possible check and report the limitation.
+- Do not alter canonical validation to bypass a local failure.
+- Run every remaining applicable check and report the limitation.
 - Let the unchanged GitHub Actions environment perform clean validation.
-- A genuine dependency or CI repair must be explicit task scope.
+- Treat a genuine dependency or CI repair as explicit task scope.
 
 ## Review-efficient delivery
 
 - Develop without an open PR.
-- Finish implementation, self-review, browser inspection and known repairs first.
-- Run all applicable local validation before opening the PR. A deterministic local failure blocks PR creation.
-- Batch related corrections instead of pushing one commit per small defect.
+- Finish implementation, self-review, applicable runtime inspection and known repairs first.
+- Batch related corrections rather than pushing one commit per defect.
 - Create exactly one final non-draft PR after applicable validation.
-- A draft PR is not a normal development mechanism. It is allowed only as a circuit breaker after an already-open final PR exposes a remote-only or previously unknown CI failure.
+- Use a draft only as a circuit breaker after an already-open final PR exposes a remote-only or previously unknown failure.
 - Do not push diagnostic or incremental repair commits to an open non-draft PR.
-- After a failed final-head CI run, read the complete failing logs, reproduce locally when possible, collect all blockers and make one consolidated corrective push.
-- If another repair cycle is unavoidable, convert the PR to draft before any further branch mutation. Keep it draft while diagnosing and mark it ready only after applicable local checks pass; the ready transition is the single intended final CI trigger.
-- Do not use close/reopen cycles or replacement PRs as a development mechanism.
-- Keep one coherent implementation concern per PR when `main` can remain usable between stages.
+- After a failed final-head CI run, diagnose the complete failure and make one consolidated corrective push.
+- Keep one coherent user-facing or technical concern per PR when `main` can remain usable between stages.
 - Do not knowingly open a PR with obvious defects merely because automated checks pass.
-- Ensure all evidence and artifacts refer to the final head SHA.
+- Ensure evidence and artifacts refer to the final head SHA.
 
-Use the exact PR title from Integration metadata when supplied. Use `.github/pull_request_template.md` and keep only sections applicable to the actual risk.
+Use `.github/pull_request_template.md` as a minimal report and delete sections that do not apply.
 
 ## Documentation boundaries
 
-Codex should not carry the Lead or Integrator's full context merely to keep documentation current.
+Codex should not carry Lead or Integrator context merely to keep documentation current.
 
-- Do not edit `PROJECT.md`, `LEAD.md` or `REVIEW.md` unless the direct prompt explicitly changes their owned process or product facts.
-- Update `LIBRARY.md` only when important files, entry points or canonical addresses are added, removed, renamed or materially reassigned and the prompt grants access to that shared file.
-- Update `ASSETS.md` only when external asset sources, licensing, hashes or asset policy change.
+- Do not edit `PROJECT.md`, `LEAD.md` or `REVIEW.md` unless the prompt explicitly changes their owned facts.
+- Update `LIBRARY.md` only when important files, entry points or canonical addresses are materially added, removed, renamed or reassigned and the prompt allows it.
+- Update `ASSETS.md` only when external sources, licensing, hashes or asset policy change.
 - Update `AGENTS.md` only when the task explicitly changes Codex operating rules.
-- Do not write future or unverified behavior as already shipped.
-- The Integrator owns the final documentation-drift check and may repair canonical docs in the same branch before merge.
-
-Parallel implementation PRs normally do not edit Lead/Integrator documents. A later integration step or the Integrator updates shared canonical context after actual delivery.
+- Do not write planned or unverified behavior as shipped.
+- Prefer documentation in the same implementation/integration PR; do not create a routine follow-up documentation PR.
+- The Integrator owns the final material documentation-drift check.
 
 ## Branch lifecycle
 
 - Ordinary tasks use exactly one ephemeral remote branch.
-- When the prompt supplies `work/<batch>/<task-slug>`, use it exactly.
-- GitHub automatic head-branch deletion handles the branch after merge.
-- Do not delete the active task branch from inside the implementation task.
+- Use an exact supplied branch name when present.
+- GitHub automatic head-branch deletion handles cleanup after merge.
+- Do not delete the active branch from inside the implementation task.
 - Do not modify repository rulesets, branch protection, settings or tokens.
-- Do not request broader administrative access merely to finish a normal task.
 - Never delete or rewrite `main`, `release/*`, `archive/*` or `keep/*`.
-- Persistent branches are exceptional and require an explicit durable task contract, approved prefix and repository-side protection.
-- Do not perform branch cleanup as a side effect of implementation work.
+- Persistent branches require an explicit durable contract and repository-side protection.
 
 ## Pixel-grid protocol
 
 All world art on the same source pixel grid must use one visual pixel size.
 
-- Do not independently scale player, environment or props that share the 16×16 grid.
+- Do not independently scale player, environment or props sharing the 16×16 grid.
 - Prefer native-size world assets and one logical render grid.
-- The displayed canvas must use integer zoom; letterboxing is acceptable.
-- Use nearest-neighbor rendering: `pixelArt: true`, `antialias: false`, `roundPixels: true`, `image-rendering: pixelated`.
-- Camera follow and scroll must not introduce subpixel sampling.
-- Check visual changes at two or more viewport sizes.
-- UI may use separate screen-space dimensions but must not alter world-art scale.
+- Use integer displayed zoom; letterboxing is acceptable.
+- Preserve nearest-neighbor rendering and integer camera sampling.
+- Check visual changes at two viewport sizes when viewport scaling is affected.
+- Screen-space UI may use separate dimensions but must not alter world-art scale.
 
 ## Third-party spritesheet protocol
 
@@ -268,10 +261,10 @@ Never select production frames by guessing raw numeric indexes.
 4. Render author examples when available.
 5. Obtain user approval for semantically ambiguous frames.
 6. Centralize approved selections behind semantic names.
-7. Record source, geometry, selected rectangles/indexes and hashes in `ASSETS.md` or a canonical manifest when applicable.
-8. Ensure visual previews from the final head are available before merge.
+7. Record source, geometry, selections and hashes when applicable.
+8. Ensure final-head visual evidence is available before merge.
 
-The spritesheet protocol does not replace the binary asset delivery preflight. Frame selection begins only after the required runtime binaries are known to be deliverable through the current branch and PR path.
+The spritesheet protocol does not replace binary delivery preflight.
 
 ## Completion report
 
@@ -279,13 +272,11 @@ Use the shortest report that contains applicable evidence.
 
 Always identify:
 
-- review class and concise scope;
-- Integration metadata, including Batch, Task, Base SHA, Depends on and Merge phase;
-- work branch, lifecycle and final head SHA;
-- whether additional remote branches were created;
-- validation performed;
+- concise scope and review class;
+- work branch and final head SHA;
+- validation actually performed;
 - real limitations.
 
-Include runtime states, viewports, devices, artifacts, asset choices, dependency changes or infrastructure changes only when they apply.
+Include Integration metadata only when the prompt supplied it. Include runtime states, devices, artifacts, assets, dependency changes or infrastructure details only when they apply.
 
-Do not claim a visual/runtime task is complete when its changed runtime behavior was not inspected. Open the final PR for strict Integrator review and state the limitation honestly.
+Do not claim a visual/runtime result was inspected when it was not. Open the final PR for Integrator review and state any residual limitation honestly.
