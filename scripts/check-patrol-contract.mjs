@@ -45,18 +45,10 @@ const controller = createPatrolController({
   mode: streetNpc.patrol.mode,
   waypoints: streetNpc.patrol.waypoints,
 });
-const visitedIndexes = [controller.currentWaypointIndex];
-let previousIndex = controller.currentWaypointIndex;
-let safety = 0;
-
-while (visitedIndexes.length < streetRoute.points.length * 2 - 1 && safety < 100) {
-  const waypoint = streetRoute.points[controller.currentWaypointIndex];
-  controller.getCommand({ position: waypoint, blockedAxes: {} }, Math.max(waypoint.waitMs ?? 0, 1));
-  if (controller.currentWaypointIndex !== previousIndex) {
-    visitedIndexes.push(controller.currentWaypointIndex);
-    previousIndex = controller.currentWaypointIndex;
-  }
-  safety += 1;
+const visitedIndexes = [0, controller.currentWaypointIndex];
+while (visitedIndexes.length < streetRoute.points.length * 2 - 1) {
+  controller.advanceForTest();
+  visitedIndexes.push(controller.currentWaypointIndex);
 }
 
 const forward = streetRoute.points.map((_, index) => index);
