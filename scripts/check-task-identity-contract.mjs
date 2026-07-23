@@ -20,7 +20,7 @@ for (const [label, text] of [
   ["LEAD.md", lead],
   ["REVIEW.md", review],
 ]) {
-  assert(text.includes("Task #<" ) || text.includes(canonicalTask), `${label} must describe numbered Task identity`);
+  assert(text.includes("Task #<") || text.includes(canonicalTask), `${label} must describe numbered Task identity`);
 }
 
 assert(roadmap.includes(canonicalTask), "ROADMAP.md must assign the active task a permanent Task number");
@@ -34,7 +34,7 @@ assert(lead.includes("PR title: Task #001 — Первая расчистка у
 assert(lead.includes("task/001-first-debris-clear"), "LEAD.md must standardize task branch naming");
 assert(lead.includes(linkedReference), "LEAD.md must require linked PR and Task references");
 
-assert(review.includes("PR #<номер> · Task #<номер> — <название>"), "REVIEW.md must require linked PR and Task references");
+assert(review.includes("PR #<pr> · Task #<task> — <название>"), "REVIEW.md must require linked PR and Task references");
 assert(review.includes(repairCommand), "REVIEW.md must issue a numbered repair command");
 assert(review.includes("Repair, rebase и повторная приёмка сохраняют исходный Task number"), "REVIEW.md must preserve Task identity through repair");
 
