@@ -15,8 +15,15 @@ export function parseTaskIdentity(title, body = "") {
   return { valid: true, canonical, number: titleMatch[1], name: titleMatch[2] };
 }
 
+export function reviewLane(body = "") {
+  const strict = /^\s*-\s*\[x\]\s*`?strict-risk`?\s*$/imu.test(body);
+  const fast = /^\s*-\s*\[ \]\s*`?strict-risk`?\s*$/imu.test(body);
+  if (strict === fast) return "invalid";
+  return strict ? "strict" : "fast";
+}
+
 export function isStrictRisk(body = "") {
-  return /^\s*-\s*\[x\]\s*`?strict-risk`?\s*$/imu.test(body);
+  return reviewLane(body) === "strict";
 }
 
 export function successfulRequiredChecks(checkRuns, requiredChecks = REQUIRED_CHECKS) {
@@ -59,12 +66,14 @@ export function hasUnresolvedCodexThread(reviewThreads = []) {
 export function evaluateFastLaneGate(input) {
   const identity = parseTaskIdentity(input.title, input.body);
   if (!identity.valid) return { merge: false, lane: "invalid", reason: identity.reason };
-  if (isStrictRisk(input.body)) return { merge: false, lane: "strict", reason: "strict-risk requires Integrator merge" };
-  if (input.draft) return { merge: false, lane: "fast", reason: "PR is draft" };
-  if (input.baseRef !== "main") return { merge: false, lane: "fast", reason: "base branch is not main" };
-  if (!input.sameRepository) return { merge: false, lane: "fast", reason: "fork PRs never auto-merge" };
-  if (!successfulRequiredChecks(input.checkRuns)) return { merge: false, lane: "fast", reason: "required checks are not successful" };
-  if (!hasCurrentCodexEvidence(input)) return { merge: false, lane: "fast", reason: "current-head Codex review evidence is missing" };
-  if (hasUnresolvedCodexThread(input.reviewThreads)) return { merge: false, lane: "fast", reason: "an unresolved Codex review thread remains" };
-  return { merge: true, lane: "fast", reason: "all automatic merge gates passed", identity };
+  const lane = reviewLane(input.body);
+  if (lane === "invalid") return { merge: false, lane, reason: "PR must explicitly declare checked or unchecked strict-risk" };
+  if (lane === "strict") return { merge: false, lane, reason: "strict-risk requires Integrator merge" };
+  if (input.draft) return { merge: false, lane, reason: "PR is draft" };
+  if (input.baseRef !== "main") return { merge: false, lane, reason: "base branch is not main" };
+  if (!input.sameRepository) return { merge: false, lane, reason: "fork PRs never auto-merge" };
+  if (!successfulRequiredChecks(input.checkRuns)) return { merge: false, lane, reason: "required checks are not successful" };
+  if (!hasCurrentCodexEvidence(input)) return { merge: false, lane, reason: "current-head Codex review evidence is missing" };
+  if (hasUnresolvedCodexThread(input.reviewThreads)) return { merge: false, lane, reason: "an unresolved Codex review thread remains" };
+  return { merge: true, lane, reason: "all automatic merge gates passed", identity };
 }
