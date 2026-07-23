@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { reconstructBinaryImport } from "./reconstruct-binary-import.mjs";
 
 function writeStagedImport(repositoryRoot, importId, bytes, { sha256 = null } = {}) {
@@ -38,6 +39,16 @@ function writeStagedImport(repositoryRoot, importId, bytes, { sha256 = null } = 
 
   return { stagingRelative, actualSha256 };
 }
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repositoryRootForWorkflow = path.resolve(scriptDirectory, "..");
+const workflow = readFileSync(path.join(repositoryRootForWorkflow, ".github/workflows/binary-import.yml"), "utf8");
+assert.match(workflow, /\.binary-import\/\*\*\/READY/, "binary import runs only after an explicit READY marker");
+assert.doesNotMatch(
+  workflow,
+  /^\s*-\s+"?\.binary-import\/\*\*"?\s*$/mu,
+  "generic staging changes must not trigger GitHub Actions",
+);
 
 const repositoryRoot = mkdtempSync(path.join(tmpdir(), "nestledburrow-binary-import-"));
 try {
