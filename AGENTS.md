@@ -229,18 +229,16 @@ A local network, proxy, package-index, browser-install or dependency failure doe
 
 ## Review-efficient delivery
 
-- Develop without an open PR.
-- Finish implementation, self-review, applicable runtime inspection and known repairs first.
-- Batch related corrections rather than pushing one commit per defect.
-- Create exactly one draft PR after applicable local validation; never open an implementation PR as non-draft.
-- Keep the PR draft while checking the remote diff, body, changed-file list and any remaining repairs.
-- Mark the draft ready for review exactly once, only when the intended final head is frozen and no further push is expected.
-- For strict-risk work, do not mark ready unless the complete local validation path passed. If the environment cannot run it, leave the PR draft and report the limitation for Integrator handling.
-- Do not push diagnostic or incremental repair commits to an open non-draft PR.
-- After a failed final-head CI run, convert the PR back to draft before any mutation, diagnose the complete failure and make one consolidated corrective push.
-- Never rerun a deterministic failed workflow without a code change. Rerun only a confirmed transient infrastructure failure.
+- Commit on the task branch as often as useful. Commit count is not a quality gate and does not need an artificial budget.
+- Finish implementation, self-review, applicable runtime inspection and all known repairs before asking remote CI to certify the result.
+- Before opening a non-draft PR or marking a draft ready, run the same applicable validation path that CI will enforce. Dependency, workflow, persistence, external-asset and other strict-risk changes require the complete local suite when the environment supports it.
+- When a task adds a new command to the mandatory `npm run check` chain, run the complete updated chain locally; passing only the new targeted script is insufficient.
+- A final non-draft PR may be opened directly after the applicable local suite is green. Use draft state when work or remote-only diagnosis remains; draft is a circuit breaker, not a restriction on committing.
+- If CI fails, identify the exact failing command first and determine whether the same command already fails on the base/current `main` or only on the PR head. Do not assume every red run was caused by the PR.
+- A pre-existing base failure is repaired as a base-contract defect before judging the implementation diff.
+- Any number of corrective commits may be pushed while the PR is draft. Do not rerun an unchanged deterministic failure; rerun only after a relevant fix or for a confirmed transient infrastructure failure.
+- Do not knowingly present a PR as ready while an applicable local command is red or was not run without an explicit limitation.
 - Keep one coherent user-facing or technical concern per PR when `main` can remain usable between stages.
-- Do not knowingly mark a PR ready with obvious defects merely because partial automated checks pass.
 - Ensure evidence and artifacts refer to the final head SHA.
 
 Use `.github/pull_request_template.md` as a minimal report and delete sections that do not apply.
@@ -306,4 +304,4 @@ Always identify:
 
 Include Integration metadata only when the prompt supplied it. Include runtime states, devices, artifacts, assets, dependency changes or infrastructure details only when they apply.
 
-Do not claim a visual/runtime result was inspected when it was not. Open the PR as draft, mark it ready exactly once only after the final head is frozen, and state any residual limitation honestly.
+Do not claim a visual/runtime result was inspected when it was not. Present the PR as ready only after the applicable local validation is green, and state any residual limitation honestly.
