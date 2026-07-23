@@ -96,7 +96,14 @@ for (const pr of pullRequests) {
     }),
   });
   if (!result.merged) throw new Error(`PR #${pr.number} was eligible but GitHub refused merge: ${result.message}`);
+
+  await request(`/repos/${owner}/${repo}/actions/workflows/deploy-pages.yml/dispatches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ref: "main" }),
+  });
+
   merged += 1;
-  console.log(`PR #${pr.number} merged as ${result.sha}`);
+  console.log(`PR #${pr.number} merged as ${result.sha}; Pages deployment dispatched`);
 }
 console.log(`Review merge gate completed: ${merged} PR(s) merged`);
