@@ -16,6 +16,9 @@ assert(helper.includes('scene.scale?.on?.("resize", refresh)'), "resize refreshe
 assert(helper.includes('addEventListener?.("fullscreenchange", refresh)'), "fullscreen changes refresh managed text resolution");
 assert(helper.includes("Math.trunc"), "text resolution and coordinates use integers");
 assert(!helper.includes("setScale"), "text helper does not scale text objects");
+assert(helper.includes("createPixelText"), "managed text uses a graphics-backed pixel font instead of browser-rasterized canvas text");
+assert(helper.includes("ф") && helper.includes("я") && helper.includes("a") && helper.includes("z"), "pixel glyph coverage includes Russian and English UI characters");
+assert(helper.includes("fillRect"), "pixel glyphs are drawn as exact integer rectangles");
 
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
