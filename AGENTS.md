@@ -74,6 +74,30 @@ Forbidden workarounds:
 
 When binaries were pre-imported, verify their exact paths, dimensions and hashes before use. A binary task is complete only when runtime files, references, applicable source/license records and validation evidence are delivered together.
 
+## Pre-imported binary handoff is declarative
+
+Transport and reconstruction of a user attachment are Lead-owned operations. A routine Codex implementation task receives the final runtime binary already committed in the supplied Base SHA.
+
+When the prompt supplies a Base SHA, repository path and hash or relevant metadata:
+
+1. verify that the real runtime file exists at that path in the supplied base;
+2. verify its stated hash and relevant metadata;
+3. treat the file as an immutable input and implement the requested runtime integration.
+
+The prompt does not need to explain how the attachment was chunked, transported or reconstructed. A compact statement such as `Use the already imported asset at <path> with SHA-256 <hash>` is a complete binary handoff.
+
+Unless the direct task explicitly changes the binary-import infrastructure, do **not**:
+
+- reconstruct an attachment from base64 chunks or a manifest;
+- inspect, create or modify `.binary-import/**` staging;
+- run, reproduce or explain the repository reconstruction bridge;
+- download another copy, regenerate, transcode, normalize, rename or replace the asset;
+- ask the Lead to copy transport mechanics into the task prompt.
+
+Do not read `BINARY_IMPORT.md` for an ordinary runtime integration task. Read it only when the direct prompt explicitly assigns maintenance or repair of the binary-import infrastructure.
+
+If the runtime file is absent from the supplied base or its hash does not match, stop before implementation and report the exact mismatch. Do not attempt to complete the Lead-owned import stage.
+
 ## Task modes
 
 ### Routine direct prompt
