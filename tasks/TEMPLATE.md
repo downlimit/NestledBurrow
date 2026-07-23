@@ -1,13 +1,20 @@
-# Optional task-file template: <short title>
+# Task #<number> — <short human-readable result title>
 
 <!-- Use this file only when work is large, high-risk, multi-stage, resumable or repeatedly reused and a durable repository contract materially reduces risk. Routine iterations use one self-contained direct Codex prompt and no preparatory task PR. Include only task-specific constraints; do not restate repository-wide rules from AGENTS.md. Remove optional sections that add no value. -->
+
+## Task identity
+
+- Task: `Task #<number> — <short human-readable result title>`
+- Work branch: `task/<number>-<slug>`
+- PR title: `Task #<number> — <short human-readable result title>`
+
+The Task number is allocated in `ROADMAP.md` before this file or prompt is issued. It never changes or gets reused. Repair of the same result keeps the same Task number.
 
 ## Integration metadata
 
 - Batch: `<NB-YYYYMMDD-NN / standalone>`
-- Task: `<id>`
 - Base SHA: `<sha>`
-- Depends on: `<none / task ids>`
+- Depends on: `<none / Task numbers>`
 - Merge phase: `<integer>`
 - Owned paths: `<paths>`
 - Shared files allowed: `<none / paths>`
@@ -17,7 +24,7 @@
 - Base branch: current `main` or the explicit Base SHA above
 - Direct push to `main`: `no`
 - Remote branches allowed: `1`
-- Work branch: `work/<batch>/<task-slug>`
+- Work branch: `task/<number>-<slug>`
 - Lifecycle: `ephemeral`
 - Create PR: `yes` — exactly once, after implementation and applicable validation
 - Delete task branch after merge: `yes` — handled by GitHub automatic head-branch deletion

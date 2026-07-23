@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "npm run check:docs && npm run check:binary-import && npm run check:input && npm run check:runtime-components && npm run check:audio && npm run check:fullscreen && npm run check:hud && npm run check:text-resolution && npm run check:movement && npm run check:character && npm run check:character-diagonals && npm run check:patrol && npm run check:interaction && npm run check:dialogue && npm run check:progress && npm run check:i18n && npm run check:visual && npm run check:world && npm run check:room-preview && npm run build",
-    "check:docs": "node scripts/check-doc-contracts.mjs",
+    "check:docs": "node scripts/check-doc-contracts.mjs && node scripts/check-task-identity-contract.mjs",
     "check:binary-import": "node scripts/check-binary-import.mjs",
     "check:input": "node scripts/check-input.mjs",
     "check:movement": "node scripts/check-movement.mjs",
