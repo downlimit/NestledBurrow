@@ -40,12 +40,28 @@ export function serializeAudioSettings(settings) {
   return JSON.stringify({ schemaVersion: AUDIO_SCHEMA_VERSION, settings: normalizeAudioSettings(settings) });
 }
 
+function loadFromStorage(storage) {
+  try {
+    return deserializeAudioSettings(storage?.getItem?.(AUDIO_STORAGE_KEY));
+  } catch (error) {
+    return { status: "recovered", settings: { ...DEFAULT_AUDIO_SETTINGS }, diagnostic: error };
+  }
+}
+
 export function createAudioSettingsStore({ storage = globalThis.localStorage } = {}) {
-  let settings = { ...DEFAULT_AUDIO_SETTINGS };
+  const loaded = loadFromStorage(storage);
+  let settings = loaded.settings;
   const listeners = new Set();
-  const loaded = deserializeAudioSettings(storage?.getItem?.(AUDIO_STORAGE_KEY));
-  settings = loaded.settings;
-  function persist() { storage?.setItem?.(AUDIO_STORAGE_KEY, serializeAudioSettings(settings)); }
+
+  function persist() {
+    try {
+      storage?.setItem?.(AUDIO_STORAGE_KEY, serializeAudioSettings(settings));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   return {
     loadStatus: loaded.status,
     getSettings: () => ({ ...settings }),
