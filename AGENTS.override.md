@@ -19,7 +19,7 @@ For backward compatibility, the legacy short alias remains accepted, case-insens
 почини PR <number>
 ```
 
-For example, both `Почини «Первую расчистку участка» в существующем PR #81.` and `почини PR 81` mean: repair the existing pull request `#81`. They never mean to edit repair instructions, documentation, process files or the current checkout merely because the prompt is short.
+For example, both `Почини «Первую расчистку участка» в существующем PR #81.` and `почини PR 81` mean: repair the existing pull request `#81`. The legacy alias never means to edit repair instructions, documentation, process files or the current checkout merely because the prompt is short. The same restriction applies to the canonical readable form.
 
 Before changing any file or creating any commit, Codex must:
 
