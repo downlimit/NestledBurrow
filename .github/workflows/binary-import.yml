@@ -25,32 +25,82 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
-      - name: Reconstruct and validate binaries
+      - name: Download, reconstruct and validate binaries
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t manifests < <(find .binary-import -mindepth 2 -maxdepth 2 -type f -name manifest.json | sort)
-          if [ "${#manifests[@]}" -eq 0 ]; then
-            echo "No staged binary manifests found" >&2
-            exit 1
-          fi
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import shutil
+          import urllib.parse
+          import urllib.request
 
-          for manifest in "${manifests[@]}"; do
-            node scripts/reconstruct-binary-import.mjs "$(dirname "$manifest")"
-          done
+          root = pathlib.Path.cwd().resolve()
+          manifests = sorted((root / ".binary-import").glob("*/manifest.json"))
+          if not manifests:
+              raise SystemExit("No staged binary manifests found")
 
-      - name: Commit real binary files
+          for manifest_path in manifests:
+              manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+              target_rel = manifest.get("targetPath")
+              expected_size = manifest.get("byteLength")
+              expected_hash = manifest.get("sha256")
+              source_url = manifest.get("sourceUrl")
+
+              if not isinstance(target_rel, str) or not target_rel.startswith("public/assets/"):
+                  raise SystemExit(f"Unsafe targetPath: {target_rel!r}")
+              target = (root / target_rel).resolve()
+              if root not in target.parents:
+                  raise SystemExit(f"Target escapes repository: {target_rel}")
+              if not isinstance(expected_size, int) or expected_size < 1:
+                  raise SystemExit("Invalid byteLength")
+              if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+                  raise SystemExit("Invalid sha256")
+
+              if isinstance(source_url, str):
+                  parsed = urllib.parse.urlparse(source_url)
+                  if parsed.scheme != "https" or parsed.hostname != "cdn1.suno.ai":
+                      raise SystemExit(f"Unapproved sourceUrl: {source_url}")
+                  request = urllib.request.Request(source_url, headers={"User-Agent": "NestledBurrow-asset-import/1"})
+                  with urllib.request.urlopen(request, timeout=120) as response:
+                      data = response.read(expected_size + 1)
+              else:
+                  chunk_names = manifest.get("chunks")
+                  if not isinstance(chunk_names, list) or not chunk_names:
+                      raise SystemExit("Manifest requires sourceUrl or non-empty chunks")
+                  encoded = "".join((manifest_path.parent / name).read_text(encoding="utf-8") for name in chunk_names)
+                  import base64
+                  data = base64.b64decode("".join(encoded.split()), validate=True)
+
+              if len(data) != expected_size:
+                  raise SystemExit(f"Byte length mismatch: expected {expected_size}, got {len(data)}")
+              actual_hash = hashlib.sha256(data).hexdigest()
+              if actual_hash != expected_hash:
+                  raise SystemExit(f"SHA-256 mismatch: expected {expected_hash}, got {actual_hash}")
+              if target.suffix.lower() == ".mp3" and data[:3] != b"ID3" and data[:2] not in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+                  raise SystemExit("Downloaded file does not look like MP3 data")
+
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(data)
+              shutil.rmtree(manifest_path.parent)
+              print(f"Imported {target_rel}: {len(data)} bytes, sha256 {actual_hash}")
+          PY
+
+      - name: Restore canonical workflow and commit real files
         shell: bash
         run: |
           set -euo pipefail
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/binary-import.yml
           git diff --check
           git add -A
           if git diff --cached --quiet; then
-            echo "Reconstruction produced no repository changes" >&2
+            echo "Import produced no repository changes" >&2
             exit 1
           fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Reconstruct staged binary assets"
+          git commit -m "Import verified Sunlit Save Point audio"
           git push origin "HEAD:${GITHUB_REF_NAME}"
