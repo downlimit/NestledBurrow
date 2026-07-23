@@ -30,6 +30,8 @@ assert(isPointInRect(NEW_GAME_CANCEL_HIT_AREA.x + 2, NEW_GAME_CANCEL_HIT_AREA.y 
 for (const char of "v devabcdef0123456789") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
 const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
+const debrisRuntime = readFileSync("src/debrisRuntime.js", "utf8");
+const debugPanel = readFileSync("src/movementDebugPanel.js", "utf8");
 assert(main.includes("onNewGame: () => this.startNewGame()"), "composition root wires New Game callback");
 assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "all HUD areas exclude MobileJoystick input");
 assert(gameHud.includes('localization.t("hud:progress.newGame")'), "New Game label is localized");
@@ -48,4 +50,9 @@ for (const rect of iconRects) {
 }
 assert(gameHud.includes("hud:resources.summary"), "energy and wood HUD label is localized");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
-console.log("hud checks passed: build, fullscreen, language, sound icon and localized New Game controls are aligned");
+assert(debrisRuntime.includes(".setPosition(DEBRIS_OBJECT.tile.x * TILE_SIZE, DEBRIS_OBJECT.tile.y * TILE_SIZE)"), "debris visual is anchored at its world tile before scaling");
+assert(debrisRuntime.includes("drawLog(graphics);"), "debris geometry is drawn in local coordinates");
+assert(!debrisRuntime.includes("drawLog(graphics, DEBRIS_OBJECT.tile.x * TILE_SIZE"), "debris animation does not scale absolute world coordinates around the origin");
+assert(debugPanel.includes("if (input) input.value = String(this.gameplayTuning[field.key]);"), "Reset defaults synchronizes gameplay tuning inputs from gameplay state");
+assert(!debugPanel.includes("for (const [key, input] of this.inputs)"), "gameplay inputs are not synchronized from movement config");
+console.log("hud checks passed: layout, localized controls, anchored debris feedback and tuning input synchronization are aligned");
