@@ -1,6 +1,8 @@
 name: Codex Actions Trigger Test
 
 on:
+  push:
+    branches: [main]
   issue_comment:
     types: [created]
 
@@ -9,7 +11,7 @@ permissions:
 
 jobs:
   trigger:
-    if: github.event.issue.pull_request != null && github.event.issue.number == 87 && contains(github.event.comment.body, 'NB-CODEX-ACTIONS-TRIGGER-TEST')
+    if: github.event_name == 'push' || (github.event.issue.pull_request != null && github.event.issue.number == 87 && contains(github.event.comment.body, 'NB-CODEX-ACTIONS-TRIGGER-TEST'))
     runs-on: ubuntu-latest
     steps:
       - name: Ask Codex from GitHub Actions
