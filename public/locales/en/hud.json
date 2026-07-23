@@ -12,8 +12,12 @@
     "talk": "Talk",
     "next": "Next",
     "close": "Close",
-    "clear": "Clear",
-    "notEnoughEnergy": "Not enough energy"
+    "clear": "Chop",
+    "notEnoughEnergy": "Not enough energy",
+    "hit": "Hit",
+    "sleep": "Sleep",
+    "wake": "Wake up",
+    "energyRestored": "Energy restored"
   },
   "progress": {
     "newGame": "New game",
@@ -28,6 +32,6 @@
     "effects": "Effects"
   },
   "resources": {
-    "summary": "EN {current}/{max}  Wood {wood}"
+    "summary": "EN {current}/{max}  Wood {wood}\nT {time}s x{scale}"
   }
 }

@@ -12,8 +12,12 @@
     "talk": "Говорить",
     "next": "Дальше",
     "close": "Закрыть",
-    "clear": "Разобрать",
-    "notEnoughEnergy": "Не хватает энергии"
+    "clear": "Разрубить",
+    "notEnoughEnergy": "Не хватает энергии",
+    "hit": "Ударить",
+    "sleep": "Спать",
+    "wake": "Проснуться",
+    "energyRestored": "Энергия восстановлена"
   },
   "progress": {
     "newGame": "Новая игра",
@@ -28,6 +32,6 @@
     "effects": "Эффекты"
   },
   "resources": {
-    "summary": "ЭН {current}/{max}  Дер {wood}"
+    "summary": "ЭН {current}/{max}  Дер {wood}\nВ {time}с x{scale}"
   }
 }

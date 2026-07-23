@@ -7,8 +7,14 @@ export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
 const GAMEPLAY_TUNING_FIELDS = Object.freeze([
   Object.freeze({ key: "maximumEnergy", min: 1, max: 999, step: 1 }),
-  Object.freeze({ key: "clearingEnergyCost", min: 0, max: 999, step: 1 }),
   Object.freeze({ key: "woodReward", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "hitsPerLog", min: 1, max: 99, step: 1 }),
+  Object.freeze({ key: "energyPerHit", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "awakeDrainAmount", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "awakeDrainIntervalSeconds", min: 0.1, max: 999, step: 0.1 }),
+  Object.freeze({ key: "exhaustedMovementMultiplier", min: 0, max: 1, step: 0.000001 }),
+  Object.freeze({ key: "sleepTimeScale", min: 1, max: 64, step: 0.1 }),
+  Object.freeze({ key: "sleepEnergyRegenPerSecond", min: 0, max: 999, step: 0.1 }),
 ]);
 
 export function loadMovementDebugConfig({ enabled, storage = globalThis.localStorage } = {}) {
@@ -229,6 +235,7 @@ export class MovementDebugPanel {
       `speed ${speed.toFixed(1)} / ${this.movementConfig.maxSpeed}`,
       `velocity ${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}`,
       `facing ${snapshot.facing}`,
+      `energy ${Math.floor(snapshot.energy ?? 0)} time ${Math.floor(snapshot.elapsedGameSeconds ?? 0)}s x${snapshot.timeScale ?? 1}`,
     ].join("\n");
   }
 
