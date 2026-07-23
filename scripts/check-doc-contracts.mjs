@@ -100,12 +100,15 @@ hasAll(
     "## Risk-based validation",
     "### Fast lane",
     "### Strict lane",
-    "Create exactly one final non-draft PR",
+    "Create exactly one draft PR",
+    "Mark the draft ready for review exactly once",
+    "Never rerun a deterministic failed workflow",
     "one consolidated corrective push",
     "Include Integration metadata only when the prompt supplied it",
   ],
   "AGENTS.md",
 );
+assert(!agents.includes("Create exactly one final non-draft PR"), "AGENTS.md must not open implementation PRs directly as non-draft");
 assert(!agents.includes("Read `PROJECT.md`, `LIBRARY.md`"), "AGENTS.md must not restore blanket context loading");
 assert(
   !agents.includes("Always identify:\n\n- review class and concise scope;\n- Integration metadata"),
@@ -162,4 +165,4 @@ hasAll(
 assert(!prTemplate.includes("Required for implementation PRs"), "PR template must not require strict metadata for routine work");
 assert(!prTemplate.includes("strict Integrator review"), "PR template must not classify every PR as strict");
 
-console.log("documentation contracts passed: creative fast lane is the default and strict ceremony is risk-triggered");
+console.log("documentation contracts passed: creative fast lane is the default, draft-first delivery is enforced and strict ceremony is risk-triggered");
