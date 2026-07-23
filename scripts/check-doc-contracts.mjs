@@ -12,6 +12,7 @@ const project = read("PROJECT.md");
 const game = read("GAME.md");
 const roadmap = read("ROADMAP.md");
 const lead = read("LEAD.md");
+const agentsOverride = read("AGENTS.override.md");
 const agents = read("AGENTS.md");
 const review = read("REVIEW.md");
 const library = read("LIBRARY.md");
@@ -138,6 +139,27 @@ assert(
 );
 
 hasAll(
+  agentsOverride,
+  [
+    "<!-- audience: codex -->",
+    "# Root Codex command-routing override",
+    "почини PR <number>",
+    "fetch the named PR metadata",
+    "stop without editing anything",
+    "is not `main`",
+    "must not",
+    "invoke `make_pr`",
+    "same existing PR head branch",
+  ],
+  "AGENTS.override.md",
+);
+assert(
+  agentsOverride.includes("read the root `AGENTS.md`") &&
+    agentsOverride.includes("never means to edit repair instructions"),
+  "AGENTS.override.md must route the short repair command before any repository mutation",
+);
+
+hasAll(
   agents,
   [
     "<!-- audience: codex -->",
@@ -212,4 +234,4 @@ hasAll(
 assert(!prTemplate.includes("Required for implementation PRs"), "PR template must not require strict metadata for routine work");
 assert(!prTemplate.includes("strict Integrator review"), "PR template must not classify every PR as strict");
 
-console.log("documentation contracts passed: named product map, roadmap, role recovery and repair invariants are enforced");
+console.log("documentation contracts passed: named product map, roadmap, role recovery and exact PR-repair routing are enforced");
