@@ -1,6 +1,10 @@
 export const CODEX_REVIEWER_LOGIN = "chatgpt-codex-connector[bot]";
 export const REQUIRED_CHECKS = Object.freeze(["Validate", "Browser E2E"]);
 
+export function isCodexReviewer(login = "") {
+  return login.replace(/\[bot\]$/u, "") === "chatgpt-codex-connector";
+}
+
 export function parseTaskIdentity(title, body = "") {
   const titleMatch = /^Task #(\d{3}) — (.+)$/u.exec(title.trim());
   if (!titleMatch) return { valid: false, reason: "PR title must use Task #NNN — Name" };
@@ -31,7 +35,7 @@ export function successfulRequiredChecks(checkRuns, requiredChecks = REQUIRED_CH
 
 export function hasCurrentCodexEvidence({ reviews = [], reactions = [], headSha, headUpdatedAt }) {
   const currentReview = reviews.some((review) =>
-    review.user?.login === CODEX_REVIEWER_LOGIN &&
+    isCodexReviewer(review.user?.login) &&
     review.commit_id === headSha &&
     ["APPROVED", "COMMENTED"].includes(String(review.state).toUpperCase()),
   );
@@ -39,7 +43,7 @@ export function hasCurrentCodexEvidence({ reviews = [], reactions = [], headSha,
 
   const headUpdateTime = Date.parse(headUpdatedAt ?? 0);
   return Number.isFinite(headUpdateTime) && reactions.some((reaction) =>
-    reaction.user?.login === CODEX_REVIEWER_LOGIN &&
+    isCodexReviewer(reaction.user?.login) &&
     reaction.content === "+1" &&
     Date.parse(reaction.created_at ?? 0) >= headUpdateTime,
   );
@@ -48,7 +52,7 @@ export function hasCurrentCodexEvidence({ reviews = [], reactions = [], headSha,
 export function hasUnresolvedCodexThread(reviewThreads = []) {
   return reviewThreads.some((thread) =>
     !thread.isResolved &&
-    (thread.comments?.nodes ?? []).some((comment) => comment.author?.login === CODEX_REVIEWER_LOGIN),
+    (thread.comments?.nodes ?? []).some((comment) => isCodexReviewer(comment.author?.login)),
   );
 }
 
