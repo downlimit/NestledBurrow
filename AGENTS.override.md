@@ -22,7 +22,7 @@ For backward compatibility, these legacy forms remain accepted, case-insensitive
 
 For example, `Task #001 — Почини «Первую расчистку участка» в существующем PR #81 по последнему repair-комментарию.` means: repair `PR #81 · Task #001 — Первая расчистка участка`.
 
-Legacy aliases never mean to edit repair instructions, documentation, process files or the current checkout merely because the prompt is short. The same restriction applies to the canonical numbered form.
+The legacy alias never means to edit repair instructions, documentation, process files or the current checkout merely because the prompt is short. The same restriction applies to the canonical numbered form.
 
 Before changing any file or creating any commit, Codex must:
 
