@@ -36,5 +36,13 @@ assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "locali
 assert(gameHud.includes("graphics.clear();"), "sound icon render starts from a cleared Graphics surface through the HUD render pass");
 assert(!gameHud.includes("strokeCircle"), "sound icon avoids closed circular waves");
 assert(!gameHud.includes("fillCircle"), "sound icon avoids closed circular slider elements");
+const soundButtonSource = gameHud.slice(gameHud.indexOf("function renderSoundButton()"), gameHud.indexOf("function renderSoundPanel()"));
+const iconRects = [...soundButtonSource.matchAll(/\.fillRect\(x \+ (\d+), y \+ (\d+), (\d+), (\d+)\)/g)].map((match) => ({ x: Number(match[1]), y: Number(match[2]), width: Number(match[3]), height: Number(match[4]) }));
+assert(iconRects.length >= 9, "sound icon uses explicit pixel rectangles");
+for (const rect of iconRects) {
+  assert(rect.x >= 3 && rect.y >= 3, "sound icon pixels stay inside the button's top-left border");
+  assert(rect.x + rect.width <= SOUND_HIT_AREA.width - 3, "sound icon pixels stay inside the button's right border");
+  assert(rect.y + rect.height <= SOUND_HIT_AREA.height - 3, "sound icon pixels stay inside the button's bottom border");
+}
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
-console.log("hud checks passed: build, fullscreen, language and localized New Game controls are aligned");
+console.log("hud checks passed: build, fullscreen, language, sound icon and localized New Game controls are aligned");
