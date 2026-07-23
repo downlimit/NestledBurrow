@@ -9,6 +9,8 @@ const hasAll = (text, required, label) => {
 };
 
 const project = read("PROJECT.md");
+const game = read("GAME.md");
+const roadmap = read("ROADMAP.md");
 const lead = read("LEAD.md");
 const agents = read("AGENTS.md");
 const review = read("REVIEW.md");
@@ -24,91 +26,115 @@ hasAll(
     "привет, ты лид",
     "привет, ты интегратор",
     "проверь все PR",
+    "GAME.md",
+    "ROADMAP.md",
     "LEAD.md",
     "REVIEW.md",
     "Fast lane используется по умолчанию",
-    "Полное ревью не должно блокировать Lead-чат",
+    "Полная приёмка PR не должна блокировать Lead-чат",
   ],
   "PROJECT.md",
 );
-assert(
-  /для роли Лид[^\n]*`LEAD\.md`/.test(project) && /для роли Интегратор[^\n]*`REVIEW\.md`/.test(project),
-  "PROJECT.md must route both roles to their contracts",
+
+hasAll(
+  game,
+  [
+    "<!-- audience: product-design -->",
+    "продуктового вижна и фактической карты реализации",
+    "### Зрелость реализации",
+    "### Продуктовый verdict",
+    "Отсутствует",
+    "Фундамент",
+    "Играбельно",
+    "Интегрировано",
+    "Принято",
+    "Переделать",
+    "Отклонено",
+    "ROADMAP.md",
+    "## Карта продукта: что реально существует",
+    "Расчистка и присвоение заброшенного пространства",
+    "Вскапывание, посадка, полив и урожай картофеля",
+    "Гости, выбор продукта, потребление и оплата",
+    "Миньоны из предметов и назначение работы",
+  ],
+  "GAME.md",
 );
+assert(
+  game.includes("Merge и зелёный CI меняют только зрелость") &&
+    game.includes("Verdict меняется только после пользовательского теста"),
+  "GAME.md must separate implementation maturity from product acceptance",
+);
+
+hasAll(
+  roadmap,
+  [
+    "<!-- audience: project-roles -->",
+    "что мы делаем прямо сейчас",
+    "что собираемся проверять следующим",
+    "## Сейчас",
+    "Первая расчистка участка",
+    "## Следом",
+    "Полный цикл одного картофеля",
+    "Первый сервисный цикл таверны",
+    "Первый миньон",
+    "Base SHA не хранится здесь",
+    "Завершённая работа не остаётся бесконечно висеть активной",
+  ],
+  "ROADMAP.md",
+);
+
+for (const [label, text] of [
+  ["PROJECT.md", project],
+  ["GAME.md", game],
+  ["ROADMAP.md", roadmap],
+  ["LEAD.md", lead],
+  ["REVIEW.md", review],
+]) {
+  assert(!text.includes("#80"), `${label} must not depend on a magic issue number`);
+  assert(!text.includes("Canonical execution ledger"), `${label} must not restore the removed issue ledger`);
+}
 
 hasAll(
   lead,
   [
     "<!-- audience: lead-chat -->",
-    "постоянного ChatGPT-чата **Лид**",
-    "проверь все PR",
-    "## Fast lane",
-    "Fast lane используется по умолчанию",
-    "## Strict lane",
-    "Strict lane используется только при реальном риске",
     "одна самодостаточная задача Codex",
     "одна ветка",
     "один финальный PR",
     "Прочитай AGENTS.md и только релевантные файлы проекта.",
-    "Binary delivery path",
+    "GAME.md",
+    "ROADMAP.md",
     "Base SHA",
-    "Depends on",
-    "Merge phase",
-    "## Выбор между одной задачей, волной и последовательностью",
-    "### Настоящая параллельная волна",
-    "реально сокращать критический календарный путь",
+    "Fast lane",
+    "Strict lane",
+    "Параллельная волна допустима только",
+    "BINARY_IMPORT.md",
+    "Собственная Lead-задача не завершена",
   ],
   "LEAD.md",
-);
-assert(
-  lead.includes("Не добавлять автоматически Batch ID") && lead.includes("огромные owned-path списки"),
-  "LEAD.md must keep routine fast-lane metadata optional",
 );
 
 hasAll(
   review,
   [
     "<!-- audience: integrator-chat -->",
-    "постоянного ChatGPT-чата **Интегратор**",
     "проверь все PR",
     "всем открытым non-draft PR",
-    "Fast lane — по умолчанию",
-    "Strict lane — только по реальному риску",
-    "targeted reads и per-file patches",
+    "GAME.md",
+    "ROADMAP.md",
+    "## Fast lane",
+    "## Strict lane",
     "final-head CI",
-    "Независимый PR не обязан ребейзиться",
-    "api_tool.list_resources",
-    "### Достаточность и темп",
-    "Не делать серию одинаковых polling-вызовов",
-    "Нулевая неопределённость не требуется",
-    "### Выбор исполнителя repair",
-    "### Передача Codex через PR",
-    "integrator-codex-repair:v1",
-    "новый PR не создавай",
-    "Публикация PR-комментария сама по себе не означает запуск Codex",
-    "нужен один launch-шаг пользователя",
+    "Публикация комментария не означает запуск Codex",
     "почини PR <номер>",
-    "Codex в repair-потоке не создаёт новый PR",
-    "Повторная приёмка не начинается с нуля",
+    "Содержательный repair остаётся в существующей PR-ветке",
+    "Интегратор не присваивает verdict",
   ],
   "REVIEW.md",
 );
 assert(
-  review.includes("Отсутствие полной Integration metadata в обычном самостоятельном PR не является дефектом"),
-  "REVIEW.md must not make strict metadata mandatory for routine PRs",
-);
-assert(
-  review.includes("механические defects") && review.includes("Содержательный repair передаётся Codex"),
-  "REVIEW.md must delegate substantive repairs while keeping mechanical fixes local",
-);
-assert(
-  review.includes("Не говорить, что Codex запущен") &&
-    review.includes("Способность Интегратора писать GitHub-комментарии не считается способностью запускать Codex"),
-  "REVIEW.md must distinguish a published repair contract from an actually launched Codex task",
-);
-assert(
-  !review.includes("В репозитории downlimit/NestledBurrow исправь PR #<number> по последнему комментарию"),
-  "REVIEW.md must not require the user to remember a long Codex repair prompt",
+  review.includes("механические defects") && review.includes("Не создавать новый issue, branch или PR"),
+  "REVIEW.md must keep mechanical repairs local and substantive repairs in the existing PR",
 );
 
 hasAll(
@@ -126,25 +152,15 @@ hasAll(
     "Do not create another branch or pull request",
     "## Integration metadata is optional",
     "Routine independent work does not require Batch",
-    "copy the metadata into the PR body, never into `.github/pull_request_template.md`",
     "## Risk-based validation",
     "### Fast lane",
     "### Strict lane",
-    "Commit on the task branch as often as useful",
     "same applicable validation path that CI will enforce",
-    "run the complete updated chain locally",
-    "determine whether the same command already fails on the base/current `main` or only on the PR head",
-    "A pre-existing base failure is repaired as a base-contract defect",
     "Do not rerun an unchanged deterministic failure",
-    "Include Integration metadata only when the prompt supplied it",
   ],
   "AGENTS.md",
 );
 assert(!agents.includes("Read `PROJECT.md`, `LIBRARY.md`"), "AGENTS.md must not restore blanket context loading");
-assert(
-  !agents.includes("Always identify:\n\n- review class and concise scope;\n- Integration metadata"),
-  "AGENTS.md must not require strict metadata in every completion report",
-);
 
 hasAll(
   prWorkflow,
@@ -196,4 +212,4 @@ hasAll(
 assert(!prTemplate.includes("Required for implementation PRs"), "PR template must not require strict metadata for routine work");
 assert(!prTemplate.includes("strict Integrator review"), "PR template must not classify every PR as strict");
 
-console.log("documentation contracts passed: structural workflow invariants and CI-parity preflight are enforced");
+console.log("documentation contracts passed: named product map, roadmap, role recovery and repair invariants are enforced");
