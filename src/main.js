@@ -457,6 +457,7 @@ async function bootstrap() {
   pixelArt: true,
   antialias: false,
   roundPixels: true,
+  disableVisibilityChange: true,
   scene: WorldScene,
   scale: {
     mode: Phaser.Scale.NONE,

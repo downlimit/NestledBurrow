@@ -33,5 +33,8 @@ assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "all H
 assert(gameHud.includes('localization.t("hud:progress.newGame")'), "New Game label is localized");
 assert(gameHud.includes('localization.t(`hud:sound.${channel}`)'), "sound panel labels are localized");
 assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "localized HUD text uses locale Unicode font");
+assert(gameHud.includes("graphics.clear();"), "sound icon render starts from a cleared Graphics surface through the HUD render pass");
+assert(!gameHud.includes("strokeCircle"), "sound icon avoids closed circular waves");
+assert(!gameHud.includes("fillCircle"), "sound icon avoids closed circular slider elements");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
 console.log("hud checks passed: build, fullscreen, language and localized New Game controls are aligned");

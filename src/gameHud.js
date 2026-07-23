@@ -12,6 +12,7 @@ import {
   renderFullscreenIcon,
 } from "./hud.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
+import { createManagedText, setManagedTextStyle } from "./textResolution.js";
 
 export const NEW_GAME_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 78, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -139,7 +140,7 @@ export function createGameHud(scene, options) {
   function renderButton(rect, textObject, labelText) {
     graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6);
     graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(rect.x + 3.5, rect.y + 3.5, rect.width - 7, rect.height - 7);
-    textObject.setStyle(textStyle()).setText(labelText).setVisible(true);
+    setManagedTextStyle(textObject, scene, textStyle()).setText(labelText).setVisible(true);
     textObject.setPosition(
       Math.round(rect.x + (rect.width - textObject.width) / 2),
       Math.round(rect.y + (rect.height - textObject.height) / 2),
@@ -178,8 +179,7 @@ export function createGameHud(scene, options) {
         NEW_GAME_CONFIRM_PANEL.width - 1,
         NEW_GAME_CONFIRM_PANEL.height - 1,
       );
-      confirmMessageText
-        .setStyle(textStyle({ fontSize: "10px", align: "center", wordWrap: { width: NEW_GAME_CONFIRM_PANEL.width - 24 } }))
+      setManagedTextStyle(confirmMessageText, scene, textStyle({ fontSize: "10px", align: "center", wordWrap: { width: NEW_GAME_CONFIRM_PANEL.width - 24 } }))
         .setText(localization.t("hud:progress.confirmNewGame"))
         .setVisible(true)
         .setPosition(NEW_GAME_CONFIRM_PANEL.x + 12, NEW_GAME_CONFIRM_PANEL.y + 14);
@@ -225,9 +225,32 @@ export function createGameHud(scene, options) {
     const muted = (audioSettings?.getSettings?.().master ?? 1) <= 0;
     graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(SOUND_HIT_AREA.x + 3, SOUND_HIT_AREA.y + 3, SOUND_HIT_AREA.width - 6, SOUND_HIT_AREA.height - 6);
     graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(SOUND_HIT_AREA.x + 3.5, SOUND_HIT_AREA.y + 3.5, SOUND_HIT_AREA.width - 7, SOUND_HIT_AREA.height - 7);
-    graphics.fillStyle(HUD_COLORS.light, 0.95).fillRect(SOUND_HIT_AREA.x + 10, SOUND_HIT_AREA.y + 14, 4, 6).fillTriangle(SOUND_HIT_AREA.x + 14, SOUND_HIT_AREA.y + 14, SOUND_HIT_AREA.x + 20, SOUND_HIT_AREA.y + 10, SOUND_HIT_AREA.x + 20, SOUND_HIT_AREA.y + 24);
-    if (muted) graphics.lineStyle(2, 0xd95757, 1).lineBetween(SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 11, SOUND_HIT_AREA.x + 28, SOUND_HIT_AREA.y + 23).lineBetween(SOUND_HIT_AREA.x + 28, SOUND_HIT_AREA.y + 11, SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 23);
-    else graphics.lineStyle(1, HUD_COLORS.mid, 1).strokeCircle(SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 17, 4).strokeCircle(SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 17, 7);
+    const x = SOUND_HIT_AREA.x;
+    const y = SOUND_HIT_AREA.y;
+    graphics
+      .fillStyle(HUD_COLORS.light, 0.95)
+      .fillRect(x + 10, y + 14, 4, 6)
+      .fillRect(x + 14, y + 12, 3, 10)
+      .fillRect(x + 17, y + 10, 2, 14)
+      .fillRect(x + 19, y + 12, 1, 10);
+    if (muted) {
+      graphics
+        .lineStyle(2, 0xd95757, 1)
+        .lineBetween(x + 23, y + 13, x + 28, y + 22)
+        .lineBetween(x + 28, y + 13, x + 23, y + 22);
+    } else {
+      graphics
+        .fillStyle(HUD_COLORS.mid, 1)
+        .fillRect(x + 23, y + 13, 2, 2)
+        .fillRect(x + 25, y + 15, 2, 2)
+        .fillRect(x + 25, y + 18, 2, 2)
+        .fillRect(x + 23, y + 20, 2, 2)
+        .fillRect(x + 28, y + 10, 2, 2)
+        .fillRect(x + 30, y + 12, 2, 4)
+        .fillRect(x + 31, y + 16, 2, 3)
+        .fillRect(x + 30, y + 19, 2, 4)
+        .fillRect(x + 28, y + 23, 2, 2);
+    }
   }
 
   function renderSoundPanel() {
@@ -239,9 +262,9 @@ export function createGameHud(scene, options) {
     for (const channel of ["master", "music", "effects"]) {
       const rect = SOUND_SLIDER_RECTS[channel];
       const y = rect.y + 2;
-      soundTexts[channel].setStyle(textStyle({ fontSize: "8px" })).setText(localization.t(`hud:sound.${channel}`)).setVisible(true).setPosition(SOUND_PANEL_AREA.x + 6, y);
+      setManagedTextStyle(soundTexts[channel], scene, textStyle({ fontSize: "8px" })).setText(localization.t(`hud:sound.${channel}`)).setVisible(true).setPosition(SOUND_PANEL_AREA.x + 6, y);
       const percent = Math.round(settings[channel] * 100);
-      soundTexts[`${channel}Value`].setStyle(textStyle({ fontSize: "8px" })).setText(`${percent}%`).setVisible(true).setPosition(rect.x + rect.width + 8, y);
+      setManagedTextStyle(soundTexts[`${channel}Value`], scene, textStyle({ fontSize: "8px" })).setText(`${percent}%`).setVisible(true).setPosition(rect.x + rect.width + 8, y);
       graphics.fillStyle(HUD_COLORS.shadow, 0.9).fillRect(rect.x, rect.y + 5, rect.width, 4);
       graphics.fillStyle(HUD_COLORS.mid, 1).fillRect(rect.x, rect.y + 5, Math.round(rect.width * settings[channel]), 4);
       graphics.fillStyle(HUD_COLORS.light, 1).fillRect(rect.x + Math.round(rect.width * settings[channel]) - 2, rect.y + 2, 4, 10);
@@ -300,8 +323,7 @@ function createZone(scene, rect) {
 }
 
 function createText(scene, extraStyle = {}) {
-  return scene.add
-    .text(0, 0, "", { fontSize: "9px", color: "#f2eadc", ...extraStyle })
+  return createManagedText(scene, 0, 0, "", { fontSize: "9px", color: "#f2eadc", ...extraStyle })
     .setDepth(HUD_DEPTH + 3)
     .setScrollFactor(0)
     .setVisible(false);

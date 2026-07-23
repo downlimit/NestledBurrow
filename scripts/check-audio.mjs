@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   AUDIO_STORAGE_KEY,
@@ -87,6 +87,11 @@ const runtime = new PhaserAudioRuntime(fakeScene, store);
 runtime.startMusic();
 runtime.startMusic();
 assert.equal(addCount, 1);
+assert.equal(fakeSound.isPlaying, true);
 runtime.destroy();
-
+const audioRuntimeSource = readFileSync("src/audioRuntime.js", "utf8");
+assert(!audioRuntimeSource.includes("visibilitychange"), "audio runtime does not pause or stop on visibility loss");
+assert(!audioRuntimeSource.includes("blur"), "audio runtime does not pause or stop on window blur");
+const mainSource = readFileSync("src/main.js", "utf8");
+assert(mainSource.includes("disableVisibilityChange: true"), "Phaser config disables automatic visibility pause");
 console.log("audio checks passed");
