@@ -85,6 +85,9 @@ hasAll(
     "### Передача Codex через PR",
     "integrator-codex-repair:v1",
     "новый PR не создавай",
+    "Публикация PR-комментария сама по себе не означает запуск Codex",
+    "нужен один launch-шаг пользователя",
+    "Codex в repair-потоке не создаёт новый PR",
     "Повторная приёмка не начинается с нуля",
   ],
   "REVIEW.md",
@@ -96,6 +99,11 @@ assert(
 assert(
   review.includes("механические defects") && review.includes("Содержательный repair передаётся Codex"),
   "REVIEW.md must delegate substantive repairs while keeping mechanical fixes local",
+);
+assert(
+  review.includes("Не говорить, что Codex запущен") &&
+    review.includes("Способность Интегратора писать GitHub-комментарии не считается способностью запускать Codex"),
+  "REVIEW.md must distinguish a published repair contract from an actually launched Codex task",
 );
 
 hasAll(
