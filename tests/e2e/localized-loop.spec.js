@@ -113,3 +113,34 @@ test("mobile touch starts a Russian dialogue without joystick capture", async ({
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   expect(pageErrors).toEqual([]);
 });
+
+test("desktop clears persistent debris and New Game restores gameplay only", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "desktop keyboard debris flow only");
+  await boot(page);
+  await bridge(page, "setLanguage", "en");
+  await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
+  await placeNear(page, "fallen-log-01");
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.clear");
+  await pressInteract(page);
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 80, maximumEnergy: 100, wood: 1, debris: { "fallen-log-01": { cleared: true } } } });
+  await expect.poll(async () => (await bridge(page, "getDebrisState"))?.present).toBe(false);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
+  await page.reload();
+  await boot(page);
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 80, wood: 1, debris: { "fallen-log-01": { cleared: true } } } });
+  await clickLogical(page, 24, 18);
+  await clickLogical(page, 92, 111);
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } } });
+  await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
+  await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
+});
+
+test("mobile touch clears debris through prompt hit area", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("mobile"), "mobile debris touch flow only");
+  await boot(page);
+  await placeNear(page, "fallen-log-01");
+  const box = await page.locator("canvas").boundingBox();
+  if (!box) throw new Error("Game canvas is unavailable");
+  await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 80, wood: 1, debris: { "fallen-log-01": { cleared: true } } } });
+});

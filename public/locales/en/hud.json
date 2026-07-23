@@ -11,7 +11,9 @@
   "interaction": {
     "talk": "Talk",
     "next": "Next",
-    "close": "Close"
+    "close": "Close",
+    "clear": "Clear",
+    "notEnoughEnergy": "Not enough energy"
   },
   "progress": {
     "newGame": "New game",
@@ -24,5 +26,8 @@
     "master": "Master",
     "music": "Music",
     "effects": "Effects"
+  },
+  "resources": {
+    "summary": "EN {current}/{max}  Wood {wood}"
   }
 }

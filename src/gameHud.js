@@ -24,6 +24,7 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   music: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 32, width: 66, height: 14 }),
   effects: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 50, width: 66, height: 14 }),
 });
+export const RESOURCE_HUD_AREA = Object.freeze({ x: 92, y: 6, width: 82, height: 24 });
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 46, width: GAME_WIDTH - 48, height: 88 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 98, width: 96, height: 26 });
 export const NEW_GAME_CANCEL_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 140, y: 98, width: 96, height: 26 });
@@ -36,6 +37,7 @@ export function createGameHud(scene, options) {
     onLanguageChange = () => {},
     onNewGame = () => {},
     audioSettings,
+    getGameplayState = () => null,
   } = options;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const label = compactBuildLabel(buildId);
@@ -63,6 +65,7 @@ export function createGameHud(scene, options) {
   const confirmText = createText(scene);
   const cancelText = createText(scene);
   const soundTexts = { title: createText(scene), master: createText(scene), music: createText(scene), effects: createText(scene), masterValue: createText(scene), musicValue: createText(scene), effectsValue: createText(scene) };
+  const resourceText = createText(scene, { fontSize: "8px" });
 
   function stop(pointer, event) {
     event?.stopPropagation?.();
@@ -163,6 +166,7 @@ export function createGameHud(scene, options) {
     confirmText.setVisible(false);
     cancelText.setVisible(false);
 
+    renderResources();
     renderSoundButton();
     renderSoundPanel();
 
@@ -203,6 +207,14 @@ export function createGameHud(scene, options) {
     if (fullscreenHud) {
       renderFullscreenIcon(fullscreenHud.graphics, isFullscreenActive(document, gameContainer));
     }
+  }
+
+  function renderResources() {
+    const gameplay = getGameplayState?.();
+    if (!gameplay) { resourceText.setVisible(false); return; }
+    graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(RESOURCE_HUD_AREA.x, RESOURCE_HUD_AREA.y, RESOURCE_HUD_AREA.width, RESOURCE_HUD_AREA.height);
+    graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(RESOURCE_HUD_AREA.x + 0.5, RESOURCE_HUD_AREA.y + 0.5, RESOURCE_HUD_AREA.width - 1, RESOURCE_HUD_AREA.height - 1);
+    setManagedTextStyle(resourceText, scene, textStyle({ fontSize: "8px" })).setText(localization.t("hud:resources.summary", { current: gameplay.currentEnergy, max: gameplay.maximumEnergy, wood: gameplay.wood })).setVisible(true).setPosition(RESOURCE_HUD_AREA.x + 5, RESOURCE_HUD_AREA.y + 7);
   }
 
   function setSliderValue(channel, localX) {
@@ -286,7 +298,7 @@ export function createGameHud(scene, options) {
   return {
     render,
     isConfirming() { return confirmingNewGame; },
-    getLayoutState() { return { soundPanelOpen, areas: { newGame: NEW_GAME_HIT_AREA, sound: SOUND_HIT_AREA, language: LANGUAGE_HIT_AREA, fullscreen: FULLSCREEN_HIT_AREA, build: BUILD_LABEL, soundPanel: SOUND_PANEL_AREA } }; },
+    getLayoutState() { return { soundPanelOpen, areas: { newGame: NEW_GAME_HIT_AREA, resources: RESOURCE_HUD_AREA, sound: SOUND_HIT_AREA, language: LANGUAGE_HIT_AREA, fullscreen: FULLSCREEN_HIT_AREA, build: BUILD_LABEL, soundPanel: SOUND_PANEL_AREA } }; },
     isPointInHud(x, y) {
       return (
         isPointInRect(x, y, NEW_GAME_HIT_AREA) ||
@@ -302,7 +314,7 @@ export function createGameHud(scene, options) {
       destroyed = true;
       unsubscribe?.();
       for (const zone of [languageHit, soundHit, soundPanelHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit]) zone.destroy();
-      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText, ...Object.values(soundTexts)]) text.destroy();
+      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText, resourceText, ...Object.values(soundTexts)]) text.destroy();
       graphics.destroy();
       if (fullscreenHud) {
         if (fullscreenHandler) fullscreenHud.hit.off("pointerdown", fullscreenHandler);

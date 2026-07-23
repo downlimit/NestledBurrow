@@ -9,6 +9,7 @@ import {
   NEW_GAME_CONFIRM_HIT_AREA,
   NEW_GAME_CONFIRM_PANEL,
   NEW_GAME_HIT_AREA,
+  RESOURCE_HUD_AREA,
 } from "../src/gameHud.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
@@ -16,11 +17,12 @@ assert.equal(compactBuildLabel("4e090db123"), "v 4e090db", "HUD uses compact can
 assert.equal(measureBitmapText("v 4e090db"), 51, "bitmap label width is deterministic for alignment");
 assert(Number.isInteger(BUILD_LABEL.x) && Number.isInteger(BUILD_LABEL.y), "build label aligns to whole logical pixels");
 assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch sized");
-assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width < SOUND_HIT_AREA.x, "New Game and right HUD group do not overlap");
+assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width < RESOURCE_HUD_AREA.x, "New Game and resource HUD do not overlap");
+assert(RESOURCE_HUD_AREA.x + RESOURCE_HUD_AREA.width < SOUND_HIT_AREA.x, "New Game and right HUD group do not overlap");
 assert(SOUND_HIT_AREA.x + SOUND_HIT_AREA.width <= LANGUAGE_HIT_AREA.x, "sound and language hit areas do not overlap");
 assert(LANGUAGE_HIT_AREA.x + LANGUAGE_HIT_AREA.width <= FULLSCREEN_HIT_AREA.x, "language and fullscreen hit areas do not overlap");
 assert(BUILD_LABEL.x < SOUND_HIT_AREA.x, "build label is placed left of the right HUD controls");
-for (const rect of [NEW_GAME_HIT_AREA, SOUND_HIT_AREA, LANGUAGE_HIT_AREA, FULLSCREEN_HIT_AREA, SOUND_PANEL_AREA, NEW_GAME_CONFIRM_PANEL, NEW_GAME_CONFIRM_HIT_AREA, NEW_GAME_CANCEL_HIT_AREA]) {
+for (const rect of [NEW_GAME_HIT_AREA, RESOURCE_HUD_AREA, SOUND_HIT_AREA, LANGUAGE_HIT_AREA, FULLSCREEN_HIT_AREA, SOUND_PANEL_AREA, NEW_GAME_CONFIRM_PANEL, NEW_GAME_CONFIRM_HIT_AREA, NEW_GAME_CANCEL_HIT_AREA]) {
   assert(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= GAME_WIDTH && rect.y + rect.height <= GAME_HEIGHT, "GameHud rectangle stays inside logical viewport");
 }
 assert(isPointInRect(NEW_GAME_CONFIRM_HIT_AREA.x + 2, NEW_GAME_CONFIRM_HIT_AREA.y + 2, NEW_GAME_CONFIRM_PANEL), "confirm action stays inside confirmation panel");
@@ -44,5 +46,6 @@ for (const rect of iconRects) {
   assert(rect.x + rect.width <= SOUND_HIT_AREA.width - 3, "sound icon pixels stay inside the button's right border");
   assert(rect.y + rect.height <= SOUND_HIT_AREA.height - 3, "sound icon pixels stay inside the button's bottom border");
 }
+assert(gameHud.includes("hud:resources.summary"), "energy and wood HUD label is localized");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
 console.log("hud checks passed: build, fullscreen, language, sound icon and localized New Game controls are aligned");

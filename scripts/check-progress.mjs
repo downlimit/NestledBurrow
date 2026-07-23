@@ -15,6 +15,7 @@ import {
   setEntityFlag,
   setSessionFlag,
   startDialogue,
+  clearDebris,
 } from "../src/gameSessionState.js";
 import {
   NEIGHBOR_DIALOGUE_IDS,
@@ -49,6 +50,7 @@ function assertStage(state, stage, homeDialogue, streetDialogue) {
 }
 
 const session = createFreshGameSessionState();
+assert.deepEqual(session.gameplay, { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } }, "fresh state has gameplay defaults");
 assertStage(session, NEIGHBOR_QUEST_STAGES.notStarted, NEIGHBOR_DIALOGUE_IDS.homeIntro, NEIGHBOR_DIALOGUE_IDS.streetBefore);
 assert.deepEqual(completeNeighborDialogue(session, NEIGHBOR_DIALOGUE_IDS.streetResponse).status, "ignored", "street response cannot skip intro");
 assert.equal(getNeighborQuestStage(session), NEIGHBOR_QUEST_STAGES.notStarted, "cannot reach completed before start");
@@ -99,6 +101,19 @@ assert.equal(loaded.status, "loaded", "valid save loads");
 assert.equal(loaded.state.dialogue.targetId, null, "loaded game has no active dialogue target");
 assert.equal(getSessionFlag(loaded.state, NEIGHBOR_QUEST_FLAGS.started), true, "session flags persist");
 assert.equal(getEntityFlag(loaded.state, "home-npc", "visited"), true, "entity flags persist");
+const oldSaveLoad = deserializeSessionEnvelope(JSON.stringify({
+  schemaVersion: SAVE_SCHEMA_VERSION,
+  state: {
+    version: 1,
+    currentWorldId: "village",
+    playerId: "player",
+    entities: { player: { id: "player", flags: {} }, "home-npc": { id: "home-npc", flags: { visited: true } } },
+    flags: { old: true },
+  },
+}));
+assert.deepEqual(oldSaveLoad.state.gameplay, { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } }, "version-1 save without gameplay loads defaults");
+assert.equal(getSessionFlag(oldSaveLoad.state, "old"), true, "old save session flags survive gameplay normalization");
+assert.equal(getEntityFlag(oldSaveLoad.state, "home-npc", "visited"), true, "old save entity flags survive gameplay normalization");
 assert.equal(Object.getPrototypeOf(loaded.state.flags), null, "loaded session flags use null prototype");
 assert.equal(Object.getPrototypeOf(loaded.state.entities), null, "loaded entities use null prototype");
 assert.equal(persistence.clear().status, "cleared", "clear removes progress key");
@@ -130,6 +145,23 @@ for (const poisonedKey of ["__proto__", "constructor", "prototype"]) {
   assert.throws(() => normalizeGameSessionState({ ...clone(fresh), entities: { [poisonedKey]: { id: poisonedKey, flags: {} } } }), /reserved|Entity/, `${poisonedKey} entity rejected`);
 }
 
+const clearState = createFreshGameSessionState();
+assert.deepEqual(clearDebris(clearState, "fallen-log-01", { energyCost: 20, woodReward: 1 }).status, "cleared", "debris clears once");
+assert.equal(clearState.gameplay.currentEnergy, 80, "clearing spends energy");
+assert.equal(clearState.gameplay.wood, 1, "clearing awards wood");
+assert.equal(clearDebris(clearState, "fallen-log-01", { energyCost: 20, woodReward: 1 }).mutated, false, "repeat clearing does not mutate");
+const lowEnergy = createFreshGameSessionState();
+lowEnergy.gameplay.currentEnergy = 10;
+const lowBefore = clone(lowEnergy);
+assert.equal(clearDebris(lowEnergy, "fallen-log-01", { energyCost: 20, woodReward: 1 }).status, "insufficient-energy", "low energy blocks clearing");
+assert.deepEqual(clone(lowEnergy), lowBefore, "low energy creates no partial mutation");
+const clearRoundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(clearState));
+assert.equal(clearRoundTrip.state.gameplay.debris["fallen-log-01"].cleared, true, "cleared state persists");
+assert.equal(clearRoundTrip.state.gameplay.currentEnergy, 80, "energy persists");
+assert.equal(clearRoundTrip.state.gameplay.wood, 1, "wood persists");
+assert.deepEqual(createFreshGameSessionState().gameplay, { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } }, "New Game fresh state returns gameplay defaults");
+assert.deepEqual(JSON.parse(JSON.stringify(clearState)), clearState, "gameplay state remains JSON-safe");
+
 const serialized = serializeSessionEnvelope(fresh);
 const parsed = JSON.parse(serialized);
 assert.equal(parsed.schemaVersion, SAVE_SCHEMA_VERSION, "save envelope is versioned");
@@ -140,3 +172,20 @@ assert(!("dialogue" in parsed.state), "transient dialogue is not in persistence 
 assert(!serialized.includes("[object"), "serialized result contains JSON data only");
 
 console.log("progress checks passed");
+
+import { applyGameplayTuning, refillEnergy } from "../src/gameSessionState.js";
+import { GAMEPLAY_DEBUG_STORAGE_KEY, loadGameplayDebugTuning, saveGameplayDebugTuning } from "../src/gameplayDebugTuning.js";
+const tuningStorage = createMemoryStorage();
+const normalizedTuning = loadGameplayDebugTuning({ enabled: true, storage: { getItem: () => JSON.stringify({ maximumEnergy: 12.4, clearingEnergyCost: -1, woodReward: 2.8 }) } });
+assert.deepEqual(normalizedTuning, { maximumEnergy: 12, clearingEnergyCost: 0, woodReward: 3 }, "developer tuning normalizes gameplay values");
+const tunedState = createFreshGameSessionState();
+tunedState.gameplay.currentEnergy = 90;
+applyGameplayTuning(tunedState, { maximumEnergy: 50 });
+assert.equal(tunedState.gameplay.currentEnergy, 50, "maximum energy clamps current energy");
+tunedState.gameplay.currentEnergy = 1;
+refillEnergy(tunedState);
+assert.equal(tunedState.gameplay.currentEnergy, 50, "refill restores current energy to maximum");
+saveGameplayDebugTuning({ maximumEnergy: 77, clearingEnergyCost: 6, woodReward: 4 }, tuningStorage);
+assert(tuningStorage.getItem(GAMEPLAY_DEBUG_STORAGE_KEY).includes("maximumEnergy"), "debug tuning persists to separate key");
+assert.equal(tuningStorage.getItem(DEFAULT_STORAGE_KEY), null, "debug tuning does not write gameplay save key");
+assert.deepEqual(loadGameplayDebugTuning({ enabled: true, storage: { getItem: () => { throw new Error("blocked"); } } }), { maximumEnergy: 100, clearingEnergyCost: 20, woodReward: 1 }, "blocked debug localStorage falls back safely");
