@@ -46,6 +46,15 @@ assert.equal(blockedStore.loadStatus, "recovered");
 assert.deepEqual(blockedStore.getSettings(), DEFAULT_AUDIO_SETTINGS);
 assert.deepEqual(blockedStore.setChannel("master", 0.4), { master: 0.4, music: 0.5, effects: 1 });
 
+const blockedGlobal = {};
+Object.defineProperty(blockedGlobal, "localStorage", {
+  get() { throw new DOMException("blocked", "SecurityError"); },
+});
+const blockedGlobalStore = createAudioSettingsStore({ globalRef: blockedGlobal });
+assert.equal(blockedGlobalStore.loadStatus, "defaulted");
+assert.deepEqual(blockedGlobalStore.getSettings(), DEFAULT_AUDIO_SETTINGS);
+assert.deepEqual(blockedGlobalStore.setChannel("music", 0.2), { master: 1, music: 0.2, effects: 1 });
+
 assert.equal(MUSIC_PATH, "assets/audio/music/NestledBurrow_SunlitSavePoint.mp3");
 assert(existsSync(`public/${MUSIC_PATH}`));
 assert.equal(statSync(`public/${MUSIC_PATH}`).size, 3977087);
