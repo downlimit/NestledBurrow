@@ -66,4 +66,4 @@
 - [ ] No unrelated dependency, architecture, asset, workflow or infrastructure change was added.
 - [ ] Applicable evidence refers to the final head commit.
 - [ ] Material canonical documentation is current, or no durable fact changed.
-- [ ] The branch is ready for review and merge; this PR is not a development workspace.
+- [ ] The branch is ready for Integrator review and merge; Fast lane may satisfy that gate automatically.
