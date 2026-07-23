@@ -5,13 +5,21 @@ This file has precedence only for selecting the task mode. After reading it, imm
 
 ## Canonical existing-PR repair command
 
-A direct prompt matching this command, case-insensitively and with an optional `#`, is always an existing-PR repair request:
+A direct prompt matching this readable form, case-insensitively, is always an existing-PR repair request:
+
+```text
+Почини «<human-readable result name>» в существующем PR #<number>.
+```
+
+The human-readable result name exists for task-list visibility. The PR number is the authoritative GitHub address.
+
+For backward compatibility, the legacy short alias remains accepted, case-insensitively and with an optional `#`:
 
 ```text
 почини PR <number>
 ```
 
-For example, `почини PR 81` means: repair the existing pull request `#81`. It never means to edit repair instructions, documentation, process files or the current checkout merely because the prompt is short.
+For example, both `Почини «Первую расчистку участка» в существующем PR #81.` and `почини PR 81` mean: repair the existing pull request `#81`. The legacy alias never means to edit repair instructions, documentation, process files or the current checkout merely because the prompt is short. The same restriction applies to the canonical readable form.
 
 Before changing any file or creating any commit, Codex must:
 
@@ -24,7 +32,7 @@ Before changing any file or creating any commit, Codex must:
 
 For this command Codex must not:
 
-- reinterpret `почини PR <number>` as a request to improve `REVIEW.md`, `AGENTS.md`, this override or other workflow documentation;
+- reinterpret either readable repair form or `почини PR <number>` as a request to improve `REVIEW.md`, `AGENTS.md`, this override or other workflow documentation;
 - edit or commit anything while checked out on `main`;
 - create another branch, pull request, issue or task file;
 - invoke `make_pr` or any equivalent PR-creation action;
