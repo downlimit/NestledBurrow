@@ -136,7 +136,7 @@ function glyphAdvance(char, pixelSize) { return ((char === " " ? SPACE_WIDTH : G
 function drawLine(graphics, line, x, y, pixelSize) {
   let cursorX = Math.trunc(x);
   for (const char of line) {
-    const glyph = GLYPHS[char] ?? GLYPHS[char.toLowerCase()] ?? GLYPHS["?"];
+    const glyph = getRenderableGlyph(char);
     for (let row = 0; row < GLYPH_HEIGHT; row += 1) {
       for (let col = 0; col < GLYPH_WIDTH; col += 1) {
         if (glyph[row]?.[col] === "1") graphics.fillRect(cursorX + col * pixelSize, y + row * pixelSize, pixelSize, pixelSize);
@@ -144,6 +144,21 @@ function drawLine(graphics, line, x, y, pixelSize) {
     }
     cursorX += glyphAdvance(char, pixelSize);
   }
+}
+
+function getRenderableGlyph(char) {
+  const glyph = GLYPHS[char] ?? GLYPHS[char.toLowerCase()] ?? GLYPHS["?"];
+  return isCyrillicLetter(char) ? trimEmptyGlyphTop(glyph) : glyph;
+}
+
+function isCyrillicLetter(char) {
+  return /^[\u0400-\u04ff]$/u.test(char);
+}
+
+function trimEmptyGlyphTop(glyph) {
+  const firstInkRow = glyph.findIndex((row) => row.includes("1"));
+  if (firstInkRow <= 0) return glyph;
+  return [...glyph.slice(firstInkRow), ...Array.from({ length: firstInkRow }, () => "00000")];
 }
 
 function parseCssColor(color) {

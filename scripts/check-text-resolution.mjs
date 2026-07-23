@@ -18,6 +18,7 @@ assert(helper.includes("Math.trunc"), "text resolution and coordinates use integ
 assert(!helper.includes("setScale"), "text helper does not scale text objects");
 assert(helper.includes("createPixelText"), "managed text uses a graphics-backed pixel font instead of browser-rasterized canvas text");
 assert(helper.includes("ф") && helper.includes("я") && helper.includes("a") && helper.includes("z"), "pixel glyph coverage includes Russian and English UI characters");
+assert(helper.includes("trimEmptyGlyphTop") && helper.includes("isCyrillicLetter"), "Russian pixel glyphs are normalized to avoid mixed-height labels");
 assert(helper.includes("fillRect"), "pixel glyphs are drawn as exact integer rectangles");
 assert(helper.includes('align === "center"') && helper.includes("getAlignedLineX"), "wrapped pixel text honors per-line center alignment offsets");
 
@@ -41,6 +42,12 @@ assert.equal(pixelText.width, 23, "pixel text width uses the widest line");
 const firstLineMinX = Math.min(...rects.filter(({ y }) => y < 9).map(({ x }) => x));
 const secondLineMinX = Math.min(...rects.filter(({ y }) => y >= 9).map(({ x }) => x));
 assert(secondLineMinX > firstLineMinX, "shorter wrapped pixel line is centered within measured text width");
+
+rects.length = 0;
+pixelText.setText("на");
+const firstRussianGlyphMinY = Math.min(...rects.filter(({ x }) => x < 6).map(({ y }) => y));
+const secondRussianGlyphMinY = Math.min(...rects.filter(({ x }) => x >= 6).map(({ y }) => y));
+assert.equal(firstRussianGlyphMinY, secondRussianGlyphMinY, "Russian lowercase glyphs share a stable top edge");
 
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
