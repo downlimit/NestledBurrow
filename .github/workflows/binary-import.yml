@@ -5,7 +5,7 @@ on:
     branches:
       - "asset-import/**"
     paths:
-      - ".binary-import/**"
+      - ".binary-import/**/READY"
 
 permissions:
   contents: write
@@ -25,18 +25,20 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref_name }}
 
-      - name: Reconstruct and validate binaries
+      - name: Reconstruct and validate ready binaries
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t manifests < <(find .binary-import -mindepth 2 -maxdepth 2 -type f -name manifest.json | sort)
-          if [ "${#manifests[@]}" -eq 0 ]; then
-            echo "No staged binary manifests found" >&2
+          mapfile -t ready_files < <(find .binary-import -mindepth 2 -maxdepth 2 -type f -name READY | sort)
+          if [ "${#ready_files[@]}" -eq 0 ]; then
+            echo "No ready binary imports found" >&2
             exit 1
           fi
 
-          for manifest in "${manifests[@]}"; do
-            node scripts/reconstruct-binary-import.mjs "$(dirname "$manifest")"
+          for ready_file in "${ready_files[@]}"; do
+            staging_dir="$(dirname "$ready_file")"
+            test -f "$staging_dir/manifest.json"
+            node scripts/reconstruct-binary-import.mjs "$staging_dir"
           done
 
       - name: Commit real binary files
