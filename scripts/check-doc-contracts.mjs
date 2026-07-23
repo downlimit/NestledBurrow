@@ -81,12 +81,21 @@ hasAll(
     "### Достаточность и темп",
     "Не делать серию одинаковых polling-вызовов",
     "Нулевая неопределённость не требуется",
+    "### Выбор исполнителя repair",
+    "### Передача Codex через PR",
+    "integrator-codex-repair:v1",
+    "новый PR не создавай",
+    "Повторная приёмка не начинается с нуля",
   ],
   "REVIEW.md",
 );
 assert(
   review.includes("Отсутствие полной Integration metadata в обычном самостоятельном PR не является дефектом"),
   "REVIEW.md must not make strict metadata mandatory for routine PRs",
+);
+assert(
+  review.includes("механические defects") && review.includes("Содержательный repair передаётся Codex"),
+  "REVIEW.md must delegate substantive repairs while keeping mechanical fixes local",
 );
 
 hasAll(
@@ -98,6 +107,10 @@ hasAll(
     "use one ephemeral branch and one final PR",
     "targeted checks",
     "PR CI run the canonical full repository suite",
+    "### Existing PR repair task",
+    "integrator-codex-repair:v1",
+    "Update the existing PR branch",
+    "Do not create another branch or pull request",
     "## Integration metadata is optional",
     "Routine independent work does not require Batch",
     "copy the metadata into the PR body, never into `.github/pull_request_template.md`",
