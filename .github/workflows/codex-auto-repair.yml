@@ -21,7 +21,11 @@ jobs:
       github.event.pull_request.draft == false &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.review.commit_id == github.event.pull_request.head.sha
+      github.event.review.commit_id == github.event.pull_request.head.sha &&
+      !contains(github.event.pull_request.body, '- [x] `strict-risk`') &&
+      !contains(github.event.pull_request.body, '- [X] `strict-risk`') &&
+      !contains(github.event.pull_request.body, '- [x] strict-risk') &&
+      !contains(github.event.pull_request.body, '- [X] strict-risk')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -42,12 +46,12 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout current PR branch
+      - name: Checkout reviewed PR head
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-          token: ${{ secrets.CODEX_REPAIR_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -166,16 +170,23 @@ jobs:
       - name: Commit and push repair to the same PR
         if: steps.findings.outputs.has_findings == 'true'
         env:
+          CODEX_REPAIR_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         shell: bash
         run: |
           set -euo pipefail
+          remote_head="$(git ls-remote --heads origin "$HEAD_BRANCH" | awk '{print $1}')"
+          if [[ "$remote_head" != "$HEAD_SHA" ]]; then
+            echo "PR branch moved from reviewed head $HEAD_SHA to ${remote_head:-missing}; refusing stale repair push" >&2
+            exit 1
+          fi
           git config user.name "OpenAI Codex Auto Repair"
           git config user.email "codex-auto-repair@users.noreply.github.com"
           git add -A
           git commit -m "codex-auto-repair: address review findings for PR #$PR_NUMBER"
-          git push origin "HEAD:$HEAD_BRANCH"
+          git push "https://x-access-token:${CODEX_REPAIR_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:$HEAD_BRANCH"
 
       - name: Resolve repaired threads and request a fresh Codex review
         if: steps.findings.outputs.has_findings == 'true'
