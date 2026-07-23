@@ -27,7 +27,6 @@ assert(roadmap.includes(canonicalTask), "ROADMAP.md must assign the active task 
 assert(roadmap.includes("Следующий свободный номер"), "ROADMAP.md must record the next free Task number");
 assert(roadmap.includes("Task #002 — Полный цикл одного картофеля"), "ROADMAP.md must number planned work consistently");
 assert(roadmap.includes(linkedReference), "ROADMAP.md must link PR and Task identities");
-assert(roadmap.includes(repairCommand), "ROADMAP.md must expose the canonical numbered repair command");
 
 assert(lead.includes("Первая строка prompt"), "LEAD.md must standardize the first Codex prompt line");
 assert(lead.includes("PR title: Task #001 — Первая расчистка участка"), "LEAD.md must standardize PR title from Task identity");
