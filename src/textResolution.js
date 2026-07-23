@@ -88,11 +88,22 @@ function updatePixelText(textObject) {
   const color = parseCssColor(textObject.style.color ?? "#ffffff");
   const pixelSize = getPixelSize(textObject.style.fontSize);
   const lines = wrapText(textObject.text, textObject.style.wordWrap?.width, pixelSize);
-  textObject.width = Math.max(0, ...lines.map((line) => measureLine(line, pixelSize)));
+  const measuredLines = lines.map((line) => ({ line, width: measureLine(line, pixelSize) }));
+  textObject.width = Math.max(0, ...measuredLines.map(({ width }) => width));
   textObject.height = lines.length ? lines.length * GLYPH_HEIGHT * pixelSize + (lines.length - 1) * LINE_SPACING * pixelSize : 0;
   textObject.fillStyle(color, 1);
-  lines.forEach((line, lineIndex) => drawLine(textObject, line, 0, lineIndex * (GLYPH_HEIGHT + LINE_SPACING) * pixelSize, pixelSize));
+  measuredLines.forEach(({ line, width }, lineIndex) => {
+    const lineX = getAlignedLineX(textObject.style.align, textObject.width, width);
+    drawLine(textObject, line, lineX, lineIndex * (GLYPH_HEIGHT + LINE_SPACING) * pixelSize, pixelSize);
+  });
   return textObject;
+}
+
+function getAlignedLineX(align, textWidth, lineWidth) {
+  const remainingWidth = Math.max(0, textWidth - lineWidth);
+  if (align === "center") return Math.trunc(remainingWidth / 2);
+  if (align === "right") return Math.trunc(remainingWidth);
+  return 0;
 }
 
 function getPixelSize(fontSize = "9px") {
