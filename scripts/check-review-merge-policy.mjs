@@ -34,8 +34,13 @@ assert.equal(hasCurrentCodexEvidence({ reviews, headSha: "new" }), false);
 assert.equal(hasCurrentCodexEvidence({
   reviews: [],
   reactions: [{ user: { login: CODEX_REVIEWER_LOGIN }, content: "+1", created_at: "2026-07-23T18:02:00Z" }],
-  headCommittedAt: "2026-07-23T18:00:00Z",
+  headUpdatedAt: "2026-07-23T18:00:00Z",
 }), true);
+assert.equal(hasCurrentCodexEvidence({
+  reviews: [],
+  reactions: [{ user: { login: CODEX_REVIEWER_LOGIN }, content: "+1", created_at: "2026-07-23T17:59:00Z" }],
+  headUpdatedAt: "2026-07-23T18:00:00Z",
+}), false);
 assert.equal(hasUnresolvedCodexThread([{ isResolved: false, comments: { nodes: [{ author: { login: CODEX_REVIEWER_LOGIN } }] } }]), true);
 assert.equal(hasUnresolvedCodexThread([{ isResolved: true, comments: { nodes: [{ author: { login: CODEX_REVIEWER_LOGIN } }] } }]), false);
 
@@ -50,7 +55,7 @@ const eligible = {
   reactions: [],
   reviewThreads: [],
   headSha: "abc",
-  headCommittedAt: "2026-07-23T18:00:00Z",
+  headUpdatedAt: "2026-07-23T18:00:00Z",
 };
 assert.equal(evaluateFastLaneGate(eligible).merge, true);
 assert.deepEqual(evaluateFastLaneGate({ ...eligible, body: body.replace("[ ] `strict-risk`", "[x] `strict-risk`") }), {
