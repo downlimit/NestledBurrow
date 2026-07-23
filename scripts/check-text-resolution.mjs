@@ -17,9 +17,9 @@ assert(helper.includes('addEventListener?.("fullscreenchange", refresh)'), "full
 assert(helper.includes("Math.trunc"), "text resolution and coordinates use integers");
 assert(!helper.includes("setScale"), "text helper does not scale text objects");
 assert(helper.includes("createPixelText"), "managed text uses a graphics-backed pixel font instead of browser-rasterized canvas text");
-assert(helper.includes("Ф") && helper.includes("Я") && helper.includes("toLocaleLowerCase") && helper.includes("a") && helper.includes("z"), "pixel glyph coverage includes Russian and English UI characters");
+assert(helper.includes("LATIN_UPPERCASE_GLYPHS") && helper.includes("LATIN_LOWERCASE_GLYPHS") && helper.includes("CYRILLIC_UPPERCASE_GLYPHS") && helper.includes("CYRILLIC_LOWERCASE_GLYPHS"), "pixel glyph coverage has separate Latin and Cyrillic upper/lower systems");
 assert(!helper.includes("trimEmptyGlyphTop"), "Russian pixel glyph geometry is fixed in the glyph table instead of top-trimmed at render time");
-assert(helper.includes("CYRILLIC_CAPITAL_GLYPHS") && helper.includes("CYRILLIC_GLYPHS"), "Russian pixel glyphs are defined from one all-caps Cyrillic system for both Unicode cases");
+assert(!helper.includes("toLocaleLowerCase") && !helper.includes("toLocaleUpperCase") && !helper.includes("toUpperCase") && !helper.includes("GLYPHS[char.toLowerCase()]"), "pixel rendering preserves source casing and only falls back for missing exact glyphs");
 assert(helper.includes("fillRect"), "pixel glyphs are drawn as exact integer rectangles");
 assert(helper.includes('align === "center"') && helper.includes("getAlignedLineX"), "wrapped pixel text honors per-line center alignment offsets");
 
@@ -74,30 +74,29 @@ function normalizedPattern(value, glyphIndex = 0) {
 const russianAlphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя";
 for (const letter of russianAlphabet) {
   const bounds = inkBounds(letter);
-  assert.equal(bounds.minY, 0, `Russian glyph ${letter} starts on the shared top row`);
-  assert.equal(bounds.maxY, 6, `Russian glyph ${letter} reaches the shared baseline`);
+  assert(bounds.minY >= 0 && bounds.maxY <= 6, `Russian lowercase glyph ${letter} stays inside the shared cell`);
+  assert(bounds.height >= 5, `Russian lowercase glyph ${letter} remains readable at 5x7 size`);
 }
 
-for (const line of [
-  "НОВАЯ ИГРА",
-  "МИРА",
-  "ПРОВЕРЬ, ПОЖАЛУЙСТА. КАК ТАМ РОУЭН У ДОРОГИ.",
-  "е ДАЛЬШЕ",
+for (const [upper, lower] of [["А", "а"], ["Б", "б"], ["М", "м"], ["Т", "т"], ["Я", "я"], ["A", "a"], ["B", "b"], ["M", "m"], ["T", "t"], ["Y", "y"]]) {
+  assert.notEqual(normalizedPattern(`${upper}${lower}`, 0), normalizedPattern(`${upper}${lower}`, 1), `${upper}${lower} uses distinct upper/lower pixel geometry`);
+}
+
+for (const sample of [
+  "Новая игра",
+  "Мира",
+  "Проверь, пожалуйста. Как там Роуэн у дороги.",
+  "Дальше",
+  "RU",
+  "New game",
+  "Mira",
+  "Please check. How is Rowan by the road?",
+  "EN",
 ]) {
-  for (const char of line) {
-    if (!/[А-ЯЁа-яё]/u.test(char)) continue;
-    const bounds = inkBounds(char);
-    assert.equal(bounds.minY, 0, `${line}: glyph ${char} shares the Cyrillic top row`);
-    assert.equal(bounds.maxY, 6, `${line}: glyph ${char} shares the Cyrillic baseline`);
-  }
+  const rendered = renderRects(sample);
+  assert(rendered.length > 0, `${sample} renders without browser font fallback`);
+  assert.equal(pixelText.text, sample, `${sample} source casing is preserved on the text object`);
 }
-
-for (const pair of ["Аа", "Кк", "Мм", "Тт"]) {
-  assert.equal(normalizedPattern(pair, 0), normalizedPattern(pair, 1), `${pair} uses equivalent upper/lower Russian pixel geometry`);
-}
-
-assert.equal(inkBounds("а").minY, 0, "lowercase Russian а is not the old low x-height glyph");
-assert.equal(inkBounds("а").height, 7, "lowercase Russian а uses full-height all-caps geometry");
 
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");

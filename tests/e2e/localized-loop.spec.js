@@ -15,9 +15,9 @@ async function bridge(page, expression, argument) {
 }
 
 async function pressInteract(page) {
-  await page.keyboard.down("KeyE");
+  await page.keyboard.down("Space");
   await page.waitForTimeout(50);
-  await page.keyboard.up("KeyE");
+  await page.keyboard.up("Space");
 }
 
 async function placeNear(page, entityId) {

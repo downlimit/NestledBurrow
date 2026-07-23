@@ -46,7 +46,7 @@ export function createInteractionHud(scene, options = {}) {
   function actionStyle() { return { fontFamily: fontFamily(), fontSize: "8px", color: "#d9c18f" }; }
   function promptStyle() { return { fontFamily: fontFamily(), fontSize: "9px", color: "#f2eadc" }; }
   function translate(descriptor) { return localization.t(descriptor.textKey ?? descriptor, descriptor.values); }
-  function actionLabel(key) { return `${isCoarsePointer() ? "" : "E  "}${localization.t(key)}`; }
+  function actionLabel(key) { return `${isCoarsePointer() ? "" : "SPACE  "}${localization.t(key)}`; }
 
   function redraw(force = false) {
     if (destroyed) return;
