@@ -245,11 +245,11 @@ export function createGameHud(scene, options) {
         .fillRect(x + 25, y + 15, 2, 2)
         .fillRect(x + 25, y + 18, 2, 2)
         .fillRect(x + 23, y + 20, 2, 2)
-        .fillRect(x + 28, y + 10, 2, 2)
-        .fillRect(x + 30, y + 12, 2, 4)
-        .fillRect(x + 31, y + 16, 2, 3)
-        .fillRect(x + 30, y + 19, 2, 4)
-        .fillRect(x + 28, y + 23, 2, 2);
+        .fillRect(x + 26, y + 11, 2, 2)
+        .fillRect(x + 27, y + 13, 1, 3)
+        .fillRect(x + 27, y + 16, 1, 3)
+        .fillRect(x + 27, y + 19, 1, 3)
+        .fillRect(x + 26, y + 22, 2, 2);
     }
   }
 
