@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Verify local Codex and delivery token
+      - name: Locate authenticated Codex CLI
         env:
           CODEX_REPAIR_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
         shell: pwsh
@@ -38,13 +38,33 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:CODEX_REPAIR_TOKEN)) {
             throw "Missing Actions secret CODEX_REPAIR_TOKEN"
           }
-          if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-            throw "Codex CLI is not installed for the self-hosted runner user"
+
+          $candidates = [System.Collections.Generic.List[string]]::new()
+          $command = Get-Command codex -ErrorAction SilentlyContinue
+          if ($command -and $command.Source) {
+            $candidates.Add($command.Source)
           }
-          $status = (& codex login status 2>&1 | Out-String)
-          Write-Host $status
-          if ($LASTEXITCODE -ne 0 -or $status -notmatch "Logged in using ChatGPT") {
-            throw "Codex CLI on the self-hosted runner must be logged in with the ChatGPT account"
+          $candidates.Add((Join-Path $env:USERPROFILE ".local\bin\codex.exe"))
+          $candidates.Add((Join-Path $env:USERPROFILE ".local\bin\codex.cmd"))
+          $candidates.Add((Join-Path $env:LOCALAPPDATA "Programs\Codex\codex.exe"))
+          $candidates.Add((Join-Path $env:APPDATA "npm\codex.cmd"))
+
+          $codex = $candidates |
+            Where-Object { $_ -and (Test-Path $_) } |
+            Select-Object -Unique -First 1
+
+          if (-not $codex) {
+            Write-Host "USERPROFILE=$env:USERPROFILE"
+            Write-Host "PATH=$env:PATH"
+            throw "Codex CLI was not found for the self-hosted runner user"
+          }
+
+          Write-Host "Using Codex CLI: $codex"
+          "CODEX_BIN=$codex" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          & $codex login status
+          if ($LASTEXITCODE -ne 0) {
+            throw "Codex CLI is not authenticated for the self-hosted runner user"
           }
 
       - name: Checkout reviewed PR head
@@ -146,7 +166,7 @@ jobs:
         run: |
           $promptPath = Join-Path $env:RUNNER_TEMP "codex-repair-prompt.md"
           $outputPath = Join-Path $env:RUNNER_TEMP "codex-final-message.md"
-          Get-Content -Raw $promptPath | codex exec --full-auto --output-last-message $outputPath -
+          Get-Content -Raw $promptPath | & $env:CODEX_BIN exec --full-auto --output-last-message $outputPath -
           if ($LASTEXITCODE -ne 0) { throw "Codex repair failed" }
 
       - name: Validate repaired checkout
