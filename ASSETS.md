@@ -1,6 +1,6 @@
 # External assets and licenses
 
-This project uses only the listed third-party assets in the playable prototype. Full source archives were used as temporary integration sources and are not stored on the production branch after the required files were selected.
+This project uses only the listed third-party or project-provided assets in the playable prototype. Full source archives were used as temporary integration sources and are not stored on the production branch after the required files were selected.
 
 ## Basic Village Tileset
 
@@ -98,11 +98,23 @@ The diagonal frames are project-authored derivatives of the committed Kenney cha
 
 The earlier Kenney Roguelike/RPG room and continuous-world atlases remain historical implementation material. They are no longer the active runtime environment after the Basic Village migration and must not be selected as the default source for new environment work.
 
-## Rubik Regular font
+## Pixelify Sans runtime font
 
-- **Source:** official `googlefonts/rubik` project, archived version-2 file `old/version-2/fonts/ttf/Rubik-Regular.ttf`.
-- **License:** SIL Open Font License 1.1, committed as `public/assets/fonts/rubik/OFL.txt`.
-- **Runtime file:** `public/assets/fonts/rubik/Rubik-Regular.ttf`.
-- **SHA-256:** `a66d53c66f8e31520c9b6212eae9e1c6bdd59e01eab2f2068ddd1f80f062c235`.
-- **Glyph validation:** fontTools cmap inspection confirmed representative Latin and Cyrillic coverage: `AaZzАаЯяЁё`.
-- **Integrity check:** `scripts/check-localization.mjs` requires the committed font, license and exact SHA-256.
+- **Family:** Pixelify Sans.
+- **Package:** `@fontsource/pixelify-sans` pinned to `5.2.7` in `package.json` and `package-lock.json`.
+- **Official source:** https://fontsource.org/fonts/pixelify-sans
+- **License:** SIL Open Font License 1.1, distributed inside the pinned package.
+- **Runtime delivery:** package CSS imports `@fontsource/pixelify-sans/latin.css` and `@fontsource/pixelify-sans/cyrillic.css`; font binaries remain inside the installed dependency and are emitted by Vite rather than copied into tracked repository paths.
+- **Role:** active Unicode HUD/dialogue font for English and Russian.
+- **Integrity check:** `scripts/check-localization.mjs` verifies the pinned package and both subset imports.
+- **Superseded asset:** the previously committed Rubik font is no longer an active runtime dependency and is removed by the font migration.
+
+## Sunlit Save Point music
+
+- **Provenance:** exact user-provided project attachment supplied for repository inclusion; no external CDN copy or substitute was used.
+- **Runtime file:** `public/assets/audio/music/NestledBurrow_SunlitSavePoint.mp3`.
+- **Runtime role:** looping background music controlled by the master and music channels.
+- **Byte length:** `3,977,087`.
+- **SHA-256:** `502dfd51bcfa7908becd39f604a6c73d868d9742fd3d1207c985cb9482627a91`.
+- **Git blob SHA:** `76767a4fc6e5a7386118b044b5a99e02f24b0a07`.
+- **Integrity check:** `scripts/check-audio.mjs` verifies the committed path, byte length and Git blob identity before runtime integration.

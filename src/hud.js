@@ -11,7 +11,7 @@ export const HUD_COLORS = {
 
 export const FULLSCREEN_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
 export const FULLSCREEN_ICON_RECT = Object.freeze({ x: GAME_WIDTH - 26, y: 12, size: 14 });
-export const BUILD_LABEL = Object.freeze({ x: GAME_WIDTH - 38, y: 8 });
+export const BUILD_LABEL = Object.freeze({ x: GAME_WIDTH - 128, y: 8 });
 
 const GLYPH_WIDTH = 5;
 const GLYPH_HEIGHT = 7;

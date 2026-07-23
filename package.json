@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "npm run check:docs && npm run check:binary-import && npm run check:input && npm run check:runtime-components && npm run check:fullscreen && npm run check:hud && npm run check:movement && npm run check:character && npm run check:character-diagonals && npm run check:patrol && npm run check:interaction && npm run check:dialogue && npm run check:progress && npm run check:i18n && npm run check:visual && npm run check:world && npm run check:room-preview && npm run build",
+    "check": "npm run check:docs && npm run check:binary-import && npm run check:input && npm run check:runtime-components && npm run check:audio && npm run check:fullscreen && npm run check:hud && npm run check:movement && npm run check:character && npm run check:character-diagonals && npm run check:patrol && npm run check:interaction && npm run check:dialogue && npm run check:progress && npm run check:i18n && npm run check:visual && npm run check:world && npm run check:room-preview && npm run build",
     "check:docs": "node scripts/check-doc-contracts.mjs",
     "check:binary-import": "node scripts/check-binary-import.mjs",
     "check:input": "node scripts/check-input.mjs",
@@ -21,6 +21,7 @@
     "check:character-diagonals": "python scripts/check-character-diagonals.py",
     "check:patrol": "node scripts/check-patrol-contract.mjs",
     "check:runtime-components": "node scripts/check-runtime-components.mjs",
+    "check:audio": "node scripts/check-audio.mjs",
     "check:interaction": "node scripts/check-interaction.mjs",
     "check:dialogue": "node scripts/check-dialogue.mjs",
     "i18n:status": "i18next-cli status",
@@ -30,6 +31,7 @@
     "check:e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/pixelify-sans": "5.2.7",
     "phaser": "4.2.1",
     "i18next": "^25.3.2",
     "i18next-browser-languagedetector": "^8.2.0",

@@ -40,10 +40,9 @@ async function clickLogical(page, x, y) {
   await page.mouse.click(box.x + x * box.width / 320, box.y + y * box.height / 180);
 }
 
-test("locale detection and saved preference survive reload", async ({ page }, testInfo) => {
+test("default Russian locale and saved preference survive reload", async ({ page }) => {
   await boot(page);
-  const expected = testInfo.project.name.startsWith("mobile") ? "ru" : "en";
-  await expect.poll(() => bridge(page, "getLanguage")).toBe(expected);
+  await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   await bridge(page, "setLanguage", "en");
   await page.reload();
   await boot(page);
@@ -64,12 +63,14 @@ test("localized quest progress persists and New Game keeps language", async ({ p
   await page.reload();
   await boot(page);
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: { "neighborQuest.completed": true } });
+  await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
   await bridge(page, "setLanguage", "ru");
   await clickLogical(page, 24, 18);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ newGameConfirming: true });
   await clickLogical(page, 92, 111);
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: {} });
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
+  await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
 });
 
 test("desktop keyboard selects and preserves diagonal runtime facing", async ({ page }, testInfo) => {
@@ -102,6 +103,7 @@ test("mobile touch starts a Russian dialogue without joystick capture", async ({
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await boot(page);
+  await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
   await bridge(page, "setLanguage", "ru");
   await placeNear(page, "home-npc");
   const box = await page.locator("canvas").boundingBox();

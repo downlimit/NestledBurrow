@@ -6,7 +6,7 @@
   },
   "language": {
     "toggle": "Switch language",
-    "currentNext": "{current} / {next}"
+    "current": "EN"
   },
   "interaction": {
     "talk": "Talk",
@@ -18,5 +18,11 @@
     "confirmNewGame": "Erase saved quest progress and begin again?",
     "confirm": "Start over",
     "cancel": "Cancel"
+  },
+  "sound": {
+    "title": "Sound",
+    "master": "Master",
+    "music": "Music",
+    "effects": "Effects"
   }
 }

@@ -1,10 +1,10 @@
 export const STORAGE_KEY = "nestledburrow.language";
-export const FALLBACK_LANGUAGE = "en";
+export const FALLBACK_LANGUAGE = "ru";
 export const LOCALIZATION_NAMESPACES = Object.freeze(["common", "hud", "dialogue"]);
 
 export const LOCALE_REGISTRY = Object.freeze([
-  Object.freeze({ code: "en", label: "EN", direction: "ltr", fontKey: "rubik-regular" }),
-  Object.freeze({ code: "ru", label: "RU", direction: "ltr", fontKey: "rubik-regular" }),
+  Object.freeze({ code: "en", label: "EN", direction: "ltr", fontKey: "Pixelify Sans" }),
+  Object.freeze({ code: "ru", label: "RU", direction: "ltr", fontKey: "Pixelify Sans" }),
 ]);
 
 export const SUPPORTED_LOCALES = Object.freeze(LOCALE_REGISTRY.map((locale) => locale.code));

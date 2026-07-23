@@ -43,7 +43,7 @@ export async function createLocalization(options = {}) {
     fallbackNS: "common",
     backend: { loadPath: `${baseUrl()}locales/{{lng}}/{{ns}}.json` },
     detection: {
-      order: ["localStorage", "navigator"],
+      order: ["localStorage"],
       lookupLocalStorage: STORAGE_KEY,
       caches: ["localStorage"],
       excludeCacheFor: [],
