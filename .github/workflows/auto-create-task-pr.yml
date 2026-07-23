@@ -1,0 +1,79 @@
+name: Auto Create Task PR
+
+on:
+  push:
+    branches:
+      - "task/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create pull request when missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing="$(gh pr list \
+            --repo "$REPOSITORY" \
+            --head "$HEAD_BRANCH" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [[ -n "$existing" ]]; then
+            echo "PR #$existing already exists for $HEAD_BRANCH"
+            exit 0
+          fi
+
+          if [[ ! "$HEAD_BRANCH" =~ ^task/([0-9]{3})-(.+)$ ]]; then
+            echo "Unsupported task branch: $HEAD_BRANCH" >&2
+            exit 1
+          fi
+
+          task_number="${BASH_REMATCH[1]}"
+          task_slug="${BASH_REMATCH[2]}"
+          task_name="${task_slug//-/ }"
+          task_name="${task_name^}"
+          task_title="Task #${task_number} — ${task_name}"
+
+          body="$(cat <<EOF
+          # Task
+
+          - Task: \`${task_title}\`
+          - PR title: \`${task_title}\`
+
+          # Review class
+
+          - [ ] \`docs\`
+          - [x] \`code\`
+          - [ ] \`visual/runtime\`
+          - [ ] \`strict-risk\`
+
+          ## Git lifecycle
+
+          - Work branch: \`${HEAD_BRANCH}\`
+          - Final head SHA: \`${GITHUB_SHA}\`
+
+          ## Scope confirmation
+
+          - [x] Task number and title match the branch and PR title.
+          - [x] The branch is ready for review; this PR is not a development workspace.
+          EOF
+          )"
+
+          gh pr create \
+            --repo "$REPOSITORY" \
+            --base main \
+            --head "$HEAD_BRANCH" \
+            --title "$task_title" \
+            --body "$body"
