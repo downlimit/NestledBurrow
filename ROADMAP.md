@@ -31,7 +31,7 @@ Task #001 — Первая расчистка участка
 - Заголовок PR дословно совпадает с заголовком задачи: `Task #001 — Первая расчистка участка`.
 - Base SHA не хранится здесь как долгоживущий факт: Лид получает актуальный `main` непосредственно перед запуском задачи.
 
-**Следующий свободный номер:** `Task #013`.
+**Следующий свободный номер:** `Task #014`.
 
 ## Статусы
 
@@ -48,15 +48,15 @@ Task #001 — Первая расчистка участка
 
 ## Сейчас
 
-### Task #012 — Automate Codex review repair loop
+### Task #013 — Restart Codex auto-repair cleanly
 
 **Статус:** `PR открыт`
 
-**Реализация:** `PR #98 · Task #012 — Automate Codex review repair loop` добавляет официальный `openai/codex-action` как автоматического исполнителя замечаний Codex Reviewer в существующей PR-ветке.
+**Реализация:** `PR #102 · Task #013 — Restart Codex auto-repair cleanly` чинит локальный Windows self-hosted repair runner после первого неудачного end-to-end smoke.
 
-**Требуемый результат:** пользователь один раз публикует исходный PR, после чего обычный Fast lane цикл `review finding → Codex repair → push → fresh review → merge` проходит без пинга ChatGPT-чата и без кнопки Cloud Codex `Обновить ветку`.
+**Требуемый результат:** обычный Fast lane цикл `Codex Reviewer finding → локальный Codex CLI repair → push в ту же PR-ветку → fresh review → merge` проходит без пинга ChatGPT-чата, без Cloud Codex `Обновить ветку`, без GitHub Copilot и без отдельно оплачиваемого OpenAI API.
 
-**Внешняя настройка:** перед проверочным merge нужен Actions secret `OPENAI_API_KEY`; repository-scoped `CODEX_REPAIR_TOKEN` уже добавлен.
+**Текущая граница:** runner зарегистрирован и получает задания. `PR #100 · Task #013 — Verify Codex auto-repair end to end` закрыт без merge после падения первого локального preflight. `PR #102` делает поиск Codex CLI устойчивым, принудительно использует ChatGPT-auth и сохраняет repository-scoped `CODEX_REPAIR_TOKEN` только для доставки исправления.
 
 ### Task #001 — Первая расчистка участка
 
@@ -122,6 +122,12 @@ Task #001 — Первая расчистка участка
 **Статус:** `Завершено`
 
 `PR #95 · Task #010 — Clean pipeline smoke files` удалил временные smoke-файлы после подтверждения pipeline capabilities.
+
+### Task #012 — Automate Codex review repair loop
+
+**Статус:** `Переделать`
+
+`PR #98 · Task #012 — Automate Codex review repair loop` смёржен в `main` коммитом `6471e74c921805f6b18a30a4776245dfdcc1ab84` и установил первый self-hosted Codex repair workflow. Первый end-to-end smoke доказал доставку review event до локального runner, но preflight оказался хрупким и полный цикл не завершился. Исправление продолжено как отдельная Task #013.
 
 ## Следом
 
