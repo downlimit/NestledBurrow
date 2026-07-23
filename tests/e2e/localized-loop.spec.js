@@ -113,3 +113,41 @@ test("mobile touch starts a Russian dialogue without joystick capture", async ({
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   expect(pageErrors).toEqual([]);
 });
+
+test("persistent debris clearing slice survives reload and New Game", async ({ page }, testInfo) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await boot(page, "./?movementDebug=1");
+  await page.evaluate(() => {
+    localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } }));
+  });
+  await bridge(page, "setLanguage", "en");
+  await bridge(page, "placePlayerNear", "fallen-log-001");
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ entityId: "fallen-log-001", prompt: "hud:interaction.clearDebris" });
+
+  if (testInfo.project.name.startsWith("mobile")) {
+    const box = await page.locator("canvas").boundingBox();
+    if (!box) throw new Error("Game canvas is unavailable");
+    await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
+  } else {
+    await pressInteract(page);
+  }
+
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { energy: { current: 80, max: 100 }, resources: { wood: 1 }, debris: { "fallen-log-001": { cleared: true } } } });
+  await expect.poll(() => bridge(page, "getDebrisState")).toMatchObject({ exists: false, blocked: false });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBe(null);
+
+  await page.reload();
+  await boot(page, "./?movementDebug=1");
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { energy: { current: 80, max: 100 }, resources: { wood: 1 }, debris: { "fallen-log-001": { cleared: true } } } });
+  await expect.poll(() => bridge(page, "getDebrisState")).toMatchObject({ exists: false, blocked: false });
+
+  await clickLogical(page, 24, 18);
+  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ newGameConfirming: true });
+  await clickLogical(page, 92, 111);
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { energy: { current: 100, max: 100 }, resources: { wood: 0 }, debris: { "fallen-log-001": { cleared: false } } } });
+  await expect.poll(() => bridge(page, "getDebrisState")).toMatchObject({ exists: true, objectAlive: true, blocked: true });
+  await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
+  await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
+  expect(pageErrors).toEqual([]);
+});

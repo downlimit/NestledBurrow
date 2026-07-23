@@ -11,7 +11,9 @@
   "interaction": {
     "talk": "Говорить",
     "next": "Дальше",
-    "close": "Закрыть"
+    "close": "Закрыть",
+    "clearDebris": "Разобрать",
+    "notEnoughEnergy": "Не хватает энергии"
   },
   "progress": {
     "newGame": "Новая игра",
@@ -24,5 +26,9 @@
     "master": "Общая",
     "music": "Музыка",
     "effects": "Эффекты"
+  },
+  "status": {
+    "energy": "Э",
+    "wood": "Дер"
   }
 }

@@ -11,8 +11,11 @@ import {
   setEntityFlag,
   setSessionFlag,
   startDialogue,
+  normalizeGameSessionState,
 } from "../src/gameSessionState.js";
 import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction.js";
+import { createInteractionRuntime } from "../src/interactionRuntime.js";
+import { FIRST_DEBRIS_ID, FIRST_DEBRIS_POSITION, clearFirstDebris } from "../src/debrisGameplay.js";
 
 function assertPlainSerializable(value, label) {
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(value))), JSON.stringify(value), `${label} survives JSON round-trip`);
@@ -37,6 +40,11 @@ assert.deepEqual(state, {
   entities: { player: { id: "player", flags: {} } },
   flags: {},
   dialogue: { targetId: null, dialogueId: null, lineIndex: 0 },
+  gameplay: {
+    energy: { current: 100, max: 100 },
+    resources: { wood: 0 },
+    debris: { [FIRST_DEBRIS_ID]: { cleared: false } },
+  },
 }, "default state has canonical shape");
 assert.deepEqual(
   createGameSessionState({ currentWorldId: "forest", playerId: "hero" }),
@@ -47,6 +55,11 @@ assert.deepEqual(
     entities: { hero: { id: "hero", flags: {} } },
     flags: {},
     dialogue: { targetId: null, dialogueId: null, lineIndex: 0 },
+  gameplay: {
+    energy: { current: 100, max: 100 },
+    resources: { wood: 0 },
+    debris: { [FIRST_DEBRIS_ID]: { cleared: false } },
+  },
   },
   "custom world and player are supported",
 );
@@ -176,3 +189,53 @@ assert.equal(findBestInteractionTarget(source, []), null, "empty target list ret
 assert.equal(findBestInteractionTarget(source, [createInteractionTarget({ ...baseTarget, id: "no-access", position: { x: -2, y: 0 } })]), null, "no accessible targets returns null");
 assertPlainSerializable(baseTarget, "interaction target");
 assertPlainSerializable(candidate, "interaction candidate");
+
+
+const oldSaveLike = JSON.parse(JSON.stringify(state));
+delete oldSaveLike.gameplay;
+oldSaveLike.entities["npc-a"].flags.greeted = true;
+const normalizedOld = normalizeGameSessionState(oldSaveLike);
+assert.equal(normalizedOld.gameplay.energy.current, 100, "old v1 state receives current energy default");
+assert.equal(normalizedOld.gameplay.resources.wood, 0, "old v1 state receives wood default");
+assert.equal(normalizedOld.gameplay.debris[FIRST_DEBRIS_ID].cleared, false, "old v1 state receives debris default");
+assert.equal(getEntityFlag(normalizedOld, "npc-a", "greeted"), true, "normalizing old v1 state preserves entity quest flags");
+
+const clearState = createGameSessionState();
+assert.deepEqual(clearFirstDebris(clearState), { status: "cleared", mutated: true, energyCost: 20, woodReward: 1 }, "successful clear mutates once");
+assert.equal(clearState.gameplay.energy.current, 80, "clear spends energy");
+assert.equal(clearState.gameplay.resources.wood, 1, "clear grants wood");
+const afterClear = JSON.parse(JSON.stringify(clearState));
+assert.equal(clearFirstDebris(clearState).mutated, false, "repeat clear is ignored");
+assert.deepEqual(JSON.parse(JSON.stringify(clearState)), afterClear, "repeat clear does not mutate state");
+const tiredState = createGameSessionState();
+tiredState.gameplay.energy.current = 10;
+const beforeTired = JSON.parse(JSON.stringify(tiredState));
+assert.equal(clearFirstDebris(tiredState).status, "insufficient-energy", "insufficient energy reports failure");
+assert.deepEqual(JSON.parse(JSON.stringify(tiredState)), beforeTired, "insufficient energy has no partial mutation");
+assertPlainSerializable(clearState, "gameplay session state");
+
+{
+  const player = { id: "player", position: { x: FIRST_DEBRIS_POSITION.x - 12, y: FIRST_DEBRIS_POSITION.y }, facingDirection: { x: 1, y: 0 } };
+  const debrisTarget = createInteractionTarget({ id: "clear-fallen-log-001", entityId: "fallen-log-001", kind: "clear-debris", position: FIRST_DEBRIS_POSITION, radius: 24, priority: 1, prompt: "hud:interaction.clearDebris", payload: { debrisId: FIRST_DEBRIS_ID } });
+  const dialogueTarget = createInteractionTarget({ ...baseTarget, id: "talk-near", position: FIRST_DEBRIS_POSITION, priority: 0 });
+  assert.equal(findBestInteractionTarget(player, [dialogueTarget, debrisTarget]).targetId, "clear-fallen-log-001", "static debris participates in existing deterministic selection");
+  assert.equal(findBestInteractionTarget(player, [dialogueTarget]).kind, "dialogue", "dialogue target selection still works");
+}
+
+{
+  const runtimeState = createGameSessionState();
+  const player = { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } };
+  let actionCalls = 0;
+  const runtime = createInteractionRuntime({
+    sessionState: runtimeState,
+    characterSystem: { getSnapshot: (id) => id === "player" ? player : { id, position: { x: 12, y: 0 } } },
+    interactionDefinitions: [],
+    getStaticInteractionTargets: () => runtimeState.gameplay.debris[FIRST_DEBRIS_ID].cleared ? [] : [{ id: "clear-fallen-log-001", entityId: "fallen-log-001", kind: "clear-debris", position: { x: 12, y: 0 }, radius: 24, priority: 1, prompt: "hud:interaction.clearDebris", payload: { debrisId: FIRST_DEBRIS_ID } }],
+    handleWorldObjectInteraction: () => { actionCalls += 1; return clearFirstDebris(runtimeState); },
+    presenter: {},
+  });
+  runtime.update({ actions: { interact: true } });
+  runtime.update({ actions: { interact: true } });
+  assert.equal(actionCalls, 1, "cleared object leaves candidates before a second input edge can mutate again");
+  assert.equal(runtime.getCurrentCandidate(), null, "cleared object is no longer candidate");
+}

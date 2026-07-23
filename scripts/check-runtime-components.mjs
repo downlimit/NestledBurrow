@@ -6,6 +6,7 @@ import {
   loadMovementDebugConfig,
 } from "../src/movementDebugPanel.js";
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "../src/movementConfig.js";
+import { GAMEPLAY_DEBUG_STORAGE_KEY } from "../src/debrisGameplay.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
 class EventTargetStub {
@@ -309,6 +310,8 @@ let documentStub = new DocumentStub();
 let storage = createStorage();
 let movementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
 let changeCalls = 0;
+let gameplayChangeCalls = 0;
+let refillCalls = 0;
 let panel = new MovementDebugPanel({
   enabled: false,
   movementConfig,
@@ -340,6 +343,8 @@ panel = new MovementDebugPanel({
   documentRef: documentStub,
   storage,
   onConfigChange: () => changeCalls++,
+  onGameplayTuningChange: () => gameplayChangeCalls++,
+  onRefillEnergy: () => refillCalls++,
   getStatusSnapshot: () => ({ velocity: { x: 3, y: 4 }, facing: "right" }),
   navigatorRef: {
     clipboard: {
@@ -353,7 +358,7 @@ panel = new MovementDebugPanel({
 assert.equal(documentStub.body.children.length, 1, "enabled debug panel is created");
 assert.deepEqual(
   [...panel.inputs.keys()],
-  MOVEMENT_TUNING_FIELDS.map((field) => field.key),
+  [...MOVEMENT_TUNING_FIELDS.map((field) => field.key), "gameplay:maxEnergy", "gameplay:clearEnergyCost", "gameplay:woodReward"],
   "panel exposes configured fields",
 );
 const speedInput = panel.inputs.get("maxSpeed");
@@ -368,6 +373,11 @@ assert(
 speedInput.value = "nan";
 speedInput.input();
 assert.equal(changeCalls, 1, "NaN input is ignored");
+const maxEnergyInput = panel.inputs.get("gameplay:maxEnergy");
+maxEnergyInput.value = "77";
+maxEnergyInput.input();
+assert.equal(gameplayChangeCalls, 1, "gameplay tuning callback fires");
+assert(storage.getItem(GAMEPLAY_DEBUG_STORAGE_KEY).includes("\"maxEnergy\":77"), "gameplay tuning persists separately from movement config");
 panel.updateStatus();
 assert(
   panel.status.textContent.includes("velocity 3.0, 4.0") &&
@@ -392,8 +402,10 @@ timerWindow.runAll();
 assert.equal(panel.copyButton.textContent, "Copy config", "copy failure status restores");
 panel.resetDefaults();
 assert.equal(movementConfig.maxSpeed, DEFAULT_MOVEMENT_CONFIG.maxSpeed, "reset restores defaults");
-assert.equal(storage.getItem(MOVEMENT_STORAGE_KEY), null, "reset clears storage");
+assert.equal(storage.getItem(MOVEMENT_STORAGE_KEY), null, "reset clears movement storage");
+assert.equal(storage.getItem(GAMEPLAY_DEBUG_STORAGE_KEY), null, "reset clears gameplay debug storage");
 assert.equal(speedInput.value, String(DEFAULT_MOVEMENT_CONFIG.maxSpeed), "reset syncs inputs");
+assert.equal(maxEnergyInput.value, "100", "reset syncs gameplay inputs");
 const panelNode = panel.panel;
 panel.destroy();
 panel.destroy();

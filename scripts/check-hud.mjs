@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { BUILD_LABEL, FULLSCREEN_HIT_AREA, HUD_GLYPHS, compactBuildLabel, isPointInRect, measureBitmapText } from "../src/hud.js";
 import {
   LANGUAGE_HIT_AREA,
+  GAMEPLAY_STATUS_AREA,
   SOUND_HIT_AREA,
   SOUND_PANEL_AREA,
   NEW_GAME_CANCEL_HIT_AREA,
@@ -20,7 +21,9 @@ assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width < SOUND_HIT_AREA.x, "New Ga
 assert(SOUND_HIT_AREA.x + SOUND_HIT_AREA.width <= LANGUAGE_HIT_AREA.x, "sound and language hit areas do not overlap");
 assert(LANGUAGE_HIT_AREA.x + LANGUAGE_HIT_AREA.width <= FULLSCREEN_HIT_AREA.x, "language and fullscreen hit areas do not overlap");
 assert(BUILD_LABEL.x < SOUND_HIT_AREA.x, "build label is placed left of the right HUD controls");
-for (const rect of [NEW_GAME_HIT_AREA, SOUND_HIT_AREA, LANGUAGE_HIT_AREA, FULLSCREEN_HIT_AREA, SOUND_PANEL_AREA, NEW_GAME_CONFIRM_PANEL, NEW_GAME_CONFIRM_HIT_AREA, NEW_GAME_CANCEL_HIT_AREA]) {
+assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width <= GAMEPLAY_STATUS_AREA.x, "gameplay status does not overlap New Game");
+assert(GAMEPLAY_STATUS_AREA.x + GAMEPLAY_STATUS_AREA.width <= SOUND_HIT_AREA.x, "gameplay status does not overlap sound/language/fullscreen controls");
+for (const rect of [NEW_GAME_HIT_AREA, GAMEPLAY_STATUS_AREA, SOUND_HIT_AREA, LANGUAGE_HIT_AREA, FULLSCREEN_HIT_AREA, SOUND_PANEL_AREA, NEW_GAME_CONFIRM_PANEL, NEW_GAME_CONFIRM_HIT_AREA, NEW_GAME_CANCEL_HIT_AREA]) {
   assert(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= GAME_WIDTH && rect.y + rect.height <= GAME_HEIGHT, "GameHud rectangle stays inside logical viewport");
 }
 assert(isPointInRect(NEW_GAME_CONFIRM_HIT_AREA.x + 2, NEW_GAME_CONFIRM_HIT_AREA.y + 2, NEW_GAME_CONFIRM_PANEL), "confirm action stays inside confirmation panel");
@@ -34,4 +37,4 @@ assert(gameHud.includes('localization.t("hud:progress.newGame")'), "New Game lab
 assert(gameHud.includes('localization.t(`hud:sound.${channel}`)'), "sound panel labels are localized");
 assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "localized HUD text uses locale Unicode font");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
-console.log("hud checks passed: build, fullscreen, language and localized New Game controls are aligned");
+console.log("hud checks passed: build, fullscreen, language and localized New Game and gameplay status controls are aligned");

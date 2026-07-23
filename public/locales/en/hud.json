@@ -11,7 +11,9 @@
   "interaction": {
     "talk": "Talk",
     "next": "Next",
-    "close": "Close"
+    "close": "Close",
+    "clearDebris": "Clear",
+    "notEnoughEnergy": "Not enough energy"
   },
   "progress": {
     "newGame": "New game",
@@ -24,5 +26,9 @@
     "master": "Master",
     "music": "Music",
     "effects": "Effects"
+  },
+  "status": {
+    "energy": "E",
+    "wood": "Wood"
   }
 }

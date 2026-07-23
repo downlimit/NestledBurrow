@@ -139,4 +139,29 @@ assert.equal(parsed.state.playerId, fresh.playerId, "player ID saved");
 assert(!("dialogue" in parsed.state), "transient dialogue is not in persistence state");
 assert(!serialized.includes("[object"), "serialized result contains JSON data only");
 
+
+const oldV1 = clone(fresh);
+delete oldV1.gameplay;
+oldV1.flags[NEIGHBOR_QUEST_FLAGS.completed] = true;
+oldV1.entities["home-npc"].flags.visited = true;
+const oldLoaded = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: SAVE_SCHEMA_VERSION, state: oldV1 }));
+assert.equal(oldLoaded.status, "loaded", "old v1 save without gameplay fields loads");
+assert.equal(oldLoaded.state.gameplay.energy.current, 100, "old v1 save gets starting energy default");
+assert.equal(oldLoaded.state.gameplay.energy.max, 100, "old v1 save gets max energy default");
+assert.equal(oldLoaded.state.gameplay.resources.wood, 0, "old v1 save gets wood default");
+assert.equal(oldLoaded.state.gameplay.debris["fallen-log-001"].cleared, false, "old v1 save restores debris default");
+assert.equal(getSessionFlag(oldLoaded.state, NEIGHBOR_QUEST_FLAGS.completed), true, "old v1 save normalization preserves quest flags");
+assert.equal(getEntityFlag(oldLoaded.state, "home-npc", "visited"), true, "old v1 save normalization preserves entity flags");
+
+const gameplayRoundTrip = createFreshGameSessionState();
+gameplayRoundTrip.gameplay.energy.current = 55;
+gameplayRoundTrip.gameplay.resources.wood = 3;
+gameplayRoundTrip.gameplay.debris["fallen-log-001"].cleared = true;
+const gameplayLoaded = deserializeSessionEnvelope(serializeSessionEnvelope(gameplayRoundTrip));
+assert.equal(gameplayLoaded.state.gameplay.energy.current, 55, "energy current persists");
+assert.equal(gameplayLoaded.state.gameplay.resources.wood, 3, "wood persists");
+assert.equal(gameplayLoaded.state.gameplay.debris["fallen-log-001"].cleared, true, "cleared debris persists");
+assert.deepEqual(createFreshGameSessionState().gameplay, { energy: { current: 100, max: 100 }, resources: { wood: 0 }, debris: { "fallen-log-001": { cleared: false } } }, "New Game fresh state returns gameplay defaults");
+assert.equal(JSON.stringify(JSON.parse(JSON.stringify(gameplayRoundTrip))), JSON.stringify(gameplayRoundTrip), "gameplay state remains JSON-safe");
+
 console.log("progress checks passed");

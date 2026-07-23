@@ -27,6 +27,8 @@ export function createInteractionHud(scene, options = {}) {
   let renderedKey = "";
   let latchedInteract = false;
   let promptRect = null;
+  let messageState = null;
+  let messageTimer = null;
 
   const onPointerDown = (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -48,7 +50,7 @@ export function createInteractionHud(scene, options = {}) {
 
   function redraw(force = false) {
     if (destroyed) return;
-    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.() });
+    const key = JSON.stringify({ promptState, dialogueState, messageState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.() });
     if (!force && key === renderedKey) return;
     renderedKey = key;
     graphics.clear();
@@ -81,6 +83,16 @@ export function createInteractionHud(scene, options = {}) {
       promptRect = null;
       promptHit.disableInteractive();
     }
+
+    if (messageState) {
+      const text = translate(messageState);
+      promptText.setStyle(promptStyle()).setText(text).setVisible(true);
+      const width = Math.max(PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
+      const rect = { x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - width, y: GAME_HEIGHT - 62, width, height: PROMPT_HEIGHT };
+      graphics.fillStyle(HUD_COLORS.panel, 0.9).fillRect(rect.x, rect.y, rect.width, rect.height);
+      graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+      promptText.setPosition(Math.round(rect.x + 8), Math.round(rect.y + 7));
+    }
   }
 
   const unsubscribe = localization?.subscribe?.(() => redraw(true));
@@ -89,6 +101,12 @@ export function createInteractionHud(scene, options = {}) {
     showPrompt({ promptKey }) { promptState = { promptKey }; redraw(); },
     hidePrompt() { promptState = null; redraw(); },
     showDialogue(dialogue) { dialogueState = { ...dialogue }; promptState = null; redraw(); },
+    showMessage(message) {
+      messageState = { ...message };
+      if (messageTimer) scene.time.removeEvent(messageTimer);
+      messageTimer = scene.time.delayedCall(1100, () => { messageState = null; messageTimer = null; redraw(true); });
+      redraw(true);
+    },
     hideDialogue() { dialogueState = null; redraw(); },
     consumeInteractPressed() { const pressed = latchedInteract; latchedInteract = false; return pressed; },
     isPointInHud(x, y) { return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && promptRect && isPointInRect(x, y, promptRect))); },
@@ -97,6 +115,7 @@ export function createInteractionHud(scene, options = {}) {
       destroyed = true;
       unsubscribe?.();
       promptHit.off("pointerdown", onPointerDown); dialogueHit.off("pointerdown", onPointerDown);
+      if (messageTimer) scene.time.removeEvent(messageTimer);
       promptHit.destroy(); dialogueHit.destroy(); graphics.destroy();
       speakerText.destroy(); bodyText.destroy(); actionText.destroy(); promptText.destroy();
     },

@@ -9,6 +9,8 @@ export function createInteractionRuntime({
   sessionState,
   characterSystem,
   interactionDefinitions,
+  getStaticInteractionTargets = () => [],
+  handleWorldObjectInteraction,
   getDialogueDefinition,
   resolveDialogueId,
   completeDialogue,
@@ -33,7 +35,7 @@ export function createInteractionRuntime({
     if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
     else presenter?.hidePrompt?.();
 
-    if (interact && currentCandidate) startCandidateDialogue(currentCandidate);
+    if (interact && currentCandidate) startCandidateInteraction(currentCandidate);
   }
 
   function findCandidate() {
@@ -46,6 +48,7 @@ export function createInteractionRuntime({
         position: snapshot.position,
       }));
     }
+    for (const target of getStaticInteractionTargets()) targets.push(createInteractionTarget(target));
     return findBestInteractionTarget(player, targets);
   }
 
@@ -60,14 +63,22 @@ export function createInteractionRuntime({
     return resolveDialogueId(resolverId, sessionState, candidate.entityId);
   }
 
-  function startCandidateDialogue(candidate) {
-    if (candidate.kind !== "dialogue") return;
-    const dialogueId = resolveCandidateDialogueId(candidate);
-    const definition = getDialogueDefinition(dialogueId);
-    startDialogue(sessionState, { targetId: candidate.entityId, dialogueId: definition.id });
-    currentCandidate = null;
-    presenter?.hidePrompt?.();
-    showCurrentDialogueLine();
+  function startCandidateInteraction(candidate) {
+    if (candidate.kind === "dialogue") {
+      const dialogueId = resolveCandidateDialogueId(candidate);
+      const definition = getDialogueDefinition(dialogueId);
+      startDialogue(sessionState, { targetId: candidate.entityId, dialogueId: definition.id });
+      currentCandidate = null;
+      presenter?.hidePrompt?.();
+      showCurrentDialogueLine();
+      return;
+    }
+    const result = handleWorldObjectInteraction?.(candidate);
+    if (result?.mutated || result?.hidePrompt) {
+      currentCandidate = null;
+      presenter?.hidePrompt?.();
+    }
+    if (result?.messageKey) presenter?.showMessage?.({ textKey: result.messageKey });
   }
 
   function showCurrentDialogueLine() {

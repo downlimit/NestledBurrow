@@ -2,6 +2,7 @@ export const SESSION_STATE_VERSION = 1;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
+import { FIRST_DEBRIS_ID, createDefaultGameplayState } from "./debrisGameplay.js";
 
 function assertNonEmptyString(value, label) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -87,6 +88,43 @@ function normalizeEntities(entities) {
   return normalized;
 }
 
+
+function normalizeNonNegativeInteger(value, label) {
+  if (!Number.isInteger(value) || value < 0) throw new Error(`${label} must be a non-negative integer`);
+  return value;
+}
+
+function normalizePositiveInteger(value, label) {
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${label} must be a positive integer`);
+  return value;
+}
+
+function normalizeGameplayState(gameplay, tuning) {
+  assertPlainRecord(gameplay, "Session gameplay");
+  const defaults = createDefaultGameplayState(tuning);
+  const energy = gameplay.energy ?? defaults.energy;
+  const resources = gameplay.resources ?? defaults.resources;
+  const debris = gameplay.debris ?? defaults.debris;
+  assertPlainRecord(energy, "Session gameplay energy");
+  assertPlainRecord(resources, "Session gameplay resources");
+  assertPlainRecord(debris, "Session gameplay debris");
+  const max = normalizePositiveInteger(energy.max ?? defaults.energy.max, "Session max energy");
+  const current = Math.min(normalizeNonNegativeInteger(energy.current ?? defaults.energy.current, "Session current energy"), max);
+  const normalizedDebris = createSafeDictionary();
+  for (const [debrisId, state] of Object.entries(debris)) {
+    assertSafeId(debrisId, "Debris ID");
+    assertPlainRecord(state, `Debris ${debrisId}`);
+    assertBoolean(state.cleared, `Debris ${debrisId}.cleared`);
+    setOwn(normalizedDebris, debrisId, { cleared: state.cleared });
+  }
+  if (!hasOwn(normalizedDebris, FIRST_DEBRIS_ID)) setOwn(normalizedDebris, FIRST_DEBRIS_ID, { cleared: false });
+  return {
+    energy: { current, max },
+    resources: { wood: normalizeNonNegativeInteger(resources.wood ?? defaults.resources.wood, "Session wood") },
+    debris: normalizedDebris,
+  };
+}
+
 function createDialogueState(value = {}) {
   const targetId = value.targetId ?? null;
   const dialogueId = value.dialogueId ?? null;
@@ -112,6 +150,7 @@ export function createFreshGameSessionState(options = {}) {
     entities: createDictionary(),
     flags: createDictionary(),
     dialogue: createDialogueState(),
+    gameplay: createDefaultGameplayState(options.gameplayTuning),
   };
 
   ensureSessionEntity(state, playerId);
@@ -140,6 +179,7 @@ export function normalizeGameSessionState(value, options = {}) {
     entities: normalizeEntities(value.entities),
     flags: normalizeBooleanFlags(value.flags, "Session flags"),
     dialogue: options.includeDialogue === false ? createDialogueState() : createDialogueState(value.dialogue ?? {}),
+    gameplay: normalizeGameplayState(value.gameplay ?? createDefaultGameplayState(options.gameplayTuning), options.gameplayTuning),
   };
 
   ensureSessionEntity(normalized, normalized.playerId);

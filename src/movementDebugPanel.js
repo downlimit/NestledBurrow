@@ -1,5 +1,6 @@
 import { createRuntimeMovementConfig, movementSpeed } from "./characterMovement.js";
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "./movementConfig.js";
+import { GAMEPLAY_TUNING_DEFAULTS, clearGameplayDebugTuning, persistGameplayDebugTuning, normalizeGameplayTuning } from "./debrisGameplay.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
@@ -16,6 +17,9 @@ export class MovementDebugPanel {
   constructor({
     enabled,
     movementConfig,
+    gameplayTuning = GAMEPLAY_TUNING_DEFAULTS,
+    onGameplayTuningChange = () => {},
+    onRefillEnergy = () => {},
     onConfigChange = () => {},
     getStatusSnapshot = () => null,
     documentRef = globalThis.document,
@@ -26,6 +30,9 @@ export class MovementDebugPanel {
     this.enabled = Boolean(enabled);
     this.movementConfig = movementConfig;
     this.onConfigChange = onConfigChange;
+    this.gameplayTuning = normalizeGameplayTuning(gameplayTuning);
+    this.onGameplayTuningChange = onGameplayTuningChange;
+    this.onRefillEnergy = onRefillEnergy;
     this.getStatusSnapshot = getStatusSnapshot;
     this.documentRef = documentRef;
     this.storage = storage;
@@ -39,10 +46,10 @@ export class MovementDebugPanel {
 
     const panel = documentRef.createElement("section");
     panel.className = "movement-debug-panel";
-    panel.setAttribute("aria-label", "Movement tuning");
+    panel.setAttribute("aria-label", "Developer tuning");
 
     const title = documentRef.createElement("strong");
-    title.textContent = "Movement tuning";
+    title.textContent = "Developer tuning";
     panel.append(title);
 
     for (const field of MOVEMENT_TUNING_FIELDS) {
@@ -64,6 +71,24 @@ export class MovementDebugPanel {
       this.inputs.set(field.key, input);
     }
 
+    const gameplayTitle = documentRef.createElement("strong");
+    gameplayTitle.textContent = "Gameplay";
+    panel.append(gameplayTitle);
+    for (const field of [
+      { key: "maxEnergy", min: 1, max: 999, step: 1 },
+      { key: "clearEnergyCost", min: 0, max: 999, step: 1 },
+      { key: "woodReward", min: 0, max: 999, step: 1 },
+    ]) {
+      const label = documentRef.createElement("label");
+      const name = documentRef.createElement("span");
+      name.textContent = field.key;
+      const input = documentRef.createElement("input");
+      input.type = "number"; input.min = String(field.min); input.max = String(field.max); input.step = String(field.step);
+      input.value = String(this.gameplayTuning[field.key]); input.dataset.gameplayField = field.key;
+      input.addEventListener("input", () => this.applyGameplayInput(field, input));
+      label.append(name, input); panel.append(label); this.inputs.set(`gameplay:${field.key}`, input);
+    }
+
     this.status = documentRef.createElement("output");
     this.status.className = "movement-debug-status";
     panel.append(this.status);
@@ -83,7 +108,12 @@ export class MovementDebugPanel {
       void this.copyConfig();
     });
 
-    actions.append(reset, this.copyButton);
+    const refill = documentRef.createElement("button");
+    refill.type = "button";
+    refill.textContent = "Refill energy";
+    refill.addEventListener("click", () => this.onRefillEnergy());
+
+    actions.append(reset, refill, this.copyButton);
     panel.append(actions);
     documentRef.body.append(panel);
     this.panel = panel;
@@ -102,6 +132,13 @@ export class MovementDebugPanel {
     this.onConfigChange(this.movementConfig);
   }
 
+  applyGameplayInput(field, input) {
+    this.gameplayTuning = normalizeGameplayTuning({ ...this.gameplayTuning, [field.key]: Number(input.value) });
+    input.value = String(this.gameplayTuning[field.key]);
+    persistGameplayDebugTuning(this.gameplayTuning, this.storage);
+    this.onGameplayTuningChange(this.gameplayTuning);
+  }
+
   persist() {
     try {
       this.storage?.setItem(MOVEMENT_STORAGE_KEY, JSON.stringify(this.movementConfig));
@@ -117,16 +154,19 @@ export class MovementDebugPanel {
     );
     try {
       this.storage?.removeItem(MOVEMENT_STORAGE_KEY);
+      clearGameplayDebugTuning(this.storage);
     } catch {
       // Debug persistence is optional.
     }
+    this.gameplayTuning = normalizeGameplayTuning(GAMEPLAY_TUNING_DEFAULTS);
     this.syncInputs();
     this.onConfigChange(this.movementConfig);
+    this.onGameplayTuningChange(this.gameplayTuning);
   }
 
   syncInputs() {
     for (const [key, input] of this.inputs) {
-      input.value = String(this.movementConfig[key]);
+      input.value = key.startsWith("gameplay:") ? String(this.gameplayTuning[key.slice(9)]) : String(this.movementConfig[key]);
     }
   }
 
@@ -140,7 +180,7 @@ export class MovementDebugPanel {
         throw new Error("Clipboard unavailable");
       }
       await this.navigatorRef.clipboard.writeText(
-        JSON.stringify(this.movementConfig, null, 2),
+        JSON.stringify({ movement: this.movementConfig, gameplay: this.gameplayTuning }, null, 2),
       );
       statusText = "Copied";
     } catch {

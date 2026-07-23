@@ -23,6 +23,7 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   music: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 32, width: 66, height: 14 }),
   effects: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 50, width: 66, height: 14 }),
 });
+export const GAMEPLAY_STATUS_AREA = Object.freeze({ x: 92, y: 6, width: 94, height: 24 });
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 46, width: GAME_WIDTH - 48, height: 88 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 98, width: 96, height: 26 });
 export const NEW_GAME_CANCEL_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 140, y: 98, width: 96, height: 26 });
@@ -35,6 +36,7 @@ export function createGameHud(scene, options) {
     onLanguageChange = () => {},
     onNewGame = () => {},
     audioSettings,
+    getGameplayStatus = () => null,
   } = options;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const label = compactBuildLabel(buildId);
@@ -62,6 +64,7 @@ export function createGameHud(scene, options) {
   const confirmText = createText(scene);
   const cancelText = createText(scene);
   const soundTexts = { title: createText(scene), master: createText(scene), music: createText(scene), effects: createText(scene), masterValue: createText(scene), musicValue: createText(scene), effectsValue: createText(scene) };
+  const gameplayText = createText(scene, { fontSize: "8px" });
 
   function stop(pointer, event) {
     event?.stopPropagation?.();
@@ -162,6 +165,7 @@ export function createGameHud(scene, options) {
     confirmText.setVisible(false);
     cancelText.setVisible(false);
 
+    renderGameplayStatus();
     renderSoundButton();
     renderSoundPanel();
 
@@ -221,6 +225,15 @@ export function createGameHud(scene, options) {
     }
   }
 
+  function renderGameplayStatus() {
+    const status = getGameplayStatus?.();
+    gameplayText.setVisible(false);
+    if (!status) return;
+    graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(GAMEPLAY_STATUS_AREA.x, GAMEPLAY_STATUS_AREA.y, GAMEPLAY_STATUS_AREA.width, GAMEPLAY_STATUS_AREA.height);
+    graphics.lineStyle(1, HUD_COLORS.border, 0.85).strokeRect(GAMEPLAY_STATUS_AREA.x + 0.5, GAMEPLAY_STATUS_AREA.y + 0.5, GAMEPLAY_STATUS_AREA.width - 1, GAMEPLAY_STATUS_AREA.height - 1);
+    gameplayText.setStyle(textStyle({ fontSize: "8px" })).setText(`${localization.t("hud:status.energy")} ${status.energy.current}/${status.energy.max}   ${localization.t("hud:status.wood")} ${status.wood}`).setVisible(true).setPosition(GAMEPLAY_STATUS_AREA.x + 5, GAMEPLAY_STATUS_AREA.y + 8);
+  }
+
   function renderSoundButton() {
     const muted = (audioSettings?.getSettings?.().master ?? 1) <= 0;
     graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(SOUND_HIT_AREA.x + 3, SOUND_HIT_AREA.y + 3, SOUND_HIT_AREA.width - 6, SOUND_HIT_AREA.height - 6);
@@ -263,7 +276,7 @@ export function createGameHud(scene, options) {
   return {
     render,
     isConfirming() { return confirmingNewGame; },
-    getLayoutState() { return { soundPanelOpen, areas: { newGame: NEW_GAME_HIT_AREA, sound: SOUND_HIT_AREA, language: LANGUAGE_HIT_AREA, fullscreen: FULLSCREEN_HIT_AREA, build: BUILD_LABEL, soundPanel: SOUND_PANEL_AREA } }; },
+    getLayoutState() { return { soundPanelOpen, areas: { newGame: NEW_GAME_HIT_AREA, gameplay: GAMEPLAY_STATUS_AREA, sound: SOUND_HIT_AREA, language: LANGUAGE_HIT_AREA, fullscreen: FULLSCREEN_HIT_AREA, build: BUILD_LABEL, soundPanel: SOUND_PANEL_AREA } }; },
     isPointInHud(x, y) {
       return (
         isPointInRect(x, y, NEW_GAME_HIT_AREA) ||
@@ -279,7 +292,7 @@ export function createGameHud(scene, options) {
       destroyed = true;
       unsubscribe?.();
       for (const zone of [languageHit, soundHit, soundPanelHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit]) zone.destroy();
-      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText, ...Object.values(soundTexts)]) text.destroy();
+      for (const text of [languageText, newGameText, gameplayText, confirmMessageText, confirmText, cancelText, ...Object.values(soundTexts)]) text.destroy();
       graphics.destroy();
       if (fullscreenHud) {
         if (fullscreenHandler) fullscreenHud.hit.off("pointerdown", fullscreenHandler);

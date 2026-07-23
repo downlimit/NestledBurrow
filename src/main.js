@@ -47,6 +47,20 @@ import { MUSIC_KEY, getMusicUrl, PhaserAudioRuntime } from "./audioRuntime.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 import {
+  FIRST_DEBRIS_CELL,
+  FIRST_DEBRIS_ENTITY_ID,
+  FIRST_DEBRIS_ID,
+  FIRST_DEBRIS_INTERACTION_ID,
+  FIRST_DEBRIS_POSITION,
+  applyMaxEnergy,
+  clearFirstDebris,
+  isFirstDebrisCleared,
+  loadGameplayDebugTuning,
+  normalizeGameplayTuning,
+  refillEnergy,
+} from "./debrisGameplay.js";
+import { cellKey } from "./worldLayout.js";
+import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
   toPhaserFrame,
@@ -119,6 +133,7 @@ class WorldScene extends Phaser.Scene {
     this.createCharacters();
     this.createAudio();
     this.createSessionAndInteractionRuntime();
+    this.createDebrisObject();
     this.createMovementDebugPanel();
     this.createHud();
     this.attachSceneListeners();
@@ -240,11 +255,14 @@ class WorldScene extends Phaser.Scene {
   createSessionAndInteractionRuntime() {
     this.sessionPersistence = this.createPersistence();
     const loaded = this.sessionPersistence?.load();
+    this.gameplayTuning = loadGameplayDebugTuning({ enabled: this.movementDebugEnabled });
     this.sessionState = loaded?.state ?? createFreshGameSessionState({
       currentWorldId: "village",
       playerId: "player",
       initialEntityIds: NPCS.map((npc) => npc.id),
+      gameplayTuning: this.gameplayTuning,
     });
+    applyMaxEnergy(this.sessionState, this.gameplayTuning.maxEnergy);
     if (loaded?.diagnostic) {
       console.warn("Recovered NestledBurrow session", loaded.diagnostic);
     }
@@ -256,6 +274,8 @@ class WorldScene extends Phaser.Scene {
       sessionState: this.sessionState,
       characterSystem: this.characterSystem,
       interactionDefinitions: INTERACTION_DEFINITIONS,
+      getStaticInteractionTargets: () => this.getDebrisInteractionTargets(),
+      handleWorldObjectInteraction: (candidate) => this.handleWorldObjectInteraction(candidate),
       getDialogueDefinition,
       resolveDialogueId: (resolverId, state, entityId) => {
         if (resolverId !== NEIGHBOR_DIALOGUE_RESOLVER_ID) {
@@ -267,6 +287,49 @@ class WorldScene extends Phaser.Scene {
       onPersistentMutation: () => this.saveSession(),
       presenter: this.interactionHud,
     });
+  }
+
+  createDebrisObject() {
+    this.worldLayout.blocked.delete(cellKey(FIRST_DEBRIS_CELL.x, FIRST_DEBRIS_CELL.y));
+    if (isFirstDebrisCleared(this.sessionState)) return;
+    this.worldLayout.blocked.add(cellKey(FIRST_DEBRIS_CELL.x, FIRST_DEBRIS_CELL.y));
+    const g = this.add.graphics().setDepth(500 + FIRST_DEBRIS_POSITION.y);
+    g.fillStyle(0x5f3b24, 1).fillRect(FIRST_DEBRIS_POSITION.x - 10, FIRST_DEBRIS_POSITION.y - 5, 20, 8);
+    g.fillStyle(0x8a5a32, 1).fillRect(FIRST_DEBRIS_POSITION.x - 9, FIRST_DEBRIS_POSITION.y - 4, 18, 2);
+    g.fillStyle(0x2f2018, 1).fillRect(FIRST_DEBRIS_POSITION.x - 11, FIRST_DEBRIS_POSITION.y - 4, 3, 6).fillRect(FIRST_DEBRIS_POSITION.x + 8, FIRST_DEBRIS_POSITION.y - 4, 3, 6);
+    this.debrisObject = g;
+  }
+
+  getDebrisInteractionTargets() {
+    if (isFirstDebrisCleared(this.sessionState)) return [];
+    return [{
+      id: FIRST_DEBRIS_INTERACTION_ID,
+      entityId: FIRST_DEBRIS_ENTITY_ID,
+      kind: "clear-debris",
+      position: FIRST_DEBRIS_POSITION,
+      radius: 24,
+      priority: 1,
+      requiresFacing: true,
+      facingDotThreshold: 0,
+      prompt: "hud:interaction.clearDebris",
+      payload: { debrisId: FIRST_DEBRIS_ID },
+    }];
+  }
+
+  handleWorldObjectInteraction(candidate) {
+    if (candidate.kind !== "clear-debris" || candidate.payload?.debrisId !== FIRST_DEBRIS_ID) return { status: "ignored" };
+    const result = clearFirstDebris(this.sessionState, this.gameplayTuning);
+    if (result.status === "insufficient-energy") return { ...result, messageKey: "hud:interaction.notEnoughEnergy" };
+    if (!result.mutated) return result;
+    this.worldLayout.blocked.delete(cellKey(FIRST_DEBRIS_CELL.x, FIRST_DEBRIS_CELL.y));
+    this.gameHud?.render();
+    this.saveSession();
+    const target = this.debrisObject;
+    if (target) {
+      this.tweens.add({ targets: target, alpha: 0, scaleX: 1.18, scaleY: 0.72, duration: 180, onComplete: () => target.destroy() });
+      this.debrisObject = null;
+    }
+    return result;
   }
 
   createPersistence() {
@@ -288,6 +351,9 @@ class WorldScene extends Phaser.Scene {
     this.movementDebugPanel = new MovementDebugPanel({
       enabled: this.movementDebugEnabled,
       movementConfig: this.movementConfig,
+      gameplayTuning: this.gameplayTuning,
+      onGameplayTuningChange: (tuning) => { this.gameplayTuning = normalizeGameplayTuning(tuning); applyMaxEnergy(this.sessionState, this.gameplayTuning.maxEnergy); this.gameHud?.render(); },
+      onRefillEnergy: () => { refillEnergy(this.sessionState); this.gameHud?.render(); },
       onConfigChange: () => this.syncNpcMovementConfig(),
       getStatusSnapshot: () => {
         if (!this.playerCharacter) return null;
@@ -313,6 +379,7 @@ class WorldScene extends Phaser.Scene {
       audioSettings: this.audioSettings,
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
       onNewGame: () => this.startNewGame(),
+      getGameplayStatus: () => ({ energy: { ...this.sessionState.gameplay.energy }, wood: this.sessionState.gameplay.resources.wood }),
     });
   }
 
@@ -334,6 +401,9 @@ class WorldScene extends Phaser.Scene {
     if (!import.meta.env.VITE_E2E) return;
     const bridge = {
       getSession: () => JSON.parse(JSON.stringify(this.sessionState)),
+      getDebrisState: () => ({ exists: !isFirstDebrisCleared(this.sessionState), objectAlive: Boolean(this.debrisObject), blocked: this.worldLayout.blocked.has(cellKey(FIRST_DEBRIS_CELL.x, FIRST_DEBRIS_CELL.y)) }),
+      setGameplayTuning: (tuning) => { this.gameplayTuning = normalizeGameplayTuning({ ...this.gameplayTuning, ...tuning }); applyMaxEnergy(this.sessionState, this.gameplayTuning.maxEnergy); this.gameHud?.render(); },
+      refillEnergy: () => { refillEnergy(this.sessionState); this.gameHud?.render(); },
       getLanguage: () => this.localization.getLanguage(),
       setLanguage: async (language) => {
         await this.localization.changeLanguage(language);
@@ -341,7 +411,7 @@ class WorldScene extends Phaser.Scene {
         this.interactionRuntime?.refresh();
       },
       placePlayerNear: (entityId) => {
-        const target = this.characterSystem.getSnapshot(entityId);
+        const target = entityId === FIRST_DEBRIS_ENTITY_ID ? { position: FIRST_DEBRIS_POSITION } : this.characterSystem.getSnapshot(entityId);
         const player = this.characterSystem.require(this.sessionState.playerId);
         player.motor.position = { x: target.position.x - 12, y: target.position.y };
         player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
@@ -393,6 +463,8 @@ class WorldScene extends Phaser.Scene {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
+    this.debrisObject?.destroy();
+    this.debrisObject = null;
     this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
     this.interactionHud?.destroy();
