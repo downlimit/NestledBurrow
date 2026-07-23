@@ -17,8 +17,9 @@ assert(helper.includes('addEventListener?.("fullscreenchange", refresh)'), "full
 assert(helper.includes("Math.trunc"), "text resolution and coordinates use integers");
 assert(!helper.includes("setScale"), "text helper does not scale text objects");
 assert(helper.includes("createPixelText"), "managed text uses a graphics-backed pixel font instead of browser-rasterized canvas text");
-assert(helper.includes("ф") && helper.includes("я") && helper.includes("a") && helper.includes("z"), "pixel glyph coverage includes Russian and English UI characters");
-assert(helper.includes("trimEmptyGlyphTop") && helper.includes("isCyrillicLetter"), "Russian pixel glyphs are normalized to avoid mixed-height labels");
+assert(helper.includes("Ф") && helper.includes("Я") && helper.includes("toLocaleLowerCase") && helper.includes("a") && helper.includes("z"), "pixel glyph coverage includes Russian and English UI characters");
+assert(!helper.includes("trimEmptyGlyphTop"), "Russian pixel glyph geometry is fixed in the glyph table instead of top-trimmed at render time");
+assert(helper.includes("CYRILLIC_CAPITAL_GLYPHS") && helper.includes("CYRILLIC_GLYPHS"), "Russian pixel glyphs are defined from one all-caps Cyrillic system for both Unicode cases");
 assert(helper.includes("fillRect"), "pixel glyphs are drawn as exact integer rectangles");
 assert(helper.includes('align === "center"') && helper.includes("getAlignedLineX"), "wrapped pixel text honors per-line center alignment offsets");
 
@@ -43,11 +44,60 @@ const firstLineMinX = Math.min(...rects.filter(({ y }) => y < 9).map(({ x }) => 
 const secondLineMinX = Math.min(...rects.filter(({ y }) => y >= 9).map(({ x }) => x));
 assert(secondLineMinX > firstLineMinX, "shorter wrapped pixel line is centered within measured text width");
 
-rects.length = 0;
-pixelText.setText("на");
-const firstRussianGlyphMinY = Math.min(...rects.filter(({ x }) => x < 6).map(({ y }) => y));
-const secondRussianGlyphMinY = Math.min(...rects.filter(({ x }) => x >= 6).map(({ y }) => y));
-assert.equal(firstRussianGlyphMinY, secondRussianGlyphMinY, "Russian lowercase glyphs share a stable top edge");
+function renderRects(value) {
+  rects.length = 0;
+  pixelText.setText(value);
+  return rects.map((rect) => ({ ...rect }));
+}
+
+function glyphRects(value, glyphIndex = 0) {
+  const startX = glyphIndex * 6;
+  return renderRects(value).filter(({ x }) => x >= startX && x < startX + 5);
+}
+
+function inkBounds(value, glyphIndex = 0) {
+  const glyph = glyphRects(value, glyphIndex);
+  return {
+    minY: Math.min(...glyph.map(({ y }) => y)),
+    maxY: Math.max(...glyph.map(({ y }) => y)),
+    height: Math.max(...glyph.map(({ y }) => y)) - Math.min(...glyph.map(({ y }) => y)) + 1,
+  };
+}
+
+function normalizedPattern(value, glyphIndex = 0) {
+  const glyph = glyphRects(value, glyphIndex);
+  const minX = Math.min(...glyph.map(({ x }) => x));
+  const minY = Math.min(...glyph.map(({ y }) => y));
+  return glyph.map(({ x, y }) => `${x - minX},${y - minY}`).sort().join(";");
+}
+
+const russianAlphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя";
+for (const letter of russianAlphabet) {
+  const bounds = inkBounds(letter);
+  assert.equal(bounds.minY, 0, `Russian glyph ${letter} starts on the shared top row`);
+  assert.equal(bounds.maxY, 6, `Russian glyph ${letter} reaches the shared baseline`);
+}
+
+for (const line of [
+  "НОВАЯ ИГРА",
+  "МИРА",
+  "ПРОВЕРЬ, ПОЖАЛУЙСТА. КАК ТАМ РОУЭН У ДОРОГИ.",
+  "е ДАЛЬШЕ",
+]) {
+  for (const char of line) {
+    if (!/[А-ЯЁа-яё]/u.test(char)) continue;
+    const bounds = inkBounds(char);
+    assert.equal(bounds.minY, 0, `${line}: glyph ${char} shares the Cyrillic top row`);
+    assert.equal(bounds.maxY, 6, `${line}: glyph ${char} shares the Cyrillic baseline`);
+  }
+}
+
+for (const pair of ["Аа", "Кк", "Мм", "Тт"]) {
+  assert.equal(normalizedPattern(pair, 0), normalizedPattern(pair, 1), `${pair} uses equivalent upper/lower Russian pixel geometry`);
+}
+
+assert.equal(inkBounds("а").minY, 0, "lowercase Russian а is not the old low x-height glyph");
+assert.equal(inkBounds("а").height, 7, "lowercase Russian а uses full-height all-caps geometry");
 
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
