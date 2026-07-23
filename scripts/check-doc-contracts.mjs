@@ -123,6 +123,11 @@ hasAll(
     "всем открытым non-draft PR",
     "GAME.md",
     "ROADMAP.md",
+    "## Быстрый маршрут приёмки",
+    "минимальным числом GitHub-вызовов",
+    "Процессные документы нельзя «улучшать по пути»",
+    "Как только доказательств достаточно, остановить исследование",
+    "Малый и средний PR должен обычно закрываться одним review-pass",
     "## Fast lane",
     "## Strict lane",
     "final-head CI",
@@ -234,4 +239,4 @@ hasAll(
 assert(!prTemplate.includes("Required for implementation PRs"), "PR template must not require strict metadata for routine work");
 assert(!prTemplate.includes("strict Integrator review"), "PR template must not classify every PR as strict");
 
-console.log("documentation contracts passed: named product map, roadmap, role recovery and exact PR-repair routing are enforced");
+console.log("documentation contracts passed: named product map, roadmap, role recovery, fast review and exact PR-repair routing are enforced");
