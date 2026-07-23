@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  actions: write
   checks: read
   contents: write
   issues: read
