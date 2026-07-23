@@ -1,0 +1,199 @@
+name: Codex Auto Repair
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: codex-auto-repair-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.event.review.state == 'commented' &&
+      startsWith(github.event.review.user.login, 'chatgpt-codex-connector') &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.review.commit_id == github.event.pull_request.head.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Verify required secrets
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CODEX_REPAIR_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "Missing Actions secret OPENAI_API_KEY" >&2
+            exit 1
+          fi
+          if [[ -z "$CODEX_REPAIR_TOKEN" ]]; then
+            echo "Missing Actions secret CODEX_REPAIR_TOKEN" >&2
+            exit 1
+          fi
+
+      - name: Checkout current PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.CODEX_REPAIR_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install project dependencies
+        run: |
+          npm ci
+          python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Collect current Codex findings
+        id: findings
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if grep -Eiq '^\s*-\s*\[x\]\s*`?strict-risk`?\s*$' <<<"$PR_BODY"; then
+            echo "Strict-risk PRs are not auto-repaired or auto-merged"
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          owner="${REPOSITORY%%/*}"
+          repo="${REPOSITORY#*/}"
+          threads_json="$(gh api graphql \
+            -f owner="$owner" \
+            -f name="$repo" \
+            -F number="$PR_NUMBER" \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated path line originalLine comments(first:20){nodes{body author{login}}}}}}}}')"
+
+          jq '[.data.repository.pullRequest.reviewThreads.nodes[] |
+            select(.isResolved == false) |
+            select(any(.comments.nodes[]?; (.author.login // "") | startswith("chatgpt-codex-connector")))]' \
+            <<<"$threads_json" > /tmp/codex-review-threads.json
+
+          finding_count="$(jq 'length' /tmp/codex-review-threads.json)"
+          if [[ "$finding_count" == "0" ]]; then
+            echo "No unresolved Codex findings for current head"
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          repair_count="$(git log --format=%s "$BASE_SHA..HEAD_SHA" | grep -c '^codex-auto-repair:' || true)"
+          if (( repair_count >= 3 )); then
+            echo "Automatic repair stopped after three rounds" >&2
+            exit 1
+          fi
+
+          jq -r '.[] |
+            "### " + (.path // "unknown file") + ":" + ((.line // .originalLine // "?") | tostring) + "\n" +
+            ([.comments.nodes[] | select((.author.login // "") | startswith("chatgpt-codex-connector")) | .body] | last) + "\n"' \
+            /tmp/codex-review-threads.json > /tmp/codex-findings.md
+          jq -r '.[].id' /tmp/codex-review-threads.json > /tmp/codex-thread-ids.txt
+
+          cat > /tmp/codex-repair-prompt.md <<EOF
+          Repair the current pull request in place.
+
+          Repository: $REPOSITORY
+          Pull request: #$PR_NUMBER — $PR_TITLE
+          Base SHA: $BASE_SHA
+          Reviewed head SHA: $HEAD_SHA
+
+          Read AGENTS.md, then inspect only the current PR diff, directly relevant source/tests, and the findings below.
+          Modify the checked-out PR branch to address every confirmed finding. Keep the original task scope and architecture.
+          Do not create a branch, pull request, issue, task file, workflow, or process document.
+          Do not commit or push; the workflow handles delivery.
+          Run the applicable targeted checks and npm run build. Inspect the final diff.
+
+          Current unresolved Codex review findings:
+          $(cat /tmp/codex-findings.md)
+          EOF
+
+          echo "has_findings=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run Codex repair
+        if: steps.findings.outputs.has_findings == 'true'
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          prompt-file: /tmp/codex-repair-prompt.md
+          effort: medium
+          allow-bots: true
+          allow-bot-users: "chatgpt-codex-connector[bot],chatgpt-codex-connector"
+
+      - name: Validate repaired checkout
+        if: steps.findings.outputs.has_findings == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git diff --quiet; then
+            echo "Codex produced no repair changes" >&2
+            exit 1
+          fi
+          npm run check
+
+      - name: Commit and push repair to the same PR
+        if: steps.findings.outputs.has_findings == 'true'
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI Codex Auto Repair"
+          git config user.email "codex-auto-repair@users.noreply.github.com"
+          git add -A
+          git commit -m "codex-auto-repair: address review findings for PR #$PR_NUMBER"
+          git push origin "HEAD:$HEAD_BRANCH"
+
+      - name: Resolve repaired threads and request a fresh Codex review
+        if: steps.findings.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CODEX_FINAL_MESSAGE: ${{ steps.codex.outputs.final-message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r thread_id; do
+            [[ -z "$thread_id" ]] && continue
+            gh api graphql \
+              -f threadId="$thread_id" \
+              -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' \
+              >/dev/null
+          done < /tmp/codex-thread-ids.txt
+
+          summary="${CODEX_FINAL_MESSAGE:-Codex repaired the current review findings and pushed the result to this PR.}"
+          gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "### Codex auto-repair pushed\n\n$summary\n\n@codex review"
