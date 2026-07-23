@@ -1,0 +1,107 @@
+name: Auto Merge Clean PR
+
+on:
+  workflow_run:
+    workflows: [Pull Request Check]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for current Codex review and merge clean fast-lane PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr_number="$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")"
+          if [[ -z "$pr_number" ]]; then
+            pr_number="$(gh pr list --repo "$REPOSITORY" --head "$HEAD_BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
+          fi
+          if [[ -z "$pr_number" ]]; then
+            echo "No open PR found for $HEAD_BRANCH"
+            exit 0
+          fi
+
+          owner="${REPOSITORY%%/*}"
+          repo="${REPOSITORY#*/}"
+
+          for attempt in $(seq 1 40); do
+            pr_json="$(gh api "repos/$REPOSITORY/pulls/$pr_number")"
+            state="$(jq -r '.state' <<<"$pr_json")"
+            draft="$(jq -r '.draft' <<<"$pr_json")"
+            base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
+            current_head="$(jq -r '.head.sha' <<<"$pr_json")"
+            same_repo="$(jq -r '.head.repo.full_name == .base.repo.full_name' <<<"$pr_json")"
+            body="$(jq -r '.body // ""' <<<"$pr_json")"
+
+            if [[ "$state" != "open" || "$draft" != "false" || "$base_ref" != "main" || "$same_repo" != "true" ]]; then
+              echo "PR #$pr_number is not an eligible same-repository non-draft main PR"
+              exit 0
+            fi
+            if grep -Eiq '^\s*-\s*\[x\]\s*`?strict-risk`?\s*$' <<<"$body"; then
+              echo "PR #$pr_number is strict-risk and requires manual Integrator merge"
+              exit 0
+            fi
+
+            latest_ci="$(gh run list --repo "$REPOSITORY" --workflow 'Pull Request Check' --branch "$HEAD_BRANCH" --event pull_request --limit 1 --json headSha,status,conclusion)"
+            ci_head="$(jq -r '.[0].headSha // ""' <<<"$latest_ci")"
+            ci_status="$(jq -r '.[0].status // ""' <<<"$latest_ci")"
+            ci_conclusion="$(jq -r '.[0].conclusion // ""' <<<"$latest_ci")"
+            if [[ "$ci_head" != "$current_head" || "$ci_status" != "completed" || "$ci_conclusion" != "success" ]]; then
+              echo "Latest CI is not green for current PR head $current_head"
+              exit 0
+            fi
+
+            unresolved="$(gh api graphql \
+              -f owner="$owner" \
+              -f name="$repo" \
+              -F number="$pr_number" \
+              -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved comments(first:20){nodes{author{login}}}}}}}}' \
+              --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false and any(.comments.nodes[]?; (.author.login // "") | startswith("chatgpt-codex-connector")))] | length')"
+            if [[ "$unresolved" != "0" ]]; then
+              echo "PR #$pr_number has unresolved Codex review threads"
+              exit 0
+            fi
+
+            head_time="$(gh api "repos/$REPOSITORY/commits/$current_head" --jq '.commit.committer.date')"
+            clean_reaction="$(gh api -H 'Accept: application/vnd.github+json' "repos/$REPOSITORY/issues/$pr_number/reactions?per_page=100" \
+              | jq --arg head_time "$head_time" '[.[] | select(((.user.login // "") | startswith("chatgpt-codex-connector")) and .content == "+1" and .created_at >= $head_time)] | length')"
+            if [[ "$clean_reaction" != "0" ]]; then
+              latest_head="$(gh api "repos/$REPOSITORY/pulls/$pr_number" --jq '.head.sha')"
+              if [[ "$latest_head" != "$current_head" ]]; then
+                echo "PR #$pr_number moved to $latest_head; a newer CI run will evaluate it"
+                exit 0
+              fi
+              title="$(jq -r '.title' <<<"$pr_json")"
+              gh api -X PUT "repos/$REPOSITORY/pulls/$pr_number/merge" \
+                --input - <<JSON
+          {"merge_method":"squash","sha":"$current_head","commit_title":"$title"}
+          JSON
+              echo "Merged PR #$pr_number after green CI and clean current-head Codex review"
+              exit 0
+            fi
+
+            current_review="$(gh api "repos/$REPOSITORY/pulls/$pr_number/reviews?per_page=100" \
+              | jq --arg head "$current_head" '[.[] | select(((.user.login // "") | startswith("chatgpt-codex-connector")) and .commit_id == $head)] | length')"
+            if [[ "$current_review" != "0" ]]; then
+              echo "Codex completed a current-head review with comments; PR #$pr_number remains open"
+              exit 0
+            fi
+
+            echo "Waiting for Codex review on PR #$pr_number ($attempt/40)"
+            sleep 15
+          done
+
+          echo "Timed out waiting for Codex review on PR #$pr_number"
+          exit 0
