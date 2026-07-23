@@ -2,6 +2,9 @@ export const SESSION_STATE_VERSION = 1;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
+export const DEFAULT_DEBRIS_ID = "fallen-log-01";
+export const DEFAULT_MAXIMUM_ENERGY = 100;
+export const DEFAULT_STARTING_ENERGY = 100;
 
 function assertNonEmptyString(value, label) {
   if (typeof value !== "string" || value.trim() === "") {
@@ -87,6 +90,36 @@ function normalizeEntities(entities) {
   return normalized;
 }
 
+function normalizeNonNegativeInteger(value, fallback, label) {
+  if (value === undefined || value === null) return fallback;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function normalizeGameplayState(value = {}) {
+  assertPlainRecord(value, "Gameplay state");
+  const maximumEnergy = normalizeNonNegativeInteger(value.maximumEnergy, DEFAULT_MAXIMUM_ENERGY, "Maximum energy");
+  if (maximumEnergy <= 0) throw new Error("Maximum energy must be greater than 0");
+  const currentEnergy = Math.min(
+    maximumEnergy,
+    normalizeNonNegativeInteger(value.currentEnergy, DEFAULT_STARTING_ENERGY, "Current energy"),
+  );
+  const wood = normalizeNonNegativeInteger(value.wood, 0, "Wood");
+  const debrisInput = value.debris ?? {};
+  assertPlainRecord(debrisInput, "Debris state");
+  const debris = createDictionary();
+  for (const [debrisId, debrisState] of Object.entries(debrisInput)) {
+    assertSafeId(debrisId, "Debris ID");
+    assertPlainRecord(debrisState, `Debris ${debrisId}`);
+    assertBoolean(debrisState.cleared, `Debris ${debrisId}.cleared`);
+    setOwn(debris, debrisId, { cleared: debrisState.cleared });
+  }
+  if (!hasOwn(debris, DEFAULT_DEBRIS_ID)) setOwn(debris, DEFAULT_DEBRIS_ID, { cleared: false });
+  return { currentEnergy, maximumEnergy, wood, debris };
+}
+
 function createDialogueState(value = {}) {
   const targetId = value.targetId ?? null;
   const dialogueId = value.dialogueId ?? null;
@@ -112,6 +145,7 @@ export function createFreshGameSessionState(options = {}) {
     entities: createDictionary(),
     flags: createDictionary(),
     dialogue: createDialogueState(),
+    gameplay: normalizeGameplayState(),
   };
 
   ensureSessionEntity(state, playerId);
@@ -140,6 +174,7 @@ export function normalizeGameSessionState(value, options = {}) {
     entities: normalizeEntities(value.entities),
     flags: normalizeBooleanFlags(value.flags, "Session flags"),
     dialogue: options.includeDialogue === false ? createDialogueState() : createDialogueState(value.dialogue ?? {}),
+    gameplay: normalizeGameplayState(value.gameplay ?? {}),
   };
 
   ensureSessionEntity(normalized, normalized.playerId);
@@ -218,4 +253,34 @@ export function closeDialogue(state) {
   state.dialogue.dialogueId = null;
   state.dialogue.lineIndex = 0;
   return { status: "closed", lineIndex: 0 };
+}
+
+
+export function applyGameplayTuning(state, tuning) {
+  const normalized = normalizeGameplayState({
+    ...state.gameplay,
+    maximumEnergy: tuning.maximumEnergy,
+  });
+  state.gameplay.maximumEnergy = normalized.maximumEnergy;
+  state.gameplay.currentEnergy = Math.min(state.gameplay.currentEnergy, normalized.maximumEnergy);
+  return { status: "updated", gameplay: state.gameplay };
+}
+
+export function refillEnergy(state) {
+  state.gameplay.currentEnergy = state.gameplay.maximumEnergy;
+  return { status: "updated", currentEnergy: state.gameplay.currentEnergy };
+}
+
+export function clearDebris(state, debrisId, { energyCost, woodReward }) {
+  assertSafeId(debrisId, "Debris ID");
+  if (!hasOwn(state.gameplay.debris, debrisId)) setOwn(state.gameplay.debris, debrisId, { cleared: false });
+  const debris = state.gameplay.debris[debrisId];
+  if (debris.cleared) return { status: "already-cleared", mutated: false };
+  const cost = normalizeNonNegativeInteger(energyCost, 0, "Clearing energy cost");
+  const reward = normalizeNonNegativeInteger(woodReward, 0, "Wood reward");
+  if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
+  state.gameplay.currentEnergy -= cost;
+  state.gameplay.wood += reward;
+  debris.cleared = true;
+  return { status: "cleared", mutated: true, currentEnergy: state.gameplay.currentEnergy, wood: state.gameplay.wood };
 }

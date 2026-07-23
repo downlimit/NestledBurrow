@@ -37,6 +37,7 @@ assert.deepEqual(state, {
   entities: { player: { id: "player", flags: {} } },
   flags: {},
   dialogue: { targetId: null, dialogueId: null, lineIndex: 0 },
+  gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } },
 }, "default state has canonical shape");
 assert.deepEqual(
   createGameSessionState({ currentWorldId: "forest", playerId: "hero" }),
@@ -47,6 +48,7 @@ assert.deepEqual(
     entities: { hero: { id: "hero", flags: {} } },
     flags: {},
     dialogue: { targetId: null, dialogueId: null, lineIndex: 0 },
+    gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } },
   },
   "custom world and player are supported",
 );
@@ -176,3 +178,19 @@ assert.equal(findBestInteractionTarget(source, []), null, "empty target list ret
 assert.equal(findBestInteractionTarget(source, [createInteractionTarget({ ...baseTarget, id: "no-access", position: { x: -2, y: 0 } })]), null, "no accessible targets returns null");
 assertPlainSerializable(baseTarget, "interaction target");
 assertPlainSerializable(candidate, "interaction candidate");
+
+
+const debrisTarget = createInteractionTarget({
+  id: "fallen-log-01",
+  entityId: "fallen-log-01",
+  kind: "clear-debris",
+  position: { x: 8, y: 0 },
+  radius: 16,
+  priority: 1,
+  prompt: "hud:interaction.clear",
+  payload: { debrisId: "fallen-log-01" },
+});
+assert.equal(findBestInteractionTarget(source, [baseTarget, debrisTarget]).targetId, "fallen-log-01", "static debris target participates in facing/radius selection and priority is deterministic");
+assert.equal(findBestInteractionTarget(source, [baseTarget]).targetId, "talk-home-npc", "dialogue target selection still works without static object candidates");
+assert.equal(findBestInteractionTarget(source, [debrisTarget, createInteractionTarget({ ...debrisTarget, id: "a-debris", position: { x: 8, y: 0 } })]).targetId, "a-debris", "static target competition uses stable ID tie-break");
+assertPlainSerializable(debrisTarget, "debris interaction target");

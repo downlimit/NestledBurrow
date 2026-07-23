@@ -13,6 +13,8 @@ export function createInteractionRuntime({
   resolveDialogueId,
   completeDialogue,
   onPersistentMutation,
+  getStaticInteractionDefinitions = () => [],
+  runWorldObjectInteraction = () => ({ status: "ignored" }),
   presenter,
 }) {
   let destroyed = false;
@@ -30,10 +32,11 @@ export function createInteractionRuntime({
     }
 
     currentCandidate = findCandidate();
-    if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
-    else presenter?.hidePrompt?.();
+    if (currentCandidate) {
+      if (!presenter?.isMessageVisible?.()) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
+    } else presenter?.hidePrompt?.();
 
-    if (interact && currentCandidate) startCandidateDialogue(currentCandidate);
+    if (interact && currentCandidate) startCandidateInteraction(currentCandidate);
   }
 
   function findCandidate() {
@@ -45,6 +48,9 @@ export function createInteractionRuntime({
         ...definition,
         position: snapshot.position,
       }));
+    }
+    for (const definition of getStaticInteractionDefinitions()) {
+      targets.push(createInteractionTarget(definition));
     }
     return findBestInteractionTarget(player, targets);
   }
@@ -60,8 +66,18 @@ export function createInteractionRuntime({
     return resolveDialogueId(resolverId, sessionState, candidate.entityId);
   }
 
-  function startCandidateDialogue(candidate) {
-    if (candidate.kind !== "dialogue") return;
+  function startCandidateInteraction(candidate) {
+    if (candidate.kind !== "dialogue") {
+      const result = runWorldObjectInteraction(candidate);
+      if (result?.mutated) onPersistentMutation?.({ candidate, result });
+      currentCandidate = null;
+      if (result?.status === "insufficient-energy") {
+        presenter?.showMessage?.({ messageKey: "hud:interaction.notEnoughEnergy" });
+      } else {
+        presenter?.hidePrompt?.();
+      }
+      return;
+    }
     const dialogueId = resolveCandidateDialogueId(candidate);
     const definition = getDialogueDefinition(dialogueId);
     startDialogue(sessionState, { targetId: candidate.entityId, dialogueId: definition.id });

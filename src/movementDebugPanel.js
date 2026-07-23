@@ -1,7 +1,15 @@
 import { createRuntimeMovementConfig, movementSpeed } from "./characterMovement.js";
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "./movementConfig.js";
+import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./debrisConfig.js";
+import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
+
+const GAMEPLAY_TUNING_FIELDS = Object.freeze([
+  Object.freeze({ key: "maximumEnergy", min: 1, max: 999, step: 1 }),
+  Object.freeze({ key: "clearingEnergyCost", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "woodReward", min: 0, max: 999, step: 1 }),
+]);
 
 export function loadMovementDebugConfig({ enabled, storage = globalThis.localStorage } = {}) {
   if (!enabled) return {};
@@ -18,6 +26,9 @@ export class MovementDebugPanel {
     movementConfig,
     onConfigChange = () => {},
     getStatusSnapshot = () => null,
+    gameplayTuning = null,
+    onGameplayTuningChange = () => {},
+    onRefillEnergy = () => {},
     documentRef = globalThis.document,
     storage = globalThis.localStorage,
     navigatorRef = globalThis.navigator,
@@ -27,6 +38,9 @@ export class MovementDebugPanel {
     this.movementConfig = movementConfig;
     this.onConfigChange = onConfigChange;
     this.getStatusSnapshot = getStatusSnapshot;
+    this.gameplayTuning = gameplayTuning;
+    this.onGameplayTuningChange = onGameplayTuningChange;
+    this.onRefillEnergy = onRefillEnergy;
     this.documentRef = documentRef;
     this.storage = storage;
     this.navigatorRef = navigatorRef;
@@ -39,10 +53,10 @@ export class MovementDebugPanel {
 
     const panel = documentRef.createElement("section");
     panel.className = "movement-debug-panel";
-    panel.setAttribute("aria-label", "Movement tuning");
+    panel.setAttribute("aria-label", "Developer tuning");
 
     const title = documentRef.createElement("strong");
-    title.textContent = "Movement tuning";
+    title.textContent = "Developer tuning";
     panel.append(title);
 
     for (const field of MOVEMENT_TUNING_FIELDS) {
@@ -63,6 +77,8 @@ export class MovementDebugPanel {
       panel.append(label);
       this.inputs.set(field.key, input);
     }
+
+    if (this.gameplayTuning) this.appendGameplayControls(panel);
 
     this.status = documentRef.createElement("output");
     this.status.className = "movement-debug-status";
@@ -115,6 +131,11 @@ export class MovementDebugPanel {
       this.movementConfig,
       createRuntimeMovementConfig(DEFAULT_MOVEMENT_CONFIG),
     );
+    if (this.gameplayTuning) {
+      Object.assign(this.gameplayTuning, normalizeGameplayTuning(DEFAULT_GAMEPLAY_TUNING));
+      clearGameplayDebugTuning(this.storage);
+      this.onGameplayTuningChange(this.gameplayTuning);
+    }
     try {
       this.storage?.removeItem(MOVEMENT_STORAGE_KEY);
     } catch {
@@ -124,9 +145,48 @@ export class MovementDebugPanel {
     this.onConfigChange(this.movementConfig);
   }
 
+  appendGameplayControls(panel) {
+    for (const field of GAMEPLAY_TUNING_FIELDS) {
+      const label = this.documentRef.createElement("label");
+      const name = this.documentRef.createElement("span");
+      name.textContent = field.key;
+      const input = this.documentRef.createElement("input");
+      input.type = "number";
+      input.min = String(field.min);
+      input.max = String(field.max);
+      input.step = String(field.step);
+      input.value = String(this.gameplayTuning[field.key]);
+      input.dataset.field = field.key;
+      input.addEventListener("input", () => this.applyGameplayInput(field, input));
+      label.append(name, input);
+      panel.append(label);
+      this.inputs.set(field.key, input);
+    }
+    const refill = this.documentRef.createElement("button");
+    refill.type = "button";
+    refill.textContent = "Refill energy";
+    refill.addEventListener("click", () => this.onRefillEnergy());
+    panel.append(refill);
+  }
+
+  applyGameplayInput(field, input) {
+    const value = Number(input.value);
+    if (!Number.isFinite(value) || !this.gameplayTuning) return;
+    Object.assign(this.gameplayTuning, normalizeGameplayTuning({ ...this.gameplayTuning, [field.key]: value }));
+    input.value = String(this.gameplayTuning[field.key]);
+    saveGameplayDebugTuning(this.gameplayTuning, this.storage);
+    this.onGameplayTuningChange(this.gameplayTuning);
+  }
+
   syncInputs() {
-    for (const [key, input] of this.inputs) {
-      input.value = String(this.movementConfig[key]);
+    for (const field of MOVEMENT_TUNING_FIELDS) {
+      const input = this.inputs.get(field.key);
+      if (input) input.value = String(this.movementConfig[field.key]);
+    }
+    if (!this.gameplayTuning) return;
+    for (const field of GAMEPLAY_TUNING_FIELDS) {
+      const input = this.inputs.get(field.key);
+      if (input) input.value = String(this.gameplayTuning[field.key]);
     }
   }
 

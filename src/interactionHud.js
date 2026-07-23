@@ -28,6 +28,7 @@ export function createInteractionHud(scene, options = {}) {
   let renderedKey = "";
   let latchedInteract = false;
   let promptRect = null;
+  let messageTimer = null;
 
   const onPointerDown = (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -90,6 +91,13 @@ export function createInteractionHud(scene, options = {}) {
     showPrompt({ promptKey }) { promptState = { promptKey }; redraw(); },
     hidePrompt() { promptState = null; redraw(); },
     showDialogue(dialogue) { dialogueState = { ...dialogue }; promptState = null; redraw(); },
+    isMessageVisible() { return Boolean(promptState?.message); },
+    showMessage({ messageKey, duration = 900 }) {
+      promptState = { promptKey: messageKey, message: true };
+      redraw(true);
+      if (messageTimer !== null) scene.time.removeEvent(messageTimer);
+      messageTimer = scene.time.delayedCall(duration, () => { messageTimer = null; if (promptState?.message) { promptState = null; redraw(true); } });
+    },
     hideDialogue() { dialogueState = null; redraw(); },
     consumeInteractPressed() { const pressed = latchedInteract; latchedInteract = false; return pressed; },
     isPointInHud(x, y) { return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && promptRect && isPointInRect(x, y, promptRect))); },
@@ -97,6 +105,7 @@ export function createInteractionHud(scene, options = {}) {
       if (destroyed) return;
       destroyed = true;
       unsubscribe?.();
+      if (messageTimer !== null) scene.time.removeEvent(messageTimer);
       promptHit.off("pointerdown", onPointerDown); dialogueHit.off("pointerdown", onPointerDown);
       promptHit.destroy(); dialogueHit.destroy(); graphics.destroy();
       speakerText.destroy(); bodyText.destroy(); actionText.destroy(); promptText.destroy();
