@@ -1,0 +1,82 @@
+name: Auto Start Codex Repair
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  request-repair:
+    if: >-
+      startsWith(github.event.review.user.login, 'chatgpt-codex-connector') &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask Codex to address current review feedback
+        env:
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWED_HEAD: ${{ github.event.review.commit_id }}
+          CODEX_REPAIR_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
+          FALLBACK_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # A fine-grained user token makes the comment appear from the repository owner,
+          # which is the proven path that starts a Codex GitHub task. The repository token
+          # remains as a fallback so the workflow is observable before the secret is added.
+          export GH_TOKEN="${CODEX_REPAIR_TOKEN:-$FALLBACK_TOKEN}"
+
+          pr_json="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")"
+          state="$(jq -r '.state' <<<"$pr_json")"
+          draft="$(jq -r '.draft' <<<"$pr_json")"
+          current_head="$(jq -r '.head.sha' <<<"$pr_json")"
+          same_repo="$(jq -r '.head.repo.full_name == .base.repo.full_name' <<<"$pr_json")"
+
+          if [[ "$state" != "open" || "$draft" != "false" || "$same_repo" != "true" ]]; then
+            echo "PR #$PR_NUMBER is no longer an eligible open same-repository PR"
+            exit 0
+          fi
+
+          if [[ "$current_head" != "$REVIEWED_HEAD" ]]; then
+            echo "Codex reviewed $REVIEWED_HEAD but PR #$PR_NUMBER is now at $current_head"
+            exit 0
+          fi
+
+          owner="${REPOSITORY%%/*}"
+          repo="${REPOSITORY#*/}"
+          unresolved="$(gh api graphql \
+            -f owner="$owner" \
+            -f name="$repo" \
+            -F number="$PR_NUMBER" \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved comments(first:20){nodes{author{login}}}}}}}}' \
+            --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false and any(.comments.nodes[]?; (.author.login // "") | startswith("chatgpt-codex-connector")))] | length')"
+
+          if [[ "$unresolved" == "0" ]]; then
+            echo "No unresolved Codex review threads on PR #$PR_NUMBER"
+            exit 0
+          fi
+
+          marker="<!-- codex-auto-repair:$current_head -->"
+          existing="$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+            | jq --arg marker "$marker" '[.[] | select((.body // "") | contains($marker))] | length')"
+
+          if [[ "$existing" != "0" ]]; then
+            echo "Repair was already requested for PR #$PR_NUMBER at $current_head"
+            exit 0
+          fi
+
+          body="$(printf '@codex address that feedback\n\n%s' "$marker")"
+          gh api -X POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
+
+          if [[ -z "$CODEX_REPAIR_TOKEN" ]]; then
+            echo "Repair comment posted with GITHUB_TOKEN fallback. Add CODEX_REPAIR_TOKEN if Codex ignores bot-authored comments."
+          else
+            echo "Repair comment posted with CODEX_REPAIR_TOKEN for PR #$PR_NUMBER at $current_head"
+          fi
