@@ -26,25 +26,26 @@ jobs:
       !contains(github.event.pull_request.body, '- [X] `strict-risk`') &&
       !contains(github.event.pull_request.body, '- [x] strict-risk') &&
       !contains(github.event.pull_request.body, '- [X] strict-risk')
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: [self-hosted, Windows, X64, codex-repair]
+    timeout-minutes: 45
 
     steps:
-      - name: Verify required secrets
+      - name: Verify local Codex and delivery token
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CODEX_REPAIR_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          if [[ -z "$OPENAI_API_KEY" ]]; then
-            echo "Missing Actions secret OPENAI_API_KEY" >&2
-            exit 1
-          fi
-          if [[ -z "$CODEX_REPAIR_TOKEN" ]]; then
-            echo "Missing Actions secret CODEX_REPAIR_TOKEN" >&2
-            exit 1
-          fi
+          if ([string]::IsNullOrWhiteSpace($env:CODEX_REPAIR_TOKEN)) {
+            throw "Missing Actions secret CODEX_REPAIR_TOKEN"
+          }
+          if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+            throw "Codex CLI is not installed for the self-hosted runner user"
+          }
+          $status = (& codex login status 2>&1 | Out-String)
+          Write-Host $status
+          if ($LASTEXITCODE -ne 0 -or $status -notmatch "Logged in using ChatGPT") {
+            throw "Codex CLI on the self-hosted runner must be logged in with the ChatGPT account"
+          }
 
       - name: Checkout reviewed PR head
         uses: actions/checkout@v5
@@ -67,105 +68,99 @@ jobs:
           cache-dependency-path: requirements-dev.txt
 
       - name: Install project dependencies
+        shell: pwsh
         run: |
           npm ci
+          if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
           python -m pip install --disable-pip-version-check -r requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { throw "Python dependency installation failed" }
 
       - name: Collect current Codex findings
         id: findings
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if grep -Eiq '^\s*-\s*\[x\]\s*`?strict-risk`?\s*$' <<<"$PR_BODY"; then
-            echo "Strict-risk PRs are not auto-repaired or auto-merged"
-            echo "has_findings=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          owner="${REPOSITORY%%/*}"
-          repo="${REPOSITORY#*/}"
-          threads_json="$(gh api graphql \
-            -f owner="$owner" \
-            -f name="$repo" \
-            -F number="$PR_NUMBER" \
-            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated path line originalLine comments(first:20){nodes{body author{login}}}}}}}}')"
-
-          jq '[.data.repository.pullRequest.reviewThreads.nodes[] |
-            select(.isResolved == false) |
-            select(any(.comments.nodes[]?; (.author.login // "") | startswith("chatgpt-codex-connector")))]' \
-            <<<"$threads_json" > /tmp/codex-review-threads.json
-
-          finding_count="$(jq 'length' /tmp/codex-review-threads.json)"
-          if [[ "$finding_count" == "0" ]]; then
-            echo "No unresolved Codex findings for current head"
-            echo "has_findings=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          repair_count="$(git log --format=%s "$BASE_SHA..HEAD_SHA" | grep -c '^codex-auto-repair:' || true)"
-          if (( repair_count >= 3 )); then
-            echo "Automatic repair stopped after three rounds" >&2
-            exit 1
-          fi
-
-          jq -r '.[] |
-            "### " + (.path // "unknown file") + ":" + ((.line // .originalLine // "?") | tostring) + "\n" +
-            ([.comments.nodes[] | select((.author.login // "") | startswith("chatgpt-codex-connector")) | .body] | last) + "\n"' \
-            /tmp/codex-review-threads.json > /tmp/codex-findings.md
-          jq -r '.[].id' /tmp/codex-review-threads.json > /tmp/codex-thread-ids.txt
-
-          cat > /tmp/codex-repair-prompt.md <<EOF
-          Repair the current pull request in place.
-
-          Repository: $REPOSITORY
-          Pull request: #$PR_NUMBER — $PR_TITLE
-          Base SHA: $BASE_SHA
-          Reviewed head SHA: $HEAD_SHA
-
-          Read AGENTS.md, then inspect only the current PR diff, directly relevant source/tests, and the findings below.
-          Modify the checked-out PR branch to address every confirmed finding. Keep the original task scope and architecture.
-          Do not create a branch, pull request, issue, task file, workflow, or process document.
-          Do not commit or push; the workflow handles delivery.
-          Run the applicable targeted checks and npm run build. Inspect the final diff.
-
-          Current unresolved Codex review findings:
-          $(cat /tmp/codex-findings.md)
-          EOF
-
-          echo "has_findings=true" >> "$GITHUB_OUTPUT"
-
-      - name: Run Codex repair
-        if: steps.findings.outputs.has_findings == 'true'
-        id: codex
-        uses: openai/codex-action@v1
+        uses: actions/github-script@v7
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          permission-profile: ":workspace"
-          prompt-file: /tmp/codex-repair-prompt.md
-          effort: medium
-          allow-bots: true
-          allow-bot-users: "chatgpt-codex-connector[bot],chatgpt-codex-connector"
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+
+            const data = await github.graphql(`
+              query($owner:String!,$repo:String!,$number:Int!){
+                repository(owner:$owner,name:$repo){
+                  pullRequest(number:$number){
+                    reviewThreads(first:100){
+                      nodes{
+                        id
+                        isResolved
+                        path
+                        line
+                        originalLine
+                        comments(first:20){nodes{body author{login}}}
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, repo, number: pr.number });
+
+            const threads = data.repository.pullRequest.reviewThreads.nodes.filter((thread) =>
+              !thread.isResolved && thread.comments.nodes.some((comment) =>
+                (comment.author?.login ?? "").startsWith("chatgpt-codex-connector")
+              )
+            );
+
+            if (threads.length === 0) {
+              core.info("No unresolved Codex findings for current head");
+              core.setOutput("has_findings", "false");
+              return;
+            }
+
+            const range = `${pr.base.sha}..${pr.head.sha}`;
+            const log = await exec.getExecOutput("git", ["log", "--format=%s", range], { silent: true });
+            const repairCount = log.stdout.split(/\r?\n/u).filter((line) => line.startsWith("codex-auto-repair:")).length;
+            if (repairCount >= 3) {
+              core.setFailed("Automatic repair stopped after three rounds");
+              return;
+            }
+
+            const findings = threads.map((thread) => {
+              const codexComments = thread.comments.nodes.filter((comment) =>
+                (comment.author?.login ?? "").startsWith("chatgpt-codex-connector")
+              );
+              const latest = codexComments.at(-1)?.body ?? "Codex finding was empty.";
+              return `### ${thread.path ?? "unknown file"}:${thread.line ?? thread.originalLine ?? "?"}\n${latest}`;
+            }).join("\n\n");
+
+            const prompt = `Repair the current pull request in place.\n\nRepository: ${owner}/${repo}\nPull request: #${pr.number} — ${pr.title}\nBase SHA: ${pr.base.sha}\nReviewed head SHA: ${pr.head.sha}\n\nRead AGENTS.md, then inspect only the current PR diff, directly relevant source/tests, and the findings below.\nModify the checked-out PR branch to address every confirmed finding. Keep the original task scope and architecture.\nDo not create a branch, pull request, issue, task file, workflow, or process document.\nDo not commit or push; the workflow handles delivery.\nRun the applicable targeted checks and npm run build. Inspect the final diff.\n\nCurrent unresolved Codex review findings:\n${findings}\n`;
+
+            const temp = process.env.RUNNER_TEMP;
+            fs.writeFileSync(path.join(temp, "codex-repair-prompt.md"), prompt, "utf8");
+            fs.writeFileSync(path.join(temp, "codex-thread-ids.json"), JSON.stringify(threads.map((thread) => thread.id)), "utf8");
+            core.setOutput("has_findings", "true");
+
+      - name: Run Codex repair with ChatGPT subscription
+        if: steps.findings.outputs.has_findings == 'true'
+        shell: pwsh
+        run: |
+          $promptPath = Join-Path $env:RUNNER_TEMP "codex-repair-prompt.md"
+          $outputPath = Join-Path $env:RUNNER_TEMP "codex-final-message.md"
+          Get-Content -Raw $promptPath | codex exec --full-auto --output-last-message $outputPath -
+          if ($LASTEXITCODE -ne 0) { throw "Codex repair failed" }
 
       - name: Validate repaired checkout
         if: steps.findings.outputs.has_findings == 'true'
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
           git diff --check
-          if git diff --quiet; then
-            echo "Codex produced no repair changes" >&2
-            exit 1
-          fi
+          if ($LASTEXITCODE -ne 0) { throw "git diff --check failed" }
+          $changes = git status --porcelain
+          if ([string]::IsNullOrWhiteSpace(($changes | Out-String))) {
+            throw "Codex produced no repair changes"
+          }
           npm run check
+          if ($LASTEXITCODE -ne 0) { throw "npm run check failed" }
 
       - name: Commit and push repair to the same PR
         if: steps.findings.outputs.has_findings == 'true'
@@ -174,37 +169,44 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          remote_head="$(git ls-remote --heads origin "$HEAD_BRANCH" | awk '{print $1}')"
-          if [[ "$remote_head" != "$HEAD_SHA" ]]; then
-            echo "PR branch moved from reviewed head $HEAD_SHA to ${remote_head:-missing}; refusing stale repair push" >&2
-            exit 1
-          fi
+          $remoteLine = git ls-remote --heads origin $env:HEAD_BRANCH
+          $remoteHead = if ($remoteLine) { ($remoteLine -split "`t")[0] } else { "" }
+          if ($remoteHead -ne $env:HEAD_SHA) {
+            throw "PR branch moved from reviewed head $env:HEAD_SHA to $remoteHead; refusing stale repair push"
+          }
           git config user.name "OpenAI Codex Auto Repair"
           git config user.email "codex-auto-repair@users.noreply.github.com"
           git add -A
-          git commit -m "codex-auto-repair: address review findings for PR #$PR_NUMBER"
-          git push "https://x-access-token:${CODEX_REPAIR_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:$HEAD_BRANCH"
+          git commit -m "codex-auto-repair: address review findings for PR #$env:PR_NUMBER"
+          if ($LASTEXITCODE -ne 0) { throw "Repair commit failed" }
+          $remote = "https://x-access-token:$env:CODEX_REPAIR_TOKEN@github.com/$env:GITHUB_REPOSITORY.git"
+          git push $remote "HEAD:$env:HEAD_BRANCH"
+          if ($LASTEXITCODE -ne 0) { throw "Repair push failed" }
 
       - name: Resolve repaired threads and request a fresh Codex review
         if: steps.findings.outputs.has_findings == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
-          REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          CODEX_FINAL_MESSAGE: ${{ steps.codex.outputs.final-message }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          while IFS= read -r thread_id; do
-            [[ -z "$thread_id" ]] && continue
-            gh api graphql \
-              -f threadId="$thread_id" \
-              -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' \
-              >/dev/null
-          done < /tmp/codex-thread-ids.txt
-
-          summary="${CODEX_FINAL_MESSAGE:-Codex repaired the current review findings and pushed the result to this PR.}"
-          gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "### Codex auto-repair pushed\n\n$summary\n\n@codex review"
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CODEX_REPAIR_TOKEN }}
+          script: |
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const ids = JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP, "codex-thread-ids.json"), "utf8"));
+            for (const threadId of ids) {
+              await github.graphql(`
+                mutation($threadId:ID!){
+                  resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}
+                }
+              `, { threadId });
+            }
+            const outputPath = path.join(process.env.RUNNER_TEMP, "codex-final-message.md");
+            const summary = fs.existsSync(outputPath)
+              ? fs.readFileSync(outputPath, "utf8").trim()
+              : "Codex repaired the current review findings and pushed the result to this PR.";
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `### Codex auto-repair pushed\n\n${summary}\n\n@codex review`,
+            });
