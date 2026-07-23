@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  issues: write
+  issues: read
   pull-requests: read
 
 jobs:
@@ -17,66 +17,106 @@ jobs:
       github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     steps:
-      - name: Ask Codex to address current review feedback
+      - name: Start an existing-PR Codex repair
         env:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEWED_HEAD: ${{ github.event.review.commit_id }}
           CODEX_REPAIR_TOKEN: ${{ secrets.CODEX_REPAIR_TOKEN }}
-          FALLBACK_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
 
-          # A fine-grained user token makes the comment appear from the repository owner,
-          # which is the proven path that starts a Codex GitHub task. The repository token
-          # remains as a fallback so the workflow is observable before the secret is added.
-          export GH_TOKEN="${CODEX_REPAIR_TOKEN:-$FALLBACK_TOKEN}"
+          if [[ -z "$CODEX_REPAIR_TOKEN" ]]; then
+            echo "::error::Missing CODEX_REPAIR_TOKEN. Add a fine-grained user token so the repair command is authored by the repository owner."
+            exit 1
+          fi
+          export GH_TOKEN="$CODEX_REPAIR_TOKEN"
 
           pr_json="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")"
           state="$(jq -r '.state' <<<"$pr_json")"
           draft="$(jq -r '.draft' <<<"$pr_json")"
+          base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
           current_head="$(jq -r '.head.sha' <<<"$pr_json")"
           same_repo="$(jq -r '.head.repo.full_name == .base.repo.full_name' <<<"$pr_json")"
+          title="$(jq -r '.title' <<<"$pr_json")"
 
-          if [[ "$state" != "open" || "$draft" != "false" || "$same_repo" != "true" ]]; then
-            echo "PR #$PR_NUMBER is no longer an eligible open same-repository PR"
+          if [[ "$state" != "open" || "$draft" != "false" || "$base_ref" != "main" || "$same_repo" != "true" ]]; then
+            echo "PR #$PR_NUMBER is not an eligible open same-repository PR targeting main"
             exit 0
           fi
-
           if [[ "$current_head" != "$REVIEWED_HEAD" ]]; then
             echo "Codex reviewed $REVIEWED_HEAD but PR #$PR_NUMBER is now at $current_head"
             exit 0
           fi
+          if [[ ! "$title" =~ ^Task\ \#([0-9]{3})\ —\ (.+)$ ]]; then
+            echo "PR #$PR_NUMBER has no canonical Task title: $title"
+            exit 1
+          fi
 
+          task_number="${BASH_REMATCH[1]}"
+          task_name="${BASH_REMATCH[2]}"
           owner="${REPOSITORY%%/*}"
           repo="${REPOSITORY#*/}"
-          unresolved="$(gh api graphql \
+
+          threads_json="$(gh api graphql \
             -f owner="$owner" \
             -f name="$repo" \
             -F number="$PR_NUMBER" \
-            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved comments(first:20){nodes{author{login}}}}}}}}' \
-            --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false and any(.comments.nodes[]?; (.author.login // "") | startswith("chatgpt-codex-connector")))] | length')"
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved comments(first:20){nodes{body author{login}}}}}}}}')"
 
+          unresolved="$(jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false and any(.comments.nodes[]?; (.author.login // "") | startswith("chatgpt-codex-connector")))] | length' <<<"$threads_json")"
           if [[ "$unresolved" == "0" ]]; then
             echo "No unresolved Codex review threads on PR #$PR_NUMBER"
             exit 0
           fi
 
+          blockers="$(jq -r '[.data.repository.pullRequest.reviewThreads.nodes[]
+            | select(.isResolved == false)
+            | .comments.nodes[]?
+            | select((.author.login // "") | startswith("chatgpt-codex-connector"))
+            | .body
+            | gsub("[\\r\\n]+"; " ")
+            | "- " + .] | unique | join("\n")' <<<"$threads_json")"
+
           marker="<!-- codex-auto-repair:$current_head -->"
           existing="$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
             | jq --arg marker "$marker" '[.[] | select((.body // "") | contains($marker))] | length')"
-
           if [[ "$existing" != "0" ]]; then
             echo "Repair was already requested for PR #$PR_NUMBER at $current_head"
             exit 0
           fi
 
-          body="$(printf '@codex address that feedback\n\n%s' "$marker")"
-          gh api -X POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
+          body="$(cat <<EOF
+          @codex
 
-          if [[ -z "$CODEX_REPAIR_TOKEN" ]]; then
-            echo "Repair comment posted with GITHUB_TOKEN fallback. Add CODEX_REPAIR_TOKEN if Codex ignores bot-authored comments."
-          else
-            echo "Repair comment posted with CODEX_REPAIR_TOKEN for PR #$PR_NUMBER at $current_head"
-          fi
+          Task #${task_number} — Почини «${task_name}» в существующем PR #${PR_NUMBER} по последнему repair-комментарию.
+
+          integrator-codex-repair:v1
+
+          Task: ${title}
+          PR: PR #${PR_NUMBER} · ${title}
+          Reviewed head: ${current_head}
+
+          Confirmed blockers:
+          ${blockers}
+
+          Required result:
+          - Address every unresolved Codex review finding and push the repair commits to the same existing PR head branch.
+
+          Invariants/exclusions:
+          - Keep the original Task identity.
+          - Do not create another branch, PR, issue, task or Task number.
+          - Do not invoke make_pr or any equivalent PR-creation action.
+          - If the existing PR branch cannot be fetched or pushed, stop and report the exact access or push blocker.
+
+          Validation:
+          - Run targeted checks for the changed behavior.
+          - Leave the final full-suite validation to repository PR CI.
+
+          ${marker}
+          EOF
+          )"
+
+          gh api -X POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
+          echo "Started existing-PR repair for PR #$PR_NUMBER at $current_head"
