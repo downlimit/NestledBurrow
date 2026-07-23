@@ -20,7 +20,7 @@ Do **not** read `PROJECT.md`, `LEAD.md`, `REVIEW.md` or `LIBRARY.md` by default.
 - Read a file from `tasks/` only when the direct prompt explicitly names it.
 - Read `ASSETS.md` when the task adds, replaces, selects or audits external assets.
 
-The direct prompt is the task contract. Do not expand scope by mining unrelated project history.
+The direct prompt is the task contract. For an existing-PR repair, the prompt may identify a PR and the latest top-level comment containing `integrator-codex-repair:v1`; that comment becomes the direct task contract. Do not expand scope by mining unrelated project history.
 
 ## Creative fast lane
 
@@ -108,6 +108,25 @@ This is the default mode.
 - Do not create an issue, task file, planning document or preparatory PR.
 - Deliver exactly one coherent observable result in one final PR.
 
+### Existing PR repair task
+
+When the direct prompt names an existing PR and the latest top-level comment containing `integrator-codex-repair:v1`:
+
+1. fetch the PR metadata, current head branch/head SHA and the latest matching repair comment;
+2. treat that repair comment as the complete task contract together with `AGENTS.md`;
+3. verify the recorded reviewed head and inspect the repair delta context;
+4. check out and update the existing PR branch;
+5. address every confirmed blocker in the current repair round while excluding optional cleanup;
+6. run the applicable targeted checks, build and runtime inspection stated by the repair contract;
+7. push all repair commits to the same PR branch;
+8. report the final head SHA, checks actually run and real limitations.
+
+Update the existing PR branch. Do not create another branch or pull request, issue, task file or replacement implementation PR. Do not ask the user to relay the blocker list, branch name, SHA or checks already present in the PR comment.
+
+If the PR head moved after the recorded reviewed head, re-read the current diff and continue only when the new commits are compatible with the same repair contract. Report an exact conflict when the scope or contract changed materially.
+
+Do not read `REVIEW.md` merely to execute the repair. The latest marked PR comment carries the Integrator's diagnosis, required result, invariants, exclusions and validation requirements.
+
 ### Strict or coordinated task
 
 Use strict handling only when the task affects at least one of these areas:
@@ -180,7 +199,7 @@ For routine code, gameplay, UI, content or configuration work:
 
 Run `npm ci` when dependencies are not already installed or package files changed. Run the full local `npm run check` when it is practical and materially reduces risk, but do not duplicate a reliable full PR CI merely as ceremony.
 
-A deterministic failure in an applicable targeted check or build blocks PR creation.
+A deterministic failure in an applicable targeted check or build blocks PR creation or marking an existing repair PR ready.
 
 ### Strict lane
 
@@ -241,7 +260,7 @@ A local network, proxy, package-index, browser-install or dependency failure doe
 - Keep one coherent user-facing or technical concern per PR when `main` can remain usable between stages.
 - Ensure evidence and artifacts refer to the final head SHA.
 
-Use `.github/pull_request_template.md` as a minimal report and delete sections that do not apply.
+Use `.github/pull_request_template.md` as a minimal report and delete sections that do not apply. For an existing-PR repair, update the current PR report only when the final scope, evidence or head SHA materially changed; do not replace its original task context.
 
 ## Documentation boundaries
 
@@ -258,6 +277,7 @@ Codex should not carry Lead or Integrator context merely to keep documentation c
 ## Branch lifecycle
 
 - Ordinary tasks use exactly one ephemeral remote branch.
+- Existing-PR repairs use the current PR head branch and never create a replacement branch or PR.
 - Use an exact supplied branch name when present.
 - GitHub automatic head-branch deletion handles cleanup after merge.
 - Do not delete the active branch from inside the implementation task.
