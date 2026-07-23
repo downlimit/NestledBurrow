@@ -42,7 +42,9 @@ hasAll(
     "<!-- audience: lead-chat -->",
     "постоянного ChatGPT-чата **Лид**",
     "проверь все PR",
+    "## Fast lane",
     "Fast lane используется по умолчанию",
+    "## Strict lane",
     "Strict lane используется только при реальном риске",
     "одна самодостаточная задача Codex",
     "одна ветка",
@@ -52,7 +54,9 @@ hasAll(
     "Base SHA",
     "Depends on",
     "Merge phase",
-    "Несколько задач выдаются только когда они реально сокращают календарное время",
+    "## Выбор между одной задачей, волной и последовательностью",
+    "### Настоящая параллельная волна",
+    "реально сокращать критический календарный путь",
   ],
   "LEAD.md",
 );
@@ -100,15 +104,16 @@ hasAll(
     "## Risk-based validation",
     "### Fast lane",
     "### Strict lane",
-    "Create exactly one draft PR",
-    "Mark the draft ready for review exactly once",
-    "Never rerun a deterministic failed workflow",
-    "one consolidated corrective push",
+    "Commit on the task branch as often as useful",
+    "same applicable validation path that CI will enforce",
+    "run the complete updated chain locally",
+    "determine whether the same command already fails on the base/current `main` or only on the PR head",
+    "A pre-existing base failure is repaired as a base-contract defect",
+    "Do not rerun an unchanged deterministic failure",
     "Include Integration metadata only when the prompt supplied it",
   ],
   "AGENTS.md",
 );
-assert(!agents.includes("Create exactly one final non-draft PR"), "AGENTS.md must not open implementation PRs directly as non-draft");
 assert(!agents.includes("Read `PROJECT.md`, `LIBRARY.md`"), "AGENTS.md must not restore blanket context loading");
 assert(
   !agents.includes("Always identify:\n\n- review class and concise scope;\n- Integration metadata"),
@@ -165,4 +170,4 @@ hasAll(
 assert(!prTemplate.includes("Required for implementation PRs"), "PR template must not require strict metadata for routine work");
 assert(!prTemplate.includes("strict Integrator review"), "PR template must not classify every PR as strict");
 
-console.log("documentation contracts passed: creative fast lane is the default, draft-first delivery is enforced and strict ceremony is risk-triggered");
+console.log("documentation contracts passed: structural workflow invariants and CI-parity preflight are enforced");
