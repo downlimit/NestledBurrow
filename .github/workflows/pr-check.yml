@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: pr-check-${{ github.event.pull_request.number }}
@@ -49,19 +48,6 @@ jobs:
 
       - name: Run project checks
         run: npm run check
-
-      - name: Test whether Actions bot triggers Codex
-        if: github.event.pull_request.number == 87
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-            -d '{"body":"@codex address the remaining unresolved review feedback in this existing PR, push fixes to the same branch, and do not create another PR. Automated trigger capability test: NB-CODEX-BOT-TRIGGER-1"}'
 
       - name: Upload world previews
         if: always()
