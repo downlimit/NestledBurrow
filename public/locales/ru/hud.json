@@ -6,7 +6,7 @@
   },
   "language": {
     "toggle": "Сменить язык",
-    "currentNext": "{current} / {next}"
+    "current": "RU"
   },
   "interaction": {
     "talk": "Говорить",
@@ -18,5 +18,11 @@
     "confirmNewGame": "Удалить сохранённый прогресс и начать заново?",
     "confirm": "Начать",
     "cancel": "Отмена"
+  },
+  "sound": {
+    "title": "Звук",
+    "master": "Общая",
+    "music": "Музыка",
+    "effects": "Эффекты"
   }
 }

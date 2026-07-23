@@ -1,2 +1,3 @@
-export const RUBIK_FONT_KEY = "rubik-regular";
-export const RUBIK_FONT_PATH = "assets/fonts/rubik/Rubik-Regular.ttf";
+export const PIXELIFY_FONT_KEY = "Pixelify Sans";
+export const PIXELIFY_FONT_PACKAGE = "@fontsource/pixelify-sans";
+export const PIXELIFY_FONT_SOURCE = "https://fontsource.org/fonts/pixelify-sans";

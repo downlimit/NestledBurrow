@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import "@fontsource/pixelify-sans/latin.css";
+import "@fontsource/pixelify-sans/cyrillic.css";
 import "./style.css";
 import { clampVectorLength } from "./input.js";
 import { createMovementState, createRuntimeMovementConfig } from "./characterMovement.js";
@@ -39,7 +41,9 @@ import {
 } from "./neighborQuest.js";
 import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
-import { RUBIK_FONT_KEY, RUBIK_FONT_PATH } from "./localization/font.js";
+import { PIXELIFY_FONT_KEY } from "./localization/font.js";
+import { createAudioSettingsStore } from "./audioSettings.js";
+import { MUSIC_KEY, getMusicUrl, PhaserAudioRuntime } from "./audioRuntime.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 import {
@@ -50,7 +54,6 @@ import {
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
-const FONT_ASSET_URL = `${import.meta.env.BASE_URL}${RUBIK_FONT_PATH}`;
 
 class WorldScene extends Phaser.Scene {
   constructor() {
@@ -59,7 +62,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.font(RUBIK_FONT_KEY, FONT_ASSET_URL, "truetype");
+    this.load.audio(MUSIC_KEY, getMusicUrl(import.meta.env.BASE_URL));
     this.getUsedCharacterVisualProfiles().forEach((visualProfile) => {
       this.preloadCharacterVisualProfile(visualProfile);
     });
@@ -114,6 +117,7 @@ class WorldScene extends Phaser.Scene {
     this.createCharacterAnimations();
     this.createInput();
     this.createCharacters();
+    this.createAudio();
     this.createSessionAndInteractionRuntime();
     this.createMovementDebugPanel();
     this.createHud();
@@ -227,6 +231,12 @@ class WorldScene extends Phaser.Scene {
     this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
   }
 
+  createAudio() {
+    this.audioSettings = createAudioSettingsStore({ storage: window.localStorage });
+    this.audioRuntime = new PhaserAudioRuntime(this, this.audioSettings);
+    this.audioRuntime.startMusic();
+  }
+
   createSessionAndInteractionRuntime() {
     this.sessionPersistence = this.createPersistence();
     const loaded = this.sessionPersistence?.load();
@@ -300,6 +310,7 @@ class WorldScene extends Phaser.Scene {
       buildId: BUILD_ID,
       localization: this.localization,
       gameContainer: this.gameContainer,
+      audioSettings: this.audioSettings,
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
       onNewGame: () => this.startNewGame(),
     });
@@ -340,7 +351,8 @@ class WorldScene extends Phaser.Scene {
         dialogueActive: this.interactionRuntime?.isDialogueActive() ?? false,
         dialogue: { ...this.sessionState.dialogue },
       }),
-      getHudState: () => ({ newGameConfirming: this.gameHud?.isConfirming?.() ?? false }),
+      getHudState: () => ({ newGameConfirming: this.gameHud?.isConfirming?.() ?? false, ...this.gameHud?.getLayoutState?.() }),
+      getAudioSettings: () => this.audioSettings?.getSettings(),
     };
     this.e2eBridge = bridge;
     window.__NESTLED_BURROW_E2E__ = bridge;
@@ -391,6 +403,8 @@ class WorldScene extends Phaser.Scene {
     this.characterSystem = null;
     this.gameHud?.destroy();
     this.gameHud = null;
+    this.audioRuntime?.destroy();
+    this.audioRuntime = null;
     if (window.__NESTLED_BURROW_E2E__ === this.e2eBridge) {
       delete window.__NESTLED_BURROW_E2E__;
     }
@@ -432,6 +446,7 @@ class WorldScene extends Phaser.Scene {
 
 async function bootstrap() {
   const localization = await createLocalization();
+  await document.fonts?.load?.(`400 9px "${PIXELIFY_FONT_KEY}"`);
   window.__NESTLED_BURROW_LOCALIZATION__ = localization;
   new Phaser.Game({
   type: Phaser.AUTO,

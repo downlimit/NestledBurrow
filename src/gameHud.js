@@ -14,7 +14,15 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
 
 export const NEW_GAME_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 78, height: 30 });
-export const LANGUAGE_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 86, y: 4, width: 48, height: 30 });
+export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
+export const LANGUAGE_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 84, y: 4, width: 44, height: 30 });
+export const SOUND_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 122, y: 4, width: 32, height: 30 });
+export const SOUND_PANEL_AREA = Object.freeze({ x: GAME_WIDTH - 166, y: 34, width: 158, height: 66 });
+export const SOUND_SLIDER_RECTS = Object.freeze({
+  master: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 14, width: 66, height: 14 }),
+  music: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 32, width: 66, height: 14 }),
+  effects: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 50, width: 66, height: 14 }),
+});
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 46, width: GAME_WIDTH - 48, height: 88 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 98, width: 96, height: 26 });
 export const NEW_GAME_CANCEL_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 140, y: 98, width: 96, height: 26 });
@@ -26,6 +34,7 @@ export function createGameHud(scene, options) {
     gameContainer,
     onLanguageChange = () => {},
     onNewGame = () => {},
+    audioSettings,
   } = options;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const label = compactBuildLabel(buildId);
@@ -36,8 +45,13 @@ export function createGameHud(scene, options) {
   let fullscreenHud = null;
   let fullscreenHandler = null;
   let languageLatched = false;
+  let soundPanelOpen = false;
+  let draggingChannel = null;
 
   const languageHit = createZone(scene, LANGUAGE_HIT_AREA);
+  const soundHit = createZone(scene, SOUND_HIT_AREA);
+  const soundPanelHit = createZone(scene, SOUND_PANEL_AREA).disableInteractive();
+  const sliderHits = Object.fromEntries(Object.entries(SOUND_SLIDER_RECTS).map(([channel, rect]) => [channel, createZone(scene, rect).disableInteractive()]));
   const newGameHit = createZone(scene, NEW_GAME_HIT_AREA);
   const confirmHit = createZone(scene, NEW_GAME_CONFIRM_HIT_AREA);
   const cancelHit = createZone(scene, NEW_GAME_CANCEL_HIT_AREA);
@@ -47,6 +61,7 @@ export function createGameHud(scene, options) {
   const confirmMessageText = createText(scene, { align: "center", wordWrap: { width: NEW_GAME_CONFIRM_PANEL.width - 24 } });
   const confirmText = createText(scene);
   const cancelText = createText(scene);
+  const soundTexts = { title: createText(scene), master: createText(scene), music: createText(scene), effects: createText(scene), masterValue: createText(scene), musicValue: createText(scene), effectsValue: createText(scene) };
 
   function stop(pointer, event) {
     event?.stopPropagation?.();
@@ -69,6 +84,21 @@ export function createGameHud(scene, options) {
     render();
   }
 
+  soundHit.on("pointerdown", (pointer, _x, _y, event) => {
+    stop(pointer, event);
+    if (confirmingNewGame) return;
+    soundPanelOpen = !soundPanelOpen;
+    render();
+  });
+  soundPanelHit.on("pointerdown", stop);
+  soundPanelHit.on("pointerup", stop);
+  for (const [channel, zone] of Object.entries(sliderHits)) {
+    zone.on("pointerdown", (pointer, localX, _localY, event) => { stop(pointer, event); draggingChannel = channel; setSliderValue(channel, localX); });
+    zone.on("pointermove", (pointer, localX, _localY, event) => { stop(pointer, event); if (draggingChannel === channel && pointer.isDown) setSliderValue(channel, localX); });
+    zone.on("pointerup", (pointer, localX, _localY, event) => { stop(pointer, event); if (draggingChannel === channel) setSliderValue(channel, localX); draggingChannel = null; });
+    zone.on("pointerout", () => { draggingChannel = null; });
+  }
+
   languageHit.on("pointerdown", (pointer, _x, _y, event) => {
     stop(pointer, event);
     void toggleLanguage();
@@ -81,6 +111,7 @@ export function createGameHud(scene, options) {
     stop(pointer, event);
     if (confirmingNewGame) return;
     confirmingNewGame = true;
+    soundPanelOpen = false;
     render();
   });
   confirmHit.on("pointerdown", (pointer, _x, _y, event) => {
@@ -119,18 +150,20 @@ export function createGameHud(scene, options) {
     if (destroyed) return;
     graphics.clear();
     const current = localization.getLocale().label;
-    const next = getNextLocale().label;
 
     renderButton(NEW_GAME_HIT_AREA, newGameText, localization.t("hud:progress.newGame"));
     renderButton(
       LANGUAGE_HIT_AREA,
       languageText,
-      localization.t("hud:language.currentNext", { current, next }),
+      current,
     );
 
     confirmMessageText.setVisible(false);
     confirmText.setVisible(false);
     cancelText.setVisible(false);
+
+    renderSoundButton();
+    renderSoundPanel();
 
     if (confirmingNewGame) {
       graphics.fillStyle(HUD_COLORS.panel, 0.97).fillRect(
@@ -154,17 +187,64 @@ export function createGameHud(scene, options) {
       renderButton(NEW_GAME_CANCEL_HIT_AREA, cancelText, localization.t("hud:progress.cancel"));
       newGameHit.disableInteractive();
       languageHit.disableInteractive();
+      soundHit.disableInteractive();
+      setSoundPanelInteractive(false);
       confirmHit.setInteractive({ useHandCursor: true });
       cancelHit.setInteractive({ useHandCursor: true });
     } else {
       newGameHit.setInteractive({ useHandCursor: true });
       languageHit.setInteractive({ useHandCursor: true });
+      soundHit.setInteractive({ useHandCursor: true });
+      setSoundPanelInteractive(soundPanelOpen);
       confirmHit.disableInteractive();
       cancelHit.disableInteractive();
     }
 
     if (fullscreenHud) {
       renderFullscreenIcon(fullscreenHud.graphics, isFullscreenActive(document, gameContainer));
+    }
+  }
+
+  function setSliderValue(channel, localX) {
+    const rect = SOUND_SLIDER_RECTS[channel];
+    audioSettings?.setChannel(channel, Math.min(1, Math.max(0, localX / rect.width)));
+    render();
+  }
+
+  function setSoundPanelInteractive(active) {
+    if (active) {
+      soundPanelHit.setInteractive({ useHandCursor: false });
+      for (const zone of Object.values(sliderHits)) zone.setInteractive({ useHandCursor: true });
+    } else {
+      soundPanelHit.disableInteractive();
+      for (const zone of Object.values(sliderHits)) zone.disableInteractive();
+    }
+  }
+
+  function renderSoundButton() {
+    const muted = (audioSettings?.getSettings?.().master ?? 1) <= 0;
+    graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(SOUND_HIT_AREA.x + 3, SOUND_HIT_AREA.y + 3, SOUND_HIT_AREA.width - 6, SOUND_HIT_AREA.height - 6);
+    graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(SOUND_HIT_AREA.x + 3.5, SOUND_HIT_AREA.y + 3.5, SOUND_HIT_AREA.width - 7, SOUND_HIT_AREA.height - 7);
+    graphics.fillStyle(HUD_COLORS.light, 0.95).fillRect(SOUND_HIT_AREA.x + 10, SOUND_HIT_AREA.y + 14, 4, 6).fillTriangle(SOUND_HIT_AREA.x + 14, SOUND_HIT_AREA.y + 14, SOUND_HIT_AREA.x + 20, SOUND_HIT_AREA.y + 10, SOUND_HIT_AREA.x + 20, SOUND_HIT_AREA.y + 24);
+    if (muted) graphics.lineStyle(2, 0xd95757, 1).lineBetween(SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 11, SOUND_HIT_AREA.x + 28, SOUND_HIT_AREA.y + 23).lineBetween(SOUND_HIT_AREA.x + 28, SOUND_HIT_AREA.y + 11, SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 23);
+    else graphics.lineStyle(1, HUD_COLORS.mid, 1).strokeCircle(SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 17, 4).strokeCircle(SOUND_HIT_AREA.x + 22, SOUND_HIT_AREA.y + 17, 7);
+  }
+
+  function renderSoundPanel() {
+    for (const text of Object.values(soundTexts)) text.setVisible(false);
+    if (!soundPanelOpen || confirmingNewGame) return;
+    graphics.fillStyle(HUD_COLORS.panel, 0.97).fillRect(SOUND_PANEL_AREA.x, SOUND_PANEL_AREA.y, SOUND_PANEL_AREA.width, SOUND_PANEL_AREA.height);
+    graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(SOUND_PANEL_AREA.x + 0.5, SOUND_PANEL_AREA.y + 0.5, SOUND_PANEL_AREA.width - 1, SOUND_PANEL_AREA.height - 1);
+    const settings = audioSettings?.getSettings?.() ?? { master: 1, music: 0.5, effects: 1 };
+    for (const channel of ["master", "music", "effects"]) {
+      const rect = SOUND_SLIDER_RECTS[channel];
+      const y = rect.y + 2;
+      soundTexts[channel].setStyle(textStyle({ fontSize: "8px" })).setText(localization.t(`hud:sound.${channel}`)).setVisible(true).setPosition(SOUND_PANEL_AREA.x + 6, y);
+      const percent = Math.round(settings[channel] * 100);
+      soundTexts[`${channel}Value`].setStyle(textStyle({ fontSize: "8px" })).setText(`${percent}%`).setVisible(true).setPosition(rect.x + rect.width + 8, y);
+      graphics.fillStyle(HUD_COLORS.shadow, 0.9).fillRect(rect.x, rect.y + 5, rect.width, 4);
+      graphics.fillStyle(HUD_COLORS.mid, 1).fillRect(rect.x, rect.y + 5, Math.round(rect.width * settings[channel]), 4);
+      graphics.fillStyle(HUD_COLORS.light, 1).fillRect(rect.x + Math.round(rect.width * settings[channel]) - 2, rect.y + 2, 4, 10);
     }
   }
 
@@ -183,10 +263,13 @@ export function createGameHud(scene, options) {
   return {
     render,
     isConfirming() { return confirmingNewGame; },
+    getLayoutState() { return { soundPanelOpen, areas: { newGame: NEW_GAME_HIT_AREA, sound: SOUND_HIT_AREA, language: LANGUAGE_HIT_AREA, fullscreen: FULLSCREEN_HIT_AREA, build: BUILD_LABEL, soundPanel: SOUND_PANEL_AREA } }; },
     isPointInHud(x, y) {
       return (
         isPointInRect(x, y, NEW_GAME_HIT_AREA) ||
         isPointInRect(x, y, LANGUAGE_HIT_AREA) ||
+        isPointInRect(x, y, SOUND_HIT_AREA) ||
+        (soundPanelOpen && isPointInRect(x, y, SOUND_PANEL_AREA)) ||
         isPointInRect(x, y, FULLSCREEN_HIT_AREA) ||
         (confirmingNewGame && isPointInRect(x, y, NEW_GAME_CONFIRM_PANEL))
       );
@@ -195,8 +278,8 @@ export function createGameHud(scene, options) {
       if (destroyed) return;
       destroyed = true;
       unsubscribe?.();
-      for (const zone of [languageHit, newGameHit, confirmHit, cancelHit]) zone.destroy();
-      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText]) text.destroy();
+      for (const zone of [languageHit, soundHit, soundPanelHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit]) zone.destroy();
+      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText, ...Object.values(soundTexts)]) text.destroy();
       graphics.destroy();
       if (fullscreenHud) {
         if (fullscreenHandler) fullscreenHud.hit.off("pointerdown", fullscreenHandler);
