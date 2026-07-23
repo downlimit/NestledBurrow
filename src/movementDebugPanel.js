@@ -5,6 +5,12 @@ import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDeb
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
+const GAMEPLAY_TUNING_FIELDS = Object.freeze([
+  Object.freeze({ key: "maximumEnergy", min: 1, max: 999, step: 1 }),
+  Object.freeze({ key: "clearingEnergyCost", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "woodReward", min: 0, max: 999, step: 1 }),
+]);
+
 export function loadMovementDebugConfig({ enabled, storage = globalThis.localStorage } = {}) {
   if (!enabled) return {};
   try {
@@ -140,11 +146,7 @@ export class MovementDebugPanel {
   }
 
   appendGameplayControls(panel) {
-    for (const field of [
-      { key: "maximumEnergy", min: 1, max: 999, step: 1 },
-      { key: "clearingEnergyCost", min: 0, max: 999, step: 1 },
-      { key: "woodReward", min: 0, max: 999, step: 1 },
-    ]) {
+    for (const field of GAMEPLAY_TUNING_FIELDS) {
       const label = this.documentRef.createElement("label");
       const name = this.documentRef.createElement("span");
       name.textContent = field.key;
@@ -177,8 +179,14 @@ export class MovementDebugPanel {
   }
 
   syncInputs() {
-    for (const [key, input] of this.inputs) {
-      input.value = String(this.movementConfig[key]);
+    for (const field of MOVEMENT_TUNING_FIELDS) {
+      const input = this.inputs.get(field.key);
+      if (input) input.value = String(this.movementConfig[field.key]);
+    }
+    if (!this.gameplayTuning) return;
+    for (const field of GAMEPLAY_TUNING_FIELDS) {
+      const input = this.inputs.get(field.key);
+      if (input) input.value = String(this.gameplayTuning[field.key]);
     }
   }
 
