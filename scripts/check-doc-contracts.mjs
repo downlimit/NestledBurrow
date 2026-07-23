@@ -87,6 +87,7 @@ hasAll(
     "новый PR не создавай",
     "Публикация PR-комментария сама по себе не означает запуск Codex",
     "нужен один launch-шаг пользователя",
+    "почини PR <номер>",
     "Codex в repair-потоке не создаёт новый PR",
     "Повторная приёмка не начинается с нуля",
   ],
@@ -104,6 +105,10 @@ assert(
   review.includes("Не говорить, что Codex запущен") &&
     review.includes("Способность Интегратора писать GitHub-комментарии не считается способностью запускать Codex"),
   "REVIEW.md must distinguish a published repair contract from an actually launched Codex task",
+);
+assert(
+  !review.includes("В репозитории downlimit/NestledBurrow исправь PR #<number> по последнему комментарию"),
+  "REVIEW.md must not require the user to remember a long Codex repair prompt",
 );
 
 hasAll(
