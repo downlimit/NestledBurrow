@@ -13,6 +13,7 @@ import {
   startDialogue,
 } from "../src/gameSessionState.js";
 import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction.js";
+import { DEBRIS_OBJECTS } from "../src/debrisConfig.js";
 
 function assertPlainSerializable(value, label) {
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(value))), JSON.stringify(value), `${label} survives JSON round-trip`);
@@ -30,28 +31,20 @@ function assertPlainSerializable(value, label) {
 }
 
 const state = createGameSessionState();
-assert.deepEqual(state, {
-  version: 1,
-  currentWorldId: "village",
-  playerId: "player",
-  entities: { player: { id: "player", flags: {} } },
-  flags: {},
-  dialogue: { targetId: null, dialogueId: null, lineIndex: 0 },
-  gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } },
-}, "default state has canonical shape");
-assert.deepEqual(
-  createGameSessionState({ currentWorldId: "forest", playerId: "hero" }),
-  {
-    version: 1,
-    currentWorldId: "forest",
-    playerId: "hero",
-    entities: { hero: { id: "hero", flags: {} } },
-    flags: {},
-    dialogue: { targetId: null, dialogueId: null, lineIndex: 0 },
-    gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } },
-  },
-  "custom world and player are supported",
-);
+assert.equal(state.version, 1, "default state has canonical version");
+assert.equal(state.currentWorldId, "village", "default state has canonical world");
+assert.equal(state.playerId, "player", "default state has canonical player");
+assert.deepEqual(state.entities, { player: { id: "player", flags: {} } }, "default state has player entity");
+assert.deepEqual(state.flags, {}, "default state has no flags");
+assert.deepEqual(state.dialogue, { targetId: null, dialogueId: null, lineIndex: 0 }, "default state has no active dialogue");
+assert.equal(Object.keys(state.gameplay.debris).length, 43, "default state has all debris records");
+assert.equal(Object.keys(state.gameplay.debris).length, DEBRIS_OBJECTS.length, "default debris state matches config");
+assert(Object.values(state.gameplay.debris).every((item) => item.cleared === false && item.remainingHits === 5), "default debris starts uncleared with five hits");
+const customState = createGameSessionState({ currentWorldId: "forest", playerId: "hero" });
+assert.equal(customState.currentWorldId, "forest", "custom world is supported");
+assert.equal(customState.playerId, "hero", "custom player is supported");
+assert.deepEqual(customState.entities, { hero: { id: "hero", flags: {} } }, "custom player entity is registered");
+assert.equal(Object.keys(customState.gameplay.debris).length, 43, "custom state has gameplay defaults");
 assert.deepEqual(Object.keys(createGameSessionState({ initialEntityIds: ["npc-a", "npc-b"] }).entities), ["player", "npc-a", "npc-b"], "initial entities register");
 assert.deepEqual(Object.keys(createGameSessionState({ initialEntityIds: ["npc-a", "npc-a"] }).entities), ["player", "npc-a"], "duplicate initial IDs do not duplicate data");
 const ensured = ensureSessionEntity(state, "npc-a");

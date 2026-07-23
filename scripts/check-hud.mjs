@@ -50,8 +50,8 @@ for (const rect of iconRects) {
 }
 assert(gameHud.includes("hud:resources.summary"), "energy and wood HUD label is localized");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
-assert(debrisRuntime.includes(".setPosition(DEBRIS_OBJECT.tile.x * TILE_SIZE, DEBRIS_OBJECT.tile.y * TILE_SIZE)"), "debris visual is anchored at its world tile before scaling");
-assert(debrisRuntime.includes("drawLog(graphics);"), "debris geometry is drawn in local coordinates");
+assert(debrisRuntime.includes(".setPosition(definition.tile.x * TILE_SIZE, definition.tile.y * TILE_SIZE)"), "debris visuals are anchored at their world tiles before scaling");
+assert(debrisRuntime.includes("drawLog(graphics, stateFor(definition)?.remainingHits ?? 5);"), "debris geometry is drawn in local coordinates with progress state");
 assert(!debrisRuntime.includes("drawLog(graphics, DEBRIS_OBJECT.tile.x * TILE_SIZE"), "debris animation does not scale absolute world coordinates around the origin");
 assert(debugPanel.includes("if (input) input.value = String(this.gameplayTuning[field.key]);"), "Reset defaults synchronizes gameplay tuning inputs from gameplay state");
 assert(!debugPanel.includes("for (const [key, input] of this.inputs)"), "gameplay inputs are not synchronized from movement config");

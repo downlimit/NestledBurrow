@@ -28,6 +28,7 @@ export class CharacterMotor {
     this.footWidth = footWidth;
     this.footDepth = footDepth;
     this.lastBlockedAxes = { x: false, y: false };
+    this.speedMultiplier = 1;
   }
 
   get speed() {
@@ -37,13 +38,13 @@ export class CharacterMotor {
   update(deltaMs, collisionEnvironment) {
     const command = this.controller.getCommand(this.createControllerContext(), deltaMs);
     this.movement = stepCharacterMovement(this.movement, command.moveDirection, deltaMs, {
-      config: this.movementConfig,
+      config: { ...this.movementConfig, maxSpeed: this.movementConfig.maxSpeed * this.speedMultiplier },
       aimDirection: command.aimDirection,
     });
 
     const moveResult = moveWithCollision(
       this.position,
-      movementDelta(this.movement, deltaMs, this.movementConfig),
+      movementDelta(this.movement, deltaMs, { ...this.movementConfig, maxSpeed: this.movementConfig.maxSpeed * this.speedMultiplier }),
       collisionEnvironment,
       this.footWidth,
       this.footDepth,
