@@ -62,9 +62,9 @@ jobs:
           Write-Host "Using Codex CLI: $codex"
           "CODEX_BIN=$codex" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-          & $codex login status
+          & $codex -c 'forced_login_method="chatgpt"' login status
           if ($LASTEXITCODE -ne 0) {
-            throw "Codex CLI is not authenticated for the self-hosted runner user"
+            throw "Codex CLI is not authenticated through ChatGPT for the self-hosted runner user"
           }
 
       - name: Checkout reviewed PR head
@@ -166,7 +166,7 @@ jobs:
         run: |
           $promptPath = Join-Path $env:RUNNER_TEMP "codex-repair-prompt.md"
           $outputPath = Join-Path $env:RUNNER_TEMP "codex-final-message.md"
-          Get-Content -Raw $promptPath | & $env:CODEX_BIN exec --full-auto --output-last-message $outputPath -
+          Get-Content -Raw $promptPath | & $env:CODEX_BIN -c 'forced_login_method="chatgpt"' exec --full-auto --output-last-message $outputPath -
           if ($LASTEXITCODE -ne 0) { throw "Codex repair failed" }
 
       - name: Validate repaired checkout
