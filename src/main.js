@@ -232,7 +232,7 @@ class WorldScene extends Phaser.Scene {
   createInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
-    this.interactKeys = this.input.keyboard.addKeys("E,SPACE");
+    this.interactKeys = this.input.keyboard.addKeys("SPACE");
     this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
   }
 
@@ -457,7 +457,6 @@ class WorldScene extends Phaser.Scene {
 
   sampleFrameActions() {
     const keyboardPressed =
-      Phaser.Input.Keyboard.JustDown(this.interactKeys.E) ||
       Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE);
     const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
     this.frameActions = Object.freeze({
