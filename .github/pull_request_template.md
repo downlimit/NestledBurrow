@@ -1,4 +1,4 @@
-<!-- Fast lane is the default. Keep the report short and delete optional sections that do not apply. Integration metadata is only for strict, dependent or parallel work. -->
+<!-- Fast lane is the default. Keep the report short and delete optional sections that do not apply. Integration metadata is only for strict, dependent or parallel work. Automatic Codex Review is repository-managed. Fast lane may squash-merge automatically after current-head review, required CI and resolved Codex threads. -->
 
 # Task
 
@@ -10,6 +10,8 @@
 <!-- State the single observable result delivered by this PR. -->
 
 # Review class
+
+<!-- Check strict-risk for persistence/schema, shared state, input/collision, dependencies, workflows, deployment, security, external assets or dependent PRs. Strict-risk disables automatic merge and requires Integrator acceptance. -->
 
 - [ ] `docs`
 - [ ] `code`
@@ -60,7 +62,8 @@
 ## Scope confirmation
 
 - [ ] Task number and title match the direct prompt, branch and PR title.
+- [ ] Review class is accurate; every strict-risk change is marked before review.
 - [ ] No unrelated dependency, architecture, asset, workflow or infrastructure change was added.
 - [ ] Applicable evidence refers to the final head commit.
 - [ ] Material canonical documentation is current, or no durable fact changed.
-- [ ] The branch is ready for Integrator review and merge; this PR is not a development workspace.
+- [ ] The branch is ready for review and merge; this PR is not a development workspace.
