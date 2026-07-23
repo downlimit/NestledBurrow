@@ -56,13 +56,10 @@ async function getReviewThreads(number) {
 }
 
 async function inspectPullRequest(pr) {
-  const [checks, reviews, reactions, commit, reviewThreads] = await Promise.all([
+  const [checks, reviews, reactions, reviewThreads] = await Promise.all([
     request(`/repos/${owner}/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`),
     request(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
-    request(`/repos/${owner}/${repo}/issues/${pr.number}/reactions?per_page=100`, {
-      headers: { Accept: "application/vnd.github+json" },
-    }),
-    request(`/repos/${owner}/${repo}/commits/${pr.head.sha}`),
+    request(`/repos/${owner}/${repo}/issues/${pr.number}/reactions?per_page=100`),
     getReviewThreads(pr.number),
   ]);
 
@@ -77,7 +74,7 @@ async function inspectPullRequest(pr) {
     reactions,
     reviewThreads,
     headSha: pr.head.sha,
-    headCommittedAt: commit.commit?.committer?.date ?? commit.commit?.author?.date,
+    headUpdatedAt: pr.updated_at,
   });
 }
 
