@@ -29,7 +29,7 @@ export function successfulRequiredChecks(checkRuns, requiredChecks = REQUIRED_CH
   });
 }
 
-export function hasCurrentCodexEvidence({ reviews = [], reactions = [], headSha, headCommittedAt }) {
+export function hasCurrentCodexEvidence({ reviews = [], reactions = [], headSha, headUpdatedAt }) {
   const currentReview = reviews.some((review) =>
     review.user?.login === CODEX_REVIEWER_LOGIN &&
     review.commit_id === headSha &&
@@ -37,11 +37,11 @@ export function hasCurrentCodexEvidence({ reviews = [], reactions = [], headSha,
   );
   if (currentReview) return true;
 
-  const headTime = Date.parse(headCommittedAt ?? 0);
-  return reactions.some((reaction) =>
+  const headUpdateTime = Date.parse(headUpdatedAt ?? 0);
+  return Number.isFinite(headUpdateTime) && reactions.some((reaction) =>
     reaction.user?.login === CODEX_REVIEWER_LOGIN &&
     reaction.content === "+1" &&
-    Date.parse(reaction.created_at ?? 0) >= headTime,
+    Date.parse(reaction.created_at ?? 0) >= headUpdateTime,
   );
 }
 
