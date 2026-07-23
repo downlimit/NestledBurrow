@@ -1,5 +1,10 @@
 <!-- Fast lane is the default. Keep the report short and delete optional sections that do not apply. Integration metadata is only for strict, dependent or parallel work. -->
 
+# Task
+
+- Task: `Task #<number> — <human-readable result name>`
+- PR title: must exactly match the Task title above
+
 # Scope
 
 <!-- State the single observable result delivered by this PR. -->
@@ -13,7 +18,7 @@
 
 ## Git lifecycle
 
-- Work branch: `<branch>`
+- Work branch: `task/<number>-<slug>`
 - Final head SHA: `<sha>`
 
 ## Validation
@@ -36,12 +41,11 @@
 
 ## Integration metadata (optional)
 
-<!-- Keep only for strict, dependent or parallel work. Routine independent PRs delete this section. -->
+<!-- Keep only for strict, dependent or parallel work. Routine independent PRs delete this section. Task identity above is mandatory and is not optional metadata. -->
 
 - Batch: `<NB-YYYYMMDD-NN>`
-- Task: `<id>`
 - Base SHA: `<sha>`
-- Depends on: `<none / task ids / PR numbers>`
+- Depends on: `<none / Task numbers / PR numbers>`
 - Merge phase: `<integer>`
 - Owned paths: `<paths>`
 - Shared files touched: `<none / explicitly allowed paths>`
@@ -55,6 +59,7 @@
 
 ## Scope confirmation
 
+- [ ] Task number and title match the direct prompt, branch and PR title.
 - [ ] No unrelated dependency, architecture, asset, workflow or infrastructure change was added.
 - [ ] Applicable evidence refers to the final head commit.
 - [ ] Material canonical documentation is current, or no durable fact changed.
