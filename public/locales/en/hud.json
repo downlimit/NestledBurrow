@@ -17,7 +17,9 @@
     "hit": "Hit",
     "sleep": "Sleep",
     "wake": "Wake up",
-    "energyRestored": "Energy restored"
+    "energyRestored": "Energy restored",
+    "chop": "Chop",
+    "mine": "Mine"
   },
   "progress": {
     "newGame": "New game",
@@ -32,6 +34,6 @@
     "effects": "Effects"
   },
   "resources": {
-    "summary": "EN {current}/{max}  Wood {wood}\nT {time}s x{scale}"
+    "summary": "EN {current}/{max}  Wood {wood}  Ruby {rubies}\n{clock}"
   }
 }

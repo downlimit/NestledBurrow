@@ -214,7 +214,7 @@ export function createGameHud(scene, options) {
     if (!gameplay) { resourceText.setVisible(false); return; }
     graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(RESOURCE_HUD_AREA.x, RESOURCE_HUD_AREA.y, RESOURCE_HUD_AREA.width, RESOURCE_HUD_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(RESOURCE_HUD_AREA.x + 0.5, RESOURCE_HUD_AREA.y + 0.5, RESOURCE_HUD_AREA.width - 1, RESOURCE_HUD_AREA.height - 1);
-    setManagedTextStyle(resourceText, scene, textStyle({ fontSize: "8px" })).setText(localization.t("hud:resources.summary", { current: Math.floor(gameplay.currentEnergy), max: gameplay.maximumEnergy, wood: gameplay.wood, time: Math.floor(gameplay.elapsedGameSeconds ?? 0), scale: gameplay.timeScale ?? 1 })).setVisible(true).setPosition(RESOURCE_HUD_AREA.x + 5, RESOURCE_HUD_AREA.y + 5);
+    setManagedTextStyle(resourceText, scene, textStyle({ fontSize: "8px" })).setText(localization.t("hud:resources.summary", { current: Math.floor(gameplay.currentEnergy), max: gameplay.maximumEnergy, wood: gameplay.wood, rubies: gameplay.rubies ?? 0, clock: gameplay.clock ?? "" })).setVisible(true).setPosition(RESOURCE_HUD_AREA.x + 5, RESOURCE_HUD_AREA.y + 5);
   }
 
   function setSliderValue(channel, localX) {

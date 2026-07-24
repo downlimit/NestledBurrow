@@ -46,7 +46,10 @@ export function createInteractionHud(scene, options = {}) {
   function actionStyle() { return { fontFamily: fontFamily(), fontSize: "8px", color: "#d9c18f" }; }
   function promptStyle() { return { fontFamily: fontFamily(), fontSize: "9px", color: "#f2eadc" }; }
   function translate(descriptor) { return localization.t(descriptor.textKey ?? descriptor, descriptor.values); }
-  function actionLabel(key) { return `${isCoarsePointer() ? "" : "SPACE  "}${localization.t(key)}`; }
+  function actionLabel(key) {
+    const action = localization.t(key);
+    return isCoarsePointer() ? action : `SPACE · ${action}`;
+  }
 
   function redraw(force = false) {
     if (destroyed) return;
@@ -73,7 +76,7 @@ export function createInteractionHud(scene, options = {}) {
     if (promptState) {
       const label = actionLabel(promptState.promptKey);
       setManagedTextStyle(promptText, scene, promptStyle()).setText(label).setVisible(true);
-      const width = Math.max(PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
+      const width = Math.max(isCoarsePointer() ? 36 : PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
       promptRect = { x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - width, y: GAME_HEIGHT - 34, width, height: PROMPT_HEIGHT };
       graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(promptRect.x, promptRect.y, promptRect.width, promptRect.height);
       graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(promptRect.x + 0.5, promptRect.y + 0.5, promptRect.width - 1, promptRect.height - 1);
