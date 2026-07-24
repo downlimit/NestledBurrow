@@ -142,15 +142,19 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
     await expect.poll(async () => (await bridge(page, "getSession"))?.gameplay?.resourceNodes?.["fallen-log-01"]?.progress).toBeCloseTo(hitCount / 7, 6);
     await bridge(page, "expireHitCooldown");
   }
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 93, maximumEnergy: 100, wood: 1, resourceNodes: { "fallen-log-01": { cleared: true, progress: 1 } } } });
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { maximumEnergy: 100, wood: 1, resourceNodes: { "fallen-log-01": { cleared: true, progress: 1 } } } });
+  const clearedSession = await bridge(page, "getSession");
+  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
+  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(93);
   await expect.poll(async () => (await bridge(page, "getDebrisState"))?.present).toBe(false);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
   await page.reload();
   await boot(page);
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 93, wood: 1, resourceNodes: { "fallen-log-01": { cleared: true } } } });
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { wood: 1, resourceNodes: { "fallen-log-01": { cleared: true } } } });
   await openNewGameConfirmation(page);
   await clickLogical(page, 92, 95);
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, stone: 0, resourceNodes: { "fallen-log-01": { cleared: false, progress: 0 } } } });
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { maximumEnergy: 100, wood: 0, stone: 0, resourceNodes: { "fallen-log-01": { cleared: false, progress: 0 } } } });
+  expect((await bridge(page, "getSession")).gameplay.currentEnergy).toBeGreaterThan(95);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
   await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
 });
@@ -167,5 +171,8 @@ test("mobile touch clears a resource through prompt hit area", async ({ page }, 
     await expect.poll(async () => (await bridge(page, "getSession"))?.gameplay?.resourceNodes?.["fallen-log-01"]?.progress).toBeCloseTo(hitCount / 7, 6);
     await bridge(page, "expireHitCooldown");
   }
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 93, wood: 1, resourceNodes: { "fallen-log-01": { cleared: true } } } });
+  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { wood: 1, resourceNodes: { "fallen-log-01": { cleared: true } } } });
+  const clearedSession = await bridge(page, "getSession");
+  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
+  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(93);
 });

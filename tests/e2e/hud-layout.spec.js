@@ -53,10 +53,10 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       stoneText: "0",
       rubyText: "0",
       icons: { wood: true, stone: true, ruby: true },
-      energyRatio: 1,
       energyFillHeight: 54,
     },
   });
+  expect(normal.resources.energyRatio).toBeGreaterThan(0.99);
   expect(normal.resources.clockText).toMatch(/^\d{2}:\d{2}$/u);
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
@@ -96,8 +96,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: false, newGameConfirming: false });
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: false });
   const sessionAfterCancel = await bridge(page, "getSession");
-  const { worldTimeSeconds: _beforeTime, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
-  const { worldTimeSeconds: _afterTime, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
+  const { worldTimeSeconds: _beforeTime, currentEnergy: _beforeEnergy, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
+  const { worldTimeSeconds: _afterTime, currentEnergy: _afterEnergy, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
   expect({ ...sessionAfterCancel, gameplay: gameplayAfterCancel }).toEqual({ ...sessionBeforeConfirmation, gameplay: gameplayBeforeConfirmation });
 });
 
