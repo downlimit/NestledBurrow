@@ -2,6 +2,26 @@ import { clampVectorLength } from "./input.js";
 import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "./movementConfig.js";
 
 const ZERO_VECTOR = Object.freeze({ x: 0, y: 0 });
+export const ENERGY_SPEED_MULTIPLIER_RATE = 1.5;
+
+export function energyTargetSpeedMultiplier(currentEnergy, maximumEnergy) {
+  const maximum = Number(maximumEnergy);
+  const current = Number(currentEnergy);
+  const fraction = maximum > 0 && Number.isFinite(current)
+    ? Math.min(1, Math.max(0, current / maximum))
+    : 0;
+  if (fraction >= 0.25) return 1;
+  if (fraction <= 0.01) return 0.25;
+  const x = Math.min(1, Math.max(0, (fraction - 0.01) / 0.24));
+  return 0.25 + 0.75 * (1 - (1 - x) ** 2);
+}
+
+export function stepSpeedMultiplier(current, target, deltaMs, rate = ENERGY_SPEED_MULTIPLIER_RATE) {
+  const safeCurrent = Math.min(1, Math.max(0.25, Number(current) || 0.25));
+  const safeTarget = Math.min(1, Math.max(0.25, Number(target) || 0.25));
+  const seconds = Math.max(0, Number(deltaMs) || 0) / 1000;
+  return moveNumberToward(safeCurrent, safeTarget, Math.max(0, Number(rate) || 0) * seconds);
+}
 
 export function createMovementState({ facing = { x: 0, y: 1 } } = {}) {
   const initialFacing = normalizeOr(safeVector(facing), { x: 0, y: 1 });

@@ -210,7 +210,7 @@ regenerateEnergy(energyState, { amount: 1000 });
 assert.equal(energyState.gameplay.currentEnergy, energyState.gameplay.maximumEnergy, "sleep regen clamps at maximum");
 const beforeTime = energyState.gameplay.worldTimeSeconds;
 advanceGameTime(energyState, 1, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale);
-assert.equal(energyState.gameplay.worldTimeSeconds - beforeTime, 640, "sleep simulation scale advances world time at x8");
+assert.equal(energyState.gameplay.worldTimeSeconds - beforeTime, 480, "sleep simulation scale advances world time at x8 with the 60x clock");
 
 console.log("progress checks passed");
 

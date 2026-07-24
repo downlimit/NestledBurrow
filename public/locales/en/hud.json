@@ -34,6 +34,6 @@
     "effects": "Effects"
   },
   "resources": {
-    "summary": "EN {current}/{max} W{wood} R{rubies}\n{clock}"
+    "energy": "EN {current}/{max}"
   }
 }

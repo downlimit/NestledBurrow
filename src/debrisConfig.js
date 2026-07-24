@@ -17,11 +17,9 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   hitsPerLog: DEFAULT_DEBRIS_MAX_HITS,
   energyPerHit: DEFAULT_DEBRIS_ENERGY_PER_HIT,
   awakeDrainAmount: 1,
-  awakeDrainIntervalSeconds: 7.2,
-  exhaustedMovementMultiplier: 1 / 3,
+  awakeDrainIntervalSeconds: 9.6,
   sleepTimeScale: 8,
-  realSecondsPerGameDay: 1080,
-  nightTintStrength: 0.55,
+  realSecondsPerGameDay: 1440,
   sleepEnergyRegenPerSecond: 10,
 });
 
@@ -99,11 +97,9 @@ export function normalizeGameplayTuning(value = {}) {
     energyPerHit: normalizeInteger(value.energyPerHit ?? value.clearingEnergyCost, DEFAULT_GAMEPLAY_TUNING.energyPerHit, 0, 999),
     awakeDrainAmount: normalizeInteger(value.awakeDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeDrainAmount, 0, 999),
     awakeDrainIntervalSeconds: normalizeNumber(value.awakeDrainIntervalSeconds, DEFAULT_GAMEPLAY_TUNING.awakeDrainIntervalSeconds, 0.1, 999),
-    exhaustedMovementMultiplier: normalizeNumber(value.exhaustedMovementMultiplier, DEFAULT_GAMEPLAY_TUNING.exhaustedMovementMultiplier, 0, 1),
     sleepTimeScale: normalizeNumber(value.sleepTimeScale, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale, 1, 64),
     sleepEnergyRegenPerSecond: normalizeNumber(value.sleepEnergyRegenPerSecond, DEFAULT_GAMEPLAY_TUNING.sleepEnergyRegenPerSecond, 0, 999),
     realSecondsPerGameDay: normalizeNumber(value.realSecondsPerGameDay, DEFAULT_GAMEPLAY_TUNING.realSecondsPerGameDay, 1, 99999),
-    nightTintStrength: normalizeNumber(value.nightTintStrength, DEFAULT_GAMEPLAY_TUNING.nightTintStrength, 0, 1),
   };
 }
 function normalizeInteger(value, fallback, min, max) { const n = Number(value); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback; }

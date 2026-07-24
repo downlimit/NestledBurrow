@@ -12,7 +12,6 @@ const GAMEPLAY_TUNING_FIELDS = Object.freeze([
   Object.freeze({ key: "energyPerHit", min: 0, max: 999, step: 1 }),
   Object.freeze({ key: "awakeDrainAmount", min: 0, max: 999, step: 1 }),
   Object.freeze({ key: "awakeDrainIntervalSeconds", min: 0.1, max: 999, step: 0.1 }),
-  Object.freeze({ key: "exhaustedMovementMultiplier", min: 0, max: 1, step: 0.000001 }),
   Object.freeze({ key: "sleepTimeScale", min: 1, max: 64, step: 0.1 }),
   Object.freeze({ key: "sleepEnergyRegenPerSecond", min: 0, max: 999, step: 0.1 }),
 ]);
