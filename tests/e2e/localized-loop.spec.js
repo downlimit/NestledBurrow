@@ -21,8 +21,10 @@ async function pressInteract(page) {
 }
 
 async function placeNear(page, entityId) {
-  await bridge(page, "placePlayerNear", entityId);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(entityId);
+  await expect.poll(async () => {
+    await bridge(page, "placePlayerNear", entityId);
+    return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
+  }).toBe(entityId);
 }
 
 async function completeDialogue(page, entityId) {
