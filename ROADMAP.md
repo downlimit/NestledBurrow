@@ -81,9 +81,9 @@ Task #001 — Первая расчистка участка
 
 ### Task #017 — Отключить Codex auto-repair
 
-**Статус:** `PR открыт`
+**Статус:** `Завершено`
 
-`PR #110 · Task #017 — Отключить Codex auto-repair` открыт в `main`. Задача удаляет review-triggered auto-repair и автоматическое создание task PR, сохраняя обычный CI и ручной repair существующей PR-ветки.
+`PR #110 · Task #017 — Отключить Codex auto-repair` смёржен в `main` коммитом `a6d5c6ebbd2bf0df1498972978d0af4d2d0e17f9`. Review-triggered auto-repair и автоматическое создание task PR удалены; обычный CI и ручной repair существующей PR-ветки сохранены.
 
 ### Task #016 — Проверить ручной цикл Codex и PR
 
