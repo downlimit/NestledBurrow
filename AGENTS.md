@@ -46,6 +46,8 @@ A routine task prompt should state the desired result, important constraints and
 
 ## Scope and risk
 
+Micro lane is for already-complete, low-risk files that cannot affect game runtime, dependencies or deployment: documentation, repository text metadata and local launchers such as `.bat` or `.cmd` files.
+
 Fast lane is the default for gameplay, UI, content, configuration, local refactors and bounded fixes.
 
 Strict handling is reserved for persistence/schema migrations, central state ownership, broad movement/input/collision contracts, dependencies, workflows/deployment/security, external assets/licensing, or dependent PRs.
@@ -57,6 +59,15 @@ For renamed public identifiers, save fields, localization keys, selectors, E2E h
 ## Fast validation ladder
 
 Do not run the same proof through several equivalent commands.
+
+### Micro changes
+
+1. Inspect the complete file and diff once.
+2. Run `git diff --check`.
+3. For documentation, run `npm run check:docs`. For a local launcher, run one focused syntax or dependency-resolution check when the environment supports it.
+4. Do not run `npm ci`, build, full project checks, runtime inspection, screenshots or Browser E2E for a micro-only diff.
+
+Do not perform a process audit, expand documentation or create extra artifacts merely to publish an already-complete micro file. Use a temporary worktree only for a real dirty-checkout collision.
 
 ### Routine code
 
@@ -100,6 +111,7 @@ Use one strong proof for each material risk.
 - Use `gh` only for an operation or Actions log unavailable through the connector. A stale `gh` token does not block connector-covered work.
 - Open one non-draft PR after applicable local validation. Draft is reserved for a user-requested work-in-progress.
 - Repository CI runs for both Ready and Draft PRs, so Draft is never a CI gate.
+- PR CI classifies micro-only diffs and skips gameplay checks and Browser E2E for them while preserving the required check names.
 - Wait for final-head CI. Repair deterministic PR failures in the same branch and PR.
 - After green required CI, merge the routine PR and fast-forward local `main`, unless the user explicitly prohibited merge.
 - Do not request Codex review, enable auto-merge, create issues, replacement PRs or extra branches unless the user explicitly asks.

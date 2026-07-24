@@ -23,6 +23,8 @@ requireText(agents, [
   "compact architecture-aware task brief",
   "never trade architectural correctness for prompt speed",
   "Do not run the same proof through several equivalent commands",
+  "Micro lane is for already-complete, low-risk files",
+  "Do not perform a process audit",
   "Open one non-draft PR",
   "merge the routine PR",
   "Task #<number> — <name> (PR #<number>)",
@@ -35,6 +37,7 @@ requireText(prTemplate, ["# Task", "## Result", "## Validation", "PR CI supplies
 requireText(taskTemplate, ["Use only for large, dependent, resumable", "Do not repeat AGENTS.md", "One Ready PR"], "task template");
 
 assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI must run for Draft and Ready PRs");
+requireText(prWorkflow, ["Classify changed paths", "runtime_changed", "Run micro checks", "if: needs.build.outputs.runtime_changed == 'true'"], "PR workflow");
 assert(!existsSync(".github/workflows/auto-merge-clean-pr.yml"), "review-gated auto-merge workflow must stay removed");
 
 for (const [label, text, limit] of [
