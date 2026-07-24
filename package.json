@@ -30,6 +30,7 @@
     "check:i18n": "node scripts/check-localization.mjs && npm run i18n:status && npm run i18n:lint",
     "check:progress": "node scripts/check-progress.mjs",
     "check:e2e": "playwright test",
+    "check:e2e:focused": "node scripts/run-focused-e2e.mjs",
     "check:text-resolution": "node scripts/check-text-resolution.mjs"
   },
   "dependencies": {

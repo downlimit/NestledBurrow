@@ -18,11 +18,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Validate
+  scope:
+    name: Classify Scope
     runs-on: ubuntu-latest
     outputs:
-      runtime_changed: ${{ steps.scope.outputs.runtime_changed }}
+      lane: ${{ steps.classify.outputs.lane }}
+      full_validation: ${{ steps.classify.outputs.full_validation }}
+      browser: ${{ steps.classify.outputs.browser }}
 
     steps:
       - name: Checkout repository
@@ -31,29 +33,30 @@ jobs:
           fetch-depth: 0
 
       - name: Classify changed paths
-        id: scope
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          runtime_changed=false
-          while IFS= read -r file; do
-            case "$file" in
-              *.md|docs/*|*.bat|*.cmd) ;;
-              *) runtime_changed=true; break ;;
-            esac
-          done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          echo "runtime_changed=$runtime_changed" >> "$GITHUB_OUTPUT"
+        id: classify
+        run: node scripts/classify-pr-scope.mjs --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Verify scope classifier
+        run: node scripts/check-pr-scope.mjs
+
+  build:
+    name: Validate
+    needs: scope
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: needs.scope.outputs.full_validation == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Setup Python
-        if: steps.scope.outputs.runtime_changed == 'true'
+        if: needs.scope.outputs.full_validation == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -61,28 +64,30 @@ jobs:
           cache-dependency-path: requirements-dev.txt
 
       - name: Install Node dependencies
-        if: steps.scope.outputs.runtime_changed == 'true'
+        if: needs.scope.outputs.full_validation == 'true'
         run: npm ci
 
       - name: Install visual check dependencies
-        if: steps.scope.outputs.runtime_changed == 'true'
+        if: needs.scope.outputs.full_validation == 'true'
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
       - name: Run project checks
-        if: steps.scope.outputs.runtime_changed == 'true'
+        if: needs.scope.outputs.full_validation == 'true'
         run: npm run check
 
-      - name: Run micro checks
-        if: steps.scope.outputs.runtime_changed == 'false'
+      - name: Run metadata checks
+        if: needs.scope.outputs.full_validation == 'false'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          npm run check:docs
+          node scripts/check-doc-contracts.mjs
+          node scripts/check-task-identity-contract.mjs
+          node scripts/check-pr-scope.mjs
           git diff --check "$BASE_SHA" "$HEAD_SHA"
 
       - name: Upload world previews
-        if: always() && steps.scope.outputs.runtime_changed == 'true'
+        if: always() && needs.scope.outputs.full_validation == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: world-previews-pr-${{ github.event.pull_request.number }}
@@ -97,8 +102,8 @@ jobs:
 
   browser:
     name: Browser E2E
-    needs: build
-    if: needs.build.outputs.runtime_changed == 'true'
+    needs: scope
+    if: needs.scope.outputs.browser == 'true'
     runs-on: ubuntu-latest
 
     steps:
