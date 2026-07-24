@@ -62,9 +62,15 @@ for (const [x, y] of expectedBlockedCells) {
 
 const resourceCells = new Set();
 for (const resource of RESOURCE_OBJECTS) {
-  assert.equal(resource.position.x % PLACEMENT_CELL_SIZE, 0, `${resource.id} x is on the placement grid`);
-  assert.equal(resource.position.y % PLACEMENT_CELL_SIZE, 0, `${resource.id} y is on the placement grid`);
   const footprint = getResourceProfile(resource.profileId).footprint;
+  const placementOrigin = {
+    x: resource.cell.x * PLACEMENT_CELL_SIZE,
+    y: resource.cell.y * PLACEMENT_CELL_SIZE,
+  };
+  assert.equal(placementOrigin.x % PLACEMENT_CELL_SIZE, 0, `${resource.id} x is on the placement grid`);
+  assert.equal(placementOrigin.y % PLACEMENT_CELL_SIZE, 0, `${resource.id} y is on the placement grid`);
+  assert.equal(resource.position.x, placementOrigin.x + footprint.width * PLACEMENT_CELL_SIZE / 2, `${resource.id} interaction x centers its footprint`);
+  assert.equal(resource.position.y, placementOrigin.y + footprint.height * PLACEMENT_CELL_SIZE / 2, `${resource.id} interaction y centers its footprint`);
   for (let y = 0; y < footprint.height; y += 1) for (let x = 0; x < footprint.width; x += 1) {
     const key = cellKey(resource.cell.x + x, resource.cell.y + y);
     assert(!resourceCells.has(key), `${resource.id} footprint does not overlap another resource`);
