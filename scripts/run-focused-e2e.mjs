@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createServer } from "node:net";
 import { resolve } from "node:path";
 
 const startedAt = Date.now();
 const viteCli = resolve("node_modules/vite/bin/vite.js");
 const playwrightCli = resolve("node_modules/@playwright/test/cli.js");
-const url = "http://127.0.0.1:4173/NestledBurrow/";
 const timeoutMs = 120_000;
+let url;
 let server;
 let testProcess;
 let timeout;
@@ -21,6 +22,17 @@ const cleanup = () => {
   stop(testProcess);
   stop(server);
 };
+
+const reserveFreePort = () => new Promise((resolvePort, reject) => {
+  const probe = createServer();
+  probe.unref();
+  probe.once("error", reject);
+  probe.listen(0, "127.0.0.1", () => {
+    const address = probe.address();
+    const port = typeof address === "object" && address ? address.port : null;
+    probe.close((error) => error ? reject(error) : resolvePort(port));
+  });
+});
 
 async function waitForServer() {
   const deadline = Date.now() + 20_000;
@@ -46,7 +58,10 @@ async function main() {
     cleanup();
   }, timeoutMs);
 
-  server = spawn(process.execPath, [viteCli, "--host", "127.0.0.1", "--port", "4173", "--strictPort"], {
+  const port = await reserveFreePort();
+  if (!Number.isInteger(port)) throw new Error("Failed to reserve a focused E2E port");
+  url = `http://127.0.0.1:${port}/NestledBurrow/`;
+  server = spawn(process.execPath, [viteCli, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     env: { ...process.env, VITE_E2E: "1" },
     stdio: "inherit",
   });
@@ -54,7 +69,7 @@ async function main() {
   console.log(`Focused E2E server ready after ${elapsed()}`);
 
   testProcess = spawn(process.execPath, [playwrightCli, "test", ...process.argv.slice(2)], {
-    env: { ...process.env, PW_REUSE_SERVER: "1" },
+    env: { ...process.env, PW_BASE_URL: url, PW_REUSE_SERVER: "1" },
     stdio: "inherit",
   });
   const exitCode = await new Promise((resolveExit) => testProcess.once("exit", (code) => resolveExit(code ?? 1)));
