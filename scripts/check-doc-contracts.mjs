@@ -43,6 +43,7 @@ requireText(taskTemplate, ["Use only for large, dependent, resumable", "Do not r
 
 assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI must run for Draft and Ready PRs");
 requireText(prWorkflow, ["Classify changed paths", "Classify Scope", "needs: scope", "needs.scope.outputs.browser == 'true'", "Run metadata checks"], "PR workflow");
+assert((prWorkflow.match(/fetch-depth: 0/g) ?? []).length >= 2, "scope and metadata validation must fetch the PR base commit");
 requireText(scopeClassifier, ["micro", "ci-meta", "runtime", "strict", "full_validation", "browser"], "PR scope classifier");
 assert(!existsSync(".github/workflows/auto-merge-clean-pr.yml"), "review-gated auto-merge workflow must stay removed");
 
