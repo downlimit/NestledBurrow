@@ -20,21 +20,20 @@ const scopeClassifier = read("scripts/classify-pr-scope.mjs");
 requireText(project, ["<!-- audience: project-bootstrap -->", "По умолчанию пользователь формулирует желаемый результат Лиду обычными словами", "достаточно глубоко разбирается в затронутой архитектуре", "системно безопасное ТЗ", "FAST_LOOP.md"], "PROJECT.md");
 requireText(agents, [
   "<!-- audience: codex -->",
-  "The usual product route is",
-  "compact architecture-aware task brief",
-  "never trade architectural correctness for prompt speed",
-  "Do not run the same proof through several equivalent commands",
-  "Micro lane is for already-complete, low-risk files",
-  "Do not perform a process audit",
-  "Open one non-draft PR",
-  "merge the routine PR",
+  "compact architecture-aware brief",
+  "Never ask the user to operate GitHub",
+  "Use one strong proof per material risk",
+  "**Micro:**",
+  "Skip installs, build, full checks",
+  "Create one non-draft PR",
+  "merge and fast-forward local `main`",
   "npm run check:e2e:focused",
   "native auto-merge",
-  "## Preview acceptance gate",
-  "explicitly sends `принято`",
-  "Task #<number> — <name> (PR #<number>)",
+  "## Preview acceptance",
+  "explicit `принято`",
+  "Task #<number> — <name>",
 ], "AGENTS.md");
-requireText(override, ["Existing PR repair", "same branch and PR", "Draft status is not required"], "AGENTS.override.md");
+requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
 requireText(lead, ["свободное описание пользователя", "достаточно глубоко для системно безопасного ТЗ", "сохранения архитектурной целостности", "40–80 строк", "80–140 строк", "Preview acceptance: required", "до явного `принято`", "Task #001 — Первая расчистка участка (PR #81)"], "LEAD.md");
 requireText(review, ["Codex сам завершает обычную задачу", "одним проходом", "Task #001 — Первая расчистка участка (PR #81)", "Codex review, reaction"], "REVIEW.md");
 requireText(fastLoop, ["# Task #020 — Ускорить цикл Codex", "## Приоритетный чеклист", "### P0", "### P1", "### P2"], "FAST_LOOP.md");
@@ -48,8 +47,8 @@ requireText(scopeClassifier, ["micro", "ci-meta", "runtime", "strict", "full_val
 assert(!existsSync(".github/workflows/auto-merge-clean-pr.yml"), "review-gated auto-merge workflow must stay removed");
 
 for (const [label, text, limit] of [
-  ["AGENTS.md", agents, 10000],
-  ["AGENTS.override.md", override, 6000],
+  ["AGENTS.md", agents, 7500],
+  ["AGENTS.override.md", override, 1500],
   ["LEAD.md", lead, 7000],
   ["REVIEW.md", review, 7000],
   ["PR template", prTemplate, 2500],
