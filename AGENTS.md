@@ -1,152 +1,90 @@
 <!-- audience: codex -->
-# Codex operating rules
+# Codex rules
 
-## Default route
+## Route and identity
 
-The usual product route is: the user describes the desired result in ordinary language to Lead, Lead turns it into a compact architecture-aware task brief, and Codex implements that brief end-to-end.
+- Normal flow: user → Lead's compact architecture-aware brief → Codex delivery. Lead inspects affected architecture, contracts, and consumers enough for safety.
+- A direct change request means implement, validate proportionally, create one Ready PR, wait for final-head CI, repair the same branch, merge, and fast-forward local `main`.
+- Stop before merge only for explicit `не сливать`, review/report-only work, or a real blocker. Never ask the user to operate GitHub.
+- Integrator is optional; use only when explicitly requested for independent acceptance or genuinely dependent PRs.
+- Report as `Task #<number> — <name>`; after PR creation add `(PR #<number>)`. PR number is secondary.
+- Preserve supplied Task number, branch, title, and Base SHA. If changing the repo without a Task number, find the next free one with one targeted `ROADMAP.md` lookup. Answer-only work needs none.
+- Final reports: result, actual checks, PR/merge, real limitation.
 
-Lead must inspect the affected architecture, contracts and consumers deeply enough to keep the brief system-safe. Keep the inspection targeted to the task; never trade architectural correctness for prompt speed.
+## Context and setup
 
-A direct implementation request that reaches Codex still means: implement, validate proportionally, open one Ready PR, wait for final-head CI, repair the same branch when needed, merge, and update local `main`.
+Read the prompt, this file plus `AGENTS.override.md`, then relevant source/tests/config only. Read `PROJECT.md`, `GAME.md`, `ROADMAP.md`, `LEAD.md`, `REVIEW.md`, or `LIBRARY.md` only when changing its facts, allocating a Task number, or targeted search cannot find the owner. `ASSETS.md`/`BINARY_IMPORT.md` are only for external/user binaries.
 
-Stop before merge only when the prompt explicitly says `не сливать`, asks for review/report only, or a real blocker remains. Do not ask the user to operate GitHub.
+Task briefs contain the result, key constraints, and acceptance; repository-wide detail stays here or in code.
 
-Lead prepares the usual product brief. Integrator is optional and is used only when the user explicitly requests independent acceptance or several dependent PRs genuinely require coordination.
-
-## Task identity and communication
-
-- Prefer `Task #<number> — <name>` in every user-facing update.
-- After a PR exists, use `Task #<number> — <name> (PR #<number>)`.
-- PR number is a secondary GitHub address.
-- Preserve a supplied Task number, branch, title and Base SHA exactly.
-- When no Task number is supplied for repository-changing work, allocate the next free number with a targeted `ROADMAP.md` lookup. Answer-only work does not need a Task number.
-- Keep final reports short: result, checks, PR/merge, real limitation.
-
-## Read before editing
-
-Read in this order:
-
-1. the direct prompt;
-2. this file and `AGENTS.override.md` when present;
-3. only directly relevant source, tests and configuration.
-
-Do not read `PROJECT.md`, `GAME.md`, `ROADMAP.md`, `LEAD.md`, `REVIEW.md` or `LIBRARY.md` by default.
-
-Read them only when the task changes their owned facts, needs a Task number, or the relevant code location genuinely cannot be found. Read `ASSETS.md` and `BINARY_IMPORT.md` only for external/user binary work.
-
-A routine task prompt should state the desired result, important constraints and acceptance. Repository-wide rules, implementation design, exhaustive test matrices and PR boilerplate belong here or in code, not in every prompt.
-
-## Before changing files
+Before editing:
 
 1. Run `git fetch --prune`.
-2. Start the one task branch from supplied Base SHA or current `origin/main`.
-3. Never commit ordinary work on `main`.
-4. Inspect the relevant implementation and search consumers of any changed contract.
-5. Preserve unrelated user changes and avoid unrelated cleanup.
+2. Branch from supplied Base SHA or current `origin/main`; never do normal work on `main`.
+3. Inspect the owner and consumers of changed contracts.
+4. Preserve unrelated user work; avoid unrelated cleanup.
 
-Use an isolated task worktree immediately when the active checkout is dirty, on another task branch or shared with running work. Never switch a shared checkout away from its current branch. For routine tasks, use Medium reasoning effort; raise it only for a concrete architecture or strict-risk ambiguity.
+For a dirty/shared checkout or another active task, use one isolated worktree; never switch the shared checkout. Default to Medium reasoning; raise only for concrete architecture/strict-risk ambiguity.
 
-## Scope and risk
+## Scope
 
-Micro lane is for already-complete, low-risk files that cannot affect game runtime, dependencies or deployment: documentation, repository text metadata and local launchers such as `.bat` or `.cmd` files.
+- **Micro:** complete low-risk docs, text metadata, or local `.bat`/`.cmd` launchers that cannot affect runtime, dependencies, or deployment.
+- **Fast (default):** gameplay, UI, content, config, local refactors, bounded fixes.
+- **Strict:** persistence/schema, central state ownership, broad movement/input/collision contracts, dependencies, workflow/deployment/security, external assets/licensing, or dependent PRs.
 
-Fast lane is the default for gameplay, UI, content, configuration, local refactors and bounded fixes.
+Use the smallest clean solution; add no dependency, framework, asset, docs, or infrastructure without concrete need.
 
-Strict handling is reserved for persistence/schema migrations, central state ownership, broad movement/input/collision contracts, dependencies, workflows/deployment/security, external assets/licensing, or dependent PRs.
+For a changed public identifier, save field, localization key, action, selector, fixture, E2E helper, or config value: search once for the old value and aliases; classify matches; update real consumers and targeted coverage; confirm no accidental stale expectation. Never weaken a valid test for CI.
 
-Use the smallest clean solution for the current observable result. Do not add dependencies, frameworks, assets, documentation or infrastructure without a concrete need.
+## Validation
 
-For renamed public identifiers, save fields, localization keys, selectors, E2E hooks or configuration values, search the repository once and update every real consumer. Preserve legacy behavior only through an explicit tested compatibility path.
+Use one strong proof per material risk; do not repeat equivalent checks.
 
-## Fast validation ladder
+**Micro:** inspect the file/diff once; run `git diff --check`; docs: `npm run check:docs`; launchers: one focused syntax/dependency check when supported. Skip installs, build, full checks, runtime, screenshots, E2E, audits, and extra artifacts.
 
-Do not run the same proof through several equivalent commands.
+**Routine code:** for interaction, note visibility/input owners, restore path, and stable fixtures before patching all owners/consumers once. Run targeted checks once; run `npm run build` once when production code changed and targeted checks exclude it. Run `npm run check:e2e:focused -- <spec>` or one focused runtime inspection. Full suite/E2E belongs to PR CI.
 
-### Micro changes
+**Strict:** run `npm run check` once when supported (includes build), plus only missing task-specific checks and focused local E2E for changed interaction. Full E2E belongs to PR CI.
 
-1. Inspect the complete file and diff once.
-2. Run `git diff --check`.
-3. For documentation, run `npm run check:docs`. For a local launcher, run one focused syntax or dependency-resolution check when the environment supports it.
-4. Do not run `npm ci`, build, full project checks, runtime inspection, screenshots or Browser E2E for a micro-only diff.
+**Docs/process:** run `npm run check:docs` and `git diff --check`; workflow changes also require direct workflow inspection and PR CI.
 
-Do not perform a process audit, expand documentation or create extra artifacts merely to publish an already-complete micro file. Use a temporary worktree only for a real dirty-checkout collision.
+Environment/evidence:
 
-### Routine code
+- Run `npm ci` only for missing/unusable dependencies or dependency/lock changes. Install Python requirements only when the required version is absent/changed.
+- Use at most one temporary validation worktree for a real dirty/locked conflict.
+- On deterministic failure, run that exact command once on current `main` to classify base versus branch. Never rerun unchanged failure or the full base suite.
+- The focused E2E launcher owns Vite, readiness, and shutdown; diagnose its failure directly instead of trying alternate launch commands.
+- Prefer assertions/stable fixtures. Avoid moving NPCs, live clocks, and whole-session equality unless tested. Use runtime for feel/interaction; maximum two focused screenshots.
+- Inspect scope once with status, `git diff --check`, and diff/stat; reopen only unreviewed changed sections. Keep successful logs compact; show relevant full output only on failure.
 
-1. For interactive work, write a short internal state checklist before the first patch: visibility owner, input owner, restore path and stable fixture for every affected normal/modal/dialogue/mobile state. Then patch all identified owners and consumers in one pass.
-2. Run the targeted checks for changed behavior once.
-3. Run `npm run build` once when production code changed and the targeted command does not already include it.
-4. For interactive behavior, run the focused local E2E spec through `npm run check:e2e:focused -- <spec>` or one focused runtime inspection.
-5. Let PR CI run the complete repository suite and full Browser E2E.
+## Preview acceptance
 
-### Strict-risk code
+Required for player-visible gameplay, HUD/UI, input, scenes, localization, animation, audio, and visual assets. Other work keeps the automatic route.
 
-1. Run `npm run check` once when the local environment supports it; it already includes the production build.
-2. Run only task-specific checks that are absent from `npm run check`.
-3. Run focused local Browser E2E for changed interactive behavior. Full Browser E2E belongs to PR CI.
+1. Finish implementation/checks; launch the task worktree.
+2. Local: keep a managed free-port server and send its URL. Cloud: send preview/forwarded URL. If unavailable, report the blocker and stop before PR.
+3. Keep feedback in the same Task/worktree; rerun only affected proof and refresh the link.
+4. No PR, auto-merge, or merge before explicit `принято`.
+5. After `принято`, stop the server; commit, create one Ready PR, wait for final-head CI, and merge.
 
-### Docs/process only
+Automation never replaces the user's runtime/visual verdict.
 
-Run `npm run check:docs` and `git diff --check`. Workflow changes also require direct workflow inspection and PR CI.
+## GitHub
 
-### Environment rules
+- Prefer the GitHub connector; use `gh` only for missing operations/Actions logs. A stale `gh` token cannot block connector-covered work.
+- Create one non-draft PR after local validation and, when gated, `принято`. Draft is only user-requested WIP and never a CI gate.
+- Micro PR classification may skip gameplay/Browser E2E while preserving required check names.
+- Wait for final-head CI; repair deterministic failures in the same branch/PR. Interactive runtime/input/HUD/localization/scene/persistence/E2E-hook changes require green final-head Browser E2E.
+- If local Chromium is unavailable, create the completed Ready PR and use canonical PR E2E. Diagnose its exact assertion; compare that command with current `main` once.
+- Enable native auto-merge on a validated Ready PR when supported and only after `принято` when gated. CI remains the gate; never add repair/auto-merge workflows.
+- After required CI passes, merge and fast-forward local `main` unless prohibited.
+- Never request Codex review or create issues, replacement PRs, or extra branches unless asked.
 
-- Run `npm ci` only when dependencies are missing/unusable or dependency/lock state changed.
-- Install Python requirements only when the required version is unavailable or changed.
-- Use at most one temporary validation worktree for an actual dirty/locked environment problem.
-- If a deterministic command fails, run that exact command once on current `main` to classify base versus PR failure. Do not repeat the full base suite.
-- Do not rerun an unchanged deterministic failure.
-- The focused E2E launcher owns one Vite process, waits for readiness and terminates it. Do not try alternate launch commands after an unchanged hang; inspect that launcher failure directly.
-- Capture verbose successful output compactly. Show the relevant full output only on failure.
+## Special and done
 
-## Evidence
+- `AGENTS.override.md` owns existing-PR repair commands.
+- External/user binaries follow `BINARY_IMPORT.md` and `ASSETS.md` preflight/provenance.
+- Create `tasks/*.md` only for explicitly named large, dependent, resumable, or reused contracts.
+- Pixel-grid/third-party spritesheets retain nearest-neighbor geometry and use metadata/contact sheets, not guessed frames.
 
-Use one strong proof for each material risk.
-
-- Automated assertions are preferred for exact values and state transitions.
-- E2E assertions must use stable fixtures and invariants. Avoid moving NPCs, exact live clocks and whole-session equality unless that moving value is the behavior under test.
-- Runtime inspection is for visual feel, interaction or behavior automation cannot establish.
-- Screenshots are for visual judgement and regressions; normally keep at most two focused states.
-- Do not require unit checks, full check, full E2E, manual smoke and many screenshots for the same risk.
-- Inspect the complete scope with `git status`, `git diff --check` and diff/stat. Re-open only changed sections not already inspected during implementation; do not replay a large known diff into context merely as ceremony.
-
-## Preview acceptance gate
-
-Apply to player-visible gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets. Other tasks keep the automatic route.
-
-1. Finish the change and checks, then launch the task worktree.
-2. Local: keep a managed free-port server and send its URL. Cloud: send the forwarded or preview URL. If unavailable, report the blocker and stop before PR.
-3. Keep feedback in the same Task and worktree; rerun only affected proof and refresh the link.
-4. Do not open a PR, enable auto-merge or merge until the user explicitly sends `принято`.
-5. After `принято`, stop the server and continue through commit, one Ready PR, final-head CI and merge.
-
-Automated evidence never replaces the user's verdict.
-
-## GitHub delivery
-
-- Prefer the installed GitHub connector for PR metadata, creation, status and merge.
-- Use `gh` only for an operation or Actions log unavailable through the connector. A stale `gh` token does not block connector-covered work.
-- Open one non-draft PR after applicable local validation. Draft is reserved for a user-requested work-in-progress.
-- Repository CI runs for both Ready and Draft PRs, so Draft is never a CI gate.
-- PR CI classifies micro-only diffs and skips gameplay checks and Browser E2E for them while preserving the required check names.
-- Wait for final-head CI. Repair deterministic PR failures in the same branch and PR.
-- Enable GitHub native auto-merge on a validated Ready PR when supported, only after `принято` for preview-gated work. CI remains the gate; do not add an auto-merge workflow.
-- After green required CI, merge the routine PR and fast-forward local `main`, unless the user explicitly prohibited merge.
-- Do not request Codex review, create issues, replacement PRs or extra branches unless the user explicitly asks.
-
-## Special routes
-
-- Existing-PR repair commands are routed by `AGENTS.override.md` and keep the same Task and PR.
-- External/user binaries require the preflight and provenance rules in `BINARY_IMPORT.md` and `ASSETS.md`.
-- Durable `tasks/*.md` contracts are only for large, dependent, resumable or repeatedly reused work explicitly named by the prompt.
-- Pixel-grid or third-party spritesheet work must preserve nearest-neighbor geometry and use source metadata/contact sheets instead of guessed frame numbers.
-
-## Completion
-
-Before reporting completion:
-
-- confirm only intended files changed;
-- report checks actually run;
-- identify final head/merge SHA and Task-first PR link;
-- state real residual limitations;
-- confirm local `main` is current after merge.
+Before completion confirm scope, actual checks, final head/merge SHA, Task-first PR link, residual limitations, and current local `main`.
