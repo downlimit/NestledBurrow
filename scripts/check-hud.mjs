@@ -10,6 +10,8 @@ import {
   NEW_GAME_CONFIRM_PANEL,
   NEW_GAME_HIT_AREA,
   RESOURCE_HUD_AREA,
+  RESOURCE_HUD_LAYOUT,
+  shouldShakeEnergyAfterInteraction,
 } from "../src/gameHud.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
@@ -19,7 +21,16 @@ assert(Number.isInteger(BUILD_LABEL.x) && Number.isInteger(BUILD_LABEL.y), "buil
 assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch sized");
 assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width < RESOURCE_HUD_AREA.x, "New Game and resource HUD do not overlap");
 assert(RESOURCE_HUD_AREA.x + RESOURCE_HUD_AREA.width < SOUND_HIT_AREA.x, "New Game and right HUD group do not overlap");
-assert(measureBitmapText("EN 100/100 W0 R0") <= RESOURCE_HUD_AREA.width - 10, "default English resource summary fits inside its HUD panel before the right controls");
+assert.equal("EN 100/100".length, 10, "localized energy text stays compact beside the resource icons");
+assert(RESOURCE_HUD_LAYOUT.woodIcon.x - RESOURCE_HUD_LAYOUT.energy.x >= 51, "resource icons reserve horizontal room after compact energy text");
+assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 16, currentEnergy: 12, maximumEnergy: 100 }), true);
+assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 19, currentEnergy: 15, maximumEnergy: 100 }), false, "exactly fifteen percent does not shake");
+assert.equal(shouldShakeEnergyAfterInteraction({ mutated: false, energyBefore: 3, currentEnergy: 3, maximumEnergy: 100 }), false, "failed interactions do not shake");
+assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 12, currentEnergy: 12, maximumEnergy: 100 }), false, "energy-neutral updates do not shake");
+for (const point of Object.values(RESOURCE_HUD_LAYOUT)) {
+  assert(point.x >= RESOURCE_HUD_AREA.x && point.x < RESOURCE_HUD_AREA.x + RESOURCE_HUD_AREA.width, "resource HUD elements stay inside the panel");
+  assert(point.y >= RESOURCE_HUD_AREA.y && point.y < RESOURCE_HUD_AREA.y + RESOURCE_HUD_AREA.height, "resource HUD elements stay inside the panel vertically");
+}
 assert(SOUND_HIT_AREA.x + SOUND_HIT_AREA.width <= LANGUAGE_HIT_AREA.x, "sound and language hit areas do not overlap");
 assert(LANGUAGE_HIT_AREA.x + LANGUAGE_HIT_AREA.width <= FULLSCREEN_HIT_AREA.x, "language and fullscreen hit areas do not overlap");
 assert(BUILD_LABEL.x < SOUND_HIT_AREA.x, "build label is placed left of the right HUD controls");
@@ -32,6 +43,9 @@ for (const char of "v devabcdef0123456789") assert(HUD_GLYPHS[char], `bitmap gly
 const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const debrisRuntime = readFileSync("src/debrisRuntime.js", "utf8");
+const resourceVisuals = readFileSync("src/resourceVisuals.js", "utf8");
+const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
+const enHud = JSON.parse(readFileSync("public/locales/en/hud.json", "utf8"));
 const debugPanel = readFileSync("src/movementDebugPanel.js", "utf8");
 assert(main.includes("onNewGame: () => this.startNewGame()"), "composition root wires New Game callback");
 assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "all HUD areas exclude MobileJoystick input");
@@ -49,7 +63,14 @@ for (const rect of iconRects) {
   assert(rect.x + rect.width <= SOUND_HIT_AREA.width - 3, "sound icon pixels stay inside the button's right border");
   assert(rect.y + rect.height <= SOUND_HIT_AREA.height - 3, "sound icon pixels stay inside the button's bottom border");
 }
-assert(gameHud.includes("hud:resources.summary"), "energy and wood HUD label is localized");
+assert(gameHud.includes("hud:resources.energy"), "energy HUD label is localized");
+assert(!ruHud.resources.energy.includes("Д") && !ruHud.resources.energy.includes("Р"), "Russian resource summary has no wood or ruby letters");
+assert(!enHud.resources.energy.includes("W") && !enHud.resources.energy.includes("R"), "English resource summary has no wood or ruby letters");
+assert(gameHud.includes("const energyText = createText"), "energy text is an independent display object");
+assert(gameHud.includes("triggerEnergyShake"), "energy HUD exposes targeted low-energy feedback");
+assert(gameHud.includes("drawLog(woodIcon, 5)") && gameHud.includes("drawRuby(rubyIcon, 5)"), "resource HUD renders both canonical icons");
+assert(debrisRuntime.includes('from "./resourceVisuals.js"'), "world debris uses the shared canonical resource visuals");
+assert(resourceVisuals.includes("export function drawLog") && resourceVisuals.includes("export function drawRuby"));
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
 assert(debrisRuntime.includes(".setPosition(definition.tile.x * TILE_SIZE, definition.tile.y * TILE_SIZE)"), "debris visuals are anchored at their world tiles before scaling");
 assert(debrisRuntime.includes("drawLog(graphics, stateFor(definition)?.remainingHits ?? 5);"), "debris geometry is drawn in local coordinates with progress state");

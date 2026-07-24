@@ -3,15 +3,28 @@ import {
   applyBlockedAxes,
   createMovementState,
   createRuntimeMovementConfig,
+  energyTargetSpeedMultiplier,
   movementDelta,
   movementSpeed,
   stepCharacterMovement,
+  stepSpeedMultiplier,
 } from "../src/characterMovement.js";
 import { getActorProfile } from "../src/actorProfiles.js";
 import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "../src/movementConfig.js";
 
 const config = { ...DEFAULT_MOVEMENT_CONFIG };
 const close = (a, b, epsilon = 0.001) => Math.abs(a - b) <= epsilon;
+
+assert.equal(energyTargetSpeedMultiplier(25, 100), 1);
+assert(close(energyTargetSpeedMultiplier(13, 100), 0.8125));
+assert(close(energyTargetSpeedMultiplier(5, 100), 0.4791667));
+assert.equal(energyTargetSpeedMultiplier(1, 100), 0.25);
+assert.equal(energyTargetSpeedMultiplier(0, 100), 0.25);
+assert.equal(energyTargetSpeedMultiplier(50, 200), 1, "energy curve uses maximumEnergy instead of absolute points");
+const firstFatigueFrame = stepSpeedMultiplier(1, 0.25, 16);
+assert(firstFatigueFrame < 1 && firstFatigueFrame > 0.25, "effective multiplier starts moving without jumping to target");
+assert.equal(stepSpeedMultiplier(firstFatigueFrame, 0.25, 500), 0.25, "effective multiplier reaches the target after enough time");
+assert.equal(stepSpeedMultiplier(0.25, 1, 500), 1, "recovered speed returns smoothly to its target");
 
 let state = stepMany(createMovementState(), { x: 1, y: 1 }, 1000);
 assert(movementSpeed(state) <= config.maxSpeed + 0.001, "diagonal movement has no speed boost");

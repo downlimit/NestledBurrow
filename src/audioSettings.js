@@ -23,6 +23,11 @@ export function getEffectiveMusicVolume(settings) {
   return clampVolume(normalized.master * normalized.music);
 }
 
+export function getEffectiveEffectsVolume(settings) {
+  const normalized = normalizeAudioSettings(settings);
+  return clampVolume(normalized.master * normalized.effects);
+}
+
 export function deserializeAudioSettings(raw) {
   try {
     if (typeof raw !== "string" || !raw.trim()) return { status: "defaulted", settings: { ...DEFAULT_AUDIO_SETTINGS } };
@@ -75,6 +80,7 @@ export function createAudioSettingsStore({ storage, globalRef = globalThis } = {
     loadStatus: loaded.status,
     getSettings: () => ({ ...settings }),
     getEffectiveMusicVolume: () => getEffectiveMusicVolume(settings),
+    getEffectiveEffectsVolume: () => getEffectiveEffectsVolume(settings),
     setChannel(channel, value) {
       if (!AUDIO_CHANNELS.includes(channel)) throw new Error(`Unknown audio channel: ${channel}`);
       settings = { ...settings, [channel]: clampVolume(value) };

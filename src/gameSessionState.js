@@ -1,5 +1,5 @@
 import { DEBRIS_OBJECTS, RUBY_OBJECTS, DEFAULT_DEBRIS_MAX_HITS, DEFAULT_DEBRIS_ENERGY_PER_HIT, RUBY_REWARD } from "./debrisConfig.js";
-import { DEFAULT_START_TIME_SECONDS, DEFAULT_GAME_SECONDS_PER_REAL_SECOND, advanceWorldTimeSeconds } from "./gameClock.js";
+import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
 
 export const SESSION_STATE_VERSION = 1;
 export const DEFAULT_WORLD_ID = "village";
@@ -109,7 +109,7 @@ function normalizeGameplayState(value = {}) {
   const wood = normalizeNonNegativeInteger(value.wood, 0, "Wood");
   const rubies = normalizeNonNegativeInteger(value.rubies, 0, "Rubies");
   const elapsedGameSeconds = normalizeNonNegativeNumber(value.elapsedGameSeconds, 0, "Elapsed game seconds");
-  const worldTimeSeconds = normalizeNonNegativeNumber(value.worldTimeSeconds, DEFAULT_START_TIME_SECONDS + elapsedGameSeconds * DEFAULT_GAME_SECONDS_PER_REAL_SECOND, "World time seconds");
+  const worldTimeSeconds = normalizeNonNegativeNumber(value.worldTimeSeconds, DEFAULT_START_TIME_SECONDS + elapsedGameSeconds * LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, "World time seconds");
   const debrisInput = value.debris ?? {};
   assertPlainRecord(debrisInput, "Debris state");
   const debris = createDictionary();

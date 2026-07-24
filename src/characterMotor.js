@@ -3,6 +3,7 @@ import {
   createMovementState,
   movementDelta,
   movementSpeed,
+  stepSpeedMultiplier,
   stepCharacterMovement,
 } from "./characterMovement.js";
 import { moveWithCollision } from "./movement.js";
@@ -28,7 +29,8 @@ export class CharacterMotor {
     this.footWidth = footWidth;
     this.footDepth = footDepth;
     this.lastBlockedAxes = { x: false, y: false };
-    this.speedMultiplier = 1;
+    this.targetSpeedMultiplier = 1;
+    this.effectiveSpeedMultiplier = 1;
   }
 
   get speed() {
@@ -36,15 +38,21 @@ export class CharacterMotor {
   }
 
   update(deltaMs, collisionEnvironment) {
+    this.effectiveSpeedMultiplier = stepSpeedMultiplier(
+      this.effectiveSpeedMultiplier,
+      this.targetSpeedMultiplier,
+      deltaMs,
+    );
+    const effectiveMaxSpeed = this.movementConfig.maxSpeed * this.effectiveSpeedMultiplier;
     const command = this.controller.getCommand(this.createControllerContext(), deltaMs);
     this.movement = stepCharacterMovement(this.movement, command.moveDirection, deltaMs, {
-      config: { ...this.movementConfig, maxSpeed: this.movementConfig.maxSpeed * this.speedMultiplier },
+      config: { ...this.movementConfig, maxSpeed: effectiveMaxSpeed },
       aimDirection: command.aimDirection,
     });
 
     const moveResult = moveWithCollision(
       this.position,
-      movementDelta(this.movement, deltaMs, { ...this.movementConfig, maxSpeed: this.movementConfig.maxSpeed * this.speedMultiplier }),
+      movementDelta(this.movement, deltaMs, { ...this.movementConfig, maxSpeed: effectiveMaxSpeed }),
       collisionEnvironment,
       this.footWidth,
       this.footDepth,
@@ -66,6 +74,8 @@ export class CharacterMotor {
       aimDirection: { x: this.movement.aimDirection.x, y: this.movement.aimDirection.y },
       blockedAxes: { x: this.lastBlockedAxes.x, y: this.lastBlockedAxes.y },
       speed: this.speed,
+      targetSpeedMultiplier: this.targetSpeedMultiplier,
+      effectiveSpeedMultiplier: this.effectiveSpeedMultiplier,
     });
   }
 
@@ -79,6 +89,8 @@ export class CharacterMotor {
       aimDirection: { x: this.movement.aimDirection.x, y: this.movement.aimDirection.y },
       blockedAxes: { x: this.lastBlockedAxes.x, y: this.lastBlockedAxes.y },
       speed: this.speed,
+      targetSpeedMultiplier: this.targetSpeedMultiplier,
+      effectiveSpeedMultiplier: this.effectiveSpeedMultiplier,
     });
   }
 }

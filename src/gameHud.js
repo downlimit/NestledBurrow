@@ -13,6 +13,7 @@ import {
 } from "./hud.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
+import { drawLog, drawRuby } from "./resourceVisuals.js";
 
 export const NEW_GAME_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 78, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -25,9 +26,24 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   effects: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 50, width: 66, height: 14 }),
 });
 export const RESOURCE_HUD_AREA = Object.freeze({ x: 90, y: 6, width: 100, height: 24 });
+export const RESOURCE_HUD_LAYOUT = Object.freeze({
+  energy: Object.freeze({ x: 95, y: 7 }),
+  clock: Object.freeze({ x: 95, y: 17 }),
+  woodIcon: Object.freeze({ x: 146, y: 6 }),
+  woodValue: Object.freeze({ x: 155, y: 8 }),
+  rubyIcon: Object.freeze({ x: 169, y: 6 }),
+  rubyValue: Object.freeze({ x: 178, y: 8 }),
+});
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 46, width: GAME_WIDTH - 48, height: 88 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 98, width: 96, height: 26 });
 export const NEW_GAME_CANCEL_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 140, y: 98, width: 96, height: 26 });
+
+export function shouldShakeEnergyAfterInteraction({ mutated, energyBefore, currentEnergy, maximumEnergy }) {
+  return Boolean(mutated)
+    && Number(currentEnergy) < Number(energyBefore)
+    && Number(maximumEnergy) > 0
+    && Number(currentEnergy) / Number(maximumEnergy) < 0.15;
+}
 
 export function createGameHud(scene, options) {
   const {
@@ -65,7 +81,16 @@ export function createGameHud(scene, options) {
   const confirmText = createText(scene);
   const cancelText = createText(scene);
   const soundTexts = { title: createText(scene), master: createText(scene), music: createText(scene), effects: createText(scene), masterValue: createText(scene), musicValue: createText(scene), effectsValue: createText(scene) };
-  const resourceText = createText(scene, { fontSize: "8px" });
+  const energyText = createText(scene, { fontSize: "8px" });
+  const clockText = createText(scene, { fontSize: "8px" });
+  const woodValueText = createText(scene, { fontSize: "8px" });
+  const rubyValueText = createText(scene, { fontSize: "8px" });
+  const woodIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
+  const rubyIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
+  drawLog(woodIcon, 5);
+  drawRuby(rubyIcon, 5);
+  let energyShakeCount = 0;
+  let energyShakeActive = false;
 
   function stop(pointer, event) {
     event?.stopPropagation?.();
@@ -211,10 +236,38 @@ export function createGameHud(scene, options) {
 
   function renderResources() {
     const gameplay = getGameplayState?.();
-    if (!gameplay) { resourceText.setVisible(false); return; }
+    if (!gameplay) {
+      for (const displayObject of [energyText, clockText, woodValueText, rubyValueText, woodIcon, rubyIcon]) displayObject.setVisible(false);
+      return;
+    }
     graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(RESOURCE_HUD_AREA.x, RESOURCE_HUD_AREA.y, RESOURCE_HUD_AREA.width, RESOURCE_HUD_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(RESOURCE_HUD_AREA.x + 0.5, RESOURCE_HUD_AREA.y + 0.5, RESOURCE_HUD_AREA.width - 1, RESOURCE_HUD_AREA.height - 1);
-    setManagedTextStyle(resourceText, scene, textStyle({ fontSize: "8px" })).setText(localization.t("hud:resources.summary", { current: Math.floor(gameplay.currentEnergy), max: gameplay.maximumEnergy, wood: gameplay.wood, rubies: gameplay.rubies ?? 0, clock: gameplay.clock ?? "" })).setVisible(true).setPosition(RESOURCE_HUD_AREA.x + 5, RESOURCE_HUD_AREA.y + 5);
+    setManagedTextStyle(energyText, scene, textStyle({ fontSize: "6px" }))
+      .setText(localization.t("hud:resources.energy", { current: Math.floor(gameplay.currentEnergy), max: gameplay.maximumEnergy }))
+      .setVisible(true).setX(RESOURCE_HUD_LAYOUT.energy.x);
+    if (!energyShakeActive) energyText.setY(RESOURCE_HUD_LAYOUT.energy.y);
+    setManagedTextStyle(clockText, scene, textStyle({ fontSize: "6px" })).setText(gameplay.clock ?? "").setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.clock.x, RESOURCE_HUD_LAYOUT.clock.y);
+    setManagedTextStyle(woodValueText, scene, textStyle({ fontSize: "6px" })).setText(String(gameplay.wood)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodValue.x, RESOURCE_HUD_LAYOUT.woodValue.y);
+    setManagedTextStyle(rubyValueText, scene, textStyle({ fontSize: "6px" })).setText(String(gameplay.rubies ?? 0)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyValue.x, RESOURCE_HUD_LAYOUT.rubyValue.y);
+    woodIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodIcon.x, RESOURCE_HUD_LAYOUT.woodIcon.y);
+    rubyIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyIcon.x, RESOURCE_HUD_LAYOUT.rubyIcon.y);
+  }
+
+  function triggerEnergyShake() {
+    const baseY = RESOURCE_HUD_LAYOUT.energy.y;
+    scene.tweens.killTweensOf(energyText);
+    energyText.setY(baseY);
+    energyShakeCount += 1;
+    energyShakeActive = true;
+    scene.tweens.add({
+      targets: energyText,
+      y: baseY - 2,
+      duration: 45,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => { energyShakeActive = false; energyText.setY(baseY); },
+    });
   }
 
   function setSliderValue(channel, localX) {
@@ -297,6 +350,19 @@ export function createGameHud(scene, options) {
 
   return {
     render,
+    triggerEnergyShake,
+    getResourceState() {
+      return {
+        energyText: energyText.text,
+        clockText: clockText.text,
+        woodText: woodValueText.text,
+        rubyText: rubyValueText.text,
+        icons: { wood: woodIcon.visible, ruby: rubyIcon.visible },
+        energyY: energyText.y,
+        energyBaseY: RESOURCE_HUD_LAYOUT.energy.y,
+        energyShakeCount,
+      };
+    },
     isConfirming() { return confirmingNewGame; },
     getLayoutState() { return { soundPanelOpen, areas: { newGame: NEW_GAME_HIT_AREA, resources: RESOURCE_HUD_AREA, sound: SOUND_HIT_AREA, language: LANGUAGE_HIT_AREA, fullscreen: FULLSCREEN_HIT_AREA, build: BUILD_LABEL, soundPanel: SOUND_PANEL_AREA } }; },
     isPointInHud(x, y) {
@@ -314,7 +380,10 @@ export function createGameHud(scene, options) {
       destroyed = true;
       unsubscribe?.();
       for (const zone of [languageHit, soundHit, soundPanelHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit]) zone.destroy();
-      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText, resourceText, ...Object.values(soundTexts)]) text.destroy();
+      scene.tweens.killTweensOf(energyText);
+      for (const text of [languageText, newGameText, confirmMessageText, confirmText, cancelText, energyText, clockText, woodValueText, rubyValueText, ...Object.values(soundTexts)]) text.destroy();
+      woodIcon.destroy();
+      rubyIcon.destroy();
       graphics.destroy();
       if (fullscreenHud) {
         if (fullscreenHandler) fullscreenHud.hit.off("pointerdown", fullscreenHandler);
