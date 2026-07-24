@@ -134,7 +134,7 @@ test("running, exhaustion sleep and wake-up share the energy-flow contract", asy
   await bridge(page, "setEnergy", 0);
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: true, exhaustedSleeping: true, timeScale: 16 });
   await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { kind: "wake-exhausted", prompt: "hud:interaction.wake" } });
-  await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ angle: 0, textureKey: "tile_0267" });
+  await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ angle: -90, textureKey: "tile_0268" });
   await bridge(page, "tryWakeFromExhaustion");
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: false, exhaustedSleeping: false, timeScale: 1 });
 });
@@ -165,8 +165,8 @@ test("awake energy drains continuously per real second and low-energy idle recov
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(after - before).toBeGreaterThanOrEqual(1.5);
-  expect(after - before).toBeLessThan(1.6);
+  expect(after - before).toBeGreaterThanOrEqual(1.5 / 1.66);
+  expect(after - before).toBeLessThan(1.5 / 1.66 + 0.1);
 });
 
 test("resource colliders have their requested insets and work from directly above", async ({ page }) => {

@@ -27,7 +27,7 @@ assert.equal(state.gameplay.worldTimeSeconds - DEFAULT_START_TIME_SECONDS, 28800
 assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeDrainAmount, 0.5, "idle awake drain is half an energy point per second");
 assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeWalkDrainAmount, 1.5, "walking awake drain is one and a half energy points per second");
 assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeRunDrainAmount, 3, "running awake drain is three energy points per second");
-assert.equal(DEFAULT_GAMEPLAY_TUNING.lowEnergyIdleRegenPerSecond, 1.5, "low-energy idle regeneration is one and a half points per real second");
+assert.equal(DEFAULT_GAMEPLAY_TUNING.lowEnergyIdleRegenPerSecond, 1.5 / 1.66, "low-energy idle regeneration is reduced to about 0.9 points per real second");
 
 assert.equal(formatClock(0, "ru"), "00:00");
 assert.equal(formatClock(21900, "ru"), "06:05");

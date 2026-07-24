@@ -557,13 +557,14 @@ class WorldScene extends Phaser.Scene {
     const player = this.characterSystem.require(this.sessionState.playerId);
     if (exhausted) {
       player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
-      player.visual.setSleepingPose({ x: player.motor.position.x, y: player.motor.position.y - 4, facing: "down", angle: 0 });
+      player.visual.setSleepingPose({ x: player.motor.position.x, y: player.motor.position.y - 4, facing: "up", angle: -90 });
     } else {
       player.motor.position = { ...BED_WAKE_POSITION };
       player.motor.movement = createMovementState({ facing: { x: -1, y: 0 } });
       player.visual.setSleepingPose({ x: BED_OBJECT.position.x, y: BED_OBJECT.position.y - 1, facing: "right", angle: -90 });
     }
     this.debrisRuntime?.setSleeping(true);
+    this.syncLowEnergyMarker();
     this.interactionRuntime?.refresh?.();
     this.gameHud?.render?.();
   }
@@ -579,6 +580,7 @@ class WorldScene extends Phaser.Scene {
     if (!wasExhausted) player.motor.position = { ...BED_WAKE_POSITION };
     player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
     this.debrisRuntime?.setSleeping(false);
+    this.syncLowEnergyMarker();
     this.interactionRuntime?.refresh?.();
     this.gameHud?.render?.();
     this.saveSession();
@@ -629,6 +631,7 @@ class WorldScene extends Phaser.Scene {
   sampleFrameActions() {
     this.isRunning = Boolean(this.runKey?.isDown) && !this.sleeping;
     this.syncPlayerEnergyTarget();
+    this.syncLowEnergyMarker();
     const keyboardPressed =
       Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE);
     const heldResourceInteract = this.interactKeys.SPACE.isDown && this.interactionRuntime?.getCurrentCandidate?.()?.kind === RESOURCE_INTERACTION_KIND;
@@ -674,6 +677,12 @@ class WorldScene extends Phaser.Scene {
     if (!isMoving && fraction < 0.05) return { direction: "up", arrows: 1 };
     if (!isMoving) return { direction: "down", arrows: 1 };
     return { direction: "down", arrows: (this.e2eEnergyMotion?.running ?? this.isRunning) ? 3 : 2 };
+  }
+
+  syncLowEnergyMarker() {
+    const gameplay = this.sessionState?.gameplay;
+    const fraction = gameplay?.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
+    this.playerCharacter?.visual?.setLowEnergyMarker?.(!this.sleeping && fraction > 0 && fraction < 0.1);
   }
 
   getAwakeDrainAmount(flow = this.getEnergyFlow()) {

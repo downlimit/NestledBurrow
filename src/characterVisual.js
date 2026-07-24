@@ -24,6 +24,8 @@ export class CharacterVisual {
     this.sleepingPose = null;
     this.sleepMarker = null;
     this.sleepMarkerBase = null;
+    this.lowEnergyMarker = null;
+    this.lowEnergyMarkerBase = null;
     this.sprite = scene.add
       .sprite(
         spawn.x,
@@ -80,6 +82,21 @@ export class CharacterVisual {
     }
   }
 
+  setLowEnergyMarker(active) {
+    if (!active) return this.destroyLowEnergyMarker();
+    if (!this.lowEnergyMarker && this.scene.add?.graphics) {
+      this.lowEnergyMarker = this.scene.add.graphics();
+      this.lowEnergyMarker.fillStyle(0xf2eadc, 0.85).fillRect(0, 0, 3, 1).fillRect(1, 1, 1, 1).fillRect(0, 2, 3, 1);
+    }
+    const x = this.sprite.x;
+    const y = this.sprite.y - 13;
+    if (!this.lowEnergyMarker || this.lowEnergyMarkerBase?.x === x && this.lowEnergyMarkerBase?.y === y) return;
+    this.scene.tweens?.killTweensOf?.(this.lowEnergyMarker);
+    this.lowEnergyMarkerBase = { x, y };
+    this.lowEnergyMarker.setPosition(x, y).setDepth(502 + Math.round(this.sprite.y));
+    this.scene.tweens?.add?.({ targets: this.lowEnergyMarker, x: { from: x, to: x - 1 }, y: { from: y, to: y - 1 }, duration: 1000, yoyo: true, repeat: -1 });
+  }
+
   applySleepingPose() {
     const idleFrame = this.frames[this.sleepingPose.facing][this.idleFrameIndex];
     this.sprite.anims.stop();
@@ -112,10 +129,18 @@ export class CharacterVisual {
     this.sleepMarkerBase = null;
   }
 
+  destroyLowEnergyMarker() {
+    this.scene.tweens?.killTweensOf?.(this.lowEnergyMarker);
+    this.lowEnergyMarker?.destroy?.();
+    this.lowEnergyMarker = null;
+    this.lowEnergyMarkerBase = null;
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
     this.destroySleepMarker();
+    this.destroyLowEnergyMarker();
     this.sprite?.destroy?.();
   }
 }

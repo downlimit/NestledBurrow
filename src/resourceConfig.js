@@ -12,7 +12,7 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   awakeDrainAmount: 0.5,
   awakeWalkDrainAmount: 1.5,
   awakeRunDrainAmount: 3,
-  lowEnergyIdleRegenPerSecond: 1.5,
+  lowEnergyIdleRegenPerSecond: 1.5 / 1.66,
   runSpeedMultiplier: 1.66,
   exhaustionSleepScaleMultiplier: 0.5,
   exhaustionWakeCooldownSeconds: 1.5,
