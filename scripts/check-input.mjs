@@ -209,6 +209,7 @@ const interactionHudSource = readFileSync("src/interactionHud.js", "utf8");
 assert(mainSource.includes('addKeys("SPACE")'), "desktop interaction is bound to Space");
 assert(!mainSource.includes('addKeys("E,SPACE")') && !mainSource.includes('interactKeys.E'), "desktop interaction no longer advertises or samples E");
 assert(interactionHudSource.includes("SPACE · "), "desktop interaction prompt advertises uppercase Space with middle-dot separator");
+assert(interactionHudSource.includes("SPACE - "), "desktop interaction prompt uses an ASCII separator without an unsupported glyph");
 assert(!interactionHudSource.includes("SPACE  "), "desktop interaction prompt does not use double spaces");
 
 console.log("input checks passed");

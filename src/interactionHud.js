@@ -30,6 +30,7 @@ export function createInteractionHud(scene, options = {}) {
   let promptRect = null;
   let messageTimer = null;
   let suppressed = false;
+  let cooldownProgress = 0;
 
   const onPointerDown = (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -47,14 +48,19 @@ export function createInteractionHud(scene, options = {}) {
   function actionStyle() { return { fontFamily: fontFamily(), fontSize: "8px", color: "#d9c18f" }; }
   function promptStyle() { return { fontFamily: fontFamily(), fontSize: "9px", color: "#f2eadc" }; }
   function translate(descriptor) { return localization.t(descriptor.textKey ?? descriptor, descriptor.values); }
-  function actionLabel(key) {
+  function actionLabelLegacy(key) {
     const action = localization.t(key);
     return isCoarsePointer() ? action : `SPACE · ${action}`;
   }
 
+  function actionLabel(key) {
+    const action = localization.t(key);
+    return isCoarsePointer() ? action : `SPACE - ${action}`;
+  }
+
   function redraw(force = false) {
     if (destroyed) return;
-    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.(), suppressed });
+    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.(), suppressed, cooldownProgress });
     if (!force && key === renderedKey) return;
     renderedKey = key;
     graphics.clear();
@@ -87,6 +93,8 @@ export function createInteractionHud(scene, options = {}) {
       const width = Math.max(isCoarsePointer() ? 36 : PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
       promptRect = { x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - width, y: GAME_HEIGHT - 34, width, height: PROMPT_HEIGHT };
       graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(promptRect.x, promptRect.y, promptRect.width, promptRect.height);
+      const cooldownWidth = Math.round(promptRect.width * cooldownProgress);
+      if (cooldownWidth > 0) graphics.fillStyle(HUD_COLORS.light, 0.2).fillRect(promptRect.x + promptRect.width - cooldownWidth, promptRect.y + 1, cooldownWidth, promptRect.height - 2);
       graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(promptRect.x + 0.5, promptRect.y + 0.5, promptRect.width - 1, promptRect.height - 1);
       promptText.setPosition(Math.round(promptRect.x + 8), Math.round(promptRect.y + 7));
       promptHit.setPosition(promptRect.x, promptRect.y).setSize(promptRect.width, promptRect.height).setInteractive({ useHandCursor: true });
@@ -111,10 +119,17 @@ export function createInteractionHud(scene, options = {}) {
     },
     hideDialogue() { dialogueState = null; redraw(); },
     setSuppressed(value) { suppressed = Boolean(value); redraw(true); },
+    setCooldownProgress(value) {
+      const next = Math.min(1, Math.max(0, Number(value) || 0));
+      if (next === cooldownProgress) return;
+      cooldownProgress = next;
+      redraw();
+    },
     getPresentationState() {
       return {
         suppressed,
         promptVisible: Boolean(!suppressed && promptState && promptRect),
+        cooldownProgress,
         dialogueVisible: Boolean(!suppressed && dialogueState),
       };
     },

@@ -45,15 +45,16 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       options: { x: 8, y: 4, width: 74, height: 30 },
       clock: { x: 120, y: 4, width: 80, height: 24 },
       fullscreen: { x: 286, y: 4, width: 30, height: 30 },
-      resources: { x: 244, y: 54, width: 46, height: 44 },
-      energy: { x: 294, y: 54, width: 16, height: 44 },
+      resources: { x: 244, y: 38, width: 46, height: 60 },
+      energy: { x: 294, y: 38, width: 16, height: 60 },
     },
     resources: {
       woodText: "0",
+      stoneText: "0",
       rubyText: "0",
-      icons: { wood: true, ruby: true },
+      icons: { wood: true, stone: true, ruby: true },
       energyRatio: 1,
-      energyFillHeight: 38,
+      energyFillHeight: 54,
     },
   });
   expect(normal.resources.clockText).toMatch(/^\d{2}:\d{2}$/u);

@@ -1,89 +1,59 @@
-import { createRuntimeMovementConfig, movementSpeed } from "./characterMovement.js";
-import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "./movementConfig.js";
-import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./debrisConfig.js";
+import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./resourceConfig.js";
 import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
+import { LARGE_RESOURCE_HP_MULTIPLIER } from "./resourceDomain.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
-const GAMEPLAY_TUNING_FIELDS = Object.freeze([
-  Object.freeze({ key: "maximumEnergy", min: 1, max: 999, step: 1 }),
-  Object.freeze({ key: "woodReward", min: 0, max: 999, step: 1 }),
-  Object.freeze({ key: "hitsPerLog", min: 1, max: 99, step: 1 }),
-  Object.freeze({ key: "energyPerHit", min: 0, max: 999, step: 1 }),
-  Object.freeze({ key: "awakeDrainAmount", min: 0, max: 999, step: 1 }),
-  Object.freeze({ key: "awakeDrainIntervalSeconds", min: 0.1, max: 999, step: 0.1 }),
-  Object.freeze({ key: "sleepTimeScale", min: 1, max: 64, step: 0.1 }),
-  Object.freeze({ key: "sleepEnergyRegenPerSecond", min: 0, max: 999, step: 0.1 }),
+const FIELDS = Object.freeze([
+  Object.freeze({ key: "axeDamage", label: "Axe damage", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "smallLogChopHp", label: "Small log chop HP", min: 1, max: 99, step: 1 }),
+  Object.freeze({ key: "universalHitCooldownSeconds", label: "Universal hit cooldown", min: 0, max: 30, step: 0.1 }),
+  Object.freeze({ key: "minimumFatigueSpeedMultiplier", label: "Minimum fatigue speed", min: 0.05, max: 1, step: 0.05 }),
+  Object.freeze({ key: "sleepTimeScale", label: "Sleep time scale", min: 1, max: 64, step: 1 }),
+  Object.freeze({ key: "sleepEnergyPerGameHour", label: "Sleep energy / game hour", min: 0, max: 999, step: 0.5 }),
 ]);
 
-export function loadMovementDebugConfig({ enabled, storage = globalThis.localStorage } = {}) {
-  if (!enabled) return {};
-  try {
-    return JSON.parse(storage?.getItem(MOVEMENT_STORAGE_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
+export function loadMovementDebugConfig() { return {}; }
 
 export class MovementDebugPanel {
-  constructor({
-    enabled,
-    movementConfig,
-    onConfigChange = () => {},
-    getStatusSnapshot = () => null,
-    gameplayTuning = null,
-    onGameplayTuningChange = () => {},
-    onRefillEnergy = () => {},
-    documentRef = globalThis.document,
-    storage = globalThis.localStorage,
-    navigatorRef = globalThis.navigator,
-    windowRef = globalThis.window,
-  } = {}) {
+  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
     this.enabled = Boolean(enabled);
-    this.movementConfig = movementConfig;
-    this.onConfigChange = onConfigChange;
-    this.getStatusSnapshot = getStatusSnapshot;
     this.gameplayTuning = gameplayTuning;
     this.onGameplayTuningChange = onGameplayTuningChange;
     this.onRefillEnergy = onRefillEnergy;
+    this.onResetBalanceRun = onResetBalanceRun;
+    this.getStatusSnapshot = getStatusSnapshot;
     this.documentRef = documentRef;
     this.storage = storage;
-    this.navigatorRef = navigatorRef;
-    this.windowRef = windowRef;
     this.inputs = new Map();
-    this.timers = [];
+    this.open = false;
     this.destroyed = false;
-
     if (!this.enabled) return;
+
+    const toggle = documentRef.createElement("button");
+    toggle.type = "button";
+    toggle.className = "balance-debug-toggle";
+    toggle.textContent = "BAL";
+    toggle.title = "Balance tuning";
+    toggle.setAttribute("aria-label", "Toggle balance tuning");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.addEventListener("click", () => this.setOpen(!this.open));
 
     const panel = documentRef.createElement("section");
     panel.className = "movement-debug-panel";
-    panel.setAttribute("aria-label", "Developer tuning");
-
+    panel.setAttribute("aria-label", "Balance tuning");
+    panel.hidden = true;
+    panel.addEventListener("pointerdown", stopEvent);
+    panel.addEventListener("keydown", stopEvent);
     const title = documentRef.createElement("strong");
-    title.textContent = "Developer tuning";
+    title.textContent = "Balance tuning";
     panel.append(title);
 
-    for (const field of MOVEMENT_TUNING_FIELDS) {
-      const label = documentRef.createElement("label");
-      const name = documentRef.createElement("span");
-      name.textContent = field.key;
-
-      const input = documentRef.createElement("input");
-      input.type = "number";
-      input.min = String(field.min);
-      input.max = String(field.max);
-      input.step = String(field.step);
-      input.value = String(movementConfig[field.key]);
-      input.dataset.field = field.key;
-      input.addEventListener("input", () => this.applyInput(field, input));
-
-      label.append(name, input);
-      panel.append(label);
-      this.inputs.set(field.key, input);
-    }
-
-    if (this.gameplayTuning) this.appendGameplayControls(panel);
+    for (const field of FIELDS) this.appendInput(panel, field);
+    const derived = documentRef.createElement("output");
+    derived.className = "balance-derived";
+    panel.append(derived);
+    this.derived = derived;
 
     this.status = documentRef.createElement("output");
     this.status.className = "movement-debug-status";
@@ -91,164 +61,74 @@ export class MovementDebugPanel {
 
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
-
-    const reset = documentRef.createElement("button");
-    reset.type = "button";
-    reset.textContent = "Reset defaults";
-    reset.addEventListener("click", () => this.resetDefaults());
-
-    this.copyButton = documentRef.createElement("button");
-    this.copyButton.type = "button";
-    this.copyButton.textContent = "Copy config";
-    this.copyButton.addEventListener("click", () => {
-      void this.copyConfig();
-    });
-
-    actions.append(reset, this.copyButton);
+    for (const [label, handler] of [["Reset balance run", onResetBalanceRun], ["Refill energy", onRefillEnergy], ["Reset defaults", () => this.resetDefaults()]]) {
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.addEventListener("click", handler);
+      actions.append(button);
+    }
     panel.append(actions);
-    documentRef.body.append(panel);
+    documentRef.body.append(toggle, panel);
+    this.toggleButton = toggle;
     this.panel = panel;
+    this.syncInputs();
     this.updateStatus();
+  }
+
+  appendInput(panel, field) {
+    const label = this.documentRef.createElement("label");
+    const name = this.documentRef.createElement("span");
+    name.textContent = field.label;
+    const input = this.documentRef.createElement("input");
+    input.type = "number";
+    input.min = String(field.min); input.max = String(field.max); input.step = String(field.step);
+    input.dataset.field = field.key;
+    input.addEventListener("input", () => this.applyInput(field, input));
+    label.append(name, input); panel.append(label); this.inputs.set(field.key, input);
   }
 
   applyInput(field, input) {
     const value = Number(input.value);
     if (!Number.isFinite(value)) return;
-    Object.assign(
-      this.movementConfig,
-      createRuntimeMovementConfig({ ...this.movementConfig, [field.key]: value }),
-    );
-    input.value = String(this.movementConfig[field.key]);
-    this.persist();
-    this.onConfigChange(this.movementConfig);
+    Object.assign(this.gameplayTuning, normalizeGameplayTuning({ ...this.gameplayTuning, [field.key]: value }));
+    saveGameplayDebugTuning(this.gameplayTuning, this.storage);
+    this.syncInputs();
+    this.onGameplayTuningChange(this.gameplayTuning);
   }
 
-  persist() {
-    try {
-      this.storage?.setItem(MOVEMENT_STORAGE_KEY, JSON.stringify(this.movementConfig));
-    } catch {
-      // Debug persistence is optional.
-    }
+  setOpen(value) {
+    this.open = Boolean(value);
+    if (this.panel) this.panel.hidden = !this.open;
+    this.toggleButton?.setAttribute("aria-expanded", String(this.open));
   }
 
   resetDefaults() {
-    Object.assign(
-      this.movementConfig,
-      createRuntimeMovementConfig(DEFAULT_MOVEMENT_CONFIG),
-    );
-    if (this.gameplayTuning) {
-      Object.assign(this.gameplayTuning, normalizeGameplayTuning(DEFAULT_GAMEPLAY_TUNING));
-      clearGameplayDebugTuning(this.storage);
-      this.onGameplayTuningChange(this.gameplayTuning);
-    }
-    try {
-      this.storage?.removeItem(MOVEMENT_STORAGE_KEY);
-    } catch {
-      // Debug persistence is optional.
-    }
+    Object.assign(this.gameplayTuning, normalizeGameplayTuning(DEFAULT_GAMEPLAY_TUNING));
+    clearGameplayDebugTuning(this.storage);
     this.syncInputs();
-    this.onConfigChange(this.movementConfig);
-  }
-
-  appendGameplayControls(panel) {
-    for (const field of GAMEPLAY_TUNING_FIELDS) {
-      const label = this.documentRef.createElement("label");
-      const name = this.documentRef.createElement("span");
-      name.textContent = field.key;
-      const input = this.documentRef.createElement("input");
-      input.type = "number";
-      input.min = String(field.min);
-      input.max = String(field.max);
-      input.step = String(field.step);
-      input.value = String(this.gameplayTuning[field.key]);
-      input.dataset.field = field.key;
-      input.addEventListener("input", () => this.applyGameplayInput(field, input));
-      label.append(name, input);
-      panel.append(label);
-      this.inputs.set(field.key, input);
-    }
-    const refill = this.documentRef.createElement("button");
-    refill.type = "button";
-    refill.textContent = "Refill energy";
-    refill.addEventListener("click", () => this.onRefillEnergy());
-    panel.append(refill);
-  }
-
-  applyGameplayInput(field, input) {
-    const value = Number(input.value);
-    if (!Number.isFinite(value) || !this.gameplayTuning) return;
-    Object.assign(this.gameplayTuning, normalizeGameplayTuning({ ...this.gameplayTuning, [field.key]: value }));
-    input.value = String(this.gameplayTuning[field.key]);
-    saveGameplayDebugTuning(this.gameplayTuning, this.storage);
     this.onGameplayTuningChange(this.gameplayTuning);
   }
 
   syncInputs() {
-    for (const field of MOVEMENT_TUNING_FIELDS) {
-      const input = this.inputs.get(field.key);
-      if (input) input.value = String(this.movementConfig[field.key]);
-    }
-    if (!this.gameplayTuning) return;
-    for (const field of GAMEPLAY_TUNING_FIELDS) {
+    for (const field of FIELDS) {
       const input = this.inputs.get(field.key);
       if (input) input.value = String(this.gameplayTuning[field.key]);
     }
-  }
-
-  async copyConfig() {
-    const button = this.copyButton;
-    if (!button || this.destroyed) return;
-
-    let statusText;
-    try {
-      if (!this.navigatorRef?.clipboard?.writeText) {
-        throw new Error("Clipboard unavailable");
-      }
-      await this.navigatorRef.clipboard.writeText(
-        JSON.stringify(this.movementConfig, null, 2),
-      );
-      statusText = "Copied";
-    } catch {
-      statusText = "Copy unavailable";
-    }
-
-    if (this.destroyed || this.copyButton !== button) return;
-    button.textContent = statusText;
-
-    const timerId = this.windowRef?.setTimeout?.(() => {
-      if (!this.destroyed && this.copyButton === button) {
-        button.textContent = "Copy config";
-      }
-    }, 1200);
-    if (timerId !== undefined) this.timers.push(timerId);
+    if (this.derived) this.derived.textContent = `Large log chop HP ${Math.round(this.gameplayTuning.smallLogChopHp * LARGE_RESOURCE_HP_MULTIPLIER)}`;
   }
 
   updateStatus(snapshot = this.getStatusSnapshot()) {
     if (!this.status || !snapshot) return;
-    const velocity = snapshot.velocity ?? { x: 0, y: 0 };
-    const speed =
-      typeof snapshot.speed === "number"
-        ? snapshot.speed
-        : movementSpeed({ velocity });
-    this.status.textContent = [
-      `speed ${speed.toFixed(1)} / ${this.movementConfig.maxSpeed}`,
-      `velocity ${velocity.x.toFixed(1)}, ${velocity.y.toFixed(1)}`,
-      `facing ${snapshot.facing}`,
-      `energy ${Math.floor(snapshot.energy ?? 0)} time ${Math.floor(snapshot.elapsedGameSeconds ?? 0)}s x${snapshot.timeScale ?? 1}`,
-    ].join("\n");
+    this.status.textContent = [`time ${snapshot.clock ?? "--:--"}`, `energy ${Math.floor(snapshot.energy ?? 0)}`, `small logs ${snapshot.smallLogsCleared ?? 0}`, `wood ${snapshot.wood ?? 0} stone ${snapshot.stone ?? 0} ruby ${snapshot.rubies ?? 0}`].join("\n");
   }
 
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
-    for (const timerId of this.timers) {
-      this.windowRef?.clearTimeout?.(timerId);
-    }
-    this.timers = [];
-    this.panel?.remove();
-    this.panel = null;
-    this.status = null;
-    this.copyButton = null;
-    this.inputs.clear();
+    this.toggleButton?.remove(); this.panel?.remove(); this.inputs.clear();
+    this.toggleButton = null; this.panel = null; this.status = null;
   }
 }
+
+function stopEvent(event) { event?.stopPropagation?.(); }

@@ -11,9 +11,10 @@ import {
   setEntityFlag,
   setSessionFlag,
   startDialogue,
+  SESSION_STATE_VERSION,
 } from "../src/gameSessionState.js";
 import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction.js";
-import { DEBRIS_OBJECTS } from "../src/debrisConfig.js";
+import { RESOURCE_OBJECTS } from "../src/resourceConfig.js";
 
 function assertPlainSerializable(value, label) {
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(value))), JSON.stringify(value), `${label} survives JSON round-trip`);
@@ -31,20 +32,19 @@ function assertPlainSerializable(value, label) {
 }
 
 const state = createGameSessionState();
-assert.equal(state.version, 1, "default state has canonical version");
+assert.equal(state.version, SESSION_STATE_VERSION, "default state has canonical version");
 assert.equal(state.currentWorldId, "village", "default state has canonical world");
 assert.equal(state.playerId, "player", "default state has canonical player");
 assert.deepEqual(state.entities, { player: { id: "player", flags: {} } }, "default state has player entity");
 assert.deepEqual(state.flags, {}, "default state has no flags");
 assert.deepEqual(state.dialogue, { targetId: null, dialogueId: null, lineIndex: 0 }, "default state has no active dialogue");
-assert.equal(Object.keys(state.gameplay.debris).length, 43, "default state has all debris records");
-assert.equal(Object.keys(state.gameplay.debris).length, DEBRIS_OBJECTS.length, "default debris state matches config");
-assert(Object.values(state.gameplay.debris).every((item) => item.cleared === false && item.remainingHits === 5), "default debris starts uncleared with five hits");
+assert.equal(Object.keys(state.gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "default state has all resource records");
+assert(Object.values(state.gameplay.resourceNodes).every((item) => item.cleared === false && item.progress === 0), "default resources start uncleared at zero progress");
 const customState = createGameSessionState({ currentWorldId: "forest", playerId: "hero" });
 assert.equal(customState.currentWorldId, "forest", "custom world is supported");
 assert.equal(customState.playerId, "hero", "custom player is supported");
 assert.deepEqual(customState.entities, { hero: { id: "hero", flags: {} } }, "custom player entity is registered");
-assert.equal(Object.keys(customState.gameplay.debris).length, 43, "custom state has gameplay defaults");
+assert.equal(Object.keys(customState.gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "custom state has gameplay defaults");
 assert.deepEqual(Object.keys(createGameSessionState({ initialEntityIds: ["npc-a", "npc-b"] }).entities), ["player", "npc-a", "npc-b"], "initial entities register");
 assert.deepEqual(Object.keys(createGameSessionState({ initialEntityIds: ["npc-a", "npc-a"] }).entities), ["player", "npc-a"], "duplicate initial IDs do not duplicate data");
 const ensured = ensureSessionEntity(state, "npc-a");
@@ -176,12 +176,12 @@ assertPlainSerializable(candidate, "interaction candidate");
 const debrisTarget = createInteractionTarget({
   id: "fallen-log-01",
   entityId: "fallen-log-01",
-  kind: "clear-debris",
+  kind: "work-resource",
   position: { x: 8, y: 0 },
   radius: 16,
   priority: 1,
   prompt: "hud:interaction.clear",
-  payload: { debrisId: "fallen-log-01" },
+  payload: { resourceId: "fallen-log-01" },
 });
 assert.equal(findBestInteractionTarget(source, [baseTarget, debrisTarget]).targetId, "fallen-log-01", "static debris target participates in facing/radius selection and priority is deterministic");
 assert.equal(findBestInteractionTarget(source, [baseTarget]).targetId, "talk-home-npc", "dialogue target selection still works without static object candidates");

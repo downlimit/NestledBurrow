@@ -1,4 +1,4 @@
-export function createGridCollisionEnvironment({ bounds, cellSize, isBlockedCell, blockedCells } = {}) {
+export function createGridCollisionEnvironment({ bounds, cellSize, isBlockedCell, blockedCells, isBlockedBox } = {}) {
   validateBounds(bounds);
   validateCellSize(cellSize);
 
@@ -13,6 +13,7 @@ export function createGridCollisionEnvironment({ bounds, cellSize, isBlockedCell
     }),
     cellSize,
     isBlockedCell: blockingQuery,
+    isBlockedBox: typeof isBlockedBox === "function" ? isBlockedBox : null,
   };
 }
 

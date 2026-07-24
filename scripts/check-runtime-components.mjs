@@ -307,127 +307,45 @@ function createTimerWindow({ immediate = false } = {}) {
 
 let documentStub = new DocumentStub();
 let storage = createStorage();
-let movementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
+let gameplayTuning = { maximumEnergy: 100, axeDamage: 1, smallLogChopHp: 7, energyPerHit: 1, awakeDrainAmount: 0.5, awakeWalkDrainAmount: 1.5, awakeRunDrainAmount: 3, universalHitCooldownSeconds: 0.66, minimumFatigueSpeedMultiplier: 0.25, sleepTimeScale: 32, sleepEnergyPerGameHour: 12.5, realSecondsPerGameDay: 1440 };
 let changeCalls = 0;
-let panel = new MovementDebugPanel({
-  enabled: false,
-  movementConfig,
-  documentRef: documentStub,
-  storage,
-});
-assert.equal(documentStub.body.children.length, 0, "disabled debug panel is not created");
-
-storage.setItem(MOVEMENT_STORAGE_KEY, '{"maxSpeed":123}');
-assert.equal(
-  loadMovementDebugConfig({ enabled: true, storage }).maxSpeed,
-  123,
-  "stored overrides load",
-);
-storage.setItem(MOVEMENT_STORAGE_KEY, "{");
-assert.deepEqual(
-  loadMovementDebugConfig({ enabled: true, storage }),
-  {},
-  "malformed stored JSON is ignored",
-);
+let resetCalls = 0;
+let panel = new MovementDebugPanel({ enabled: false, gameplayTuning, documentRef: documentStub, storage });
+assert.equal(documentStub.body.children.length, 0, "disabled debug controls are absent");
+assert.deepEqual(loadMovementDebugConfig({ enabled: true, storage }), {}, "legacy movement overrides are no longer exposed");
 
 documentStub = new DocumentStub();
-storage = createStorage();
-movementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
-const timerWindow = createTimerWindow();
 panel = new MovementDebugPanel({
-  enabled: true,
-  movementConfig,
-  documentRef: documentStub,
-  storage,
-  onConfigChange: () => changeCalls++,
-  getStatusSnapshot: () => ({ velocity: { x: 3, y: 4 }, facing: "right" }),
-  navigatorRef: {
-    clipboard: {
-      async writeText(text) {
-        storage.clipboard = text;
-      },
-    },
-  },
-  windowRef: timerWindow,
+  enabled: true, gameplayTuning, documentRef: documentStub, storage,
+  onGameplayTuningChange: () => changeCalls++,
+  onResetBalanceRun: () => resetCalls++,
+  getStatusSnapshot: () => ({ clock: "06:00", energy: 100, smallLogsCleared: 2, wood: 2, stone: 1, rubies: 0 }),
 });
-assert.equal(documentStub.body.children.length, 1, "enabled debug panel is created");
-assert.deepEqual(
-  [...panel.inputs.keys()],
-  MOVEMENT_TUNING_FIELDS.map((field) => field.key),
-  "panel exposes configured fields",
-);
-const speedInput = panel.inputs.get("maxSpeed");
-speedInput.value = "9999";
-speedInput.input();
-assert.equal(movementConfig.maxSpeed, 300, "input is normalized");
-assert.equal(changeCalls, 1, "change callback fires");
-assert(
-  storage.getItem(MOVEMENT_STORAGE_KEY).includes('"maxSpeed":300'),
-  "changes persist",
-);
-speedInput.value = "nan";
-speedInput.input();
-assert.equal(changeCalls, 1, "NaN input is ignored");
+assert.equal(documentStub.body.children.length, 2, "enabled debug creates a toggle and panel");
+assert.equal(panel.panel.hidden, true, "panel is closed by default");
+panel.toggleButton.emit("click");
+assert.equal(panel.panel.hidden, false, "toggle opens the panel");
+panel.toggleButton.emit("click");
+assert.equal(panel.panel.hidden, true, "toggle closes the panel");
+assert.deepEqual([...panel.inputs.keys()], ["axeDamage", "smallLogChopHp", "universalHitCooldownSeconds", "minimumFatigueSpeedMultiplier", "sleepTimeScale", "sleepEnergyPerGameHour"], "panel exposes only agreed balance fields");
+const hpInput = panel.inputs.get("smallLogChopHp");
+hpInput.value = "9";
+hpInput.input();
+assert.equal(gameplayTuning.smallLogChopHp, 9, "input applies live normalized tuning");
+assert.equal(changeCalls, 1, "live tuning callback fires");
+assert(storage.getItem("nestledBurrow.gameplayDebug").includes('"smallLogChopHp":9'), "balance tuning persists separately");
+assert(panel.derived.textContent.includes("14"), "derived large log HP updates and remains read-only");
 panel.updateStatus();
-assert(
-  panel.status.textContent.includes("velocity 3.0, 4.0") &&
-    panel.status.textContent.includes("facing right"),
-  "status updates from snapshot",
-);
-await panel.copyConfig();
-assert(storage.clipboard.includes('"maxSpeed": 300'), "copy writes JSON");
-assert.equal(panel.copyButton.textContent, "Copied", "copy status is visible before timeout");
-timerWindow.runAll();
-assert.equal(panel.copyButton.textContent, "Copy config", "copy status restores");
-panel.navigatorRef = {
-  clipboard: {
-    async writeText() {
-      throw new Error("no");
-    },
-  },
-};
-await panel.copyConfig();
-assert.equal(panel.copyButton.textContent, "Copy unavailable", "copy failure is visible");
-timerWindow.runAll();
-assert.equal(panel.copyButton.textContent, "Copy config", "copy failure status restores");
+assert(panel.status.textContent.includes("time 06:00") && panel.status.textContent.includes("wood 2 stone 1 ruby 0"), "compact live status reports balance state");
+const resetButton = panel.panel.children.at(-1).children[0];
+resetButton.emit("click");
+assert.equal(resetCalls, 1, "balance reset action is wired");
 panel.resetDefaults();
-assert.equal(movementConfig.maxSpeed, DEFAULT_MOVEMENT_CONFIG.maxSpeed, "reset restores defaults");
-assert.equal(storage.getItem(MOVEMENT_STORAGE_KEY), null, "reset clears storage");
-assert.equal(speedInput.value, String(DEFAULT_MOVEMENT_CONFIG.maxSpeed), "reset syncs inputs");
+assert.equal(gameplayTuning.smallLogChopHp, 7, "defaults restore production preset");
 const panelNode = panel.panel;
-panel.destroy();
-panel.destroy();
-assert.equal(panelNode.removed, true, "destroy removes DOM node and is idempotent");
-
-let resolveClipboard;
-const clipboardDeferred = new Promise((resolve) => {
-  resolveClipboard = resolve;
-});
-documentStub = new DocumentStub();
-movementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
-const deferredTimerWindow = createTimerWindow();
-panel = new MovementDebugPanel({
-  enabled: true,
-  movementConfig,
-  documentRef: documentStub,
-  storage: createStorage(),
-  navigatorRef: {
-    clipboard: {
-      async writeText() {
-        await clipboardDeferred;
-      },
-    },
-  },
-  windowRef: deferredTimerWindow,
-});
-const pendingCopy = panel.copyConfig();
-panel.destroy();
-resolveClipboard();
-await assert.doesNotReject(
-  pendingCopy,
-  "clipboard completion after panel destruction must not touch removed UI",
-);
-assert.equal(panel.copyButton, null, "destroyed panel does not resurrect its copy button");
-assert.equal(deferredTimerWindow.timers.size, 0, "destroyed panel schedules no delayed UI reset");
+const toggleNode = panel.toggleButton;
+panel.destroy(); panel.destroy();
+assert.equal(panelNode.removed, true, "destroy removes panel idempotently");
+assert.equal(toggleNode.removed, true, "destroy removes toggle idempotently");
 
 console.log("runtime component checks passed");

@@ -36,6 +36,8 @@ export function collides(position, layout, footWidth, footDepth) {
     }
   }
 
+  if (environment.isBlockedBox?.(box)) return true;
+
   return false;
 }
 

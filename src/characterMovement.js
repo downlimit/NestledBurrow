@@ -4,16 +4,17 @@ import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "./movementConfi
 const ZERO_VECTOR = Object.freeze({ x: 0, y: 0 });
 export const ENERGY_SPEED_MULTIPLIER_RATE = 1.5;
 
-export function energyTargetSpeedMultiplier(currentEnergy, maximumEnergy) {
+export function energyTargetSpeedMultiplier(currentEnergy, maximumEnergy, minimumMultiplier = 0.25) {
   const maximum = Number(maximumEnergy);
   const current = Number(currentEnergy);
   const fraction = maximum > 0 && Number.isFinite(current)
     ? Math.min(1, Math.max(0, current / maximum))
     : 0;
   if (fraction >= 0.25) return 1;
-  if (fraction <= 0.01) return 0.25;
+  const minimum = Math.min(1, Math.max(0.05, Number(minimumMultiplier) || 0.25));
+  if (fraction <= 0.01) return minimum;
   const x = Math.min(1, Math.max(0, (fraction - 0.01) / 0.24));
-  return 0.25 + 0.75 * (1 - (1 - x) ** 2);
+  return minimum + (1 - minimum) * (1 - (1 - x) ** 2);
 }
 
 export function stepSpeedMultiplier(current, target, deltaMs, rate = ENERGY_SPEED_MULTIPLIER_RATE) {

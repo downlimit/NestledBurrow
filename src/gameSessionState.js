@@ -1,7 +1,8 @@
-import { DEBRIS_OBJECTS, RUBY_OBJECTS, DEFAULT_DEBRIS_MAX_HITS, DEFAULT_DEBRIS_ENERGY_PER_HIT, RUBY_REWARD } from "./debrisConfig.js";
+import { RESOURCE_OBJECTS } from "./resourceConfig.js";
+import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
 import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
 
-export const SESSION_STATE_VERSION = 1;
+export const SESSION_STATE_VERSION = 2;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
@@ -105,40 +106,29 @@ function normalizeGameplayState(value = {}) {
   assertPlainRecord(value, "Gameplay state");
   const maximumEnergy = normalizeNonNegativeInteger(value.maximumEnergy, DEFAULT_MAXIMUM_ENERGY, "Maximum energy");
   if (maximumEnergy <= 0) throw new Error("Maximum energy must be greater than 0");
-  const currentEnergy = Math.min(maximumEnergy, normalizeNonNegativeInteger(value.currentEnergy, DEFAULT_STARTING_ENERGY, "Current energy"));
+  const currentEnergy = Math.min(maximumEnergy, normalizeNonNegativeNumber(value.currentEnergy, DEFAULT_STARTING_ENERGY, "Current energy"));
   const wood = normalizeNonNegativeInteger(value.wood, 0, "Wood");
+  const stone = normalizeNonNegativeInteger(value.stone, 0, "Stone");
   const rubies = normalizeNonNegativeInteger(value.rubies, 0, "Rubies");
   const elapsedGameSeconds = normalizeNonNegativeNumber(value.elapsedGameSeconds, 0, "Elapsed game seconds");
   const worldTimeSeconds = normalizeNonNegativeNumber(value.worldTimeSeconds, DEFAULT_START_TIME_SECONDS + elapsedGameSeconds * LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, "World time seconds");
-  const debrisInput = value.debris ?? {};
-  assertPlainRecord(debrisInput, "Debris state");
-  const debris = createDictionary();
-  for (const definition of DEBRIS_OBJECTS) {
-    const debrisState = hasOwn(debrisInput, definition.id) ? debrisInput[definition.id] : {};
-    if (debrisState !== undefined) assertPlainRecord(debrisState, `Debris ${definition.id}`);
-    const legacyCleared = Boolean(debrisState?.cleared);
-    const remainingHits = legacyCleared ? 0 : normalizePositiveHitCount(debrisState?.remainingHits, DEFAULT_DEBRIS_MAX_HITS, `Debris ${definition.id}.remainingHits`);
-    setOwn(debris, definition.id, { cleared: remainingHits <= 0, remainingHits });
+  const nodeInput = value.resourceNodes ?? {};
+  assertPlainRecord(nodeInput, "Resource node state");
+  const resourceNodes = createDictionary();
+  for (const definition of RESOURCE_OBJECTS) {
+    const input = hasOwn(nodeInput, definition.id) ? nodeInput[definition.id] : {};
+    assertPlainRecord(input, `Resource ${definition.id}`);
+    const progress = normalizeProgress(input.progress, Boolean(input.cleared) ? 1 : 0, `Resource ${definition.id}.progress`);
+    setOwn(resourceNodes, definition.id, { cleared: progress >= 1, progress });
   }
-  for (const [debrisId, debrisState] of Object.entries(debrisInput)) {
-    assertSafeId(debrisId, "Debris ID");
-    if (hasOwn(debris, debrisId)) continue;
-    assertPlainRecord(debrisState, `Debris ${debrisId}`);
-    const cleared = Boolean(debrisState.cleared);
-    const remainingHits = cleared ? 0 : normalizePositiveHitCount(debrisState.remainingHits, DEFAULT_DEBRIS_MAX_HITS, `Debris ${debrisId}.remainingHits`);
-    setOwn(debris, debrisId, { cleared, remainingHits });
+  for (const [resourceId, input] of Object.entries(nodeInput)) {
+    assertSafeId(resourceId, "Resource ID");
+    if (hasOwn(resourceNodes, resourceId)) continue;
+    assertPlainRecord(input, `Resource ${resourceId}`);
+    const progress = normalizeProgress(input.progress, Boolean(input.cleared) ? 1 : 0, `Resource ${resourceId}.progress`);
+    setOwn(resourceNodes, resourceId, { cleared: progress >= 1, progress });
   }
-  const rubyInput = value.rubyNodes ?? {};
-  assertPlainRecord(rubyInput, "Ruby node state");
-  const rubyNodes = createDictionary();
-  for (const definition of RUBY_OBJECTS) {
-    const rubyState = hasOwn(rubyInput, definition.id) ? rubyInput[definition.id] : {};
-    if (rubyState !== undefined) assertPlainRecord(rubyState, `Ruby ${definition.id}`);
-    const cleared = Boolean(rubyState?.cleared);
-    const remainingHits = cleared ? 0 : normalizePositiveHitCount(rubyState?.remainingHits, DEFAULT_DEBRIS_MAX_HITS, `Ruby ${definition.id}.remainingHits`);
-    setOwn(rubyNodes, definition.id, { cleared: remainingHits <= 0, remainingHits });
-  }
-  return { currentEnergy, maximumEnergy, wood, rubies, debris, rubyNodes, worldTimeSeconds };
+  return { currentEnergy, maximumEnergy, wood, stone, rubies, resourceNodes, worldTimeSeconds };
 }
 
 function normalizeNonNegativeNumber(value, fallback, label) {
@@ -147,10 +137,10 @@ function normalizeNonNegativeNumber(value, fallback, label) {
   return value;
 }
 
-function normalizePositiveHitCount(value, fallback, label) {
+function normalizeProgress(value, fallback, label) {
   if (value === undefined || value === null) return fallback;
-  if (!Number.isInteger(value) || value < 0) throw new Error(`${label} must be a non-negative integer`);
-  return Math.min(DEFAULT_DEBRIS_MAX_HITS, value);
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error(`${label} must be in 0..1`);
+  return value;
 }
 
 function createDialogueState(value = {}) {
@@ -304,58 +294,37 @@ export function refillEnergy(state) {
   return { status: "updated", currentEnergy: state.gameplay.currentEnergy };
 }
 
-export function hitDebris(state, debrisId, { energyPerHit = DEFAULT_DEBRIS_ENERGY_PER_HIT, woodReward = 1, maxHits = DEFAULT_DEBRIS_MAX_HITS } = {}) {
-  assertSafeId(debrisId, "Debris ID");
-  if (!hasOwn(state.gameplay.debris, debrisId)) setOwn(state.gameplay.debris, debrisId, { cleared: false, remainingHits: maxHits });
-  const debris = state.gameplay.debris[debrisId];
-  if (debris.cleared || debris.remainingHits <= 0) return { status: "already-cleared", mutated: false };
-  const cost = normalizeNonNegativeInteger(energyPerHit, 0, "Debris hit energy cost");
-  const reward = normalizeNonNegativeInteger(woodReward, 0, "Wood reward");
+export function hitResourceNode(state, resourceId, { action, damage = 1, energyPerHit = 1, tuning = {} } = {}) {
+  assertSafeId(resourceId, "Resource ID");
+  const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
+  if (!definition) return { status: "unknown-resource", mutated: false };
+  const profile = getResourceProfile(definition.profileId);
+  const node = state.gameplay.resourceNodes[resourceId];
+  if (!node || node.cleared) return { status: "already-cleared", mutated: false };
+  const cost = normalizeNonNegativeInteger(energyPerHit, 0, "Resource hit energy cost");
   if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
+  const result = applyResourceWork(node, profile, { action: action ?? profile.preferredAction, damage, tuning });
+  if (!result.mutated) return result;
   state.gameplay.currentEnergy -= cost;
-  debris.remainingHits = Math.max(0, debris.remainingHits - 1);
-  if (debris.remainingHits === 0) {
-    debris.cleared = true;
-    state.gameplay.wood += reward;
-    return { status: "cleared", mutated: true, currentEnergy: state.gameplay.currentEnergy, wood: state.gameplay.wood, remainingHits: 0 };
-  }
-  return { status: "hit", mutated: true, currentEnergy: state.gameplay.currentEnergy, wood: state.gameplay.wood, remainingHits: debris.remainingHits };
+  if (result.status === "cleared") state.gameplay[profile.reward.resource] += profile.reward.amount;
+  return { ...result, currentEnergy: state.gameplay.currentEnergy, reward: result.status === "cleared" ? profile.reward : null };
 }
 
-export function clearDebris(state, debrisId, options = {}) {
-  assertSafeId(debrisId, "Debris ID");
-  if (!hasOwn(state.gameplay.debris, debrisId)) setOwn(state.gameplay.debris, debrisId, { cleared: false, remainingHits: DEFAULT_DEBRIS_MAX_HITS });
-  const debris = state.gameplay.debris[debrisId];
-  if (debris.cleared) return { status: "already-cleared", mutated: false };
-  const cost = normalizeNonNegativeInteger(options.energyCost, 0, "Clearing energy cost");
-  const reward = normalizeNonNegativeInteger(options.woodReward, 0, "Wood reward");
-  if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
-  state.gameplay.currentEnergy -= cost;
-  state.gameplay.wood += reward;
-  debris.remainingHits = 0;
-  debris.cleared = true;
-  return { status: "cleared", mutated: true, currentEnergy: state.gameplay.currentEnergy, wood: state.gameplay.wood, remainingHits: 0 };
-}
-
-export function hitRuby(state, rubyId, { energyPerHit = DEFAULT_DEBRIS_ENERGY_PER_HIT, rubyReward = RUBY_REWARD, maxHits = DEFAULT_DEBRIS_MAX_HITS } = {}) {
-  assertSafeId(rubyId, "Ruby ID");
-  if (!hasOwn(state.gameplay.rubyNodes, rubyId)) setOwn(state.gameplay.rubyNodes, rubyId, { cleared: false, remainingHits: maxHits });
-  const node = state.gameplay.rubyNodes[rubyId];
-  if (node.cleared || node.remainingHits <= 0) return { status: "already-cleared", mutated: false };
-  const cost = normalizeNonNegativeInteger(energyPerHit, 0, "Ruby hit energy cost");
-  if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
-  state.gameplay.currentEnergy -= cost;
-  node.remainingHits = Math.max(0, node.remainingHits - 1);
-  if (node.remainingHits === 0) {
-    node.cleared = true;
-    state.gameplay.rubies += normalizeNonNegativeInteger(rubyReward, 0, "Ruby reward");
-    return { status: "cleared", mutated: true, currentEnergy: state.gameplay.currentEnergy, rubies: state.gameplay.rubies, remainingHits: 0 };
+export function resetBalanceRun(state) {
+  state.gameplay.currentEnergy = state.gameplay.maximumEnergy;
+  state.gameplay.worldTimeSeconds = DEFAULT_START_TIME_SECONDS;
+  state.gameplay.wood = 0;
+  state.gameplay.stone = 0;
+  state.gameplay.rubies = 0;
+  for (const node of Object.values(state.gameplay.resourceNodes)) {
+    node.cleared = false;
+    node.progress = 0;
   }
-  return { status: "hit", mutated: true, currentEnergy: state.gameplay.currentEnergy, rubies: state.gameplay.rubies, remainingHits: node.remainingHits };
+  return { status: "reset", gameplay: state.gameplay };
 }
 
 export function drainAwakeEnergy(state, { amount }) {
-  const drain = normalizeNonNegativeInteger(amount, 0, "Awake energy drain");
+  const drain = normalizeNonNegativeNumber(amount, 0, "Awake energy drain");
   const before = state.gameplay.currentEnergy;
   state.gameplay.currentEnergy = Math.max(0, before - drain);
   return { status: before === state.gameplay.currentEnergy ? "unchanged" : "updated", currentEnergy: state.gameplay.currentEnergy };

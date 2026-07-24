@@ -116,11 +116,19 @@ Stable-ID insertion-ordered registry персонажей: add/lookup/require, o
 
 ### `src/gameSessionState.js`
 
-Plain JSON-сериализуемая session-модель и canonical fresh/normalize boundary: version, current world, player/entity IDs, global/entity flags и transient dialogue state. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+Plain JSON-сериализуемая session-модель и canonical fresh/normalize boundary: version, current world, player/entity IDs, global/entity flags, transient dialogue state, stone и общий `resourceNodes` progress `0..1`. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+
+### `src/resourceDomain.js`
+
+Единый immutable registry профилей малых/крупных брёвен, камней и рубиновой жилы: `chop/mine/mow`, action HP, производный множитель `1.6`, награды, visual/SFX/prompt и чистая операция нормализованной работы.
+
+### `src/resourceConfig.js`
+
+Production balance preset, 8 px placement grid и стабильная композиция resource nodes с profile IDs, позициями и interaction descriptors.
 
 ### `src/sessionPersistence.js`
 
-Версионированный save envelope и adapter над Storage: load/save/clear, strict validation, migration boundary, durable flags only и safe fresh-state recovery для empty/corrupt/unsupported saves.
+Версионированный save envelope и adapter над Storage: load/save/clear, strict validation, явная migration schema v1 → v2 для частично расчищенных узлов, durable flags only и safe fresh-state recovery для empty/corrupt/unsupported saves.
 
 ### `src/neighborQuest.js`
 
@@ -148,7 +156,7 @@ Phaser Unicode presenter boundary для локализованных `TALK` pro
 
 ### `src/gameHud.js`
 
-Единый владелец screen-space build/fullscreen/language/`NEW GAME` UI: locale-aware Phaser Text, confirmation lifecycle, hit-area exclusion, language preference preservation и cleanup.
+Единый владелец screen-space build/fullscreen/language/`NEW GAME` UI: locale-aware Phaser Text, канонические wood/stone/ruby visuals, confirmation lifecycle, hit-area exclusion, language preference preservation и cleanup.
 
 ### `src/localization/index.js`
 
@@ -168,7 +176,7 @@ Runtime-компонент мобильного джойстика: Phaser/nativ
 
 ### `src/movementDebugPanel.js`
 
-Опциональная DOM-панель по `?movementDebug=1`: tuning inputs, нормализация, `localStorage`, reset/copy, runtime status включая eight-direction facing, async clipboard lifecycle и cleanup.
+Компактная DOM-панель баланса: автоматически доступна в dev и через `?movementDebug=1`, открывается 4×4 кнопкой, ограничена viewport и scroll, меняет согласованные resource/sleep параметры, показывает live status и выполняет balance/refill/default resets.
 
 ### `src/fullscreen.js`
 

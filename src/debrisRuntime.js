@@ -1,77 +1,104 @@
-import { BED_OBJECT, BED_WAKE_TILE, DEBRIS_OBJECTS, RUBY_OBJECTS } from "./debrisConfig.js";
-import { TILE_SIZE } from "./worldConfig.js";
+import { BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
+import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "./resourceConfig.js";
+import { getResourceProfile } from "./resourceDomain.js";
 import { cellKey } from "./worldLayout.js";
-import { drawLog, drawRuby } from "./resourceVisuals.js";
+import { drawResource } from "./resourceVisuals.js";
 
 export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   const visuals = new Map();
   let bedGraphics = null;
-  let sleepGraphics = null;
   let destroyed = false;
 
-  function stateFor(definition) { return definition.kind === "mine-ruby" ? sessionState.gameplay.rubyNodes[definition.id] : sessionState.gameplay.debris[definition.id]; }
-  function isPresent(definition) { return !destroyed && !stateFor(definition)?.cleared; }
-  function key(definition) { return cellKey(definition.tile.x, definition.tile.y); }
+  const stateFor = (definition) => sessionState.gameplay.resourceNodes[definition.id];
+  const isPresent = (definition) => !destroyed && !stateFor(definition)?.cleared;
+  const footprintKeys = (definition) => {
+    const profile = getResourceProfile(definition.profileId);
+    const keys = [];
+    for (let y = 0; y < profile.footprint.height; y += 1) for (let x = 0; x < profile.footprint.width; x += 1) keys.push(cellKey(definition.cell.x + x, definition.cell.y + y));
+    return keys;
+  };
+  const setBlocked = (definition, active) => {
+    if (!active) return worldLayout.clearResourceCollider(definition.id);
+    const profile = getResourceProfile(definition.profileId);
+    const width = profile.footprint.width * PLACEMENT_CELL_SIZE;
+    const height = profile.footprint.height * PLACEMENT_CELL_SIZE;
+    const topInset = profile.collisionTopInset ?? 0;
+    const leftInset = profile.collisionLeftInset ?? 0;
+    const rightInset = profile.collisionRightInset ?? 0;
+    worldLayout.setResourceCollider(definition.id, {
+      left: definition.cell.x * PLACEMENT_CELL_SIZE + leftInset,
+      right: definition.cell.x * PLACEMENT_CELL_SIZE + width - rightInset,
+      top: definition.cell.y * PLACEMENT_CELL_SIZE + topInset,
+      bottom: definition.cell.y * PLACEMENT_CELL_SIZE + height,
+    });
+  };
 
   function createVisual(definition) {
     if (!isPresent(definition) || visuals.has(definition.id)) return;
-    worldLayout.blocked.add(key(definition));
-    const graphics = scene.add.graphics().setPosition(definition.tile.x * TILE_SIZE, definition.tile.y * TILE_SIZE).setDepth(500 + (definition.tile.y + 1) * TILE_SIZE);
-    if (definition.kind === "mine-ruby") drawRuby(graphics, stateFor(definition)?.remainingHits ?? 5); else drawLog(graphics, stateFor(definition)?.remainingHits ?? 5);
+    setBlocked(definition, true);
+    const profile = getResourceProfile(definition.profileId);
+    const graphics = scene.add.graphics().setPosition(definition.cell.x * PLACEMENT_CELL_SIZE, definition.cell.y * PLACEMENT_CELL_SIZE).setDepth(500 + definition.position.y);
+    drawResource(graphics, profile, stateFor(definition)?.progress ?? 0);
     visuals.set(definition.id, graphics);
   }
 
   function redraw(definition) {
     const graphics = visuals.get(definition.id);
     if (!graphics) return;
+    graphics.setPosition(definition.cell.x * PLACEMENT_CELL_SIZE, definition.cell.y * PLACEMENT_CELL_SIZE);
     graphics.clear();
-    if (definition.kind === "mine-ruby") drawRuby(graphics, stateFor(definition)?.remainingHits ?? 5); else drawLog(graphics, stateFor(definition)?.remainingHits ?? 5);
+    drawResource(graphics, getResourceProfile(definition.profileId), stateFor(definition)?.progress ?? 0);
   }
 
-  function hitWithFeedback(debrisId, result, onComplete = () => {}) {
-    const definition = [...DEBRIS_OBJECTS, ...RUBY_OBJECTS].find((item) => item.id === debrisId);
+  function hitWithFeedback(resourceId, result, onComplete = () => {}) {
+    const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
     if (!definition) return onComplete();
-    const graphics = visuals.get(debrisId);
+    const graphics = visuals.get(resourceId);
     if (!graphics) return onComplete();
     redraw(definition);
-    scene.tweens.add({ targets: graphics, x: { from: graphics.x - 2, to: graphics.x + 2 }, scaleY: 0.85, duration: 70, yoyo: true, repeat: 1, onComplete });
-    if (result.status === "cleared") clearWithFeedback(debrisId, onComplete);
+    if (result.status === "cleared") return clearWithFeedback(resourceId, onComplete);
+    const anchorX = definition.cell.x * PLACEMENT_CELL_SIZE;
+    const anchorY = definition.cell.y * PLACEMENT_CELL_SIZE;
+    scene.tweens.add({
+      targets: graphics,
+      x: { from: anchorX - 1, to: anchorX + 1 },
+      duration: 60,
+      yoyo: true,
+      onComplete: () => { graphics.setPosition(anchorX, anchorY); onComplete(); },
+    });
   }
 
-  function clearWithFeedback(debrisId, onComplete = () => {}) {
-    const definition = [...DEBRIS_OBJECTS, ...RUBY_OBJECTS].find((item) => item.id === debrisId);
+  function clearWithFeedback(resourceId, onComplete = () => {}) {
+    const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
     if (!definition) return onComplete();
-    const graphics = visuals.get(debrisId);
-    worldLayout.blocked.delete(key(definition));
+    const graphics = visuals.get(resourceId);
+    setBlocked(definition, false);
     if (!graphics) return onComplete();
-    scene.tweens.add({ targets: graphics, alpha: 0, scaleY: 0.55, duration: 160, ease: "Quad.easeOut", onComplete: () => { graphics.destroy(); visuals.delete(debrisId); onComplete(); } });
+    scene.tweens.add({ targets: graphics, alpha: 0, scaleY: 0.55, duration: 160, ease: "Quad.easeOut", onComplete: () => { graphics.destroy(); visuals.delete(resourceId); onComplete(); } });
   }
 
   function createBed() {
-    if (worldLayout.blocked.has(cellKey(BED_WAKE_TILE.x, BED_WAKE_TILE.y))) throw new Error("BED_WAKE_TILE must remain walkable");
-    worldLayout.blocked.add(key(BED_OBJECT));
-    bedGraphics = scene.add.graphics().setPosition(BED_OBJECT.tile.x * TILE_SIZE, BED_OBJECT.tile.y * TILE_SIZE).setDepth(500 + (BED_OBJECT.tile.y + 1) * TILE_SIZE);
+    if (worldLayout.isBlockedCell(BED_WAKE_TILE.x * 2, BED_WAKE_TILE.y * 2)) throw new Error("BED_WAKE_TILE must remain walkable");
+    for (let y = 28; y < 30; y += 1) for (let x = 64; x < 66; x += 1) worldLayout.blocked.add(cellKey(x, y));
+    bedGraphics = scene.add.graphics().setPosition(BED_OBJECT.position.x - 8, BED_OBJECT.position.y - 8).setDepth(500 + BED_OBJECT.position.y);
     drawBed(bedGraphics);
   }
 
-  function setSleeping(active) {
-    if (active && !sleepGraphics) {
-      sleepGraphics = scene.add.graphics().setDepth(900).setScrollFactor(0);
-      sleepGraphics.fillStyle(0x1b2945, 0.8).fillRect(226, 36, 76, 22).lineStyle(1, 0xf2eadc, 0.9).strokeRect(226.5, 36.5, 75, 21).fillStyle(0xf2eadc, 1).fillRect(236, 43, 6, 6).fillRect(248, 41, 6, 6).fillRect(260, 39, 6, 6);
-    } else if (!active && sleepGraphics) { sleepGraphics.destroy(); sleepGraphics = null; }
-  }
+  function setSleeping(_active) {}
 
-  DEBRIS_OBJECTS.forEach(createVisual);
-  RUBY_OBJECTS.forEach(createVisual);
+  RESOURCE_OBJECTS.forEach(createVisual);
   createBed();
 
   return {
-    getInteractionDefinitions() { return [...DEBRIS_OBJECTS.filter(isPresent), ...RUBY_OBJECTS.filter(isPresent), BED_OBJECT]; },
-    isPresent(id) { const definition = [...DEBRIS_OBJECTS, ...RUBY_OBJECTS].find((item) => item.id === (id ?? DEBRIS_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },
-    hitWithFeedback,
-    clearWithFeedback,
-    setSleeping,
-    destroy() { destroyed = true; for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); bedGraphics?.destroy(); sleepGraphics?.destroy(); worldLayout.blocked.delete(key(BED_OBJECT)); for (const d of [...DEBRIS_OBJECTS, ...RUBY_OBJECTS]) worldLayout.blocked.delete(key(d)); },
+    getInteractionDefinitions() { return [...RESOURCE_OBJECTS.filter(isPresent), BED_OBJECT]; },
+    isPresent(id) { const definition = RESOURCE_OBJECTS.find((item) => item.id === (id ?? RESOURCE_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },
+    getVisualState(id) {
+      const graphics = visuals.get(id);
+      return graphics ? { x: graphics.x, y: graphics.y } : null;
+    },
+    hitWithFeedback, clearWithFeedback, setSleeping,
+    rebuild() { for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); RESOURCE_OBJECTS.forEach(createVisual); },
+    destroy() { destroyed = true; for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); bedGraphics?.destroy(); for (const definition of RESOURCE_OBJECTS) setBlocked(definition, false); },
   };
 }
 

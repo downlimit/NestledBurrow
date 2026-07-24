@@ -70,6 +70,11 @@ export function createInteractionRuntime({
     if (candidate.kind !== "dialogue") {
       const result = runWorldObjectInteraction(candidate);
       if (result?.mutated) onPersistentMutation?.({ candidate, result });
+      if (result?.status === "cooldown") {
+        currentCandidate = candidate;
+        presenter?.showPrompt?.({ promptKey: candidate.prompt });
+        return;
+      }
       currentCandidate = null;
       if (result?.status === "insufficient-energy") {
         presenter?.showMessage?.({ messageKey: "hud:interaction.notEnoughEnergy" });
