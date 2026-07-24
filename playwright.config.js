@@ -12,7 +12,7 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173/NestledBurrow/",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.PW_REUSE_SERVER === "1" || !process.env.CI,
     env: { ...process.env, VITE_E2E: "1" },
   },
   projects: [

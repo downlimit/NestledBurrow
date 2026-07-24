@@ -15,6 +15,7 @@ const fastLoop = read("FAST_LOOP.md");
 const taskTemplate = read("tasks/TEMPLATE.md");
 const prTemplate = read(".github/pull_request_template.md");
 const prWorkflow = read(".github/workflows/pr-check.yml");
+const scopeClassifier = read("scripts/classify-pr-scope.mjs");
 
 requireText(project, ["<!-- audience: project-bootstrap -->", "По умолчанию пользователь формулирует желаемый результат Лиду обычными словами", "достаточно глубоко разбирается в затронутой архитектуре", "системно безопасное ТЗ", "FAST_LOOP.md"], "PROJECT.md");
 requireText(agents, [
@@ -27,6 +28,8 @@ requireText(agents, [
   "Do not perform a process audit",
   "Open one non-draft PR",
   "merge the routine PR",
+  "npm run check:e2e:focused",
+  "native auto-merge",
   "Task #<number> — <name> (PR #<number>)",
 ], "AGENTS.md");
 requireText(override, ["Existing PR repair", "same branch and PR", "Draft status is not required"], "AGENTS.override.md");
@@ -37,7 +40,8 @@ requireText(prTemplate, ["# Task", "## Result", "## Validation", "PR CI supplies
 requireText(taskTemplate, ["Use only for large, dependent, resumable", "Do not repeat AGENTS.md", "One Ready PR"], "task template");
 
 assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI must run for Draft and Ready PRs");
-requireText(prWorkflow, ["Classify changed paths", "runtime_changed", "Run micro checks", "if: needs.build.outputs.runtime_changed == 'true'"], "PR workflow");
+requireText(prWorkflow, ["Classify changed paths", "Classify Scope", "needs: scope", "needs.scope.outputs.browser == 'true'", "Run metadata checks"], "PR workflow");
+requireText(scopeClassifier, ["micro", "ci-meta", "runtime", "strict", "full_validation", "browser"], "PR scope classifier");
 assert(!existsSync(".github/workflows/auto-merge-clean-pr.yml"), "review-gated auto-merge workflow must stay removed");
 
 for (const [label, text, limit] of [

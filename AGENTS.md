@@ -44,6 +44,8 @@ A routine task prompt should state the desired result, important constraints and
 4. Inspect the relevant implementation and search consumers of any changed contract.
 5. Preserve unrelated user changes and avoid unrelated cleanup.
 
+Use an isolated task worktree immediately when the active checkout is dirty, on another task branch or shared with running work. Never switch a shared checkout away from its current branch. For routine tasks, use Medium reasoning effort; raise it only for a concrete architecture or strict-risk ambiguity.
+
 ## Scope and risk
 
 Micro lane is for already-complete, low-risk files that cannot affect game runtime, dependencies or deployment: documentation, repository text metadata and local launchers such as `.bat` or `.cmd` files.
@@ -71,10 +73,11 @@ Do not perform a process audit, expand documentation or create extra artifacts m
 
 ### Routine code
 
-1. Run the targeted checks for changed behavior once.
-2. Run `npm run build` once when production code changed and the targeted command does not already include it.
-3. For interactive behavior, run the focused local E2E spec or one focused runtime inspection.
-4. Let PR CI run the complete repository suite and full Browser E2E.
+1. For interactive work, write a short internal state checklist before the first patch: visibility owner, input owner, restore path and stable fixture for every affected normal/modal/dialogue/mobile state. Then patch all identified owners and consumers in one pass.
+2. Run the targeted checks for changed behavior once.
+3. Run `npm run build` once when production code changed and the targeted command does not already include it.
+4. For interactive behavior, run the focused local E2E spec through `npm run check:e2e:focused -- <spec>` or one focused runtime inspection.
+5. Let PR CI run the complete repository suite and full Browser E2E.
 
 ### Strict-risk code
 
@@ -93,6 +96,7 @@ Run `npm run check:docs` and `git diff --check`. Workflow changes also require d
 - Use at most one temporary validation worktree for an actual dirty/locked environment problem.
 - If a deterministic command fails, run that exact command once on current `main` to classify base versus PR failure. Do not repeat the full base suite.
 - Do not rerun an unchanged deterministic failure.
+- The focused E2E launcher owns one Vite process, waits for readiness and terminates it. Do not try alternate launch commands after an unchanged hang; inspect that launcher failure directly.
 - Capture verbose successful output compactly. Show the relevant full output only on failure.
 
 ## Evidence
@@ -100,6 +104,7 @@ Run `npm run check:docs` and `git diff --check`. Workflow changes also require d
 Use one strong proof for each material risk.
 
 - Automated assertions are preferred for exact values and state transitions.
+- E2E assertions must use stable fixtures and invariants. Avoid moving NPCs, exact live clocks and whole-session equality unless that moving value is the behavior under test.
 - Runtime inspection is for visual feel, interaction or behavior automation cannot establish.
 - Screenshots are for visual judgement and regressions; normally keep at most two focused states.
 - Do not require unit checks, full check, full E2E, manual smoke and many screenshots for the same risk.
@@ -113,8 +118,9 @@ Use one strong proof for each material risk.
 - Repository CI runs for both Ready and Draft PRs, so Draft is never a CI gate.
 - PR CI classifies micro-only diffs and skips gameplay checks and Browser E2E for them while preserving the required check names.
 - Wait for final-head CI. Repair deterministic PR failures in the same branch and PR.
+- Enable GitHub native auto-merge on a validated Ready PR when the connector supports it. CI remains the gate; do not add a repair or auto-merge workflow.
 - After green required CI, merge the routine PR and fast-forward local `main`, unless the user explicitly prohibited merge.
-- Do not request Codex review, enable auto-merge, create issues, replacement PRs or extra branches unless the user explicitly asks.
+- Do not request Codex review, create issues, replacement PRs or extra branches unless the user explicitly asks.
 
 ## Special routes
 

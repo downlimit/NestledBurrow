@@ -49,7 +49,6 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       energy: { x: 294, y: 54, width: 16, height: 44 },
     },
     resources: {
-      clockText: "06:00",
       woodText: "0",
       rubyText: "0",
       icons: { wood: true, ruby: true },
@@ -57,15 +56,17 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       energyFillHeight: 38,
     },
   });
+  expect(normal.resources.clockText).toMatch(/^\d{2}:\d{2}$/u);
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
   expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(false);
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
+  const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
   await expect.poll(async () => {
-    await bridge(page, "placePlayerNear", "home-npc");
+    await bridge(page, "placePlayerNear", debrisId);
     return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
-  }).toBe("home-npc");
+  }).toBe(debrisId);
   await activateLogical(page, 45, 19);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true, buildLabelVisible: true });
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
