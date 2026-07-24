@@ -3,11 +3,15 @@
 
 ## Default route
 
-The user talks directly to Codex. A direct implementation request means: implement, validate proportionally, open one Ready PR, wait for final-head CI, repair the same branch when needed, merge, and update local `main`.
+The usual product route is: the user describes the desired result in ordinary language to Lead, Lead turns it into a compact architecture-aware task brief, and Codex implements that brief end-to-end.
+
+Lead must inspect the affected architecture, contracts and consumers deeply enough to keep the brief system-safe. Keep the inspection targeted to the task; never trade architectural correctness for prompt speed.
+
+A direct implementation request that reaches Codex still means: implement, validate proportionally, open one Ready PR, wait for final-head CI, repair the same branch when needed, merge, and update local `main`.
 
 Stop before merge only when the prompt explicitly says `не сливать`, asks for review/report only, or a real blocker remains. Do not ask the user to operate GitHub.
 
-Use Lead or Integrator only when the user explicitly requests that role or several dependent PRs genuinely require coordination.
+Lead prepares the usual product brief. Integrator is optional and is used only when the user explicitly requests independent acceptance or several dependent PRs genuinely require coordination.
 
 ## Task identity and communication
 
