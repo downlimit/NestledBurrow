@@ -4,6 +4,10 @@ export const DEBRIS_INTERACTION_KIND = "clear-debris";
 export const BED_INTERACTION_KIND = "sleep-bed";
 export const DEFAULT_DEBRIS_ID = "fallen-log-01";
 export const BED_OBJECT_ID = "home-bed-01";
+export const RUBY_INTERACTION_KIND = "mine-ruby";
+export const RUBY_REWARD = 1;
+export const BED_WAKE_TILE = Object.freeze({ x: 32, y: 15 });
+export const BED_WAKE_POSITION = Object.freeze({ x: BED_WAKE_TILE.x * TILE_SIZE + TILE_SIZE / 2, y: BED_WAKE_TILE.y * TILE_SIZE + TILE_SIZE / 2 });
 export const DEFAULT_DEBRIS_MAX_HITS = 5;
 export const DEFAULT_DEBRIS_ENERGY_PER_HIT = 4;
 
@@ -13,9 +17,11 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   hitsPerLog: DEFAULT_DEBRIS_MAX_HITS,
   energyPerHit: DEFAULT_DEBRIS_ENERGY_PER_HIT,
   awakeDrainAmount: 1,
-  awakeDrainIntervalSeconds: 5,
+  awakeDrainIntervalSeconds: 7.2,
   exhaustedMovementMultiplier: 1 / 3,
   sleepTimeScale: 8,
+  realSecondsPerGameDay: 1080,
+  nightTintStrength: 0.55,
   sleepEnergyRegenPerSecond: 10,
 });
 
@@ -26,6 +32,7 @@ const OUTDOOR_TILES = [
   [20, 34], [23, 34], [26, 34], [37, 34], [40, 34], [43, 34], [22, 39], [32, 39], [42, 39],
 ];
 const INDOOR_TILES = [[22, 14], [25, 14], [28, 14], [35, 14], [38, 14], [41, 14], [22, 18], [25, 18], [38, 18], [41, 18]];
+const RUBY_TILES = [[18, 35], [45, 35]];
 
 function makeDebris(id, roomId, tile) {
   return Object.freeze({
@@ -49,6 +56,25 @@ export const DEBRIS_OBJECTS = Object.freeze([
   ...INDOOR_TILES.map((tile, index) => makeDebris(`home-log-${String(index + 1).padStart(2, "0")}`, "home", tile)),
 ]);
 export const DEBRIS_OBJECT = DEBRIS_OBJECTS[0];
+
+function makeRuby(index, tile) {
+  const id = `yard-ruby-${String(index + 1).padStart(2, "0")}`;
+  return Object.freeze({
+    id,
+    entityId: id,
+    roomId: "yard",
+    kind: RUBY_INTERACTION_KIND,
+    tile: Object.freeze({ x: tile[0], y: tile[1] }),
+    position: Object.freeze({ x: tile[0] * TILE_SIZE + TILE_SIZE / 2, y: tile[1] * TILE_SIZE + TILE_SIZE / 2 }),
+    radius: 24,
+    priority: 1.5,
+    requiresFacing: true,
+    facingDotThreshold: 0,
+    prompt: "hud:interaction.mine",
+    payload: Object.freeze({ rubyId: id }),
+  });
+}
+export const RUBY_OBJECTS = Object.freeze(RUBY_TILES.map((tile, index) => makeRuby(index, tile)));
 
 export const BED_OBJECT = Object.freeze({
   id: BED_OBJECT_ID,
@@ -76,6 +102,8 @@ export function normalizeGameplayTuning(value = {}) {
     exhaustedMovementMultiplier: normalizeNumber(value.exhaustedMovementMultiplier, DEFAULT_GAMEPLAY_TUNING.exhaustedMovementMultiplier, 0, 1),
     sleepTimeScale: normalizeNumber(value.sleepTimeScale, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale, 1, 64),
     sleepEnergyRegenPerSecond: normalizeNumber(value.sleepEnergyRegenPerSecond, DEFAULT_GAMEPLAY_TUNING.sleepEnergyRegenPerSecond, 0, 999),
+    realSecondsPerGameDay: normalizeNumber(value.realSecondsPerGameDay, DEFAULT_GAMEPLAY_TUNING.realSecondsPerGameDay, 1, 99999),
+    nightTintStrength: normalizeNumber(value.nightTintStrength, DEFAULT_GAMEPLAY_TUNING.nightTintStrength, 0, 1),
   };
 }
 function normalizeInteger(value, fallback, min, max) { const n = Number(value); return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback; }

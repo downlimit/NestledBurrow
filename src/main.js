@@ -28,7 +28,8 @@ import {
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitDebris, refillEnergy, regenerateEnergy } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitDebris, hitRuby, refillEnergy, regenerateEnergy } from "./gameSessionState.js";
+import { formatClock, nightTintAlpha } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
 import { createInteractionRuntime } from "./interactionRuntime.js";
@@ -44,9 +45,10 @@ import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
 import { createAudioSettingsStore } from "./audioSettings.js";
 import { MUSIC_KEY, getMusicUrl, PhaserAudioRuntime } from "./audioRuntime.js";
+import { HUD_DEPTH } from "./hud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
-import { BED_INTERACTION_KIND, BED_OBJECT, DEBRIS_INTERACTION_KIND, DEBRIS_OBJECT, DEBRIS_OBJECTS } from "./debrisConfig.js";
+import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_POSITION, BED_WAKE_TILE, DEBRIS_INTERACTION_KIND, DEBRIS_OBJECT, DEBRIS_OBJECTS, RUBY_INTERACTION_KIND, RUBY_OBJECTS } from "./debrisConfig.js";
 import { createDebrisRuntime } from "./debrisRuntime.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import {
@@ -125,10 +127,12 @@ class WorldScene extends Phaser.Scene {
     this.createSessionAndInteractionRuntime();
     this.createDebrisRuntime();
     this.sleeping = false;
+    this.simulationScale = 1;
     this.timeScale = 1;
     this.awakeDrainAccumulatorSeconds = 0;
     this.autosaveAccumulatorSeconds = 0;
     this.createMovementDebugPanel();
+    this.createDayNightRuntime();
     this.createHud();
     this.attachSceneListeners();
     this.createJoystick();
@@ -293,7 +297,17 @@ class WorldScene extends Phaser.Scene {
     if (candidate.kind === BED_INTERACTION_KIND) {
       if (this.sleeping) this.wakeUp();
       else this.startSleeping();
+      this.suppressNextInteract = true;
       return { status: this.sleeping ? "sleeping" : "awake", mutated: false };
+    }
+    if (candidate.kind === RUBY_INTERACTION_KIND) {
+      const result = hitRuby(this.sessionState, candidate.payload.rubyId, { energyPerHit: this.gameplayTuning.energyPerHit });
+      if (result.mutated) {
+        this.gameHud?.render?.();
+        this.debrisRuntime?.hitWithFeedback?.(candidate.payload.rubyId, result, () => this.interactionRuntime?.refresh?.());
+        this.saveSession();
+      }
+      return result;
     }
     if (candidate.kind !== DEBRIS_INTERACTION_KIND) return { status: "ignored" };
     const result = hitDebris(this.sessionState, candidate.payload.debrisId, {
@@ -339,8 +353,8 @@ class WorldScene extends Phaser.Scene {
           velocity: this.playerCharacter.movement.velocity,
           facing: this.playerCharacter.lastFacing,
           energy: this.sessionState?.gameplay?.currentEnergy,
-          timeScale: this.timeScale,
-          elapsedGameSeconds: this.sessionState?.gameplay?.elapsedGameSeconds,
+          timeScale: this.simulationScale,
+          worldTimeSeconds: this.sessionState?.gameplay?.worldTimeSeconds,
         };
       },
     });
@@ -357,7 +371,7 @@ class WorldScene extends Phaser.Scene {
       localization: this.localization,
       gameContainer: this.gameContainer,
       audioSettings: this.audioSettings,
-      getGameplayState: () => ({ ...this.sessionState?.gameplay, timeScale: this.timeScale, sleeping: this.sleeping }),
+      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
       onNewGame: () => this.startNewGame(),
     });
@@ -402,9 +416,16 @@ class WorldScene extends Phaser.Scene {
       getHudState: () => ({ newGameConfirming: this.gameHud?.isConfirming?.() ?? false, ...this.gameHud?.getLayoutState?.() }),
       getAudioSettings: () => this.audioSettings?.getSettings(),
       interact: () => { this.frameActions = Object.freeze({ interact: true, primary: false, secondary: false }); this.interactionRuntime?.update({ actions: this.frameActions }); },
-      getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: DEBRIS_OBJECT, definitions: DEBRIS_OBJECTS, bed: BED_OBJECT }),
+      getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: DEBRIS_OBJECT, definitions: DEBRIS_OBJECTS, rubies: RUBY_OBJECTS, bed: BED_OBJECT, wakeTile: BED_WAKE_TILE }),
       setEnergy: (value) => { this.sessionState.gameplay.currentEnergy = Math.max(0, Math.min(this.sessionState.gameplay.maximumEnergy, Number(value) || 0)); this.gameHud?.render(); },
-      getRuntimeState: () => ({ sleeping: this.sleeping, timeScale: this.timeScale }),
+      getRuntimeState: () => ({ sleeping: this.sleeping, timeScale: this.simulationScale }),
+      setWorldTimeSeconds: (value) => { this.sessionState.gameplay.worldTimeSeconds = Math.max(0, Number(value) || 0); this.updateDayNightLighting(); this.gameHud?.render(); },
+      getClockText: () => formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()),
+      getDayNightState: () => ({ alpha: nightTintAlpha(this.sessionState.gameplay.worldTimeSeconds, this.gameplayTuning.nightTintStrength), worldTimeSeconds: this.sessionState.gameplay.worldTimeSeconds }),
+      getResourceState: () => JSON.parse(JSON.stringify(this.sessionState.gameplay)),
+      getRubyNodeState: (id) => JSON.parse(JSON.stringify(this.sessionState.gameplay.rubyNodes[id])),
+      getCharacterSnapshot: (id) => this.characterSystem.getSnapshot(id),
+      wakeUp: () => this.wakeUp(),
     };
     this.e2eBridge = bridge;
     window.__NESTLED_BURROW_E2E__ = bridge;
@@ -467,10 +488,11 @@ class WorldScene extends Phaser.Scene {
 
   startSleeping() {
     this.sleeping = true;
-    this.timeScale = this.gameplayTuning.sleepTimeScale;
+    this.simulationScale = this.gameplayTuning.sleepTimeScale;
+    this.timeScale = this.simulationScale;
     this.awakeDrainAccumulatorSeconds = 0;
     const player = this.characterSystem.require(this.sessionState.playerId);
-    player.motor.position = { x: BED_OBJECT.position.x + 10, y: BED_OBJECT.position.y + 8 };
+    player.motor.position = { ...BED_WAKE_POSITION };
     player.motor.movement = createMovementState({ facing: { x: -1, y: 0 } });
     this.debrisRuntime?.setSleeping(true);
     this.gameHud?.render?.();
@@ -478,16 +500,23 @@ class WorldScene extends Phaser.Scene {
 
   wakeUp() {
     this.sleeping = false;
+    this.simulationScale = 1;
     this.timeScale = 1;
     this.awakeDrainAccumulatorSeconds = 0;
+    const player = this.characterSystem.require(this.sessionState.playerId);
+    player.motor.position = { ...BED_WAKE_POSITION };
+    player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
     this.debrisRuntime?.setSleeping(false);
+    this.interactionRuntime?.refresh?.();
     this.gameHud?.render?.();
     this.saveSession();
   }
 
   updateGameplayTime(deltaMs) {
     const realSeconds = Math.max(0, deltaMs) / 1000;
-    advanceGameTime(this.sessionState, realSeconds, this.timeScale);
+    this.simulationScale = this.sleeping ? this.gameplayTuning.sleepTimeScale : 1;
+    this.timeScale = this.simulationScale;
+    advanceGameTime(this.sessionState, realSeconds, this.simulationScale);
     if (this.sleeping) {
       regenerateEnergy(this.sessionState, { amount: this.gameplayTuning.sleepEnergyRegenPerSecond * realSeconds });
       if (this.sessionState.gameplay.currentEnergy >= this.sessionState.gameplay.maximumEnergy) this.wakeUp();
@@ -502,6 +531,7 @@ class WorldScene extends Phaser.Scene {
       const multiplier = this.sessionState.gameplay.currentEnergy <= 0 ? this.gameplayTuning.exhaustedMovementMultiplier : 1;
       this.playerCharacter.motor.speedMultiplier = multiplier;
     }
+    this.updateDayNightLighting?.();
     this.gameHud?.render?.();
     this.autosaveAccumulatorSeconds = (this.autosaveAccumulatorSeconds ?? 0) + realSeconds;
     if (this.autosaveAccumulatorSeconds >= 1) {
@@ -512,8 +542,11 @@ class WorldScene extends Phaser.Scene {
 
   update(_time, delta) {
     this.sampleFrameActions();
-    this.updateGameplayTime(delta);
-    this.characterSystem?.update(delta);
+    const realDeltaMs = delta;
+    this.updateGameplayTime(realDeltaMs);
+    const worldDeltaMs = realDeltaMs * (this.simulationScale ?? 1);
+    this.setNpcAnimationTimeScale(this.simulationScale ?? 1);
+    this.characterSystem?.update(worldDeltaMs);
     this.interactionRuntime?.update({ actions: this.frameActions });
     this.updateMovementDebugStatus();
   }
@@ -523,10 +556,24 @@ class WorldScene extends Phaser.Scene {
       Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE);
     const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
     this.frameActions = Object.freeze({
-      interact: keyboardPressed || mobilePressed,
+      interact: this.suppressNextInteract ? false : (keyboardPressed || mobilePressed),
       primary: false,
       secondary: false,
     });
+    this.suppressNextInteract = false;
+  }
+
+  createDayNightRuntime() {
+    this.dayNightOverlay = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xA8C4E6, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(HUD_DEPTH - 1).setBlendMode(Phaser.BlendModes.MULTIPLY);
+    this.updateDayNightLighting();
+  }
+
+  updateDayNightLighting() {
+    this.dayNightOverlay?.setAlpha(nightTintAlpha(this.sessionState?.gameplay?.worldTimeSeconds ?? 0, this.gameplayTuning?.nightTintStrength));
+  }
+
+  setNpcAnimationTimeScale(scale) {
+    for (const c of this.characterSystem?.values?.() ?? []) if (c.id !== this.sessionState.playerId && c.sprite?.anims) c.sprite.anims.timeScale = scale;
   }
 
   getMovementVector() {

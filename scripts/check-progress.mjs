@@ -60,7 +60,7 @@ assert.equal(DEBRIS_OBJECTS.filter((item) => item.roomId === "yard").length, 33,
 assert.equal(DEBRIS_OBJECTS.filter((item) => item.roomId === "home").length, 10, "10 debris are in the home");
 assert.equal(new Set(DEBRIS_OBJECTS.map((item) => item.id)).size, 43, "debris IDs are unique");
 assert(Object.values(session.gameplay.debris).every((item) => item.remainingHits === 5 && item.cleared === false), "fresh debris start with five remaining hits");
-assert.equal(session.gameplay.elapsedGameSeconds, 0, "fresh state has reset game time");
+assert.equal(session.gameplay.worldTimeSeconds, 21600, "fresh state starts at 06:00");
 assertStage(session, NEIGHBOR_QUEST_STAGES.notStarted, NEIGHBOR_DIALOGUE_IDS.homeIntro, NEIGHBOR_DIALOGUE_IDS.streetBefore);
 assert.deepEqual(completeNeighborDialogue(session, NEIGHBOR_DIALOGUE_IDS.streetResponse).status, "ignored", "street response cannot skip intro");
 assert.equal(getNeighborQuestStage(session), NEIGHBOR_QUEST_STAGES.notStarted, "cannot reach completed before start");
@@ -122,7 +122,7 @@ const oldSaveLoad = deserializeSessionEnvelope(JSON.stringify({
   },
 }));
 assert.equal(Object.keys(oldSaveLoad.state.gameplay.debris).length, 43, "version-1 save without gameplay loads debris defaults");
-assert.equal(oldSaveLoad.state.gameplay.elapsedGameSeconds, 0, "version-1 save without gameplay loads time default");
+assert.equal(oldSaveLoad.state.gameplay.worldTimeSeconds, 21600, "version-1 save without gameplay starts at 06:00");
 assert.equal(getSessionFlag(oldSaveLoad.state, "old"), true, "old save session flags survive gameplay normalization");
 assert.equal(getEntityFlag(oldSaveLoad.state, "home-npc", "visited"), true, "old save entity flags survive gameplay normalization");
 assert.equal(Object.getPrototypeOf(loaded.state.flags), null, "loaded session flags use null prototype");
@@ -208,9 +208,9 @@ regenerateEnergy(energyState, { amount: 10 });
 assert.equal(energyState.gameplay.currentEnergy, 10, "sleep regen restores ten energy");
 regenerateEnergy(energyState, { amount: 1000 });
 assert.equal(energyState.gameplay.currentEnergy, energyState.gameplay.maximumEnergy, "sleep regen clamps at maximum");
-const beforeTime = energyState.gameplay.elapsedGameSeconds;
+const beforeTime = energyState.gameplay.worldTimeSeconds;
 advanceGameTime(energyState, 1, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale);
-assert.equal(energyState.gameplay.elapsedGameSeconds - beforeTime, 8, "sleep time scale advances game time at x8");
+assert.equal(energyState.gameplay.worldTimeSeconds - beforeTime, 640, "sleep simulation scale advances world time at x8");
 
 console.log("progress checks passed");
 

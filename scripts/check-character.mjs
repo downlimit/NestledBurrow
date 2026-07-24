@@ -59,7 +59,7 @@ assert(/this\.player = this\.characterSystem\.require\("player"\)\.sprite/.test(
 assert(/startFollow\(this\.player, true, 1, 1\)/.test(mainSource), "camera target remains the player sprite");
 assert(!/this\.characters\s*=/.test(mainSource), "WorldScene does not keep a mutable character array registry");
 assert(!/this\.characters\.forEach/.test(mainSource), "WorldScene does not update a mutable character array directly");
-assert(/this\.characterSystem\?\.update\(delta\)/.test(mainSource), "WorldScene updates characters through CharacterSystem");
+assert(/this\.characterSystem\?\.update\((delta|worldDeltaMs)\)/.test(mainSource), "WorldScene updates characters through CharacterSystem");
 
 
 const playerProfile = getActorProfile(ACTOR_PROFILE_IDS.player);

@@ -1,4 +1,5 @@
-import { DEBRIS_OBJECTS, DEFAULT_DEBRIS_MAX_HITS, DEFAULT_DEBRIS_ENERGY_PER_HIT } from "./debrisConfig.js";
+import { DEBRIS_OBJECTS, RUBY_OBJECTS, DEFAULT_DEBRIS_MAX_HITS, DEFAULT_DEBRIS_ENERGY_PER_HIT, RUBY_REWARD } from "./debrisConfig.js";
+import { DEFAULT_START_TIME_SECONDS, DEFAULT_GAME_SECONDS_PER_REAL_SECOND, advanceWorldTimeSeconds } from "./gameClock.js";
 
 export const SESSION_STATE_VERSION = 1;
 export const DEFAULT_WORLD_ID = "village";
@@ -106,7 +107,9 @@ function normalizeGameplayState(value = {}) {
   if (maximumEnergy <= 0) throw new Error("Maximum energy must be greater than 0");
   const currentEnergy = Math.min(maximumEnergy, normalizeNonNegativeInteger(value.currentEnergy, DEFAULT_STARTING_ENERGY, "Current energy"));
   const wood = normalizeNonNegativeInteger(value.wood, 0, "Wood");
+  const rubies = normalizeNonNegativeInteger(value.rubies, 0, "Rubies");
   const elapsedGameSeconds = normalizeNonNegativeNumber(value.elapsedGameSeconds, 0, "Elapsed game seconds");
+  const worldTimeSeconds = normalizeNonNegativeNumber(value.worldTimeSeconds, DEFAULT_START_TIME_SECONDS + elapsedGameSeconds * DEFAULT_GAME_SECONDS_PER_REAL_SECOND, "World time seconds");
   const debrisInput = value.debris ?? {};
   assertPlainRecord(debrisInput, "Debris state");
   const debris = createDictionary();
@@ -125,7 +128,17 @@ function normalizeGameplayState(value = {}) {
     const remainingHits = cleared ? 0 : normalizePositiveHitCount(debrisState.remainingHits, DEFAULT_DEBRIS_MAX_HITS, `Debris ${debrisId}.remainingHits`);
     setOwn(debris, debrisId, { cleared, remainingHits });
   }
-  return { currentEnergy, maximumEnergy, wood, debris, elapsedGameSeconds };
+  const rubyInput = value.rubyNodes ?? {};
+  assertPlainRecord(rubyInput, "Ruby node state");
+  const rubyNodes = createDictionary();
+  for (const definition of RUBY_OBJECTS) {
+    const rubyState = hasOwn(rubyInput, definition.id) ? rubyInput[definition.id] : {};
+    if (rubyState !== undefined) assertPlainRecord(rubyState, `Ruby ${definition.id}`);
+    const cleared = Boolean(rubyState?.cleared);
+    const remainingHits = cleared ? 0 : normalizePositiveHitCount(rubyState?.remainingHits, DEFAULT_DEBRIS_MAX_HITS, `Ruby ${definition.id}.remainingHits`);
+    setOwn(rubyNodes, definition.id, { cleared: remainingHits <= 0, remainingHits });
+  }
+  return { currentEnergy, maximumEnergy, wood, rubies, debris, rubyNodes, worldTimeSeconds };
 }
 
 function normalizeNonNegativeNumber(value, fallback, label) {
@@ -324,6 +337,23 @@ export function clearDebris(state, debrisId, options = {}) {
   return { status: "cleared", mutated: true, currentEnergy: state.gameplay.currentEnergy, wood: state.gameplay.wood, remainingHits: 0 };
 }
 
+export function hitRuby(state, rubyId, { energyPerHit = DEFAULT_DEBRIS_ENERGY_PER_HIT, rubyReward = RUBY_REWARD, maxHits = DEFAULT_DEBRIS_MAX_HITS } = {}) {
+  assertSafeId(rubyId, "Ruby ID");
+  if (!hasOwn(state.gameplay.rubyNodes, rubyId)) setOwn(state.gameplay.rubyNodes, rubyId, { cleared: false, remainingHits: maxHits });
+  const node = state.gameplay.rubyNodes[rubyId];
+  if (node.cleared || node.remainingHits <= 0) return { status: "already-cleared", mutated: false };
+  const cost = normalizeNonNegativeInteger(energyPerHit, 0, "Ruby hit energy cost");
+  if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
+  state.gameplay.currentEnergy -= cost;
+  node.remainingHits = Math.max(0, node.remainingHits - 1);
+  if (node.remainingHits === 0) {
+    node.cleared = true;
+    state.gameplay.rubies += normalizeNonNegativeInteger(rubyReward, 0, "Ruby reward");
+    return { status: "cleared", mutated: true, currentEnergy: state.gameplay.currentEnergy, rubies: state.gameplay.rubies, remainingHits: 0 };
+  }
+  return { status: "hit", mutated: true, currentEnergy: state.gameplay.currentEnergy, rubies: state.gameplay.rubies, remainingHits: node.remainingHits };
+}
+
 export function drainAwakeEnergy(state, { amount }) {
   const drain = normalizeNonNegativeInteger(amount, 0, "Awake energy drain");
   const before = state.gameplay.currentEnergy;
@@ -342,6 +372,6 @@ export function regenerateEnergy(state, { amount }) {
 export function advanceGameTime(state, realDeltaSeconds, timeScale = 1) {
   const delta = normalizeNonNegativeNumber(realDeltaSeconds, 0, "Real delta seconds");
   const scale = normalizeNonNegativeNumber(timeScale, 1, "Time scale");
-  state.gameplay.elapsedGameSeconds += delta * scale;
-  return { elapsedGameSeconds: state.gameplay.elapsedGameSeconds, timeScale: scale };
+  state.gameplay.worldTimeSeconds = advanceWorldTimeSeconds(state.gameplay.worldTimeSeconds, delta, scale);
+  return { worldTimeSeconds: state.gameplay.worldTimeSeconds, timeScale: scale };
 }

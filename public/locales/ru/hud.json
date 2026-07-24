@@ -12,12 +12,14 @@
     "talk": "Говорить",
     "next": "Дальше",
     "close": "Закрыть",
-    "clear": "Разрубить",
+    "clear": "Рубить",
     "notEnoughEnergy": "Не хватает энергии",
     "hit": "Ударить",
     "sleep": "Спать",
     "wake": "Проснуться",
-    "energyRestored": "Энергия восстановлена"
+    "energyRestored": "Энергия восстановлена",
+    "chop": "Рубить",
+    "mine": "Добыть"
   },
   "progress": {
     "newGame": "Новая игра",
@@ -32,6 +34,6 @@
     "effects": "Эффекты"
   },
   "resources": {
-    "summary": "ЭН {current}/{max}  Дер {wood}\nВ {time}с x{scale}"
+    "summary": "ЭН {current}/{max} Д{wood} Р{rubies}\n{clock}"
   }
 }
