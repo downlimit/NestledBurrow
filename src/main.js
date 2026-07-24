@@ -395,6 +395,10 @@ class WorldScene extends Phaser.Scene {
       audioSettings: this.audioSettings,
       getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
+      onConfirmationChange: (active) => {
+        this.interactionHud?.setSuppressed?.(active);
+        if (!active) this.interactionRuntime?.refresh?.();
+      },
       onNewGame: () => this.startNewGame(),
     });
   }
@@ -436,7 +440,9 @@ class WorldScene extends Phaser.Scene {
         dialogueActive: this.interactionRuntime?.isDialogueActive() ?? false,
         dialogue: { ...this.sessionState.dialogue },
       }),
+      getInteractionHudState: () => this.interactionHud?.getPresentationState?.(),
       getHudState: () => ({ newGameConfirming: this.gameHud?.isConfirming?.() ?? false, resources: this.gameHud?.getResourceState?.(), ...this.gameHud?.getLayoutState?.() }),
+      isHudPoint: ({ x, y }) => this.isHudPoint(x, y),
       getAudioSettings: () => this.audioSettings?.getSettings(),
       setAudioChannel: ({ channel, value }) => this.audioSettings?.setChannel?.(channel, value),
       getAudioEffectState: () => ({ lastEffectType: this.audioRuntime?.lastEffectType ?? null, playCount: this.audioRuntime?.effectPlayCount ?? 0 }),

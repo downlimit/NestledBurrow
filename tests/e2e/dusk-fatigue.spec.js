@@ -49,10 +49,11 @@ test("multiply overlay follows exact dusk and dawn phases while HUD stays above 
   }
   const hud = await bridge(page, "getHudState");
   expect(hud.resources.icons).toEqual({ wood: true, ruby: true });
-  expect(hud.resources.energyText).toBe("ЭН 100/100");
+  expect(hud.resources.energyRatio).toBe(1);
+  expect(hud.resources.energyFillHeight).toBe(38);
   expect(hud.resources.clockText).toBe("07:00");
   await bridge(page, "setLanguage", "en");
-  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyText: "EN 100/100", clockText: "7:00 AM" } });
+  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyRatio: 1, energyFillHeight: 38, clockText: "7:00 AM" } });
 });
 
 test("energy curve changes player speed smoothly and uses maximum energy", async ({ page }) => {
@@ -72,7 +73,7 @@ test("energy curve changes player speed smoothly and uses maximum energy", async
   await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).effectiveMultiplier, { timeout: 1500 }).toBeCloseTo(1, 3);
 });
 
-test("successful low-energy hits shake only energy text and dispatch distinct volume-aware SFX", async ({ page }, testInfo) => {
+test("successful low-energy hits shake the whole energy bar and dispatch distinct volume-aware SFX", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "keyboard interaction and audio-unlock coverage runs once");
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   await boot(page);
