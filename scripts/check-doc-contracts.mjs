@@ -30,10 +30,12 @@ requireText(agents, [
   "merge the routine PR",
   "npm run check:e2e:focused",
   "native auto-merge",
+  "## Preview acceptance gate",
+  "explicitly sends `принято`",
   "Task #<number> — <name> (PR #<number>)",
 ], "AGENTS.md");
 requireText(override, ["Existing PR repair", "same branch and PR", "Draft status is not required"], "AGENTS.override.md");
-requireText(lead, ["свободное описание пользователя", "достаточно глубоко для системно безопасного ТЗ", "сохранения архитектурной целостности", "40–80 строк", "80–140 строк", "Task #001 — Первая расчистка участка (PR #81)"], "LEAD.md");
+requireText(lead, ["свободное описание пользователя", "достаточно глубоко для системно безопасного ТЗ", "сохранения архитектурной целостности", "40–80 строк", "80–140 строк", "Preview acceptance: required", "до явного `принято`", "Task #001 — Первая расчистка участка (PR #81)"], "LEAD.md");
 requireText(review, ["Codex сам завершает обычную задачу", "одним проходом", "Task #001 — Первая расчистка участка (PR #81)", "Codex review, reaction"], "REVIEW.md");
 requireText(fastLoop, ["# Task #020 — Ускорить цикл Codex", "## Приоритетный чеклист", "### P0", "### P1", "### P2"], "FAST_LOOP.md");
 requireText(prTemplate, ["# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
@@ -41,6 +43,7 @@ requireText(taskTemplate, ["Use only for large, dependent, resumable", "Do not r
 
 assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI must run for Draft and Ready PRs");
 requireText(prWorkflow, ["Classify changed paths", "Classify Scope", "needs: scope", "needs.scope.outputs.browser == 'true'", "Run metadata checks"], "PR workflow");
+assert((prWorkflow.match(/fetch-depth: 0/g) ?? []).length >= 2, "scope and metadata validation must fetch the PR base commit");
 requireText(scopeClassifier, ["micro", "ci-meta", "runtime", "strict", "full_validation", "browser"], "PR scope classifier");
 assert(!existsSync(".github/workflows/auto-merge-clean-pr.yml"), "review-gated auto-merge workflow must stay removed");
 
@@ -55,4 +58,4 @@ for (const [label, text, limit] of [
   assert(text.length <= limit, `${label} exceeds the fast-loop size budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: Lead-to-Codex briefing, Task-first reporting, compact prompts, proportional validation and CI-to-merge completion are enforced");
+console.log("documentation contracts passed: compact Lead briefs, proportional validation, preview acceptance and CI-to-merge completion are enforced");

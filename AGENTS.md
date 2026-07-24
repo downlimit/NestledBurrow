@@ -110,6 +110,18 @@ Use one strong proof for each material risk.
 - Do not require unit checks, full check, full E2E, manual smoke and many screenshots for the same risk.
 - Inspect the complete scope with `git status`, `git diff --check` and diff/stat. Re-open only changed sections not already inspected during implementation; do not replay a large known diff into context merely as ceremony.
 
+## Preview acceptance gate
+
+Apply to player-visible gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets. Other tasks keep the automatic route.
+
+1. Finish the change and checks, then launch the task worktree.
+2. Local: keep a managed free-port server and send its URL. Cloud: send the forwarded or preview URL. If unavailable, report the blocker and stop before PR.
+3. Keep feedback in the same Task and worktree; rerun only affected proof and refresh the link.
+4. Do not open a PR, enable auto-merge or merge until the user explicitly sends `принято`.
+5. After `принято`, stop the server and continue through commit, one Ready PR, final-head CI and merge.
+
+Automated evidence never replaces the user's verdict.
+
 ## GitHub delivery
 
 - Prefer the installed GitHub connector for PR metadata, creation, status and merge.
@@ -118,7 +130,7 @@ Use one strong proof for each material risk.
 - Repository CI runs for both Ready and Draft PRs, so Draft is never a CI gate.
 - PR CI classifies micro-only diffs and skips gameplay checks and Browser E2E for them while preserving the required check names.
 - Wait for final-head CI. Repair deterministic PR failures in the same branch and PR.
-- Enable GitHub native auto-merge on a validated Ready PR when the connector supports it. CI remains the gate; do not add a repair or auto-merge workflow.
+- Enable GitHub native auto-merge on a validated Ready PR when supported, only after `принято` for preview-gated work. CI remains the gate; do not add an auto-merge workflow.
 - After green required CI, merge the routine PR and fast-forward local `main`, unless the user explicitly prohibited merge.
 - Do not request Codex review, create issues, replacement PRs or extra branches unless the user explicitly asks.
 
