@@ -19,6 +19,7 @@ assert(Number.isInteger(BUILD_LABEL.x) && Number.isInteger(BUILD_LABEL.y), "buil
 assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch sized");
 assert(NEW_GAME_HIT_AREA.x + NEW_GAME_HIT_AREA.width < RESOURCE_HUD_AREA.x, "New Game and resource HUD do not overlap");
 assert(RESOURCE_HUD_AREA.x + RESOURCE_HUD_AREA.width < SOUND_HIT_AREA.x, "New Game and right HUD group do not overlap");
+assert(measureBitmapText("EN 100/100 W0 R0") <= RESOURCE_HUD_AREA.width - 10, "default English resource summary fits inside its HUD panel before the right controls");
 assert(SOUND_HIT_AREA.x + SOUND_HIT_AREA.width <= LANGUAGE_HIT_AREA.x, "sound and language hit areas do not overlap");
 assert(LANGUAGE_HIT_AREA.x + LANGUAGE_HIT_AREA.width <= FULLSCREEN_HIT_AREA.x, "language and fullscreen hit areas do not overlap");
 assert(BUILD_LABEL.x < SOUND_HIT_AREA.x, "build label is placed left of the right HUD controls");

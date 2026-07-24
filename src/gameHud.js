@@ -24,7 +24,7 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   music: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 32, width: 66, height: 14 }),
   effects: Object.freeze({ x: SOUND_PANEL_AREA.x + 58, y: SOUND_PANEL_AREA.y + 50, width: 66, height: 14 }),
 });
-export const RESOURCE_HUD_AREA = Object.freeze({ x: 92, y: 6, width: 82, height: 24 });
+export const RESOURCE_HUD_AREA = Object.freeze({ x: 90, y: 6, width: 100, height: 24 });
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 46, width: GAME_WIDTH - 48, height: 88 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 98, width: 96, height: 26 });
 export const NEW_GAME_CANCEL_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 140, y: 98, width: 96, height: 26 });

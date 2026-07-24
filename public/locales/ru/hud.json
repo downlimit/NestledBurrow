@@ -34,6 +34,6 @@
     "effects": "Эффекты"
   },
   "resources": {
-    "summary": "ЭН {current}/{max}  Дер {wood}  Руб {rubies}\n{clock}"
+    "summary": "ЭН {current}/{max} Д{wood} Р{rubies}\n{clock}"
   }
 }
