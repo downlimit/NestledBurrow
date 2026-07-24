@@ -29,6 +29,7 @@ export function createInteractionHud(scene, options = {}) {
   let latchedInteract = false;
   let promptRect = null;
   let messageTimer = null;
+  let suppressed = false;
 
   const onPointerDown = (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -53,11 +54,18 @@ export function createInteractionHud(scene, options = {}) {
 
   function redraw(force = false) {
     if (destroyed) return;
-    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.() });
+    const key = JSON.stringify({ promptState, dialogueState, coarse: Boolean(isCoarsePointer()), lang: localization?.getLanguage?.(), suppressed });
     if (!force && key === renderedKey) return;
     renderedKey = key;
     graphics.clear();
     for (const t of [speakerText, bodyText, actionText, promptText]) t.setVisible(false);
+
+    if (suppressed) {
+      promptRect = null;
+      promptHit.disableInteractive();
+      dialogueHit.disableInteractive();
+      return;
+    }
 
     if (dialogueState) {
       graphics.fillStyle(HUD_COLORS.panel, 0.92).fillRect(DIALOGUE_RECT.x, DIALOGUE_RECT.y, DIALOGUE_RECT.width, DIALOGUE_RECT.height);
@@ -102,8 +110,16 @@ export function createInteractionHud(scene, options = {}) {
       messageTimer = scene.time.delayedCall(duration, () => { messageTimer = null; if (promptState?.message) { promptState = null; redraw(true); } });
     },
     hideDialogue() { dialogueState = null; redraw(); },
+    setSuppressed(value) { suppressed = Boolean(value); redraw(true); },
+    getPresentationState() {
+      return {
+        suppressed,
+        promptVisible: Boolean(!suppressed && promptState && promptRect),
+        dialogueVisible: Boolean(!suppressed && dialogueState),
+      };
+    },
     consumeInteractPressed() { const pressed = latchedInteract; latchedInteract = false; return pressed; },
-    isPointInHud(x, y) { return Boolean((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && promptRect && isPointInRect(x, y, promptRect))); },
+    isPointInHud(x, y) { return Boolean(!suppressed && ((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && promptRect && isPointInRect(x, y, promptRect)))); },
     destroy() {
       if (destroyed) return;
       destroyed = true;

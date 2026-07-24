@@ -8,6 +8,9 @@
     "toggle": "Switch language",
     "current": "EN"
   },
+  "options": {
+    "title": "Options"
+  },
   "interaction": {
     "talk": "Talk",
     "next": "Next",

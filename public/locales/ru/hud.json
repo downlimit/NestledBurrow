@@ -8,6 +8,9 @@
     "toggle": "Сменить язык",
     "current": "RU"
   },
+  "options": {
+    "title": "Опции"
+  },
   "interaction": {
     "talk": "Говорить",
     "next": "Дальше",

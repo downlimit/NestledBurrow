@@ -42,6 +42,12 @@ async function clickLogical(page, x, y) {
   await page.mouse.click(box.x + x * box.width / 320, box.y + y * box.height / 180);
 }
 
+async function openNewGameConfirmation(page) {
+  await clickLogical(page, 45, 19);
+  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true });
+  await clickLogical(page, 185, 87);
+}
+
 test("default Russian locale and saved preference survive reload", async ({ page }) => {
   await boot(page);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
@@ -67,9 +73,9 @@ test("localized quest progress persists and New Game keeps language", async ({ p
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: { "neighborQuest.completed": true } });
   await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
   await bridge(page, "setLanguage", "ru");
-  await clickLogical(page, 24, 18);
+  await openNewGameConfirmation(page);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ newGameConfirming: true });
-  await clickLogical(page, 92, 111);
+  await clickLogical(page, 92, 95);
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: {} });
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
@@ -133,8 +139,8 @@ test("desktop clears persistent debris and New Game restores gameplay only", asy
   await page.reload();
   await boot(page);
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 80, wood: 1, debris: { "fallen-log-01": { cleared: true } } } });
-  await clickLogical(page, 24, 18);
-  await clickLogical(page, 92, 111);
+  await openNewGameConfirmation(page);
+  await clickLogical(page, 92, 95);
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 100, maximumEnergy: 100, wood: 0, debris: { "fallen-log-01": { cleared: false } } } });
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
   await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
