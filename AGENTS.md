@@ -61,11 +61,12 @@ Environment/evidence:
 
 Required for player-visible gameplay, HUD/UI, input, scenes, localization, animation, audio, and visual assets. Other work keeps the automatic route.
 
-1. Finish implementation/checks; launch the task worktree.
-2. Local: keep a managed free-port server and send its URL. Cloud: send preview/forwarded URL. If unavailable, report the blocker and stop before PR.
-3. Keep feedback in the same Task/worktree; rerun only affected proof and refresh the link.
-4. No PR, auto-merge, or merge before explicit `принято`.
-5. After `принято`, stop the server; commit, create one Ready PR, wait for final-head CI, and merge.
+1. Finish implementation/checks; launch the task worktree and send its URL.
+2. Before explicit `принято`: edit → smallest named check (`--grep` when possible) → refresh the same preview. No full diff, stage, commit, push, PR, auto-merge, or merge.
+3. Test servers use separate free ports and never stop the live preview. If a mutating Git result is unclear, inspect state read-only before retry.
+4. After `принято`: stop preview; inspect the full diff once; commit once; push; create one Ready PR; wait for final-head CI; merge.
+
+If no local/cloud preview URL is available, report the blocker and stop before publication.
 
 Automation never replaces the user's runtime/visual verdict.
 
