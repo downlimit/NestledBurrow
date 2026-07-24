@@ -21,8 +21,10 @@ async function pressInteract(page) {
 }
 
 async function placeNear(page, entityId) {
-  await bridge(page, "placePlayerNear", entityId);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(entityId);
+  await expect.poll(async () => {
+    await bridge(page, "placePlayerNear", entityId);
+    return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
+  }).toBe(entityId);
 }
 
 async function completeDialogue(page, entityId) {
@@ -120,8 +122,11 @@ test("desktop clears persistent debris and New Game restores gameplay only", asy
   await bridge(page, "setLanguage", "en");
   await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
   await placeNear(page, "fallen-log-01");
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.clear");
-  await pressInteract(page);
+  for (let remainingHits = 4; remainingHits >= 0; remainingHits -= 1) {
+    await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
+    await pressInteract(page);
+    await expect.poll(async () => (await bridge(page, "getSession"))?.gameplay?.debris?.["fallen-log-01"]?.remainingHits).toBe(remainingHits);
+  }
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 80, maximumEnergy: 100, wood: 1, debris: { "fallen-log-01": { cleared: true } } } });
   await expect.poll(async () => (await bridge(page, "getDebrisState"))?.present).toBe(false);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
@@ -141,6 +146,10 @@ test("mobile touch clears debris through prompt hit area", async ({ page }, test
   await placeNear(page, "fallen-log-01");
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
-  await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
+  for (let remainingHits = 4; remainingHits >= 0; remainingHits -= 1) {
+    await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
+    await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
+    await expect.poll(async () => (await bridge(page, "getSession"))?.gameplay?.debris?.["fallen-log-01"]?.remainingHits).toBe(remainingHits);
+  }
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { currentEnergy: 80, wood: 1, debris: { "fallen-log-01": { cleared: true } } } });
 });
