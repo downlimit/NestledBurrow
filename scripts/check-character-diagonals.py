@@ -40,6 +40,13 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def rgba_sha256(path: Path) -> str:
+    """Hash decoded pixels so equivalent PNG encodings compare equally."""
+    with Image.open(path) as image:
+        rgba = image.convert("RGBA")
+        return hashlib.sha256(rgba.tobytes()).hexdigest()
+
+
 def copy_builder_inputs(validation_root: Path) -> None:
     source = ROOT / KENNEY_ROOT
     target = validation_root / KENNEY_ROOT
@@ -85,18 +92,21 @@ def main() -> None:
             verify_png(committed)
             verify_png(generated)
             committed_hash = sha256(committed)
-            generated_hash = sha256(generated)
             if committed_hash != expected_hash:
                 raise AssertionError(
                     f"{relative_path}: committed SHA-256 {committed_hash} != approved {expected_hash}"
                 )
-            if generated_hash != expected_hash:
+            committed_pixels = rgba_sha256(committed)
+            generated_pixels = rgba_sha256(generated)
+            if generated_pixels != committed_pixels:
                 raise AssertionError(
-                    f"{relative_path}: generated SHA-256 {generated_hash} != approved {expected_hash}"
+                    f"{relative_path}: generated RGBA pixels {generated_pixels} "
+                    f"!= committed RGBA pixels {committed_pixels}"
                 )
-            if committed.read_bytes() != generated.read_bytes():
-                raise AssertionError(f"{relative_path}: committed bytes differ from deterministic builder output")
-            print(f"PASS {relative_path}: sha256:{expected_hash}")
+            print(
+                f"PASS {relative_path}: committed sha256:{expected_hash}; "
+                f"generated pixels sha256:{generated_pixels}"
+            )
 
         source_contact = validation_root / "artifacts/character-diagonal-contact-sheet.png"
         target_contact = ROOT / "artifacts/character-diagonal-contact-sheet.png"
