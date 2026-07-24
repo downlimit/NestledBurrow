@@ -15,6 +15,7 @@ import {
   RESOURCE_HUD_AREA,
   RESOURCE_HUD_LAYOUT,
   SOUND_SLIDER_RECTS,
+  isEnergyCritical,
   shouldShakeEnergyAfterInteraction,
 } from "../src/gameHud.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
@@ -71,6 +72,8 @@ assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 16
 assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 19, currentEnergy: 15, maximumEnergy: 100 }), false, "exactly fifteen percent does not shake");
 assert.equal(shouldShakeEnergyAfterInteraction({ mutated: false, energyBefore: 3, currentEnergy: 3, maximumEnergy: 100 }), false, "failed interactions do not shake");
 assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 12, currentEnergy: 12, maximumEnergy: 100 }), false, "energy-neutral updates do not shake");
+assert.equal(isEnergyCritical(14, 100), true, "energy bar becomes red below the shake threshold");
+assert.equal(isEnergyCritical(15, 100), false, "exactly fifteen percent remains the normal energy color");
 for (const char of "v devabcdef0123456789") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
 
 const main = readFileSync("src/main.js", "utf8");
@@ -94,17 +97,21 @@ assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "locali
 assert(gameHud.includes("drawBitmapTextInto(graphics, OPTIONS_BUILD_LABEL.x, OPTIONS_BUILD_LABEL.y, buildLabel)"), "build ID is rendered only by the Options panel pass");
 assert(!gameHud.includes("drawBitmapText(scene"), "normal gameplay no longer creates a permanent build label");
 assert(!gameHud.includes('localization.t("hud:resources.energy"'), "energy is represented by the vertical bar without a letter label");
-assert(gameHud.includes("drawLog(woodIcon, 5)") && gameHud.includes("drawRuby(rubyIcon, 5)"), "resource HUD renders both canonical icons");
+assert(gameHud.includes("drawLog(woodIcon, 0)") && gameHud.includes("drawStone(stoneIcon, 0)") && gameHud.includes("drawRuby(rubyIcon, 0)"), "resource HUD renders all three canonical icons");
 assert(debrisRuntime.includes('from "./resourceVisuals.js"'), "world debris uses the shared canonical resource visuals");
-assert(resourceVisuals.includes("export function drawLog") && resourceVisuals.includes("export function drawRuby"));
+assert(resourceVisuals.includes("export function drawLog") && resourceVisuals.includes("export function drawStone") && resourceVisuals.includes("export function drawRuby"));
 assert(gameHud.includes("energyFillHeight = energyRatio > 0 ? Math.max(1"), "low non-zero energy remains visibly filled");
 assert(gameHud.includes("ENERGY_HUD_AREA.y + 3 + innerHeight - energyFillHeight"), "energy fill grows from bottom to top");
 assert(gameHud.includes("targets: energyBarGraphics"), "low-energy feedback shakes the complete energy bar graphics");
 assert(gameHud.includes("killTweensOf(energyBarGraphics)") && gameHud.includes("energyBarGraphics.setY(baseY)"), "retrigger resets the bar before shaking without accumulated offset");
+assert(gameHud.includes("energyCritical ? 0xd94a4a : HUD_COLORS.mid"), "critical energy uses the red fill color");
+assert(gameHud.includes("now - event.time <= 1500"), "energy arrows summarize the most recent 1.5 seconds of real energy changes");
+assert(gameHud.includes("duration: 500") && gameHud.includes("delay: 100"), "energy arrows fade in, briefly hold, then fade out");
 assert(gameHud.includes("setOptionsPanelInteractive(false)"), "confirmation disables hidden Options hit areas");
 assert(interactionHud.includes("setSuppressed(value)") && interactionHud.includes("getPresentationState()") && interactionHud.includes("!suppressed &&"), "suppressed interaction presentation has no active HUD hit area and exposes deterministic state");
+assert(interactionHud.includes("setCooldownProgress(value)") && interactionHud.includes("promptRect.x + promptRect.width - cooldownWidth"), "interaction prompt renders a right-to-left cooldown overlay");
 assert(gameHud.includes("isConfirming()"), "GameHud exposes deterministic confirmation state");
-assert(debrisRuntime.includes(".setPosition(definition.tile.x * TILE_SIZE, definition.tile.y * TILE_SIZE)"), "debris visuals remain anchored at world tiles");
+assert(debrisRuntime.includes("definition.cell.x * PLACEMENT_CELL_SIZE"), "resource visuals remain anchored to the 8 px placement grid");
 assert(debugPanel.includes("if (input) input.value = String(this.gameplayTuning[field.key]);"), "Reset defaults keeps gameplay tuning inputs synchronized");
 
 console.log("hud checks passed: 320x180 zones, Options lifecycle, resource stack and whole-bar energy feedback are aligned");

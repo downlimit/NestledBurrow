@@ -11,6 +11,11 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from "./worldConfig.js";
+import { PLACEMENT_CELL_SIZE } from "./resourceConfig.js";
+
+function blockTile(blocked, tileX, tileY) {
+  for (let y = 0; y < 2; y += 1) for (let x = 0; x < 2; x += 1) blocked.add(cellKey(tileX * 2 + x, tileY * 2 + y));
+}
 
 function addTree(tiles, blocked, x, y, variant) {
   const base = variant * 3;
@@ -27,7 +32,7 @@ function addTree(tiles, blocked, x, y, variant) {
     }
   }
 
-  blocked.add(cellKey(x + 1, y + 3));
+  blockTile(blocked, x + 1, y + 3);
 }
 
 function getGrassFrame(x, y) {
@@ -45,6 +50,7 @@ export function createWorldLayout() {
   const houseWallTiles = [];
   const decorationTiles = [];
   const blocked = new Set();
+  const resourceColliders = new Map();
 
   for (let y = 0; y < WORLD_ROWS; y += 1) {
     for (let x = 0; x < WORLD_COLUMNS; x += 1) {
@@ -73,7 +79,7 @@ export function createWorldLayout() {
           ? HOUSE_FRAMES.topRight
           : HOUSE_FRAMES.top;
     houseWallTiles.push({ x, y: HOUSE.y, frame });
-    blocked.add(cellKey(x, HOUSE.y));
+    blockTile(blocked, x, HOUSE.y);
   }
 
   for (let y = HOUSE.y + 1; y < DOOR_Y; y += 1) {
@@ -83,8 +89,8 @@ export function createWorldLayout() {
       y,
       frame: HOUSE_FRAMES.sideRight,
     });
-    blocked.add(cellKey(HOUSE.x, y));
-    blocked.add(cellKey(HOUSE.x + HOUSE.columns - 1, y));
+    blockTile(blocked, HOUSE.x, y);
+    blockTile(blocked, HOUSE.x + HOUSE.columns - 1, y);
   }
 
   for (let x = HOUSE.x; x < HOUSE.x + HOUSE.columns; x += 1) {
@@ -98,7 +104,7 @@ export function createWorldLayout() {
           ? HOUSE_FRAMES.bottomRight
           : HOUSE_FRAMES.bottom;
     houseWallTiles.push({ x, y: DOOR_Y, frame });
-    blocked.add(cellKey(x, DOOR_Y));
+    blockTile(blocked, x, DOOR_Y);
   }
 
   addTree(decorationTiles, blocked, 7, 6, 0);
@@ -108,8 +114,9 @@ export function createWorldLayout() {
 
   const environment = createGridCollisionEnvironment({
     bounds: { left: 0, top: 0, right: WORLD_WIDTH, bottom: WORLD_HEIGHT },
-    cellSize: TILE_SIZE,
+    cellSize: PLACEMENT_CELL_SIZE,
     isBlockedCell: (x, y) => blocked.has(cellKey(x, y)),
+    isBlockedBox: (box) => [...resourceColliders.values()].some((rect) => box.left < rect.right && box.right > rect.left && box.top < rect.bottom && box.bottom > rect.top),
   });
 
   return {
@@ -119,6 +126,9 @@ export function createWorldLayout() {
     houseWallTiles,
     decorationTiles,
     blocked,
+    setResourceCollider(id, rect) { resourceColliders.set(id, Object.freeze({ ...rect })); },
+    clearResourceCollider(id) { resourceColliders.delete(id); },
+    getResourceCollider(id) { return resourceColliders.get(id) ?? null; },
     spawn: {
       x: (HOUSE.x + Math.floor(HOUSE.columns / 2)) * TILE_SIZE + TILE_SIZE / 2,
       y: (HOUSE.y + 8) * TILE_SIZE + TILE_SIZE - 2,

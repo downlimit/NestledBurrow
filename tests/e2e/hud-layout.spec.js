@@ -45,17 +45,18 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       options: { x: 8, y: 4, width: 74, height: 30 },
       clock: { x: 120, y: 4, width: 80, height: 24 },
       fullscreen: { x: 286, y: 4, width: 30, height: 30 },
-      resources: { x: 244, y: 54, width: 46, height: 44 },
-      energy: { x: 294, y: 54, width: 16, height: 44 },
+      resources: { x: 244, y: 38, width: 46, height: 60 },
+      energy: { x: 294, y: 38, width: 16, height: 60 },
     },
     resources: {
       woodText: "0",
+      stoneText: "0",
       rubyText: "0",
-      icons: { wood: true, ruby: true },
-      energyRatio: 1,
-      energyFillHeight: 38,
+      icons: { wood: true, stone: true, ruby: true },
+      energyFillHeight: 54,
     },
   });
+  expect(normal.resources.energyRatio).toBeGreaterThan(0.99);
   expect(normal.resources.clockText).toMatch(/^\d{2}:\d{2}$/u);
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
@@ -95,8 +96,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: false, newGameConfirming: false });
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: false });
   const sessionAfterCancel = await bridge(page, "getSession");
-  const { worldTimeSeconds: _beforeTime, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
-  const { worldTimeSeconds: _afterTime, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
+  const { worldTimeSeconds: _beforeTime, currentEnergy: _beforeEnergy, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
+  const { worldTimeSeconds: _afterTime, currentEnergy: _afterEnergy, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
   expect({ ...sessionAfterCancel, gameplay: gameplayAfterCancel }).toEqual({ ...sessionBeforeConfirmation, gameplay: gameplayBeforeConfirmation });
 });
 

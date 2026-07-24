@@ -28,7 +28,7 @@ import {
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitDebris, hitRuby, refillEnergy, regenerateEnergy } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitResourceNode, refillEnergy, regenerateEnergy, resetBalanceRun } from "./gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
@@ -48,7 +48,9 @@ import { MUSIC_KEY, getMusicUrl, PhaserAudioRuntime } from "./audioRuntime.js";
 import { HUD_DEPTH } from "./hud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
-import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_POSITION, BED_WAKE_TILE, DEBRIS_INTERACTION_KIND, DEBRIS_OBJECT, DEBRIS_OBJECTS, RUBY_INTERACTION_KIND, RUBY_OBJECTS } from "./debrisConfig.js";
+import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_POSITION, BED_WAKE_TILE } from "./debrisConfig.js";
+import { DEFAULT_RESOURCE_ID, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
+import { getResourceProfile } from "./resourceDomain.js";
 import { createDebrisRuntime } from "./debrisRuntime.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import {
@@ -57,7 +59,7 @@ import {
   toPhaserFrame,
 } from "./characterVisualProfiles.js";
 
-const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "dev";
+const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
 
 class WorldScene extends Phaser.Scene {
@@ -113,8 +115,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    this.movementDebugEnabled =
-      new URLSearchParams(window.location.search).get("movementDebug") === "1";
+    this.movementDebugEnabled = import.meta.env.DEV || new URLSearchParams(window.location.search).get("movementDebug") === "1";
     this.worldLayout = createWorldLayout();
     this.characterSystem = createCharacterSystem({ collisionEnvironment: this.worldLayout });
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -127,10 +128,13 @@ class WorldScene extends Phaser.Scene {
     this.createSessionAndInteractionRuntime();
     this.createDebrisRuntime();
     this.sleeping = false;
+    this.exhaustedSleeping = false;
+    this.isRunning = false;
     this.simulationScale = 1;
     this.timeScale = 1;
-    this.awakeDrainAccumulatorSeconds = 0;
     this.autosaveAccumulatorSeconds = 0;
+    this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY;
+    this.lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
     this.createMovementDebugPanel();
     this.createDayNightRuntime();
     this.createHud();
@@ -241,6 +245,7 @@ class WorldScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
     this.interactKeys = this.input.keyboard.addKeys("SPACE");
+    this.runKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
   }
 
@@ -284,7 +289,10 @@ class WorldScene extends Phaser.Scene {
       },
       completeDialogue: completeNeighborDialogue,
       onPersistentMutation: () => { this.gameHud?.render?.(); this.saveSession(); },
-      getStaticInteractionDefinitions: () => this.debrisRuntime?.getInteractionDefinitions?.() ?? [],
+      getStaticInteractionDefinitions: () => [
+        ...(this.debrisRuntime?.getInteractionDefinitions?.() ?? []),
+        ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
+      ],
       runWorldObjectInteraction: (candidate) => this.runWorldObjectInteraction(candidate),
       presenter: this.interactionHud,
     });
@@ -301,28 +309,25 @@ class WorldScene extends Phaser.Scene {
       this.suppressNextInteract = true;
       return { status: this.sleeping ? "sleeping" : "awake", mutated: false };
     }
-    if (candidate.kind === RUBY_INTERACTION_KIND) {
-      const energyBefore = this.sessionState.gameplay.currentEnergy;
-      const result = hitRuby(this.sessionState, candidate.payload.rubyId, { energyPerHit: this.gameplayTuning.energyPerHit });
-      if (result.mutated) {
-        this.gameHud?.render?.();
-        this.applySuccessfulHitFeedback("ruby", energyBefore);
-        this.debrisRuntime?.hitWithFeedback?.(candidate.payload.rubyId, result, () => this.interactionRuntime?.refresh?.());
-        this.saveSession();
-      }
-      return result;
-    }
-    if (candidate.kind !== DEBRIS_INTERACTION_KIND) return { status: "ignored" };
+    if (candidate.kind === "wake-exhausted") return this.tryWakeFromExhaustion();
+    if (candidate.kind !== RESOURCE_INTERACTION_KIND) return { status: "ignored" };
+    const nowMs = globalThis.performance?.now?.() ?? Date.now();
+    if (nowMs - this.lastSuccessfulHitAtMs < this.gameplayTuning.universalHitCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
+    const definition = RESOURCE_OBJECTS.find((item) => item.id === candidate.payload.resourceId);
+    if (!definition) return { status: "unknown-resource", mutated: false };
+    const profile = getResourceProfile(definition.profileId);
     const energyBefore = this.sessionState.gameplay.currentEnergy;
-    const result = hitDebris(this.sessionState, candidate.payload.debrisId, {
+    const result = hitResourceNode(this.sessionState, definition.id, {
+      action: profile.preferredAction,
+      damage: this.gameplayTuning.axeDamage,
       energyPerHit: this.gameplayTuning.energyPerHit,
-      woodReward: this.gameplayTuning.woodReward,
-      maxHits: this.gameplayTuning.hitsPerLog,
+      tuning: this.gameplayTuning,
     });
     if (result.mutated) {
+      this.lastSuccessfulHitAtMs = nowMs;
       this.gameHud?.render?.();
-      this.applySuccessfulHitFeedback("log", energyBefore);
-      this.debrisRuntime?.hitWithFeedback?.(candidate.payload.debrisId, result, () => this.interactionRuntime?.refresh?.());
+      this.applySuccessfulHitFeedback(profile.sfx, energyBefore);
+      this.debrisRuntime?.hitWithFeedback?.(definition.id, result, () => this.interactionRuntime?.refresh?.());
       this.saveSession();
     }
     return result;
@@ -342,7 +347,9 @@ class WorldScene extends Phaser.Scene {
     this.playerCharacter.motor.targetSpeedMultiplier = energyTargetSpeedMultiplier(
       this.sessionState.gameplay.currentEnergy,
       this.sessionState.gameplay.maximumEnergy,
+      this.gameplayTuning.minimumFatigueSpeedMultiplier,
     );
+    this.playerCharacter.motor.runSpeedMultiplier = this.isRunning ? this.gameplayTuning.runSpeedMultiplier : 1;
   }
 
   createPersistence() {
@@ -368,15 +375,16 @@ class WorldScene extends Phaser.Scene {
       gameplayTuning: this.gameplayTuning,
       onGameplayTuningChange: (tuning) => { applyGameplayTuning(this.sessionState, tuning); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); },
       onRefillEnergy: () => { refillEnergy(this.sessionState); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.saveSession(); },
+      onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
       getStatusSnapshot: () => {
         if (!this.playerCharacter) return null;
         return {
-          speed: undefined,
-          velocity: this.playerCharacter.movement.velocity,
-          facing: this.playerCharacter.lastFacing,
           energy: this.sessionState?.gameplay?.currentEnergy,
-          timeScale: this.simulationScale,
-          worldTimeSeconds: this.sessionState?.gameplay?.worldTimeSeconds,
+          clock: formatClock(this.sessionState?.gameplay?.worldTimeSeconds, this.localization.getLanguage()),
+          smallLogsCleared: RESOURCE_OBJECTS.filter((item) => getResourceProfile(item.profileId).id === "log-small" && this.sessionState?.gameplay?.resourceNodes[item.id]?.cleared).length,
+          wood: this.sessionState?.gameplay?.wood,
+          stone: this.sessionState?.gameplay?.stone,
+          rubies: this.sessionState?.gameplay?.rubies,
         };
       },
     });
@@ -393,7 +401,7 @@ class WorldScene extends Phaser.Scene {
       localization: this.localization,
       gameContainer: this.gameContainer,
       audioSettings: this.audioSettings,
-      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping }),
+      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, energyFlow: this.getEnergyFlow() }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
       onConfirmationChange: (active) => {
         this.interactionHud?.setSuppressed?.(active);
@@ -428,11 +436,17 @@ class WorldScene extends Phaser.Scene {
         this.interactionRuntime?.refresh();
       },
       placePlayerNear: (entityId) => {
-        const debris = [...DEBRIS_OBJECTS, ...RUBY_OBJECTS].find((item) => item.id === entityId);
-        const target = debris ? { position: debris.position } : entityId === BED_OBJECT.id ? { position: BED_OBJECT.position } : this.characterSystem.getSnapshot(entityId);
+        const resource = RESOURCE_OBJECTS.find((item) => item.id === entityId);
+        const target = resource ? { position: resource.position } : entityId === BED_OBJECT.id ? { position: BED_OBJECT.position } : this.characterSystem.getSnapshot(entityId);
         const player = this.characterSystem.require(this.sessionState.playerId);
         player.motor.position = { x: target.position.x - 12, y: target.position.y };
         player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
+        this.interactionRuntime?.refresh?.();
+      },
+      placePlayerAt: ({ x, y, facing = { x: 0, y: -1 } }) => {
+        const player = this.characterSystem.require(this.sessionState.playerId);
+        player.motor.position = { x: Number(x), y: Number(y) };
+        player.motor.movement = createMovementState({ facing });
         this.interactionRuntime?.refresh?.();
       },
       getInteractionState: () => ({
@@ -447,18 +461,34 @@ class WorldScene extends Phaser.Scene {
       setAudioChannel: ({ channel, value }) => this.audioSettings?.setChannel?.(channel, value),
       getAudioEffectState: () => ({ lastEffectType: this.audioRuntime?.lastEffectType ?? null, playCount: this.audioRuntime?.effectPlayCount ?? 0 }),
       interact: () => { this.frameActions = Object.freeze({ interact: true, primary: false, secondary: false }); this.interactionRuntime?.update({ actions: this.frameActions }); },
-      getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: DEBRIS_OBJECT, definitions: DEBRIS_OBJECTS, rubies: RUBY_OBJECTS, bed: BED_OBJECT, wakeTile: BED_WAKE_TILE }),
+      expireHitCooldown: () => { this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; },
+      getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID), definitions: RESOURCE_OBJECTS, bed: BED_OBJECT, wakeTile: BED_WAKE_TILE }),
       setEnergy: (value) => { this.sessionState.gameplay.currentEnergy = Math.max(0, Math.min(this.sessionState.gameplay.maximumEnergy, Number(value) || 0)); this.syncPlayerEnergyTarget(); this.gameHud?.render(); },
       setEnergyState: ({ current, maximum }) => { this.sessionState.gameplay.maximumEnergy = Math.max(1, Number(maximum) || 1); this.sessionState.gameplay.currentEnergy = Math.max(0, Math.min(this.sessionState.gameplay.maximumEnergy, Number(current) || 0)); this.syncPlayerEnergyTarget(); this.gameHud?.render(); },
-      getRuntimeState: () => ({ sleeping: this.sleeping, timeScale: this.simulationScale }),
+      setPlayerMotion: ({ moving = false, running = false } = {}) => {
+        const player = this.characterSystem.require(this.sessionState.playerId);
+        player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
+        player.motor.movement.velocity.x = moving ? player.motor.movementConfig.movingSpeedThreshold : 0;
+        this.e2eEnergyMotion = { moving: Boolean(moving), running: Boolean(running) };
+        this.isRunning = Boolean(running);
+      },
+      advanceGameplayTime: (milliseconds) => this.updateGameplayTime(Math.max(0, Number(milliseconds) || 0)),
+      getRuntimeState: () => ({ sleeping: this.sleeping, exhaustedSleeping: this.exhaustedSleeping, timeScale: this.simulationScale }),
       setWorldTimeSeconds: (value) => { this.sessionState.gameplay.worldTimeSeconds = Math.max(0, Number(value) || 0); this.updateDayNightLighting(); this.gameHud?.render(); },
       getClockText: () => formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()),
       getDayNightState: () => ({ color: dayNightMultiplyColor(this.sessionState.gameplay.worldTimeSeconds), worldTimeSeconds: this.sessionState.gameplay.worldTimeSeconds }),
       getResourceState: () => JSON.parse(JSON.stringify(this.sessionState.gameplay)),
-      getRubyNodeState: (id) => JSON.parse(JSON.stringify(this.sessionState.gameplay.rubyNodes[id])),
+      getResourceNodeState: (id) => JSON.parse(JSON.stringify(this.sessionState.gameplay.resourceNodes[id])),
+      getResourceVisualState: (id) => this.debrisRuntime?.getVisualState?.(id) ?? null,
+      getResourceCollider: (id) => this.worldLayout?.getResourceCollider?.(id) ?? null,
       getCharacterSnapshot: (id) => this.characterSystem.getSnapshot(id),
-      getPlayerMovementState: () => ({ targetMultiplier: this.playerCharacter?.motor?.targetSpeedMultiplier, effectiveMultiplier: this.playerCharacter?.motor?.effectiveSpeedMultiplier }),
+      getPlayerMovementState: () => ({ targetMultiplier: this.playerCharacter?.motor?.targetSpeedMultiplier, effectiveMultiplier: this.playerCharacter?.motor?.effectiveSpeedMultiplier, runSpeedMultiplier: this.playerCharacter?.motor?.runSpeedMultiplier }),
+      getPlayerVisualState: () => {
+        const sprite = this.playerCharacter?.sprite;
+        return sprite ? { x: sprite.x, y: sprite.y, angle: sprite.angle, textureKey: sprite.texture?.key } : null;
+      },
       wakeUp: () => this.wakeUp(),
+      tryWakeFromExhaustion: () => this.tryWakeFromExhaustion(() => 0),
     };
     this.e2eBridge = bridge;
     window.__NESTLED_BURROW_E2E__ = bridge;
@@ -519,27 +549,38 @@ class WorldScene extends Phaser.Scene {
     this.e2eBridge = null;
   }
 
-  startSleeping() {
+  startSleeping({ exhausted = false } = {}) {
     this.sleeping = true;
-    this.simulationScale = this.gameplayTuning.sleepTimeScale;
+    this.exhaustedSleeping = exhausted;
+    this.simulationScale = this.getSleepTimeScale();
     this.timeScale = this.simulationScale;
-    this.awakeDrainAccumulatorSeconds = 0;
     const player = this.characterSystem.require(this.sessionState.playerId);
-    player.motor.position = { ...BED_WAKE_POSITION };
-    player.motor.movement = createMovementState({ facing: { x: -1, y: 0 } });
+    if (exhausted) {
+      player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
+      player.visual.setSleepingPose({ x: player.motor.position.x, y: player.motor.position.y - 4, facing: "up", angle: -90 });
+    } else {
+      player.motor.position = { ...BED_WAKE_POSITION };
+      player.motor.movement = createMovementState({ facing: { x: -1, y: 0 } });
+      player.visual.setSleepingPose({ x: BED_OBJECT.position.x, y: BED_OBJECT.position.y - 1, facing: "right", angle: -90 });
+    }
     this.debrisRuntime?.setSleeping(true);
+    this.syncLowEnergyMarker();
+    this.interactionRuntime?.refresh?.();
     this.gameHud?.render?.();
   }
 
   wakeUp() {
+    const wasExhausted = this.exhaustedSleeping;
     this.sleeping = false;
+    this.exhaustedSleeping = false;
     this.simulationScale = 1;
     this.timeScale = 1;
-    this.awakeDrainAccumulatorSeconds = 0;
     const player = this.characterSystem.require(this.sessionState.playerId);
-    player.motor.position = { ...BED_WAKE_POSITION };
+    player.visual.setSleepingPose(null);
+    if (!wasExhausted) player.motor.position = { ...BED_WAKE_POSITION };
     player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
     this.debrisRuntime?.setSleeping(false);
+    this.syncLowEnergyMarker();
     this.interactionRuntime?.refresh?.();
     this.gameHud?.render?.();
     this.saveSession();
@@ -547,18 +588,19 @@ class WorldScene extends Phaser.Scene {
 
   updateGameplayTime(deltaMs) {
     const realSeconds = Math.max(0, deltaMs) / 1000;
-    this.simulationScale = this.sleeping ? this.gameplayTuning.sleepTimeScale : 1;
+    this.simulationScale = this.sleeping ? this.getSleepTimeScale() : 1;
     this.timeScale = this.simulationScale;
     advanceGameTime(this.sessionState, realSeconds, this.simulationScale);
     if (this.sleeping) {
-      regenerateEnergy(this.sessionState, { amount: this.gameplayTuning.sleepEnergyRegenPerSecond * realSeconds });
+      const gameHours = realSeconds * this.simulationScale * (86400 / this.gameplayTuning.realSecondsPerGameDay) / 3600;
+      regenerateEnergy(this.sessionState, { amount: this.getSleepEnergyPerGameHour() * gameHours });
       if (this.sessionState.gameplay.currentEnergy >= this.sessionState.gameplay.maximumEnergy) this.wakeUp();
     } else {
-      this.awakeDrainAccumulatorSeconds += realSeconds;
-      while (this.awakeDrainAccumulatorSeconds >= this.gameplayTuning.awakeDrainIntervalSeconds) {
-        this.awakeDrainAccumulatorSeconds -= this.gameplayTuning.awakeDrainIntervalSeconds;
-        drainAwakeEnergy(this.sessionState, { amount: this.gameplayTuning.awakeDrainAmount });
-      }
+      const flow = this.getEnergyFlow();
+      if (flow.direction === "up") {
+        regenerateEnergy(this.sessionState, { amount: this.gameplayTuning.lowEnergyIdleRegenPerSecond * realSeconds });
+      } else drainAwakeEnergy(this.sessionState, { amount: this.getAwakeDrainAmount(flow) * realSeconds });
+      if (this.sessionState.gameplay.currentEnergy <= 0) this.startSleeping({ exhausted: true });
     }
     this.syncPlayerEnergyTarget();
     this.updateDayNightLighting?.();
@@ -574,23 +616,108 @@ class WorldScene extends Phaser.Scene {
     this.sampleFrameActions();
     const realDeltaMs = delta;
     this.updateGameplayTime(realDeltaMs);
-    const worldDeltaMs = realDeltaMs * (this.simulationScale ?? 1);
+    let worldDeltaMs = realDeltaMs * (this.simulationScale ?? 1);
     this.setNpcAnimationTimeScale(this.simulationScale ?? 1);
-    this.characterSystem?.update(worldDeltaMs);
+    while (worldDeltaMs > 0) {
+      const substepMs = Math.min(50, worldDeltaMs);
+      this.characterSystem?.update(substepMs);
+      worldDeltaMs -= substepMs;
+    }
     this.interactionRuntime?.update({ actions: this.frameActions });
+    this.interactionHud?.setCooldownProgress?.(this.getInteractionCooldownProgress());
     this.updateMovementDebugStatus();
   }
 
   sampleFrameActions() {
+    this.isRunning = Boolean(this.runKey?.isDown) && !this.sleeping;
+    this.syncPlayerEnergyTarget();
+    this.syncLowEnergyMarker();
     const keyboardPressed =
       Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE);
+    const heldResourceInteract = this.interactKeys.SPACE.isDown && this.interactionRuntime?.getCurrentCandidate?.()?.kind === RESOURCE_INTERACTION_KIND;
     const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
     this.frameActions = Object.freeze({
-      interact: this.suppressNextInteract ? false : (keyboardPressed || mobilePressed),
+      interact: this.suppressNextInteract ? false : (keyboardPressed || heldResourceInteract || mobilePressed),
       primary: false,
       secondary: false,
     });
     this.suppressNextInteract = false;
+  }
+
+  getHitCooldownProgress(nowMs = globalThis.performance?.now?.() ?? Date.now()) {
+    const durationMs = this.gameplayTuning?.universalHitCooldownSeconds * 1000;
+    if (!(durationMs > 0) || !Number.isFinite(this.lastSuccessfulHitAtMs)) return 0;
+    return Math.max(0, Math.min(1, 1 - (nowMs - this.lastSuccessfulHitAtMs) / durationMs));
+  }
+
+  getInteractionCooldownProgress(nowMs = globalThis.performance?.now?.() ?? Date.now()) {
+    if (this.exhaustedSleeping) {
+      const durationMs = this.gameplayTuning.exhaustionWakeCooldownSeconds * 1000;
+      if (!(durationMs > 0) || !Number.isFinite(this.lastWakeAttemptAtMs)) return 0;
+      return Math.max(0, Math.min(1, 1 - (nowMs - this.lastWakeAttemptAtMs) / durationMs));
+    }
+    return this.getHitCooldownProgress(nowMs);
+  }
+
+  getSleepTimeScale() {
+    return this.gameplayTuning.sleepTimeScale * (this.exhaustedSleeping ? this.gameplayTuning.exhaustionSleepScaleMultiplier : 1);
+  }
+
+  getSleepEnergyPerGameHour() {
+    return this.gameplayTuning.sleepEnergyPerGameHour / (this.exhaustedSleeping ? 6 : 1);
+  }
+
+  getEnergyFlow() {
+    const gameplay = this.sessionState?.gameplay;
+    const player = this.playerCharacter?.motor;
+    if (!gameplay || !player) return null;
+    if (this.sleeping) return { direction: "up", arrows: 1 };
+    const isMoving = this.e2eEnergyMotion?.moving ?? (player.speed >= player.movementConfig.movingSpeedThreshold);
+    const fraction = gameplay.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
+    if (!isMoving && fraction < 0.05) return { direction: "up", arrows: 1 };
+    if (!isMoving) return { direction: "down", arrows: 1 };
+    return { direction: "down", arrows: (this.e2eEnergyMotion?.running ?? this.isRunning) ? 3 : 2 };
+  }
+
+  syncLowEnergyMarker() {
+    const gameplay = this.sessionState?.gameplay;
+    const fraction = gameplay?.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
+    this.playerCharacter?.visual?.setLowEnergyMarker?.(!this.sleeping && fraction > 0 && fraction < 0.1);
+  }
+
+  getAwakeDrainAmount(flow = this.getEnergyFlow()) {
+    if (flow?.arrows >= 3) return this.gameplayTuning.awakeRunDrainAmount;
+    if (flow?.arrows === 2) return this.gameplayTuning.awakeWalkDrainAmount;
+    return this.gameplayTuning.awakeDrainAmount;
+  }
+
+  getExhaustionWakeInteraction() {
+    const position = this.playerCharacter?.motor?.position ?? { x: 0, y: 0 };
+    return {
+      id: "wake-exhausted-player", entityId: "wake-exhausted-player", roomId: "world", kind: "wake-exhausted",
+      position: { x: position.x, y: position.y }, radius: 24, priority: 100, requiresFacing: false, facingDotThreshold: -1,
+      prompt: "hud:interaction.wake", payload: {},
+    };
+  }
+
+  getWakeProbability() {
+    const gameplay = this.sessionState.gameplay;
+    const fraction = gameplay.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
+    if (fraction < 0.05) return 0.1;
+    if (fraction < 0.1) return 0.66;
+    return fraction > 0.25 ? 1 : 0.66;
+  }
+
+  tryWakeFromExhaustion(random = Math.random) {
+    if (!this.exhaustedSleeping) return { status: "ignored", mutated: false };
+    const nowMs = globalThis.performance?.now?.() ?? Date.now();
+    if (nowMs - this.lastWakeAttemptAtMs < this.gameplayTuning.exhaustionWakeCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
+    this.lastWakeAttemptAtMs = nowMs;
+    if (random() < this.getWakeProbability()) {
+      this.wakeUp();
+      return { status: "awake", mutated: true };
+    }
+    return { status: "wake-failed", mutated: false };
   }
 
   createDayNightRuntime() {

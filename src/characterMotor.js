@@ -31,6 +31,7 @@ export class CharacterMotor {
     this.lastBlockedAxes = { x: false, y: false };
     this.targetSpeedMultiplier = 1;
     this.effectiveSpeedMultiplier = 1;
+    this.runSpeedMultiplier = 1;
   }
 
   get speed() {
@@ -43,7 +44,7 @@ export class CharacterMotor {
       this.targetSpeedMultiplier,
       deltaMs,
     );
-    const effectiveMaxSpeed = this.movementConfig.maxSpeed * this.effectiveSpeedMultiplier;
+    const effectiveMaxSpeed = this.movementConfig.maxSpeed * this.effectiveSpeedMultiplier * this.runSpeedMultiplier;
     const command = this.controller.getCommand(this.createControllerContext(), deltaMs);
     this.movement = stepCharacterMovement(this.movement, command.moveDirection, deltaMs, {
       config: { ...this.movementConfig, maxSpeed: effectiveMaxSpeed },
@@ -76,6 +77,7 @@ export class CharacterMotor {
       speed: this.speed,
       targetSpeedMultiplier: this.targetSpeedMultiplier,
       effectiveSpeedMultiplier: this.effectiveSpeedMultiplier,
+      runSpeedMultiplier: this.runSpeedMultiplier,
     });
   }
 
@@ -91,6 +93,7 @@ export class CharacterMotor {
       speed: this.speed,
       targetSpeedMultiplier: this.targetSpeedMultiplier,
       effectiveSpeedMultiplier: this.effectiveSpeedMultiplier,
+      runSpeedMultiplier: this.runSpeedMultiplier,
     });
   }
 }

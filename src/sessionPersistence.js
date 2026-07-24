@@ -1,6 +1,6 @@
 import { createFreshGameSessionState, normalizeGameSessionState, SESSION_STATE_VERSION } from "./gameSessionState.js";
 
-export const SAVE_SCHEMA_VERSION = 1;
+export const SAVE_SCHEMA_VERSION = 2;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -35,6 +35,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (!isPlainObject(envelope)) {
     return { status: "recovered", state: createFreshState(), diagnostic: { kind: "invalid-envelope", message: "Save envelope must be an object" } };
   }
+  if (envelope.schemaVersion === 1) envelope = migrateV1Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -48,8 +49,30 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
 }
 
 const migrationRegistry = new Map([
+  [1, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
+
+function migrateV1Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const resourceNodes = {};
+  for (const [id, node] of Object.entries(gameplay.debris ?? {})) {
+    const remaining = Number.isInteger(node?.remainingHits) ? Math.min(5, Math.max(0, node.remainingHits)) : 5;
+    resourceNodes[id] = { progress: node?.cleared ? 1 : (5 - remaining) / 5, cleared: Boolean(node?.cleared) || remaining === 0 };
+  }
+  for (const [id, node] of Object.entries(gameplay.rubyNodes ?? {})) {
+    const remaining = Number.isInteger(node?.remainingHits) ? Math.min(5, Math.max(0, node.remainingHits)) : 5;
+    resourceNodes[id] = { progress: node?.cleared ? 1 : (5 - remaining) / 5, cleared: Boolean(node?.cleared) || remaining === 0 };
+  }
+  delete gameplay.debris;
+  delete gameplay.rubyNodes;
+  gameplay.resourceNodes = resourceNodes;
+  gameplay.stone = 0;
+  state.gameplay = gameplay;
+  state.version = SESSION_STATE_VERSION;
+  return { schemaVersion: SAVE_SCHEMA_VERSION, state };
+}
 
 export function migrateSessionEnvelope(envelope, options = {}) {
   if (!isPlainObject(envelope)) return { status: "unsupported", diagnostic: { kind: "invalid-envelope", message: "Save envelope must be an object" } };

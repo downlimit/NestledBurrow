@@ -15,13 +15,13 @@ import {
   setEntityFlag,
   setSessionFlag,
   startDialogue,
-  clearDebris,
-  hitDebris,
+  hitResourceNode,
   drainAwakeEnergy,
   regenerateEnergy,
   advanceGameTime,
 } from "../src/gameSessionState.js";
-import { DEBRIS_OBJECTS, DEFAULT_GAMEPLAY_TUNING } from "../src/debrisConfig.js";
+import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
+import { getResourceProfile, resolveActionHp } from "../src/resourceDomain.js";
 import {
   NEIGHBOR_DIALOGUE_IDS,
   NEIGHBOR_QUEST_ENTITIES,
@@ -55,11 +55,16 @@ function assertStage(state, stage, homeDialogue, streetDialogue) {
 }
 
 const session = createFreshGameSessionState();
-assert.equal(Object.keys(session.gameplay.debris).length, 43, "fresh state has 43 debris records");
-assert.equal(DEBRIS_OBJECTS.filter((item) => item.roomId === "yard").length, 33, "33 debris are in the yard");
-assert.equal(DEBRIS_OBJECTS.filter((item) => item.roomId === "home").length, 10, "10 debris are in the home");
-assert.equal(new Set(DEBRIS_OBJECTS.map((item) => item.id)).size, 43, "debris IDs are unique");
-assert(Object.values(session.gameplay.debris).every((item) => item.remainingHits === 5 && item.cleared === false), "fresh debris start with five remaining hits");
+assert.equal(Object.keys(session.gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "fresh state has every resource node");
+assert(RESOURCE_OBJECTS.filter((item) => item.profileId === "log-small").length >= 8, "balance route has at least eight small logs");
+assert.equal(new Set(RESOURCE_OBJECTS.map((item) => item.id)).size, RESOURCE_OBJECTS.length, "resource IDs are unique");
+assert(Object.values(session.gameplay.resourceNodes).every((item) => item.progress === 0 && item.cleared === false), "fresh resources start at zero progress");
+assert.equal(session.gameplay.stone, 0, "fresh stone counter starts at zero");
+for (const profileId of ["log-small", "log-large", "stone-small", "stone-large", "ruby-node"]) {
+  const profile = getResourceProfile(profileId);
+  assert(Object.isFrozen(profile) && Object.isFrozen(profile.actionHp), `${profileId} profile is immutable`);
+  assert.deepEqual(Object.keys(profile.actionHp), ["chop", "mine", "mow"], `${profileId} exposes every work action`);
+}
 assert.equal(session.gameplay.worldTimeSeconds, 21600, "fresh state starts at 06:00");
 assertStage(session, NEIGHBOR_QUEST_STAGES.notStarted, NEIGHBOR_DIALOGUE_IDS.homeIntro, NEIGHBOR_DIALOGUE_IDS.streetBefore);
 assert.deepEqual(completeNeighborDialogue(session, NEIGHBOR_DIALOGUE_IDS.streetResponse).status, "ignored", "street response cannot skip intro");
@@ -112,7 +117,7 @@ assert.equal(loaded.state.dialogue.targetId, null, "loaded game has no active di
 assert.equal(getSessionFlag(loaded.state, NEIGHBOR_QUEST_FLAGS.started), true, "session flags persist");
 assert.equal(getEntityFlag(loaded.state, "home-npc", "visited"), true, "entity flags persist");
 const oldSaveLoad = deserializeSessionEnvelope(JSON.stringify({
-  schemaVersion: SAVE_SCHEMA_VERSION,
+  schemaVersion: 1,
   state: {
     version: 1,
     currentWorldId: "village",
@@ -121,10 +126,22 @@ const oldSaveLoad = deserializeSessionEnvelope(JSON.stringify({
     flags: { old: true },
   },
 }));
-assert.equal(Object.keys(oldSaveLoad.state.gameplay.debris).length, 43, "version-1 save without gameplay loads debris defaults");
+assert.equal(Object.keys(oldSaveLoad.state.gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "version-1 save without gameplay loads resource defaults");
 assert.equal(oldSaveLoad.state.gameplay.worldTimeSeconds, 21600, "version-1 save without gameplay starts at 06:00");
 assert.equal(getSessionFlag(oldSaveLoad.state, "old"), true, "old save session flags survive gameplay normalization");
 assert.equal(getEntityFlag(oldSaveLoad.state, "home-npc", "visited"), true, "old save entity flags survive gameplay normalization");
+const partialLegacy = deserializeSessionEnvelope(JSON.stringify({
+  schemaVersion: 1,
+  state: {
+    version: 1, currentWorldId: "village", playerId: "player",
+    entities: { player: { id: "player", flags: {} }, "home-npc": { id: "home-npc", flags: {} }, "street-npc": { id: "street-npc", flags: {} } }, flags: {},
+    gameplay: { currentEnergy: 75, maximumEnergy: 100, wood: 4, rubies: 2, debris: { "fallen-log-01": { cleared: false, remainingHits: 3 } }, rubyNodes: { "yard-ruby-01": { cleared: true, remainingHits: 0 } }, worldTimeSeconds: 30000 },
+  },
+}));
+assert.equal(partialLegacy.status, "loaded", "schema-v1 gameplay migrates explicitly");
+assert.equal(partialLegacy.state.gameplay.resourceNodes["fallen-log-01"].progress, 0.4, "legacy partial hits become normalized progress against the old maximum");
+assert.equal(partialLegacy.state.gameplay.resourceNodes["yard-ruby-01"].cleared, true, "legacy cleared ruby stays cleared");
+assert.deepEqual({ wood: partialLegacy.state.gameplay.wood, stone: partialLegacy.state.gameplay.stone, rubies: partialLegacy.state.gameplay.rubies }, { wood: 4, stone: 0, rubies: 2 }, "migration preserves rewards and initializes stone without duplicate grants");
 assert.equal(Object.getPrototypeOf(loaded.state.flags), null, "loaded session flags use null prototype");
 assert.equal(Object.getPrototypeOf(loaded.state.entities), null, "loaded entities use null prototype");
 assert.equal(persistence.clear().status, "cleared", "clear removes progress key");
@@ -157,20 +174,20 @@ for (const poisonedKey of ["__proto__", "constructor", "prototype"]) {
 }
 
 const clearState = createFreshGameSessionState();
-assert.deepEqual(clearDebris(clearState, "fallen-log-01", { energyCost: 20, woodReward: 1 }).status, "cleared", "debris clears once");
+assert.deepEqual(hitResourceNode(clearState, "fallen-log-01", { damage: 7, energyPerHit: 20, tuning: DEFAULT_GAMEPLAY_TUNING }).status, "cleared", "resource clears once");
 assert.equal(clearState.gameplay.currentEnergy, 80, "clearing spends energy");
 assert.equal(clearState.gameplay.wood, 1, "clearing awards wood");
-assert.equal(clearDebris(clearState, "fallen-log-01", { energyCost: 20, woodReward: 1 }).mutated, false, "repeat clearing does not mutate");
+assert.equal(hitResourceNode(clearState, "fallen-log-01", { damage: 7, energyPerHit: 20, tuning: DEFAULT_GAMEPLAY_TUNING }).mutated, false, "repeat clearing does not mutate");
 const lowEnergy = createFreshGameSessionState();
 lowEnergy.gameplay.currentEnergy = 10;
 const lowBefore = clone(lowEnergy);
-assert.equal(clearDebris(lowEnergy, "fallen-log-01", { energyCost: 20, woodReward: 1 }).status, "insufficient-energy", "low energy blocks clearing");
+assert.equal(hitResourceNode(lowEnergy, "fallen-log-01", { damage: 7, energyPerHit: 20, tuning: DEFAULT_GAMEPLAY_TUNING }).status, "insufficient-energy", "low energy blocks clearing");
 assert.deepEqual(clone(lowEnergy), lowBefore, "low energy creates no partial mutation");
 const clearRoundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(clearState));
-assert.equal(clearRoundTrip.state.gameplay.debris["fallen-log-01"].cleared, true, "cleared state persists");
+assert.equal(clearRoundTrip.state.gameplay.resourceNodes["fallen-log-01"].cleared, true, "cleared state persists");
 assert.equal(clearRoundTrip.state.gameplay.currentEnergy, 80, "energy persists");
 assert.equal(clearRoundTrip.state.gameplay.wood, 1, "wood persists");
-assert.equal(Object.keys(createFreshGameSessionState().gameplay.debris).length, 43, "New Game fresh state returns all debris defaults");
+assert.equal(Object.keys(createFreshGameSessionState().gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "New Game fresh state returns all resource defaults");
 assert.deepEqual(JSON.parse(JSON.stringify(clearState)), clearState, "gameplay state remains JSON-safe");
 
 const serialized = serializeSessionEnvelope(fresh);
@@ -184,19 +201,19 @@ assert(!serialized.includes("[object"), "serialized result contains JSON data on
 
 
 const hitState = createFreshGameSessionState();
-assert.equal(hitDebris(hitState, "fallen-log-01", { energyPerHit: 4, woodReward: 1 }).remainingHits, 4, "one hit leaves four hits");
-assert.equal(hitState.gameplay.currentEnergy, 96, "one hit spends four energy");
-for (let i = 0; i < 3; i += 1) hitDebris(hitState, "fallen-log-01", { energyPerHit: 4, woodReward: 1 });
-assert.equal(hitState.gameplay.debris["fallen-log-01"].cleared, false, "four hits do not clear debris");
-assert.equal(hitDebris(hitState, "fallen-log-01", { energyPerHit: 4, woodReward: 1 }).status, "cleared", "fifth hit clears debris");
+assert.equal(hitResourceNode(hitState, "fallen-log-01", { damage: 1, energyPerHit: 1, tuning: DEFAULT_GAMEPLAY_TUNING }).progress, 1 / 7, "one hit stores normalized progress");
+assert.equal(hitState.gameplay.currentEnergy, 99, "one hit spends one energy");
+for (let i = 0; i < 5; i += 1) hitResourceNode(hitState, "fallen-log-01", { damage: 1, energyPerHit: 1, tuning: DEFAULT_GAMEPLAY_TUNING });
+assert.equal(hitState.gameplay.resourceNodes["fallen-log-01"].cleared, false, "six hits do not clear a small log");
+assert.equal(hitResourceNode(hitState, "fallen-log-01", { damage: 1, energyPerHit: 1, tuning: DEFAULT_GAMEPLAY_TUNING }).status, "cleared", "seventh hit clears a small log");
 assert.equal(hitState.gameplay.wood, 1, "wood is awarded once on full clearing");
-assert.equal(hitDebris(hitState, "fallen-log-01", { energyPerHit: 4, woodReward: 1 }).mutated, false, "cleared debris cannot be hit again");
+assert.equal(hitResourceNode(hitState, "fallen-log-01", { damage: 1, energyPerHit: 1, tuning: DEFAULT_GAMEPLAY_TUNING }).mutated, false, "cleared resource cannot be hit again");
 const partialRoundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(hitState));
-assert.equal(partialRoundTrip.state.gameplay.debris["fallen-log-01"].cleared, true, "hit state persists through round-trip");
+assert.equal(partialRoundTrip.state.gameplay.resourceNodes["fallen-log-01"].cleared, true, "hit state persists through round-trip");
 const lowHit = createFreshGameSessionState();
 lowHit.gameplay.currentEnergy = 3;
 const lowHitBefore = clone(lowHit);
-assert.equal(hitDebris(lowHit, "fallen-log-01", { energyPerHit: 4, woodReward: 1 }).status, "insufficient-energy", "low energy blocks hit");
+assert.equal(hitResourceNode(lowHit, "fallen-log-01", { damage: 1, energyPerHit: 4, tuning: DEFAULT_GAMEPLAY_TUNING }).status, "insufficient-energy", "low energy blocks hit");
 assert.deepEqual(clone(lowHit), lowHitBefore, "low-energy hit is atomic");
 const energyState = createFreshGameSessionState();
 drainAwakeEnergy(energyState, { amount: 1 });
@@ -206,21 +223,29 @@ drainAwakeEnergy(energyState, { amount: 5 });
 assert.equal(energyState.gameplay.currentEnergy, 0, "awake drain clamps at zero");
 regenerateEnergy(energyState, { amount: 10 });
 assert.equal(energyState.gameplay.currentEnergy, 10, "sleep regen restores ten energy");
+regenerateEnergy(energyState, { amount: 0.5 });
+assert.equal(deserializeSessionEnvelope(serializeSessionEnvelope(energyState)).state.gameplay.currentEnergy, 10.5, "fractional game-hour regeneration survives save round-trip");
 regenerateEnergy(energyState, { amount: 1000 });
 assert.equal(energyState.gameplay.currentEnergy, energyState.gameplay.maximumEnergy, "sleep regen clamps at maximum");
 const beforeTime = energyState.gameplay.worldTimeSeconds;
 advanceGameTime(energyState, 1, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale);
-assert.equal(energyState.gameplay.worldTimeSeconds - beforeTime, 480, "sleep simulation scale advances world time at x8 with the 60x clock");
+assert.equal(energyState.gameplay.worldTimeSeconds - beforeTime, 1920, "sleep simulation scale advances world time at x32 with the 60x clock");
+assert.equal(resolveActionHp(getResourceProfile("log-large"), "chop", DEFAULT_GAMEPLAY_TUNING), 11, "large HP is rounded from the 1.6 multiplier");
+const rewardState = createFreshGameSessionState();
+assert.equal(hitResourceNode(rewardState, "yard-log-04", { damage: 99, energyPerHit: 0, tuning: DEFAULT_GAMEPLAY_TUNING }).reward.amount, 3, "large log awards +3 wood");
+assert.equal(hitResourceNode(rewardState, "yard-stone-01", { damage: 99, energyPerHit: 0, tuning: DEFAULT_GAMEPLAY_TUNING }).reward.amount, 3, "large stone awards +3 stone");
+assert.equal(hitResourceNode(rewardState, "yard-stone-02", { damage: 99, energyPerHit: 0, tuning: DEFAULT_GAMEPLAY_TUNING }).reward.amount, 1, "small stone awards +1 stone");
+assert.deepEqual({ wood: rewardState.gameplay.wood, stone: rewardState.gameplay.stone }, { wood: 3, stone: 4 }, "size rewards update canonical counters");
 
 console.log("progress checks passed");
 
 import { applyGameplayTuning, refillEnergy } from "../src/gameSessionState.js";
 import { GAMEPLAY_DEBUG_STORAGE_KEY, loadGameplayDebugTuning, saveGameplayDebugTuning } from "../src/gameplayDebugTuning.js";
 const tuningStorage = createMemoryStorage();
-const normalizedTuning = loadGameplayDebugTuning({ enabled: true, storage: { getItem: () => JSON.stringify({ maximumEnergy: 12.4, clearingEnergyCost: -1, woodReward: 2.8 }) } });
+const normalizedTuning = loadGameplayDebugTuning({ enabled: true, storage: { getItem: () => JSON.stringify({ maximumEnergy: 12.4, clearingEnergyCost: -1, hitsPerLog: 9 }) } });
 assert.equal(normalizedTuning.maximumEnergy, 12, "developer tuning normalizes maximum energy");
 assert.equal(normalizedTuning.energyPerHit, 0, "developer tuning migrates clearing cost to energy per hit");
-assert.equal(normalizedTuning.woodReward, 3, "developer tuning normalizes wood reward");
+assert.equal(normalizedTuning.smallLogChopHp, 9, "legacy debug HP migrates to the resource tuning field");
 const tunedState = createFreshGameSessionState();
 tunedState.gameplay.currentEnergy = 90;
 applyGameplayTuning(tunedState, { maximumEnergy: 50 });
@@ -228,7 +253,7 @@ assert.equal(tunedState.gameplay.currentEnergy, 50, "maximum energy clamps curre
 tunedState.gameplay.currentEnergy = 1;
 refillEnergy(tunedState);
 assert.equal(tunedState.gameplay.currentEnergy, 50, "refill restores current energy to maximum");
-saveGameplayDebugTuning({ maximumEnergy: 77, energyPerHit: 6, woodReward: 4 }, tuningStorage);
+saveGameplayDebugTuning({ maximumEnergy: 77, energyPerHit: 6, smallLogChopHp: 8 }, tuningStorage);
 assert(tuningStorage.getItem(GAMEPLAY_DEBUG_STORAGE_KEY).includes("maximumEnergy"), "debug tuning persists to separate key");
 assert.equal(tuningStorage.getItem(DEFAULT_STORAGE_KEY), null, "debug tuning does not write gameplay save key");
 assert.deepEqual(loadGameplayDebugTuning({ enabled: true, storage: { getItem: () => { throw new Error("blocked"); } } }), DEFAULT_GAMEPLAY_TUNING, "blocked debug localStorage falls back safely");

@@ -3,8 +3,8 @@ import { getEffectiveEffectsVolume, getEffectiveMusicVolume } from "./audioSetti
 export const MUSIC_KEY = "music.sunlit-save-point";
 export const MUSIC_PATH = "assets/audio/music/NestledBurrow_SunlitSavePoint.mp3";
 export const PROCEDURAL_SFX = Object.freeze({
-  log: Object.freeze({ oscillator: "square", startFrequency: 132, endFrequency: 82, durationSeconds: 0.09, gain: 0.075 }),
-  ruby: Object.freeze({ oscillator: "triangle", startFrequency: 520, endFrequency: 760, durationSeconds: 0.11, gain: 0.065 }),
+  chop: Object.freeze({ oscillator: "square", startFrequency: 132, endFrequency: 82, durationSeconds: 0.09, gain: 0.075 }),
+  mine: Object.freeze({ oscillator: "triangle", startFrequency: 520, endFrequency: 760, durationSeconds: 0.11, gain: 0.065 }),
 });
 
 export function getMusicUrl(baseUrl = import.meta.env.BASE_URL) {

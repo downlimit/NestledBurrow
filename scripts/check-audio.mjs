@@ -28,9 +28,9 @@ assert.equal(clampVolume(-1), 0);
 assert.equal(clampVolume(2), 1);
 assert.equal(getEffectiveMusicVolume({ master: 0.4, music: 0.25, effects: 1 }), 0.1);
 assert.equal(getEffectiveEffectsVolume({ master: 0.4, music: 0.25, effects: 0.5 }), 0.2);
-assert.notDeepEqual(PROCEDURAL_SFX.log, PROCEDURAL_SFX.ruby, "log and ruby effects have distinct chiptune definitions");
-assert(PROCEDURAL_SFX.log.durationSeconds >= 0.06 && PROCEDURAL_SFX.log.durationSeconds <= 0.14);
-assert(PROCEDURAL_SFX.ruby.durationSeconds >= 0.06 && PROCEDURAL_SFX.ruby.durationSeconds <= 0.14);
+assert.notDeepEqual(PROCEDURAL_SFX.chop, PROCEDURAL_SFX.mine, "chop and mine effects have distinct chiptune definitions");
+assert(PROCEDURAL_SFX.chop.durationSeconds >= 0.06 && PROCEDURAL_SFX.chop.durationSeconds <= 0.14);
+assert(PROCEDURAL_SFX.mine.durationSeconds >= 0.06 && PROCEDURAL_SFX.mine.durationSeconds <= 0.14);
 
 const storage = memory();
 const store = createAudioSettingsStore({ storage });
@@ -93,7 +93,7 @@ runtime.startMusic();
 runtime.startMusic();
 assert.equal(addCount, 1);
 assert.equal(fakeSound.isPlaying, true);
-assert.equal(runtime.playEffect("log"), false, "procedural SFX safely no-ops without a Web Audio context");
+assert.equal(runtime.playEffect("chop"), false, "procedural SFX safely no-ops without a Web Audio context");
 const scheduled = [];
 fakeScene.sound.context = {
   state: "running",
@@ -109,12 +109,12 @@ fakeScene.sound.context = {
     return { gain: { setValueAtTime(value) { scheduled.push(["gain", value]); }, linearRampToValueAtTime() {} }, connect() {} };
   },
 };
-assert.equal(runtime.playEffect("log"), true);
-assert.equal(runtime.lastEffectType, "log");
+assert.equal(runtime.playEffect("chop"), true);
+assert.equal(runtime.lastEffectType, "chop");
 assert(scheduled.some(([kind, value]) => kind === "gain" && value > 0), "audible gain uses master times effects volume");
 store.setChannel("effects", 0);
 const scheduledBeforeMute = scheduled.length;
-assert.equal(runtime.playEffect("ruby"), false);
+assert.equal(runtime.playEffect("mine"), false);
 assert.equal(scheduled.length, scheduledBeforeMute, "zero effects volume creates no audible output");
 runtime.destroy();
 const audioRuntimeSource = readFileSync("src/audioRuntime.js", "utf8");

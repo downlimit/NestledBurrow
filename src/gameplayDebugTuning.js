@@ -1,4 +1,4 @@
-import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./debrisConfig.js";
+import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./resourceConfig.js";
 
 export const GAMEPLAY_DEBUG_STORAGE_KEY = "nestledBurrow.gameplayDebug";
 

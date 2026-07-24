@@ -11,7 +11,7 @@ import {
 } from "./hud.js";
 import { GAME_WIDTH } from "./worldConfig.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
-import { drawLog, drawRuby } from "./resourceVisuals.js";
+import { drawLog, drawRuby, drawStone } from "./resourceVisuals.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -25,13 +25,15 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   effects: Object.freeze({ x: 68, y: 78, width: 66, height: 14 }),
 });
 export const OPTIONS_BUILD_LABEL = Object.freeze({ x: 14, y: 102 });
-export const RESOURCE_HUD_AREA = Object.freeze({ x: 244, y: 54, width: 46, height: 44 });
-export const ENERGY_HUD_AREA = Object.freeze({ x: 294, y: 54, width: 16, height: 44 });
+export const RESOURCE_HUD_AREA = Object.freeze({ x: 244, y: 38, width: 46, height: 60 });
+export const ENERGY_HUD_AREA = Object.freeze({ x: 294, y: 38, width: 16, height: 60 });
 export const RESOURCE_HUD_LAYOUT = Object.freeze({
-  woodIcon: Object.freeze({ x: 250, y: 60 }),
-  woodValue: Object.freeze({ x: 264, y: 60 }),
-  rubyIcon: Object.freeze({ x: 250, y: 78 }),
-  rubyValue: Object.freeze({ x: 264, y: 78 }),
+  woodIcon: Object.freeze({ x: 250, y: 52 }),
+  woodValue: Object.freeze({ x: 264, y: 55 }),
+  stoneIcon: Object.freeze({ x: 250, y: 68 }),
+  stoneValue: Object.freeze({ x: 264, y: 71 }),
+  rubyIcon: Object.freeze({ x: 250, y: 84 }),
+  rubyValue: Object.freeze({ x: 264, y: 87 }),
 });
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 36, width: GAME_WIDTH - 48, height: 78 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 82, width: 96, height: 26 });
@@ -42,6 +44,10 @@ export function shouldShakeEnergyAfterInteraction({ mutated, energyBefore, curre
     && Number(currentEnergy) < Number(energyBefore)
     && Number(maximumEnergy) > 0
     && Number(currentEnergy) / Number(maximumEnergy) < 0.15;
+}
+
+export function isEnergyCritical(currentEnergy, maximumEnergy) {
+  return Number(maximumEnergy) > 0 && Number(currentEnergy) / Number(maximumEnergy) < 0.15;
 }
 
 export function createGameHud(scene, options) {
@@ -57,6 +63,7 @@ export function createGameHud(scene, options) {
   } = options;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const energyBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0);
+  const energyArrowGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 3).setScrollFactor(0);
   const buildLabel = compactBuildLabel(buildId);
 
   let destroyed = false;
@@ -70,6 +77,12 @@ export function createGameHud(scene, options) {
   let energyRatio = 0;
   let energyShakeCount = 0;
   let energyShakeActive = false;
+  let energyCritical = false;
+  let energyFlow = null;
+  let previousEnergy = null;
+  let energyEvents = [];
+  let energyArrowState = null;
+  let lastEnergyArrowTriggeredAt = -Infinity;
 
   const optionsHit = createZone(scene, OPTIONS_HIT_AREA);
   const optionsPanelHit = createZone(scene, OPTIONS_PANEL_AREA).disableInteractive();
@@ -92,11 +105,14 @@ export function createGameHud(scene, options) {
   };
   const clockText = createText(scene, { fontSize: "8px" });
   const woodValueText = createText(scene, { fontSize: "8px" });
+  const stoneValueText = createText(scene, { fontSize: "8px" });
   const rubyValueText = createText(scene, { fontSize: "8px" });
   const woodIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
+  const stoneIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
   const rubyIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
-  drawLog(woodIcon, 5);
-  drawRuby(rubyIcon, 5);
+  drawLog(woodIcon, 0);
+  drawStone(stoneIcon, 0);
+  drawRuby(rubyIcon, 0);
 
   function stop(pointer, event) {
     event?.stopPropagation?.();
@@ -185,10 +201,11 @@ export function createGameHud(scene, options) {
   }
 
   function hideManagedObjects() {
-    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, rubyValueText, ...Object.values(soundTexts)]) {
+    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...Object.values(soundTexts)]) {
       text.setVisible(false);
     }
     woodIcon.setVisible(false);
+    stoneIcon.setVisible(false);
     rubyIcon.setVisible(false);
   }
 
@@ -229,28 +246,76 @@ export function createGameHud(scene, options) {
     graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(RESOURCE_HUD_AREA.x, RESOURCE_HUD_AREA.y, RESOURCE_HUD_AREA.width, RESOURCE_HUD_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(RESOURCE_HUD_AREA.x + 0.5, RESOURCE_HUD_AREA.y + 0.5, RESOURCE_HUD_AREA.width - 1, RESOURCE_HUD_AREA.height - 1);
     setManagedTextStyle(woodValueText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.wood)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodValue.x, RESOURCE_HUD_LAYOUT.woodValue.y);
+    setManagedTextStyle(stoneValueText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.stone ?? 0)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.stoneValue.x, RESOURCE_HUD_LAYOUT.stoneValue.y);
     setManagedTextStyle(rubyValueText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.rubies ?? 0)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyValue.x, RESOURCE_HUD_LAYOUT.rubyValue.y);
     woodIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodIcon.x, RESOURCE_HUD_LAYOUT.woodIcon.y);
+    stoneIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.stoneIcon.x, RESOURCE_HUD_LAYOUT.stoneIcon.y);
     rubyIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyIcon.x, RESOURCE_HUD_LAYOUT.rubyIcon.y);
-    renderEnergyBar(gameplay.currentEnergy, gameplay.maximumEnergy);
+    renderEnergyBar(gameplay.currentEnergy, gameplay.maximumEnergy, gameplay.energyFlow);
   }
 
-  function renderEnergyBar(currentEnergy, maximumEnergy) {
+  function renderEnergyBar(currentEnergy, maximumEnergy, flow = null) {
     const innerHeight = ENERGY_HUD_AREA.height - 6;
     const maximum = Number(maximumEnergy);
     energyRatio = maximum > 0 ? Math.min(1, Math.max(0, Number(currentEnergy) / maximum)) : 0;
     energyFillHeight = energyRatio > 0 ? Math.max(1, Math.round(innerHeight * energyRatio)) : 0;
+    energyCritical = isEnergyCritical(currentEnergy, maximumEnergy);
     energyBarGraphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(ENERGY_HUD_AREA.x, ENERGY_HUD_AREA.y, ENERGY_HUD_AREA.width, ENERGY_HUD_AREA.height);
     energyBarGraphics.fillStyle(HUD_COLORS.shadow, 0.95).fillRect(ENERGY_HUD_AREA.x + 3, ENERGY_HUD_AREA.y + 3, ENERGY_HUD_AREA.width - 6, innerHeight);
     if (energyFillHeight > 0) {
-      energyBarGraphics.fillStyle(HUD_COLORS.mid, 1).fillRect(
+      energyBarGraphics.fillStyle(energyCritical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(
         ENERGY_HUD_AREA.x + 3,
         ENERGY_HUD_AREA.y + 3 + innerHeight - energyFillHeight,
         ENERGY_HUD_AREA.width - 6,
         energyFillHeight,
       );
     }
+    energyFlow = flow?.direction ? { direction: flow.direction, arrows: Math.min(3, Math.max(1, Math.round(flow.arrows) || 1)) } : null;
+    trackEnergyChange(currentEnergy);
     energyBarGraphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(ENERGY_HUD_AREA.x + 0.5, ENERGY_HUD_AREA.y + 0.5, ENERGY_HUD_AREA.width - 1, ENERGY_HUD_AREA.height - 1);
+  }
+
+  function trackEnergyChange(currentEnergy) {
+    const value = Number(currentEnergy);
+    if (!Number.isFinite(value)) return;
+    const now = scene.time.now;
+    if (Number.isFinite(previousEnergy) && value !== previousEnergy) energyEvents.push({ time: now, amount: value - previousEnergy });
+    previousEnergy = value;
+    energyEvents = energyEvents.filter((event) => now - event.time <= 1500);
+    const netAmount = energyEvents.reduce((total, event) => total + event.amount, 0);
+    if (netAmount === 0 || now - lastEnergyArrowTriggeredAt < 1100) return;
+    const direction = netAmount > 0 ? "up" : "down";
+    const ratePerSecond = Math.abs(netAmount) / 1.5;
+    const arrows = ratePerSecond > 2 ? 3 : ratePerSecond > 1.5 ? 2 : 1;
+    showEnergyArrows({ direction, arrows, ratePerSecond }, now);
+  }
+
+  function showEnergyArrows(flow, now) {
+    lastEnergyArrowTriggeredAt = now;
+    energyArrowState = { direction: flow.direction, arrows: flow.arrows, ratePerSecond: flow.ratePerSecond };
+    scene.tweens.killTweensOf(energyArrowGraphics);
+    energyArrowGraphics.clear().setAlpha(0);
+    drawEnergyFlow(energyArrowGraphics, flow);
+    scene.tweens.add({
+      targets: energyArrowGraphics,
+      alpha: 1,
+      duration: 500,
+      ease: "Sine.easeInOut",
+      onComplete: () => scene.tweens.add({
+        targets: energyArrowGraphics,
+        alpha: 0,
+        delay: 100,
+        duration: 500,
+        ease: "Sine.easeInOut",
+        onComplete: () => { energyArrowGraphics.clear(); energyArrowState = null; },
+      }),
+    });
+  }
+
+  function drawEnergyFlow(target, flow) {
+    if (!flow) return;
+    const startY = flow.arrows === 1 ? 65 : flow.arrows === 2 ? 59 : 53;
+    for (let index = 0; index < flow.arrows; index += 1) drawEnergyArrow(target, ENERGY_HUD_AREA.x + 5, startY + index * 7, flow.direction);
   }
 
   function renderOptionsPanel() {
@@ -352,10 +417,14 @@ export function createGameHud(scene, options) {
       return {
         clockText: clockText.text,
         woodText: woodValueText.text,
+        stoneText: stoneValueText.text,
         rubyText: rubyValueText.text,
-        icons: { wood: woodIcon.visible, ruby: rubyIcon.visible },
+        icons: { wood: woodIcon.visible, stone: stoneIcon.visible, ruby: rubyIcon.visible },
         energyRatio,
         energyFillHeight,
+        energyCritical,
+        energyFlow,
+        energyArrowState,
         energyY: energyBarGraphics.y,
         energyBaseY: 0,
         energyShakeCount,
@@ -366,6 +435,7 @@ export function createGameHud(scene, options) {
     getLayoutState() {
       return {
         optionsOpen,
+        buildLabel,
         buildLabelVisible: optionsOpen && !confirmingNewGame,
         areas: {
           options: OPTIONS_HIT_AREA,
@@ -396,10 +466,13 @@ export function createGameHud(scene, options) {
       unsubscribe?.();
       for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
-      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, rubyValueText, ...Object.values(soundTexts)]) text.destroy();
+      scene.tweens.killTweensOf(energyArrowGraphics);
+      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...Object.values(soundTexts)]) text.destroy();
       woodIcon.destroy();
+      stoneIcon.destroy();
       rubyIcon.destroy();
       energyBarGraphics.destroy();
+      energyArrowGraphics.destroy();
       graphics.destroy();
       if (fullscreenHud) {
         if (fullscreenHandler) fullscreenHud.hit.off("pointerdown", fullscreenHandler);
@@ -408,6 +481,14 @@ export function createGameHud(scene, options) {
       }
     },
   };
+}
+
+function drawEnergyArrow(graphics, x, y, direction) {
+  const rows = direction === "up"
+    ? [[2], [1, 2, 3], [0, 1, 2, 3, 4], [2], [2]]
+    : [[2], [2], [0, 1, 2, 3, 4], [1, 2, 3], [2]];
+  graphics.fillStyle(direction === "up" ? 0x9fd38a : 0xf2eadc, 0.9);
+  rows.forEach((columns, row) => columns.forEach((column) => graphics.fillRect(x + column, y + row, 1, 1)));
 }
 
 function createZone(scene, rect) {

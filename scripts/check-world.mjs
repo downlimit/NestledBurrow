@@ -16,6 +16,8 @@ import {
   WORLD_ROWS,
   WORLD_WIDTH,
 } from "../src/worldConfig.js";
+import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
+import { getResourceProfile } from "../src/resourceDomain.js";
 
 const layout = createWorldLayout();
 const footWidth = 8;
@@ -23,7 +25,7 @@ const footDepth = 5;
 
 assert(WORLD_WIDTH > GAME_WIDTH && WORLD_HEIGHT > GAME_HEIGHT, "world is larger than camera");
 assert.deepEqual(layout.bounds, { left: 0, top: 0, right: WORLD_WIDTH, bottom: WORLD_HEIGHT }, "world layout exposes current world bounds");
-assert.equal(layout.cellSize, TILE_SIZE, "world layout exposes tile-sized collision cells");
+assert.equal(layout.cellSize, PLACEMENT_CELL_SIZE, "world layout exposes the 8 px placement collision grid");
 assert.equal(typeof layout.isBlockedCell, "function", "world layout implements collision query");
 assert.equal(
   layout.groundTiles.length,
@@ -39,8 +41,10 @@ assert.equal(layout.houseWallTiles.length > 0, true);
 assert.equal(layout.decorationTiles.length, 48, "four 3x4 trees are present");
 
 for (let x = DOOR_LEFT; x < DOOR_LEFT + HOUSE.doorWidth; x += 1) {
-  assert.equal(isBlockedCell(layout, x, DOOR_Y), false, "doorway is open in diagnostic layout data");
-  assert.equal(layout.isBlockedCell(x, DOOR_Y), false, "doorway is open through environment query");
+  for (let offset = 0; offset < 2; offset += 1) {
+    assert.equal(isBlockedCell(layout, x * 2 + offset, DOOR_Y * 2), false, "doorway is open in diagnostic layout data");
+    assert.equal(layout.isBlockedCell(x * 2 + offset, DOOR_Y * 2), false, "doorway is open through environment query");
+  }
 }
 
 const expectedBlockedCells = [
@@ -52,8 +56,31 @@ const expectedBlockedCells = [
   [51 + 1, 34 + 3],
 ];
 for (const [x, y] of expectedBlockedCells) {
-  assert.equal(layout.blocked.has(cellKey(x, y)), true, `diagnostic blocked set contains ${x},${y}`);
-  assert.equal(layout.isBlockedCell(x, y), true, `environment query blocks ${x},${y}`);
+  assert.equal(layout.blocked.has(cellKey(x * 2, y * 2)), true, `diagnostic blocked set contains tile ${x},${y}`);
+  assert.equal(layout.isBlockedCell(x * 2, y * 2), true, `environment query blocks tile ${x},${y}`);
+}
+
+const resourceCells = new Set();
+for (const resource of RESOURCE_OBJECTS) {
+  const footprint = getResourceProfile(resource.profileId).footprint;
+  const placementOrigin = {
+    x: resource.cell.x * PLACEMENT_CELL_SIZE,
+    y: resource.cell.y * PLACEMENT_CELL_SIZE,
+  };
+  assert.equal(placementOrigin.x % PLACEMENT_CELL_SIZE, 0, `${resource.id} x is on the placement grid`);
+  assert.equal(placementOrigin.y % PLACEMENT_CELL_SIZE, 0, `${resource.id} y is on the placement grid`);
+  assert.equal(resource.position.x, placementOrigin.x + footprint.width * PLACEMENT_CELL_SIZE / 2, `${resource.id} interaction x centers its footprint`);
+  assert.equal(resource.position.y, placementOrigin.y + footprint.height * PLACEMENT_CELL_SIZE / 2, `${resource.id} interaction y centers its footprint`);
+  for (let y = 0; y < footprint.height; y += 1) for (let x = 0; x < footprint.width; x += 1) {
+    const key = cellKey(resource.cell.x + x, resource.cell.y + y);
+    assert(!resourceCells.has(key), `${resource.id} footprint does not overlap another resource`);
+    assert(!layout.blocked.has(key), `${resource.id} footprint does not overlap static terrain`);
+    resourceCells.add(key);
+  }
+}
+for (const [label, point] of [["spawn", layout.spawn], ["outdoor target", layout.outdoorTarget], ...NPCS.flatMap((npc) => [[`${npc.id} spawn`, npc.spawn], ...npc.patrol.waypoints.map((waypoint, index) => [`${npc.id} waypoint ${index}`, waypoint])])]) {
+  const cell = cellKey(Math.floor(point.x / PLACEMENT_CELL_SIZE), Math.floor(point.y / PLACEMENT_CELL_SIZE));
+  assert(!resourceCells.has(cell), `${label} remains outside resource footprints`);
 }
 
 for (const point of [layout.spawn, layout.outdoorTarget]) {
