@@ -306,6 +306,7 @@ class WorldScene extends Phaser.Scene {
       getStaticInteractionDefinitions: () => [
         ...(this.debrisRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.facilityRuntime?.getInteractionDefinitions?.() ?? []),
+        ...(this.sleeping && !this.exhaustedSleeping ? [this.getSleepingWakeInteraction()] : []),
         ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
       ],
       isInteractionAllowed: (definition) => !this.facilityRuntime?.isUsing()
@@ -826,6 +827,19 @@ class WorldScene extends Phaser.Scene {
       id: "wake-exhausted-player", entityId: "wake-exhausted-player", roomId: "world", kind: "wake-exhausted",
       position: { x: position.x, y: position.y }, radius: 24, priority: 100, requiresFacing: false, facingDotThreshold: -1,
       prompt: "hud:interaction.wake", payload: {},
+    };
+  }
+
+  getSleepingWakeInteraction() {
+    const position = this.playerCharacter?.motor?.position ?? BED_OBJECT.position;
+    return {
+      ...BED_OBJECT,
+      position: { x: position.x, y: position.y },
+      radius: 24,
+      priority: 100,
+      requiresFacing: false,
+      facingDotThreshold: -1,
+      prompt: "hud:interaction.wake",
     };
   }
 
