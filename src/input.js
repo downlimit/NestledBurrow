@@ -2,7 +2,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
 
 export const JOYSTICK = {
   baseRadius: 21,
-  sprintRadius: 33,
+  sprintRadius: 54.45,
   knobRadius: 9,
   maxOffset: 15,
   activationRadius: 31,
