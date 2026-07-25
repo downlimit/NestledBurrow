@@ -25,7 +25,7 @@
 - interaction targeting является чистой детерминированной функцией;
 - `InteractionRuntime` связывает snapshots, session operations и presenter;
 - `InteractionHud` изолирует Phaser-представление диалога и mobile tap lifecycle;
-- `MobileJoystick` и `MovementDebugPanel` имеют самостоятельное lifecycle ownership.
+- `MobileJoystick`, `MovementDebugPanel` и `CameraFollowRuntime` имеют самостоятельное lifecycle ownership.
 
 Существующий movement core следует расширять эволюционно.
 
@@ -260,6 +260,18 @@ Playwright должен проверять:
 Используются отдельные desktop и mobile projects с locale/touch/device emulation. Screenshot artifacts полезны для review; хрупкие pixel-diff baselines не вводятся без стабильной rendering environment.
 
 Unit/contract tests остаются основным доказательством pure logic.
+
+### 14. Presentation camera follow
+
+`CameraFollowRuntime` владеет внутренними точками B/F/C и отдельной невидимой follow target. После visual update он получает presentation-позицию игрока: поэтому sleep и facility visual-pose корректно кадрируются, не изменяя безопасную motor position.
+
+- B догоняет P frame-rate-independent экспоненциальной интерполяцией;
+- F зеркально продолжает вектор B→P;
+- C плавно смешивает B и F по фактической скорости персонажа;
+- start, restart и explicit hard relocation сбрасывают B/F/C в P;
+- camera bounds и integer zoom остаются собственностью `WorldScene`.
+
+Tuning B/F является debug presentation preference в `localStorage`; он не входит в `GameSessionState` и не требует migration save.
 
 ## Реализованные шаги
 

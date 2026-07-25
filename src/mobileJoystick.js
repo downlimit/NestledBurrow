@@ -16,6 +16,7 @@ export class MobileJoystick {
     this.canvas = options.canvas ?? scene?.game?.canvas;
     this.isExcludedPoint = options.isExcludedPoint ?? (() => false);
     this.direction = { x: 0, y: 0 };
+    this.sprinting = false;
     this.activeJoystickPointerId = null;
     this.activeDomPointerId = null;
     this.activeTouchIdentifier = null;
@@ -36,6 +37,12 @@ export class MobileJoystick {
       .circle(0, 0, JOYSTICK.baseRadius, 0xd9c18f, 0.22)
       .setStrokeStyle(1, 0xf2eadc, 0.32)
       .setDepth(9000)
+      .setScrollFactor(0)
+      .setVisible(false);
+    this.sprintRing = scene.add
+      .circle(0, 0, JOYSTICK.sprintRadius, 0xd9a58f, 0)
+      .setStrokeStyle(1, 0xd9a58f, 0.72)
+      .setDepth(8999)
       .setScrollFactor(0)
       .setVisible(false);
     this.knob = scene.add
@@ -81,6 +88,10 @@ export class MobileJoystick {
 
   getDirection() {
     return { x: this.direction.x, y: this.direction.y };
+  }
+
+  isSprinting() {
+    return this.sprinting;
   }
 
   addPhaser(event, fn, context) {
@@ -132,6 +143,8 @@ export class MobileJoystick {
     this.capturePointer();
     this.center = clampJoystickCenter(x, y);
     this.direction = { x: 0, y: 0 };
+    this.sprinting = false;
+    this.sprintRing?.setPosition(this.center.x, this.center.y).setVisible(true);
     this.base?.setPosition(this.center.x, this.center.y).setVisible(true);
     this.knob?.setPosition(this.center.x, this.center.y).setVisible(true);
   }
@@ -204,6 +217,7 @@ export class MobileJoystick {
     if (!this.center) return;
     const state = getJoystickState(pointer.x, pointer.y, this.center);
     this.direction = { x: state.movementX, y: state.movementY };
+    this.sprinting = Math.hypot(pointer.x - this.center.x, pointer.y - this.center.y) >= JOYSTICK.sprintRadius;
     this.knob?.setPosition(state.knobX, state.knobY);
   }
 
@@ -221,7 +235,9 @@ export class MobileJoystick {
     this.activeTouchIdentifier = null;
     this.pointerCaptured = false;
     this.direction = { x: 0, y: 0 };
+    this.sprinting = false;
     this.center = null;
+    this.sprintRing?.setVisible(false);
     this.base?.setVisible(false);
     this.knob?.setVisible(false);
   }
@@ -240,8 +256,10 @@ export class MobileJoystick {
     this.reset();
     this.base?.destroy();
     this.knob?.destroy();
+    this.sprintRing?.destroy();
     this.base = null;
     this.knob = null;
+    this.sprintRing = null;
   }
 }
 

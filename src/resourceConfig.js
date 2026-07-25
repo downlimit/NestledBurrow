@@ -21,6 +21,8 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   sleepTimeScale: 32,
   realSecondsPerGameDay: 1440,
   sleepEnergyPerGameHour: 12.5,
+  backPointFollowRate: 5,
+  cameraLeadTransitionSeconds: 2,
   needs: Object.freeze({
     flowArrowRatios: Object.freeze([1, 2.5]),
     novelty: Object.freeze({ base: -0.25, running: 9, commonResource: -1.5, ruby: 8 }),
@@ -76,6 +78,8 @@ export function normalizeGameplayTuning(value = {}) {
     sleepTimeScale: number(value.sleepTimeScale, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale, 1, 64),
     sleepEnergyPerGameHour: number(value.sleepEnergyPerGameHour ?? value.sleepEnergyRegenPerSecond, DEFAULT_GAMEPLAY_TUNING.sleepEnergyPerGameHour, 0, 999),
     realSecondsPerGameDay: number(value.realSecondsPerGameDay, DEFAULT_GAMEPLAY_TUNING.realSecondsPerGameDay, 1, 99999),
+    backPointFollowRate: number(value.backPointFollowRate, DEFAULT_GAMEPLAY_TUNING.backPointFollowRate, 0.1, 20),
+    cameraLeadTransitionSeconds: number(value.cameraLeadTransitionSeconds, DEFAULT_GAMEPLAY_TUNING.cameraLeadTransitionSeconds, 0.1, 10),
     needs: DEFAULT_GAMEPLAY_TUNING.needs,
   };
 }

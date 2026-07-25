@@ -20,12 +20,12 @@ assert.equal(isTouchJoystickSupported({ maxTouchPoints: 0, coarsePointer: true }
 assert.equal(isTouchJoystickSupported({ maxTouchPoints: 0, coarsePointer: false }), false);
 assert.deepEqual(clampJoystickCenter(80, 90), { x: 80, y: 90 });
 assert.deepEqual(clampJoystickCenter(2, 1), {
-  x: JOYSTICK.baseRadius,
-  y: JOYSTICK.baseRadius,
+  x: JOYSTICK.sprintRadius,
+  y: JOYSTICK.sprintRadius,
 });
 assert.deepEqual(clampJoystickCenter(GAME_WIDTH / 2 - 1, GAME_HEIGHT - 1), {
-  x: GAME_WIDTH / 2 - JOYSTICK.baseRadius,
-  y: GAME_HEIGHT - JOYSTICK.baseRadius,
+  x: GAME_WIDTH / 2 - JOYSTICK.sprintRadius,
+  y: GAME_HEIGHT - JOYSTICK.sprintRadius,
 });
 assert.equal(isInsideJoystickActivation(GAME_WIDTH / 2 - 0.1, 90), true);
 assert.equal(isInsideJoystickActivation(GAME_WIDTH / 2, 90), false);
@@ -188,6 +188,7 @@ near(
   1,
   "actual component uses production joystick math outside canvas",
 );
+assert.equal(joystick.isSprinting(), true, "raw pointer distance beyond the 33 px ring enables sprint");
 canvas.emit("pointerleave", {});
 assert.equal(joystick.activeJoystickPointerId, 1, "boundary leave does not reset");
 canvas.emit("lostpointercapture", { pointerId: 1 });
@@ -196,6 +197,7 @@ windowRef.emit("pointerup", { pointerId: 2, cancelable: true, preventDefault() {
 assert.equal(joystick.activeJoystickPointerId, 1, "nonmatching release ignored");
 windowRef.emit("pointerup", { pointerId: 1, cancelable: true, preventDefault() {} });
 assert.deepEqual(joystick.getDirection(), { x: 0, y: 0 }, "matching release resets");
+assert.equal(joystick.isSprinting(), false, "matching release clears sprint");
 
 joystick.destroy();
 assert.equal(
