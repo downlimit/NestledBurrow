@@ -42,6 +42,7 @@ Strict lane дополнительно проверяет конкретный m
 ## Failure и repair
 
 - Сначала найти точную failing-команду и assertion.
+- Перед repair contract дождаться terminal-состояния всех jobs текущего head SHA и объединить deterministic failures в один repair.
 - Один раз сравнить её с current `main`.
 - Base failure не приписывать feature PR.
 - Transient failure перезапускать только при реальном инфраструктурном признаке.

@@ -216,6 +216,14 @@ Foot-box collision и axis-separated sliding по переданному collisi
 
 ## Проверки и инструменты
 
+### `scripts/manage-task-preview.mjs`
+
+Запускает один detached task-preview на стабильном свободном порту, хранит PID/URL/logs в ignored `artifacts`, проверяет HTTP и живой canvas 320×180, повторно использует здоровый процесс и поддерживает `start/status/stop`.
+
+### `scripts/run-focused-e2e.mjs`
+
+Владеет отдельным временным Vite-процессом для focused Browser E2E, резервирует свободный порт, ждёт readiness и завершает только собственные test/server процессы.
+
 ### `scripts/check-doc-contracts.mjs`
 
 Проверяет role bootstrap, отдельные Lead/Integrator/Codex contracts, команду `проверь все PR`, dynamic GitHub tool discovery, Integration metadata и отсутствие blanket context loading для Codex.
@@ -297,13 +305,13 @@ Indoor/outdoor camera previews включают соответствующего
 
 ### `package.json`
 
-Команды запуска, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/character-diagonals/interaction/dialogue/visual/world/preview проверок.
+Команды managed task-preview, focused E2E, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/character-diagonals/interaction/dialogue/visual/world проверок.
 
 ## Инфраструктура
 
 ### `.github/workflows/pr-check.yml`
 
-Проверяет финальный PR и загружает world previews и diagonal contact sheet.
+Классифицирует scope, параллельно запускает Validate и Browser E2E для runtime-маршрута и загружает тяжёлые diagnostic artifacts только при failure.
 
 ### `.github/workflows/deploy-pages.yml`
 
