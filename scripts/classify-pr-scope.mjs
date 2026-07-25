@@ -25,6 +25,7 @@ const isCiMeta = (path) =>
     "scripts/check-pr-scope.mjs",
     "scripts/check-doc-contracts.mjs",
     "scripts/check-task-identity-contract.mjs",
+    "scripts/manage-task-preview.mjs",
   ].includes(path) || path.startsWith("tasks/");
 
 const isMicro = (path) =>

@@ -89,7 +89,7 @@ jobs:
           git diff --check "$BASE_SHA" "$HEAD_SHA"
 
       - name: Upload world previews
-        if: always() && needs.scope.outputs.full_validation == 'true'
+        if: failure() && needs.scope.outputs.full_validation == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: world-previews-pr-${{ github.event.pull_request.number }}
@@ -137,7 +137,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Playwright test artifacts
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-artifacts-pr-${{ github.event.pull_request.number }}
