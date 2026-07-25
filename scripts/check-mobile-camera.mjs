@@ -39,7 +39,6 @@ assert(Math.abs(oneStep.back.x - tenSteps.back.x) < 1e-9, "B interpolation is fr
 assert(oneStep.front.x > 100, "F mirrors B beyond the presentation point");
 assert(oneStep.progress > 0 && oneStep.progress < 1, "movement begins a gradual B-to-F transition");
 assert(oneStep.target.x < oneStep.front.x, "camera starts closer to B than F");
-
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");
 const characterVisual = readFileSync("src/characterVisual.js", "utf8");
@@ -47,6 +46,8 @@ const gameHud = readFileSync("src/gameHud.js", "utf8");
 assert(interactionHud.includes("isInteractHeld()"), "mobile interaction exposes held state");
 assert(main.includes("mobileHeldResourceInteract") && main.includes("RESOURCE_INTERACTION_KIND"), "held mobile interaction repeats only repeatable resources");
 assert(main.includes("this.runKey?.isDown || this.mobileJoystick?.isSprinting?.()"), "keyboard and mobile sprint share one running state");
+assert(main.includes("presentationPosition: this.getPlayerCameraPosition()"), "camera uses the interaction-safe focus position");
+assert(main.includes("this.facilityRuntime?.isUsing?.() || this.sleeping"), "facility use and sleep keep the camera anchored to the unchanged motor position");
 assert(characterVisual.includes("setPresentationPose(pose)") && !characterVisual.includes("sleepingPose"), "facility and sleep use a general visual presentation boundary");
 assert(gameHud.includes("pinnedNeedId") && gameHud.includes("isCoarsePointer()"), "coarse pointer can pin needs tooltips");
 

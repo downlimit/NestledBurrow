@@ -44,7 +44,7 @@ import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
 import { createAudioSettingsStore } from "./audioSettings.js";
-import { MUSIC_KEY, getMusicUrl, PhaserAudioRuntime } from "./audioRuntime.js";
+import { PhaserAudioRuntime, preloadMusicPlaylist } from "./audioRuntime.js";
 import { HUD_DEPTH } from "./hud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
@@ -52,7 +52,7 @@ import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_POSITION, BED_WAKE_TILE } fr
 import { DEFAULT_RESOURCE_ID, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
 import { createDebrisRuntime } from "./debrisRuntime.js";
-import { FACILITY_INTERACTION_KIND, FACILITIES, getFacility } from "./facilityConfig.js";
+import { FACILITY_INTERACTION_KIND, FACILITIES, getFacility, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
 import { applyNeedsUpdate } from "./needsDomain.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
@@ -73,7 +73,8 @@ class WorldScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.audio(MUSIC_KEY, getMusicUrl(import.meta.env.BASE_URL));
+    preloadMusicPlaylist(this, import.meta.env.BASE_URL);
+    preloadFacilityAssets(this, import.meta.env.BASE_URL);
     this.getUsedCharacterVisualProfiles().forEach((visualProfile) => {
       this.preloadCharacterVisualProfile(visualProfile);
     });
@@ -382,6 +383,14 @@ class WorldScene extends Phaser.Scene {
     };
   }
 
+  getPlayerCameraPosition() {
+    const motorPosition = this.playerCharacter?.motor?.position;
+    if ((this.facilityRuntime?.isUsing?.() || this.sleeping) && motorPosition) {
+      return { x: Number(motorPosition.x), y: Number(motorPosition.y) };
+    }
+    return this.getPlayerPresentationPosition();
+  }
+
   syncFacilityPresentationPose() {
     if (!this.playerCharacter?.visual || this.sleeping) return;
     this.playerCharacter.visual.setPresentationPose(this.facilityRuntime?.getPresentationPose?.() ?? null);
@@ -631,11 +640,11 @@ class WorldScene extends Phaser.Scene {
     this.simulationScale = this.getSleepTimeScale();
     this.timeScale = this.simulationScale;
     const player = this.characterSystem.require(this.sessionState.playerId);
+    this.sleepOrigin = { ...player.motor.position };
     if (exhausted) {
       player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
       player.visual.setPresentationPose({ x: player.motor.position.x, y: player.motor.position.y - 4, facing: "up", angle: -90, showSleepMarker: true });
     } else {
-      player.motor.position = { ...BED_WAKE_POSITION };
       player.motor.movement = createMovementState({ facing: { x: -1, y: 0 } });
       player.visual.setPresentationPose({ x: BED_OBJECT.position.x, y: BED_OBJECT.position.y - 1, facing: "right", angle: -90, showSleepMarker: true });
     }
@@ -653,7 +662,8 @@ class WorldScene extends Phaser.Scene {
     this.timeScale = 1;
     const player = this.characterSystem.require(this.sessionState.playerId);
     player.visual.setPresentationPose(null);
-    if (!wasExhausted) player.motor.position = { ...BED_WAKE_POSITION };
+    if (!wasExhausted && this.sleepOrigin) player.motor.position = { ...this.sleepOrigin };
+    this.sleepOrigin = null;
     player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
     this.debrisRuntime?.setSleeping(false);
     this.syncLowEnergyMarker();
@@ -715,7 +725,7 @@ class WorldScene extends Phaser.Scene {
     }
     this.syncFacilityPresentationPose();
     this.cameraRuntime?.update({
-      presentationPosition: this.getPlayerPresentationPosition(),
+      presentationPosition: this.getPlayerCameraPosition(),
       speed: this.playerCharacter?.speed ?? 0,
       deltaMs: realDeltaMs,
     });
