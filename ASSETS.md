@@ -118,3 +118,32 @@ The earlier Kenney Roguelike/RPG room and continuous-world atlases remain histor
 - **SHA-256:** `502dfd51bcfa7908becd39f604a6c73d868d9742fd3d1207c985cb9482627a91`.
 - **Git blob SHA:** `76767a4fc6e5a7386118b044b5a99e02f24b0a07`.
 - **Integrity check:** `scripts/check-audio.mjs` verifies the committed path, byte length and Git blob identity before runtime integration.
+
+## User-uploaded ambient music library
+
+- **Provenance:** exact project files uploaded by the user to `asset-inbox/incoming`; no external copy or substitute was used.
+- **Delivery:** each runtime path references the exact uploaded Git blob without transcoding, normalization, recompression or byte modification.
+- **Runtime integration:** Task #034 consumes these paths as a seven-track playlist together with `NestledBurrow_SunlitSavePoint.mp3`.
+
+| Runtime file | Source upload | Git blob SHA |
+| --- | --- | --- |
+| `public/assets/audio/music/NestledBurrow_Ambient01.mp3` | `incoming/suno-song-3693411c.mp3` | `fe0ca6344d6dec08a0db0cff61e3832baa864265` |
+| `public/assets/audio/music/NestledBurrow_Ambient02.mp3` | `incoming/suno-song-9d54e725.mp3` | `86f62c53ddef908809a1f9d410cf04c71bc0c6da` |
+| `public/assets/audio/music/NestledBurrow_Ambient03.mp3` | `incoming/suno-song-c021cde4.mp3` | `c54abb765f04f337946c9617ca271a2f0f3c3716` |
+| `public/assets/audio/music/NestledBurrow_Ambient04.mp3` | `incoming/suno-song-c322d726.mp3` | `1bfeb7c5e3a5ba782395373a1511ee2c04668d9f` |
+| `public/assets/audio/music/NestledBurrow_Ambient05.mp3` | `incoming/suno-song-e6c3f46b.mp3` | `5c09c9bcff72b14f69f78085472d35de7a6c9886` |
+| `public/assets/audio/music/NestledBurrow_Ambient06.mp3` | `incoming/suno-song-ee08dca2.mp3` | `188d62946399f80a9cd936797215eecef4799b63` |
+
+The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `76767a4fc6e5a7386118b044b5a99e02f24b0a07`, identical to the existing runtime file, and is intentionally not duplicated.
+
+## User-uploaded facility sprites
+
+- **Provenance:** exact project PNG files uploaded by the user to `asset-inbox/incoming`; no external copy or substitute was used.
+- **Delivery:** each runtime path references the exact uploaded Git blob without resampling, recoloring, recompression or derived exports.
+- **Runtime integration:** Task #034 replaces the current procedural shower, toilet and dining-table drawings with these files.
+
+| Runtime file | Source upload | Native size | Git blob SHA |
+| --- | --- | ---: | --- |
+| `public/assets/project/facilities/NestledBurrow_Toilet.png` | `incoming/bathroom_toilet.png` | `16×16` | `d9f28cfc22467f365700cf7617d2d0f298fac17f` |
+| `public/assets/project/facilities/NestledBurrow_Bathtub.png` | `incoming/bathroom_bathtub.png` | `32×32` | `8e987e03a7e8047df01e915e5b964bf5a6069906` |
+| `public/assets/project/facilities/NestledBurrow_DiningTableFeast.png` | `incoming/dining_table_feast.png` | `48×16` | `57af651f65f6c6f4ff1ccac55f11819d0832efa3` |
