@@ -7,6 +7,7 @@ import { drawResource } from "./resourceVisuals.js";
 export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   const visuals = new Map();
   let bedGraphics = null;
+  let sleeping = false;
   let destroyed = false;
 
   const stateFor = (definition) => sessionState.gameplay.resourceNodes[definition.id];
@@ -84,13 +85,13 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     drawBed(bedGraphics);
   }
 
-  function setSleeping(_active) {}
+  function setSleeping(active) { sleeping = Boolean(active); }
 
   RESOURCE_OBJECTS.forEach(createVisual);
   createBed();
 
   return {
-    getInteractionDefinitions() { return [...RESOURCE_OBJECTS.filter(isPresent), BED_OBJECT]; },
+    getInteractionDefinitions() { return [...RESOURCE_OBJECTS.filter(isPresent), sleeping ? { ...BED_OBJECT, prompt: "hud:interaction.wake" } : BED_OBJECT]; },
     isPresent(id) { const definition = RESOURCE_OBJECTS.find((item) => item.id === (id ?? RESOURCE_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },
     getVisualState(id) {
       const graphics = visuals.get(id);

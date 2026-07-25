@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-const read = (path) => readFileSync(path, "utf8");
+const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const requireText = (text, tokens, label) => {
   for (const token of tokens) assert(text.includes(token), `${label} must contain: ${token}`);
 };
@@ -52,7 +52,7 @@ requireText(taskTemplate, ["Use only for large, dependent, resumable", "Do not r
 
 assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI must run for Draft and Ready PRs");
 requireText(prWorkflow, ["Classify changed paths", "Classify Scope", "needs: scope", "needs.scope.outputs.browser == 'true'", "Run metadata checks"], "PR workflow");
-requireText(prWorkflow, ["- name: Upload world previews\n        if: failure()", "- name: Upload Playwright test artifacts\n        if: failure()"], "failure artifact policy");
+requireText(prWorkflow, ["- name: Upload world previews\n        if: failure() && needs.scope.outputs.full_validation == 'true'", "- name: Upload Playwright test artifacts\n        if: failure()"], "failure artifact policy");
 assert((prWorkflow.match(/fetch-depth: 0/g) ?? []).length >= 2, "scope and metadata validation must fetch the PR base commit");
 requireText(scopeClassifier, ["micro", "ci-meta", "runtime", "strict", "full_validation", "browser"], "PR scope classifier");
 requireText(focusedE2E, ["createServer", "probe.listen(0, \"127.0.0.1\"", "PW_BASE_URL", "String(port)"], "focused E2E launcher");

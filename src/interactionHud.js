@@ -31,6 +31,7 @@ export function createInteractionHud(scene, options = {}) {
   let messageTimer = null;
   let suppressed = false;
   let cooldownProgress = 0;
+  let promptTargetAlpha = 1;
 
   const onPointerDown = (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -56,6 +57,18 @@ export function createInteractionHud(scene, options = {}) {
   function actionLabel(key) {
     const action = localization.t(key);
     return isCoarsePointer() ? action : `SPACE - ${action}`;
+  }
+
+  function transitionPromptAlpha(targetAlpha) {
+    if (targetAlpha === promptTargetAlpha) return;
+    promptTargetAlpha = targetAlpha;
+    scene.tweens.killTweensOf(promptText);
+    scene.tweens.add({
+      targets: promptText,
+      alpha: targetAlpha,
+      duration: 300,
+      ease: "Sine.easeOut",
+    });
   }
 
   function redraw(force = false) {
@@ -90,6 +103,7 @@ export function createInteractionHud(scene, options = {}) {
     if (promptState) {
       const label = actionLabel(promptState.promptKey);
       setManagedTextStyle(promptText, scene, promptStyle()).setText(label).setVisible(true);
+      transitionPromptAlpha(cooldownProgress > 0 ? 0.5 : 1);
       const width = Math.max(isCoarsePointer() ? 36 : PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
       promptRect = { x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - width, y: GAME_HEIGHT - 34, width, height: PROMPT_HEIGHT };
       graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(promptRect.x, promptRect.y, promptRect.width, promptRect.height);
@@ -115,6 +129,7 @@ export function createInteractionHud(scene, options = {}) {
       promptState = { promptKey: messageKey, message: true };
       redraw(true);
       if (messageTimer !== null) scene.time.removeEvent(messageTimer);
+      scene.tweens.killTweensOf(promptText);
       messageTimer = scene.time.delayedCall(duration, () => { messageTimer = null; if (promptState?.message) { promptState = null; redraw(true); } });
     },
     hideDialogue() { dialogueState = null; redraw(); },
@@ -125,11 +140,24 @@ export function createInteractionHud(scene, options = {}) {
       cooldownProgress = next;
       redraw();
     },
+    triggerCooldownFeedback() {
+      scene.tweens.killTweensOf(promptText);
+      promptText.setAlpha(1);
+      promptTargetAlpha = 0.5;
+      scene.tweens.add({
+        targets: promptText,
+        alpha: 0.5,
+        duration: 300,
+        ease: "Sine.easeOut",
+      });
+    },
     getPresentationState() {
       return {
         suppressed,
         promptVisible: Boolean(!suppressed && promptState && promptRect),
+        messageKey: promptState?.message ? promptState.promptKey : null,
         cooldownProgress,
+        promptAlpha: promptText.alpha,
         dialogueVisible: Boolean(!suppressed && dialogueState),
       };
     },

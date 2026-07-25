@@ -74,14 +74,15 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   const afterFirst = await bridge(page, "getSession");
   await bridge(page, "interact");
   const afterSecond = await bridge(page, "getSession");
-  expect(afterFirst.gameplay.currentEnergy).toBeLessThanOrEqual(before.gameplay.currentEnergy - 1);
-  expect(afterFirst.gameplay.currentEnergy).toBeGreaterThan(before.gameplay.currentEnergy - 1.5);
+  expect(afterFirst.gameplay.currentEnergy).toBeLessThanOrEqual(before.gameplay.currentEnergy - 0.5);
+  expect(afterFirst.gameplay.currentEnergy).toBeGreaterThan(before.gameplay.currentEnergy - 1);
   expect(afterSecond.gameplay.currentEnergy).toBeLessThanOrEqual(afterFirst.gameplay.currentEnergy);
   expect(afterSecond.gameplay.resourceNodes["yard-ruby-01"].progress).toBe(afterFirst.gameplay.resourceNodes["yard-ruby-01"].progress);
 
   await placeNear(page, "home-bed-01");
   await bridge(page, "interact");
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: true, timeScale: 32 });
+  await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { prompt: "hud:interaction.wake" } });
   await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ x: 520, y: 231, angle: -90, textureKey: "tile_0269" });
   await bridge(page, "wakeUp");
 
@@ -120,8 +121,10 @@ test("resource hit feedback returns to its placement-grid anchor", async ({ page
 
 test("running, exhaustion sleep and wake-up share the energy-flow contract", async ({ page }) => {
   await boot(page);
-  await bridge(page, "setEnergy", 4);
+  await bridge(page, "setEnergy", 14);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "up", arrows: 1 } } });
+  await bridge(page, "setEnergy", 15);
+  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 1 } } });
 
   await page.keyboard.down("ArrowRight");
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 2 } } });
@@ -146,20 +149,20 @@ test("awake energy drains continuously per real second and low-energy idle recov
   let before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   let after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeGreaterThanOrEqual(0.5);
-  expect(before - after).toBeLessThan(0.6);
+  expect(before - after).toBeGreaterThanOrEqual(0.25);
+  expect(before - after).toBeLessThan(0.35);
   await bridge(page, "setPlayerMotion", { moving: true, running: false });
+  before = (await bridge(page, "getResourceState")).currentEnergy;
+  await bridge(page, "advanceGameplayTime", 1000);
+  after = (await bridge(page, "getResourceState")).currentEnergy;
+  expect(before - after).toBeGreaterThanOrEqual(0.75);
+  expect(before - after).toBeLessThan(0.85);
+  await bridge(page, "setPlayerMotion", { moving: true, running: true });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(before - after).toBeGreaterThanOrEqual(1.5);
   expect(before - after).toBeLessThan(1.6);
-  await bridge(page, "setPlayerMotion", { moving: true, running: true });
-  before = (await bridge(page, "getResourceState")).currentEnergy;
-  await bridge(page, "advanceGameplayTime", 1000);
-  after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeGreaterThanOrEqual(3);
-  expect(before - after).toBeLessThan(3.1);
   await bridge(page, "setEnergy", 4);
   await bridge(page, "setPlayerMotion", { moving: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;

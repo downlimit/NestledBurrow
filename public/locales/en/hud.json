@@ -20,9 +20,16 @@
     "hit": "Hit",
     "sleep": "Sleep",
     "wake": "Wake up",
+    "wakeFailed": "Could not wake up",
     "energyRestored": "Energy restored",
     "chop": "Chop",
-    "mine": "Mine"
+    "mine": "Mine",
+    "shower": "Use shower",
+    "leaveShower": "Leave shower",
+    "toilet": "Use toilet",
+    "leaveToilet": "Get off toilet",
+    "eat": "Eat",
+    "stopEating": "Stop eating"
   },
   "progress": {
     "newGame": "New game",
@@ -38,5 +45,25 @@
   },
   "resources": {
     "energy": "EN {current}/{max}"
+  },
+  "needs": {
+    "novelty": {
+      "tooltip": "Novelty - fresh, enjoyable experiences. Routine lowers it; movement and rare finds restore it."
+    },
+    "energy": {
+      "tooltip": "Energy - the reserve of strength for movement, work, and other actions."
+    },
+    "satiety": {
+      "tooltip": "Satiety - how well fed the character is. A low value means hunger."
+    },
+    "toilet": {
+      "tooltip": "Toilet - how soon the character needs relief. A low value means urgency."
+    },
+    "lustre": {
+      "tooltip": "Lustre - the character is clean, fresh, and well-groomed."
+    },
+    "dialogue": {
+      "tooltip": "Dialogue - how much conversation and social contact the character is getting."
+    }
   }
 }

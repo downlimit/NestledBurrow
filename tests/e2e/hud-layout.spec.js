@@ -45,8 +45,9 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       options: { x: 8, y: 4, width: 74, height: 30 },
       clock: { x: 120, y: 4, width: 80, height: 24 },
       fullscreen: { x: 286, y: 4, width: 30, height: 30 },
-      resources: { x: 244, y: 38, width: 46, height: 60 },
-      energy: { x: 294, y: 38, width: 16, height: 60 },
+      resources: { x: 210, y: 38, width: 40, height: 68 },
+      energy: { x: 252, y: 38, width: 60, height: 68 },
+      needs: { x: 252, y: 38, width: 60, height: 68 },
     },
     resources: {
       woodText: "0",
@@ -60,7 +61,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   expect(normal.resources.clockText).toMatch(/^\d{2}:\d{2}$/u);
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
-  expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(true);
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
   const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
@@ -96,8 +97,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: false, newGameConfirming: false });
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: false });
   const sessionAfterCancel = await bridge(page, "getSession");
-  const { worldTimeSeconds: _beforeTime, currentEnergy: _beforeEnergy, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
-  const { worldTimeSeconds: _afterTime, currentEnergy: _afterEnergy, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
+  const { worldTimeSeconds: _beforeTime, currentEnergy: _beforeEnergy, needs: _beforeNeeds, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
+  const { worldTimeSeconds: _afterTime, currentEnergy: _afterEnergy, needs: _afterNeeds, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
   expect({ ...sessionAfterCancel, gameplay: gameplayAfterCancel }).toEqual({ ...sessionBeforeConfirmation, gameplay: gameplayBeforeConfirmation });
 });
 

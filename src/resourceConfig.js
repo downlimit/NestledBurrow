@@ -8,10 +8,10 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   maximumEnergy: 100,
   axeDamage: 1,
   smallLogChopHp: 7,
-  energyPerHit: 1,
-  awakeDrainAmount: 0.5,
-  awakeWalkDrainAmount: 1.5,
-  awakeRunDrainAmount: 3,
+  energyPerHit: 0.5,
+  awakeDrainAmount: 0.25,
+  awakeWalkDrainAmount: 0.75,
+  awakeRunDrainAmount: 1.5,
   lowEnergyIdleRegenPerSecond: 1.5 / 1.66,
   runSpeedMultiplier: 1.66,
   exhaustionSleepScaleMultiplier: 0.5,
@@ -21,6 +21,14 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   sleepTimeScale: 32,
   realSecondsPerGameDay: 1440,
   sleepEnergyPerGameHour: 12.5,
+  needs: Object.freeze({
+    flowArrowRatios: Object.freeze([1, 2.5]),
+    novelty: Object.freeze({ base: -0.25, running: 9, commonResource: -1.5, ruby: 8 }),
+    satiety: Object.freeze({ base: -0.165, runningMultiplier: 1.3, resourceMultiplier: 3, table: 10 }),
+    toilet: Object.freeze({ base: -0.225, showerMultiplier: 0.5, toilet: 10 }),
+    lustre: Object.freeze({ base: -0.15, toiletMultiplier: 1.5, shower: 10 }),
+    dialogue: Object.freeze({ base: -0.05, nearNpc: 0.5, radius: 48 }),
+  }),
 });
 
 const descriptors = [
@@ -55,7 +63,7 @@ export function normalizeGameplayTuning(value = {}) {
     maximumEnergy: integer(value.maximumEnergy, DEFAULT_GAMEPLAY_TUNING.maximumEnergy, 1, 999),
     axeDamage: number(value.axeDamage, DEFAULT_GAMEPLAY_TUNING.axeDamage, 0, 999),
     smallLogChopHp: integer(value.smallLogChopHp ?? value.hitsPerLog, DEFAULT_GAMEPLAY_TUNING.smallLogChopHp, 1, 99),
-    energyPerHit: integer(value.energyPerHit ?? value.clearingEnergyCost, DEFAULT_GAMEPLAY_TUNING.energyPerHit, 0, 999),
+    energyPerHit: number(value.energyPerHit ?? value.clearingEnergyCost, DEFAULT_GAMEPLAY_TUNING.energyPerHit, 0, 999),
     awakeDrainAmount: number(value.awakeDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeDrainAmount, 0, 999),
     awakeWalkDrainAmount: number(value.awakeWalkDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeWalkDrainAmount, 0, 999),
     awakeRunDrainAmount: number(value.awakeRunDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeRunDrainAmount, 0, 999),
@@ -68,6 +76,7 @@ export function normalizeGameplayTuning(value = {}) {
     sleepTimeScale: number(value.sleepTimeScale, DEFAULT_GAMEPLAY_TUNING.sleepTimeScale, 1, 64),
     sleepEnergyPerGameHour: number(value.sleepEnergyPerGameHour ?? value.sleepEnergyRegenPerSecond, DEFAULT_GAMEPLAY_TUNING.sleepEnergyPerGameHour, 0, 999),
     realSecondsPerGameDay: number(value.realSecondsPerGameDay, DEFAULT_GAMEPLAY_TUNING.realSecondsPerGameDay, 1, 99999),
+    needs: DEFAULT_GAMEPLAY_TUNING.needs,
   };
 }
 

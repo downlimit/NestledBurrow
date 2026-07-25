@@ -36,11 +36,12 @@ const characterSystem = {
   set(id, snapshot) { snapshots.set(id, snapshot); },
 };
 const presenter = {
-  prompts: [], dialogues: [], hiddenPrompts: 0, hiddenDialogues: 0,
+  prompts: [], dialogues: [], messages: [], hiddenPrompts: 0, hiddenDialogues: 0,
   showPrompt(value) { this.prompts.push(value); },
   hidePrompt() { this.hiddenPrompts += 1; },
   showDialogue(value) { this.dialogues.push(value); },
   hideDialogue() { this.hiddenDialogues += 1; },
+  showMessage(value) { this.messages.push(value); },
 };
 const session = createFreshGameSessionState();
 const saves = [];
@@ -97,4 +98,29 @@ assert.deepEqual(JSON.parse(JSON.stringify(session)), session, "session remains 
 runtime.destroy();
 runtime.destroy();
 assert.equal(runtime.getCurrentCandidate(), null, "destroy is idempotent");
+
+const wakePresenter = {
+  messages: [],
+  showPrompt() {},
+  hidePrompt() {},
+  hideDialogue() {},
+  isMessageVisible() { return false; },
+  showMessage(value) { this.messages.push(value); },
+};
+const wakeRuntime = createInteractionRuntime({
+  sessionState: createFreshGameSessionState(),
+  characterSystem,
+  interactionDefinitions: [],
+  getStaticInteractionDefinitions: () => [{
+    id: "wake", entityId: "wake", roomId: "world", kind: "wake-exhausted",
+    position: { x: 0, y: 0 }, radius: 24, priority: 100, requiresFacing: false,
+    facingDotThreshold: -1, prompt: "hud:interaction.wake", payload: {},
+  }],
+  runWorldObjectInteraction: () => ({ status: "wake-failed", mutated: false }),
+  presenter: wakePresenter,
+});
+characterSystem.set("player", { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } });
+wakeRuntime.update({ actions: { interact: true } });
+assert.deepEqual(wakePresenter.messages, [{ messageKey: "hud:interaction.wakeFailed" }], "failed exhaustion wake shows localized feedback");
+wakeRuntime.destroy();
 console.log("dialogue checks passed: localized neighbor quest runtime, effects and autosave hooks are aligned");

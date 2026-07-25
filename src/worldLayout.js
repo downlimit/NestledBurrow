@@ -129,6 +129,8 @@ export function createWorldLayout() {
     setResourceCollider(id, rect) { resourceColliders.set(id, Object.freeze({ ...rect })); },
     clearResourceCollider(id) { resourceColliders.delete(id); },
     getResourceCollider(id) { return resourceColliders.get(id) ?? null; },
+    setWorldObjectCollider(id, rect) { resourceColliders.set(id, Object.freeze({ ...rect })); },
+    clearWorldObjectCollider(id) { resourceColliders.delete(id); },
     spawn: {
       x: (HOUSE.x + Math.floor(HOUSE.columns / 2)) * TILE_SIZE + TILE_SIZE / 2,
       y: (HOUSE.y + 8) * TILE_SIZE + TILE_SIZE - 2,

@@ -1,8 +1,9 @@
 import { RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
 import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
+import { DEFAULT_NEEDS, normalizeNeeds } from "./needsDomain.js";
 
-export const SESSION_STATE_VERSION = 2;
+export const SESSION_STATE_VERSION = 3;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
@@ -128,7 +129,7 @@ function normalizeGameplayState(value = {}) {
     const progress = normalizeProgress(input.progress, Boolean(input.cleared) ? 1 : 0, `Resource ${resourceId}.progress`);
     setOwn(resourceNodes, resourceId, { cleared: progress >= 1, progress });
   }
-  return { currentEnergy, maximumEnergy, wood, stone, rubies, resourceNodes, worldTimeSeconds };
+  return { currentEnergy, maximumEnergy, wood, stone, rubies, resourceNodes, worldTimeSeconds, needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS) };
 }
 
 function normalizeNonNegativeNumber(value, fallback, label) {
@@ -301,7 +302,7 @@ export function hitResourceNode(state, resourceId, { action, damage = 1, energyP
   const profile = getResourceProfile(definition.profileId);
   const node = state.gameplay.resourceNodes[resourceId];
   if (!node || node.cleared) return { status: "already-cleared", mutated: false };
-  const cost = normalizeNonNegativeInteger(energyPerHit, 0, "Resource hit energy cost");
+  const cost = normalizeNonNegativeNumber(energyPerHit, 0, "Resource hit energy cost");
   if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
   const result = applyResourceWork(node, profile, { action: action ?? profile.preferredAction, damage, tuning });
   if (!result.mutated) return result;
@@ -316,6 +317,7 @@ export function resetBalanceRun(state) {
   state.gameplay.wood = 0;
   state.gameplay.stone = 0;
   state.gameplay.rubies = 0;
+  state.gameplay.needs = normalizeNeeds();
   for (const node of Object.values(state.gameplay.resourceNodes)) {
     node.cleared = false;
     node.progress = 0;
