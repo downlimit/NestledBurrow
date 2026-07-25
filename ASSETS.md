@@ -113,7 +113,7 @@ The earlier Kenney Roguelike/RPG room and continuous-world atlases remain histor
 
 - **Provenance:** exact user-provided project attachment supplied for repository inclusion; no external CDN copy or substitute was used.
 - **Runtime file:** `public/assets/audio/music/NestledBurrow_SunlitSavePoint.mp3`.
-- **Runtime role:** looping background music controlled by the master and music channels.
+- **Runtime role:** one entry in the randomized seven-track background playlist controlled by the master and music channels.
 - **Byte length:** `3,977,087`.
 - **SHA-256:** `502dfd51bcfa7908becd39f604a6c73d868d9742fd3d1207c985cb9482627a91`.
 - **Git blob SHA:** `76767a4fc6e5a7386118b044b5a99e02f24b0a07`.
@@ -134,6 +134,15 @@ The earlier Kenney Roguelike/RPG room and continuous-world atlases remain histor
 | `public/assets/audio/music/NestledBurrow_Ambient05.mp3` | `incoming/suno-song-e6c3f46b.mp3` | `5c09c9bcff72b14f69f78085472d35de7a6c9886` |
 | `public/assets/audio/music/NestledBurrow_Ambient06.mp3` | `incoming/suno-song-ee08dca2.mp3` | `188d62946399f80a9cd936797215eecef4799b63` |
 
+| Runtime file | Byte length | SHA-256 |
+| --- | ---: | --- |
+| `NestledBurrow_Ambient01.mp3` | 1,400,592 | `090f87cf7b5c7c724c6eda76e597ff03b2bba7b1fb38d42ed9eb12857b007a9b` |
+| `NestledBurrow_Ambient02.mp3` | 1,517,112 | `6718072ddd8cc1f85a07135c307f8ce67b9038c95da2a66a44fe728b121e04d7` |
+| `NestledBurrow_Ambient03.mp3` | 1,418,448 | `af4c80498e484c1214c497a709046d6da959727381b6bea58878cd4bd4973b11` |
+| `NestledBurrow_Ambient04.mp3` | 4,646,886 | `b32cd6a77bd783ac167afe75f3243f37129c7613749a281ee28e2d9f97ce584a` |
+| `NestledBurrow_Ambient05.mp3` | 1,550,646 | `c9e054b9c94149c5cdda6a8be06a80df961a2b9e47b8aed77d9ed15cf3c57b90` |
+| `NestledBurrow_Ambient06.mp3` | 1,392,462 | `a6bc44bded04434105c953dab23991187940c87fadea11357d2118a6e294069e` |
+
 The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `76767a4fc6e5a7386118b044b5a99e02f24b0a07`, identical to the existing runtime file, and is intentionally not duplicated.
 
 ## User-uploaded facility sprites
@@ -147,3 +156,9 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
 | `public/assets/project/facilities/NestledBurrow_Toilet.png` | `incoming/bathroom_toilet.png` | `16×16` | `d9f28cfc22467f365700cf7617d2d0f298fac17f` |
 | `public/assets/project/facilities/NestledBurrow_Bathtub.png` | `incoming/bathroom_bathtub.png` | `32×32` | `8e987e03a7e8047df01e915e5b964bf5a6069906` |
 | `public/assets/project/facilities/NestledBurrow_DiningTableFeast.png` | `incoming/dining_table_feast.png` | `48×16` | `57af651f65f6c6f4ff1ccac55f11819d0832efa3` |
+
+| Runtime file | Byte length | SHA-256 |
+| --- | ---: | --- |
+| `NestledBurrow_Toilet.png` | 2,433 | `09634a14f5b7bac4327c698f910994e7cce4fd21f37a7c4a7be80dbbbb4ce2b7` |
+| `NestledBurrow_Bathtub.png` | 4,534 | `afe4fee0f9100bfd23435a178ceaa4249be3afa5ef929e73b061f10789b637ff` |
+| `NestledBurrow_DiningTableFeast.png` | 4,101 | `5d26b665750241e94cfcc313e20385b5bb26c734fd663b7b559af626d3dd1316` |
