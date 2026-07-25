@@ -29,7 +29,7 @@ For a dirty/shared checkout or another active task, use one isolated worktree; n
 - **Fast (default):** gameplay, UI, content, config, local refactors, bounded fixes.
 - **Strict:** persistence/schema, central state ownership, broad movement/input/collision contracts, dependencies, workflow/deployment/security, external assets/licensing, or dependent PRs.
 
-Use the smallest clean solution; add no dependency, framework, asset, docs, or infrastructure without concrete need.
+Use the smallest clean solution; add no dependency, framework, asset, docs, or infrastructure without need.
 
 For a changed public identifier, behavior/rate, save field, localization key, action, selector, fixture, E2E helper, or config value: search once for the old value, field name, exact expectations, and aliases; classify matches; update real consumers and targeted coverage; confirm no accidental stale expectation. Never weaken a valid test for CI.
 
@@ -38,6 +38,8 @@ For a changed public identifier, behavior/rate, save field, localization key, ac
 Use one strong proof per material risk. A successful proof remains valid until its relevant inputs change.
 
 **Feedback gate:** batch current remarks into one pass. A healthy managed preview is the default proof. Add one smallest named check only for hidden behavior it cannot prove. Defer status/diff review, `git diff --check`, build, docs/scope checks, full suites, screenshots, and E2E until acceptance.
+
+**Micro-feedback:** during preview, `без дополнительных проверок` or equivalent for an existing presentation value: make the edit, reuse proof, health-check preview; skip build, checks, screenshots, E2E. Excludes persistence/schema, public IDs, input/collision, dependencies, workflow/security, and new behavior/architecture; otherwise run the risk check and state why.
 
 **Publication gate:** inspect scope/full diff once. Micro: diff-check plus relevant docs/launcher check. Routine: changed-risk checks plus build when absent. Strict: `npm run check` plus missing task proof. Docs/process: docs, diff-check, and relevant workflow inspection. Full E2E belongs to PR CI; focused local E2E only covers unproven interaction risk.
 
@@ -48,7 +50,7 @@ Environment/evidence:
 - On deterministic failure, diagnose the exact canonical command. Run it once on current `main` only when base classification matters; skip alternate launch paths and unchanged reruns.
 - The focused E2E launcher owns Vite, readiness, and shutdown.
 - Prefer assertions/stable fixtures over moving NPCs, live clocks, or whole-session equality. Use runtime for feel; maximum two screenshots.
-- Keep successful logs compact; load relevant full output only on failure.
+- Keep successful logs compact; load full output only on failure.
 
 ## Preview acceptance
 

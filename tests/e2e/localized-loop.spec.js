@@ -145,7 +145,7 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { maximumEnergy: 100, wood: 1, resourceNodes: { "fallen-log-01": { cleared: true, progress: 1 } } } });
   const clearedSession = await bridge(page, "getSession");
   expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
-  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(93);
+  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(97);
   await expect.poll(async () => (await bridge(page, "getDebrisState"))?.present).toBe(false);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
   await page.reload();
@@ -174,5 +174,5 @@ test("mobile touch clears a resource through prompt hit area", async ({ page }, 
   await expect.poll(() => bridge(page, "getSession")).toMatchObject({ gameplay: { wood: 1, resourceNodes: { "fallen-log-01": { cleared: true } } } });
   const clearedSession = await bridge(page, "getSession");
   expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
-  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(93);
+  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(97);
 });

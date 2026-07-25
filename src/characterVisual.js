@@ -89,7 +89,7 @@ export class CharacterVisual {
       this.lowEnergyMarker.fillStyle(0xf2eadc, 0.85).fillRect(0, 0, 3, 1).fillRect(1, 1, 1, 1).fillRect(0, 2, 3, 1);
     }
     const x = this.sprite.x;
-    const y = this.sprite.y - 13;
+    const y = this.sprite.y - 18;
     if (!this.lowEnergyMarker || this.lowEnergyMarkerBase?.x === x && this.lowEnergyMarkerBase?.y === y) return;
     this.scene.tweens?.killTweensOf?.(this.lowEnergyMarker);
     this.lowEnergyMarkerBase = { x, y };

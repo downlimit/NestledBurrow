@@ -55,6 +55,7 @@ function assertStage(state, stage, homeDialogue, streetDialogue) {
 }
 
 const session = createFreshGameSessionState();
+assert.deepEqual(session.gameplay.needs, { novelty: 100, satiety: 100, toilet: 100, lustre: 100, dialogue: 100 }, "fresh state starts every persisted need at 100");
 assert.equal(Object.keys(session.gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "fresh state has every resource node");
 assert(RESOURCE_OBJECTS.filter((item) => item.profileId === "log-small").length >= 8, "balance route has at least eight small logs");
 assert.equal(new Set(RESOURCE_OBJECTS.map((item) => item.id)).size, RESOURCE_OBJECTS.length, "resource IDs are unique");
@@ -116,6 +117,7 @@ assert.equal(loaded.status, "loaded", "valid save loads");
 assert.equal(loaded.state.dialogue.targetId, null, "loaded game has no active dialogue target");
 assert.equal(getSessionFlag(loaded.state, NEIGHBOR_QUEST_FLAGS.started), true, "session flags persist");
 assert.equal(getEntityFlag(loaded.state, "home-npc", "visited"), true, "entity flags persist");
+assert.deepEqual(loaded.state.gameplay.needs, fresh.gameplay.needs, "needs survive save/load exactly");
 const oldSaveLoad = deserializeSessionEnvelope(JSON.stringify({
   schemaVersion: 1,
   state: {
@@ -130,6 +132,21 @@ assert.equal(Object.keys(oldSaveLoad.state.gameplay.resourceNodes).length, RESOU
 assert.equal(oldSaveLoad.state.gameplay.worldTimeSeconds, 21600, "version-1 save without gameplay starts at 06:00");
 assert.equal(getSessionFlag(oldSaveLoad.state, "old"), true, "old save session flags survive gameplay normalization");
 assert.equal(getEntityFlag(oldSaveLoad.state, "home-npc", "visited"), true, "old save entity flags survive gameplay normalization");
+assert.deepEqual(oldSaveLoad.state.gameplay.needs, { novelty: 100, satiety: 100, toilet: 100, lustre: 100, dialogue: 100 }, "schema-v1 migrates through v2 and adds full needs");
+const versionTwo = clone(fresh);
+versionTwo.version = 2;
+delete versionTwo.gameplay.needs;
+versionTwo.gameplay.currentEnergy = 63;
+versionTwo.gameplay.worldTimeSeconds = 32100;
+versionTwo.gameplay.wood = 7;
+const v2Load = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 2, state: versionTwo }));
+assert.equal(v2Load.status, "loaded", "schema-v2 migrates explicitly");
+assert.deepEqual(v2Load.state.gameplay.needs, { novelty: 100, satiety: 100, toilet: 100, lustre: 100, dialogue: 100 });
+assert.deepEqual(
+  { energy: v2Load.state.gameplay.currentEnergy, time: v2Load.state.gameplay.worldTimeSeconds, wood: v2Load.state.gameplay.wood },
+  { energy: 63, time: 32100, wood: 7 },
+  "schema-v2 migration preserves prior gameplay",
+);
 const partialLegacy = deserializeSessionEnvelope(JSON.stringify({
   schemaVersion: 1,
   state: {

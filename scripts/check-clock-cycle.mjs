@@ -24,9 +24,9 @@ assert.equal(state.gameplay.worldTimeSeconds - DEFAULT_START_TIME_SECONDS, 86400
 state = createFreshGameSessionState();
 advanceGameTime(state, 60, 8);
 assert.equal(state.gameplay.worldTimeSeconds - DEFAULT_START_TIME_SECONDS, 28800, "sleep preserves the x8 simulation scale");
-assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeDrainAmount, 0.5, "idle awake drain is half an energy point per second");
-assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeWalkDrainAmount, 1.5, "walking awake drain is one and a half energy points per second");
-assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeRunDrainAmount, 3, "running awake drain is three energy points per second");
+assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeDrainAmount, 0.25, "idle awake drain is a quarter energy point per second");
+assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeWalkDrainAmount, 0.75, "walking awake drain is three quarters of an energy point per second");
+assert.equal(DEFAULT_GAMEPLAY_TUNING.awakeRunDrainAmount, 1.5, "running awake drain is one and a half energy points per second");
 assert.equal(DEFAULT_GAMEPLAY_TUNING.lowEnergyIdleRegenPerSecond, 1.5 / 1.66, "low-energy idle regeneration is reduced to about 0.9 points per real second");
 
 assert.equal(formatClock(0, "ru"), "00:00");

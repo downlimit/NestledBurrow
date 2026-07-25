@@ -14,6 +14,7 @@ export function createInteractionRuntime({
   completeDialogue,
   onPersistentMutation,
   getStaticInteractionDefinitions = () => [],
+  isInteractionAllowed = () => true,
   runWorldObjectInteraction = () => ({ status: "ignored" }),
   presenter,
 }) {
@@ -43,6 +44,7 @@ export function createInteractionRuntime({
     const player = characterSystem.getSnapshot(sessionState.playerId);
     const targets = [];
     for (const definition of interactionDefinitions) {
+      if (!isInteractionAllowed(definition)) continue;
       const snapshot = characterSystem.getSnapshot(definition.entityId);
       targets.push(createInteractionTarget({
         ...definition,
@@ -50,6 +52,7 @@ export function createInteractionRuntime({
       }));
     }
     for (const definition of getStaticInteractionDefinitions()) {
+      if (!isInteractionAllowed(definition)) continue;
       targets.push(createInteractionTarget(definition));
     }
     return findBestInteractionTarget(player, targets);
@@ -78,6 +81,8 @@ export function createInteractionRuntime({
       currentCandidate = null;
       if (result?.status === "insufficient-energy") {
         presenter?.showMessage?.({ messageKey: "hud:interaction.notEnoughEnergy" });
+      } else if (result?.status === "wake-failed") {
+        presenter?.showMessage?.({ messageKey: "hud:interaction.wakeFailed" });
       } else {
         presenter?.hidePrompt?.();
       }

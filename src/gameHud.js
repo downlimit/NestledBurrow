@@ -25,15 +25,25 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   effects: Object.freeze({ x: 68, y: 78, width: 66, height: 14 }),
 });
 export const OPTIONS_BUILD_LABEL = Object.freeze({ x: 14, y: 102 });
-export const RESOURCE_HUD_AREA = Object.freeze({ x: 244, y: 38, width: 46, height: 60 });
-export const ENERGY_HUD_AREA = Object.freeze({ x: 294, y: 38, width: 16, height: 60 });
+export const RESOURCE_HUD_AREA = Object.freeze({ x: 210, y: 38, width: 40, height: 68 });
+export const NEEDS_HUD_AREA = Object.freeze({ x: 252, y: 38, width: 60, height: 68 });
+export const ENERGY_HUD_AREA = NEEDS_HUD_AREA;
+export const NEED_ROW_IDS = Object.freeze(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
+export const NEED_ROW_SYMBOLS = Object.freeze(["N", "E", "S", "T", "L", "D"]);
+export const NEED_ROW_AREAS = Object.freeze(NEED_ROW_IDS.map((_id, index) => Object.freeze({
+  x: NEEDS_HUD_AREA.x,
+  y: NEEDS_HUD_AREA.y + 4 + index * 10,
+  width: NEEDS_HUD_AREA.width,
+  height: 10,
+})));
+export const NEED_TOOLTIP_AREA = Object.freeze({ x: 32, y: 42, width: 174, height: 54 });
 export const RESOURCE_HUD_LAYOUT = Object.freeze({
-  woodIcon: Object.freeze({ x: 250, y: 52 }),
-  woodValue: Object.freeze({ x: 264, y: 55 }),
-  stoneIcon: Object.freeze({ x: 250, y: 68 }),
-  stoneValue: Object.freeze({ x: 264, y: 71 }),
-  rubyIcon: Object.freeze({ x: 250, y: 84 }),
-  rubyValue: Object.freeze({ x: 264, y: 87 }),
+  woodIcon: Object.freeze({ x: 216, y: 52 }),
+  woodValue: Object.freeze({ x: 229, y: 55 }),
+  stoneIcon: Object.freeze({ x: 216, y: 70 }),
+  stoneValue: Object.freeze({ x: 229, y: 73 }),
+  rubyIcon: Object.freeze({ x: 216, y: 88 }),
+  rubyValue: Object.freeze({ x: 229, y: 91 }),
 });
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 36, width: GAME_WIDTH - 48, height: 78 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 82, width: 96, height: 26 });
@@ -48,6 +58,24 @@ export function shouldShakeEnergyAfterInteraction({ mutated, energyBefore, curre
 
 export function isEnergyCritical(currentEnergy, maximumEnergy) {
   return Number(maximumEnergy) > 0 && Number(currentEnergy) / Number(maximumEnergy) < 0.15;
+}
+
+export function needFlowPulseAlpha(arrows, nowMs, seed = 0) {
+  const intensity = Math.min(3, Math.max(1, Math.round(arrows) || 1));
+  const time = Number(nowMs) || 0;
+  const stableSeed = Number(seed) || 0;
+  const randomUnit = (salt) => {
+    const value = Math.sin(stableSeed * 127.1 + salt * 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  const baseInterval = [0, 2600, 1700, 900][intensity];
+  const interval = baseInterval * (0.78 + randomUnit(1) * 0.5);
+  const activeDuration = 420 + randomUnit(2) * 420;
+  const phaseOffset = randomUnit(3) * interval;
+  const drift = Math.sin(time * (0.00009 + randomUnit(4) * 0.00041) + randomUnit(5) * Math.PI * 2) * (80 + randomUnit(6) * 210)
+    + Math.sin(time * (0.000031 + randomUnit(7) * 0.00017) + randomUnit(8) * Math.PI * 2) * (35 + randomUnit(9) * 125);
+  const phase = ((time + phaseOffset + drift) % interval + interval) % interval;
+  return phase < activeDuration ? Math.sin(Math.PI * phase / activeDuration) * 0.9 : 0;
 }
 
 export function createGameHud(scene, options) {
@@ -79,10 +107,9 @@ export function createGameHud(scene, options) {
   let energyShakeActive = false;
   let energyCritical = false;
   let energyFlow = null;
-  let previousEnergy = null;
-  let energyEvents = [];
   let energyArrowState = null;
-  let lastEnergyArrowTriggeredAt = -Infinity;
+  let hoveredNeedId = null;
+  let needsRowsState = [];
 
   const optionsHit = createZone(scene, OPTIONS_HIT_AREA);
   const optionsPanelHit = createZone(scene, OPTIONS_PANEL_AREA).disableInteractive();
@@ -91,6 +118,13 @@ export function createGameHud(scene, options) {
   const newGameHit = createZone(scene, NEW_GAME_HIT_AREA).disableInteractive();
   const confirmHit = createZone(scene, NEW_GAME_CONFIRM_HIT_AREA).disableInteractive();
   const cancelHit = createZone(scene, NEW_GAME_CANCEL_HIT_AREA).disableInteractive();
+  const needHits = NEED_ROW_AREAS.map((rect, index) => {
+    const zone = createZone(scene, rect).disableInteractive();
+    zone.on("pointerover", () => { hoveredNeedId = NEED_ROW_IDS[index]; render(); });
+    zone.on("pointerout", () => { hoveredNeedId = null; render(); });
+    zone.on("pointerdown", stop);
+    return zone;
+  });
 
   const optionsText = createText(scene);
   const languageText = createText(scene);
@@ -107,6 +141,7 @@ export function createGameHud(scene, options) {
   const woodValueText = createText(scene, { fontSize: "8px" });
   const stoneValueText = createText(scene, { fontSize: "8px" });
   const rubyValueText = createText(scene, { fontSize: "8px" });
+  const needTooltipText = createText(scene, { fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } });
   const woodIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
   const stoneIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
   const rubyIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
@@ -201,7 +236,7 @@ export function createGameHud(scene, options) {
   }
 
   function hideManagedObjects() {
-    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...Object.values(soundTexts)]) {
+    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, needTooltipText, ...Object.values(soundTexts)]) {
       text.setVisible(false);
     }
     woodIcon.setVisible(false);
@@ -213,6 +248,7 @@ export function createGameHud(scene, options) {
     if (destroyed) return;
     graphics.clear();
     energyBarGraphics.clear();
+    energyArrowGraphics.clear();
     hideManagedObjects();
 
     if (confirmingNewGame) renderConfirmation();
@@ -228,6 +264,7 @@ export function createGameHud(scene, options) {
     if (gameplay) {
       renderClock(gameplay);
       renderResources(gameplay);
+      if (!optionsOpen) renderNeeds(gameplay);
     }
     if (optionsOpen) renderOptionsPanel();
   }
@@ -251,71 +288,48 @@ export function createGameHud(scene, options) {
     woodIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodIcon.x, RESOURCE_HUD_LAYOUT.woodIcon.y);
     stoneIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.stoneIcon.x, RESOURCE_HUD_LAYOUT.stoneIcon.y);
     rubyIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyIcon.x, RESOURCE_HUD_LAYOUT.rubyIcon.y);
-    renderEnergyBar(gameplay.currentEnergy, gameplay.maximumEnergy, gameplay.energyFlow);
   }
 
-  function renderEnergyBar(currentEnergy, maximumEnergy, flow = null) {
-    const innerHeight = ENERGY_HUD_AREA.height - 6;
-    const maximum = Number(maximumEnergy);
-    energyRatio = maximum > 0 ? Math.min(1, Math.max(0, Number(currentEnergy) / maximum)) : 0;
-    energyFillHeight = energyRatio > 0 ? Math.max(1, Math.round(innerHeight * energyRatio)) : 0;
-    energyCritical = isEnergyCritical(currentEnergy, maximumEnergy);
-    energyBarGraphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(ENERGY_HUD_AREA.x, ENERGY_HUD_AREA.y, ENERGY_HUD_AREA.width, ENERGY_HUD_AREA.height);
-    energyBarGraphics.fillStyle(HUD_COLORS.shadow, 0.95).fillRect(ENERGY_HUD_AREA.x + 3, ENERGY_HUD_AREA.y + 3, ENERGY_HUD_AREA.width - 6, innerHeight);
-    if (energyFillHeight > 0) {
-      energyBarGraphics.fillStyle(energyCritical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(
-        ENERGY_HUD_AREA.x + 3,
-        ENERGY_HUD_AREA.y + 3 + innerHeight - energyFillHeight,
-        ENERGY_HUD_AREA.width - 6,
-        energyFillHeight,
-      );
-    }
-    energyFlow = flow?.direction ? { direction: flow.direction, arrows: Math.min(3, Math.max(1, Math.round(flow.arrows) || 1)) } : null;
-    trackEnergyChange(currentEnergy);
-    energyBarGraphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(ENERGY_HUD_AREA.x + 0.5, ENERGY_HUD_AREA.y + 0.5, ENERGY_HUD_AREA.width - 1, ENERGY_HUD_AREA.height - 1);
-  }
-
-  function trackEnergyChange(currentEnergy) {
-    const value = Number(currentEnergy);
-    if (!Number.isFinite(value)) return;
-    const now = scene.time.now;
-    if (Number.isFinite(previousEnergy) && value !== previousEnergy) energyEvents.push({ time: now, amount: value - previousEnergy });
-    previousEnergy = value;
-    energyEvents = energyEvents.filter((event) => now - event.time <= 1500);
-    const netAmount = energyEvents.reduce((total, event) => total + event.amount, 0);
-    if (netAmount === 0 || now - lastEnergyArrowTriggeredAt < 1100) return;
-    const direction = netAmount > 0 ? "up" : "down";
-    const ratePerSecond = Math.abs(netAmount) / 1.5;
-    const arrows = ratePerSecond > 2 ? 3 : ratePerSecond > 1.5 ? 2 : 1;
-    showEnergyArrows({ direction, arrows, ratePerSecond }, now);
-  }
-
-  function showEnergyArrows(flow, now) {
-    lastEnergyArrowTriggeredAt = now;
-    energyArrowState = { direction: flow.direction, arrows: flow.arrows, ratePerSecond: flow.ratePerSecond };
-    scene.tweens.killTweensOf(energyArrowGraphics);
-    energyArrowGraphics.clear().setAlpha(0);
-    drawEnergyFlow(energyArrowGraphics, flow);
-    scene.tweens.add({
-      targets: energyArrowGraphics,
-      alpha: 1,
-      duration: 500,
-      ease: "Sine.easeInOut",
-      onComplete: () => scene.tweens.add({
-        targets: energyArrowGraphics,
-        alpha: 0,
-        delay: 100,
-        duration: 500,
-        ease: "Sine.easeInOut",
-        onComplete: () => { energyArrowGraphics.clear(); energyArrowState = null; },
-      }),
+  function renderNeeds(gameplay) {
+    energyBarGraphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(NEEDS_HUD_AREA.x, NEEDS_HUD_AREA.y, NEEDS_HUD_AREA.width, NEEDS_HUD_AREA.height);
+    energyBarGraphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(NEEDS_HUD_AREA.x + 0.5, NEEDS_HUD_AREA.y + 0.5, NEEDS_HUD_AREA.width - 1, NEEDS_HUD_AREA.height - 1);
+    const values = {
+      novelty: gameplay.needs?.novelty,
+      energy: Number(gameplay.currentEnergy) / Number(gameplay.maximumEnergy) * 100,
+      satiety: gameplay.needs?.satiety,
+      toilet: gameplay.needs?.toilet,
+      lustre: gameplay.needs?.lustre,
+      dialogue: gameplay.needs?.dialogue,
+    };
+    const flows = { ...gameplay.needsFlow, energy: gameplay.energyFlow };
+    needsRowsState = NEED_ROW_IDS.map((id, index) => {
+      const rect = NEED_ROW_AREAS[index];
+      const ratio = Math.min(1, Math.max(0, Number(values[id]) / 100 || 0));
+      const flow = flows[id] ?? null;
+      drawBitmapTextInto(energyBarGraphics, rect.x + 3, rect.y + 1, NEED_ROW_SYMBOLS[index], { shadow: 0 });
+      energyBarGraphics.fillStyle(HUD_COLORS.shadow, 1).fillRect(rect.x + 11, rect.y + 2, 25, 6);
+      const critical = id === "energy" && ratio < 0.15;
+      const fillWidth = ratio > 0 ? Math.max(1, Math.round(23 * ratio)) : 0;
+      energyBarGraphics.fillStyle(critical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(rect.x + 12, rect.y + 3, fillWidth, 4);
+      drawNeedFlow(energyArrowGraphics, rect.x + 40, rect.y + 2, flow, scene.time.now, index + 1);
+      return { id, symbol: NEED_ROW_SYMBOLS[index], ratio, flow };
     });
+    const energy = needsRowsState[1];
+    energyRatio = energy.ratio;
+    energyFillHeight = Math.round(54 * energyRatio);
+    energyCritical = energy.ratio < 0.15;
+    energyFlow = gameplay.energyFlow ?? null;
+    energyArrowState = energyFlow;
+    if (hoveredNeedId) renderNeedTooltip();
   }
 
-  function drawEnergyFlow(target, flow) {
-    if (!flow) return;
-    const startY = flow.arrows === 1 ? 65 : flow.arrows === 2 ? 59 : 53;
-    for (let index = 0; index < flow.arrows; index += 1) drawEnergyArrow(target, ENERGY_HUD_AREA.x + 5, startY + index * 7, flow.direction);
+  function renderNeedTooltip() {
+    graphics.fillStyle(HUD_COLORS.panel, 0.97).fillRect(NEED_TOOLTIP_AREA.x, NEED_TOOLTIP_AREA.y, NEED_TOOLTIP_AREA.width, NEED_TOOLTIP_AREA.height);
+    graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(NEED_TOOLTIP_AREA.x + 0.5, NEED_TOOLTIP_AREA.y + 0.5, NEED_TOOLTIP_AREA.width - 1, NEED_TOOLTIP_AREA.height - 1);
+    setManagedTextStyle(needTooltipText, scene, textStyle({ fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } }))
+      .setText(localization.t(`hud:needs.${hoveredNeedId}.tooltip`))
+      .setVisible(true)
+      .setPosition(NEED_TOOLTIP_AREA.x + 6, NEED_TOOLTIP_AREA.y + 6);
   }
 
   function renderOptionsPanel() {
@@ -351,14 +365,24 @@ export function createGameHud(scene, options) {
     if (confirmingNewGame) {
       optionsHit.disableInteractive();
       setOptionsPanelInteractive(false);
+      setNeedsInteractive(false);
       confirmHit.setInteractive({ useHandCursor: true });
       cancelHit.setInteractive({ useHandCursor: true });
       return;
     }
     optionsHit.setInteractive({ useHandCursor: true });
     setOptionsPanelInteractive(optionsOpen);
+    setNeedsInteractive(!optionsOpen);
     confirmHit.disableInteractive();
     cancelHit.disableInteractive();
+  }
+
+  function setNeedsInteractive(active) {
+    for (const zone of needHits) {
+      if (active) zone.setInteractive({ useHandCursor: true });
+      else zone.disableInteractive();
+    }
+    if (!active) hoveredNeedId = null;
   }
 
   function setOptionsPanelInteractive(active) {
@@ -429,6 +453,9 @@ export function createGameHud(scene, options) {
         energyBaseY: 0,
         energyShakeCount,
         energyShakeActive,
+        needsRows: needsRowsState,
+        hoveredNeedId,
+        tooltipVisible: needTooltipText.visible,
       };
     },
     isConfirming() { return confirmingNewGame; },
@@ -442,6 +469,9 @@ export function createGameHud(scene, options) {
           clock: CLOCK_HUD_AREA,
           resources: RESOURCE_HUD_AREA,
           energy: ENERGY_HUD_AREA,
+          needs: NEEDS_HUD_AREA,
+          needRows: NEED_ROW_AREAS,
+          needTooltip: NEED_TOOLTIP_AREA,
           language: LANGUAGE_HIT_AREA,
           newGame: NEW_GAME_HIT_AREA,
           fullscreen: FULLSCREEN_HIT_AREA,
@@ -457,6 +487,8 @@ export function createGameHud(scene, options) {
       }
       return isPointInRect(x, y, OPTIONS_HIT_AREA)
         || Boolean(optionsOpen && isPointInRect(x, y, OPTIONS_PANEL_AREA))
+        || Boolean(!optionsOpen && isPointInRect(x, y, NEEDS_HUD_AREA))
+        || Boolean(hoveredNeedId && isPointInRect(x, y, NEED_TOOLTIP_AREA))
         || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));
     },
     destroy() {
@@ -464,10 +496,10 @@ export function createGameHud(scene, options) {
       destroyed = true;
       if (confirmingNewGame) onConfirmationChange(false);
       unsubscribe?.();
-      for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit]) zone.destroy();
+      for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
       scene.tweens.killTweensOf(energyArrowGraphics);
-      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...Object.values(soundTexts)]) text.destroy();
+      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
       woodIcon.destroy();
       stoneIcon.destroy();
       rubyIcon.destroy();
@@ -483,12 +515,22 @@ export function createGameHud(scene, options) {
   };
 }
 
-function drawEnergyArrow(graphics, x, y, direction) {
+function drawEnergyArrow(graphics, x, y, direction, alpha = 0.9) {
   const rows = direction === "up"
     ? [[2], [1, 2, 3], [0, 1, 2, 3, 4], [2], [2]]
     : [[2], [2], [0, 1, 2, 3, 4], [1, 2, 3], [2]];
-  graphics.fillStyle(direction === "up" ? 0x9fd38a : 0xf2eadc, 0.9);
+  graphics.fillStyle(direction === "up" ? 0x9fd38a : 0xf2eadc, alpha);
   rows.forEach((columns, row) => columns.forEach((column) => graphics.fillRect(x + column, y + row, 1, 1)));
+}
+
+function drawNeedFlow(graphics, x, y, flow, nowMs, seed) {
+  if (!flow?.direction) return;
+  const arrows = Math.min(3, Math.max(1, Math.round(flow.arrows) || 1));
+  const alpha = needFlowPulseAlpha(arrows, nowMs, seed);
+  if (alpha <= 0) return;
+  for (let index = 0; index < arrows; index += 1) {
+    drawEnergyArrow(graphics, x + index * 5, y, flow.direction, alpha);
+  }
 }
 
 function createZone(scene, rect) {
