@@ -27,6 +27,8 @@ export function createInteractionHud(scene, options = {}) {
   let dialogueState = null;
   let renderedKey = "";
   let latchedInteract = false;
+  let heldPointerId = null;
+  let heldDomPointerId = null;
   let promptRect = null;
   let messageTimer = null;
   let suppressed = false;
@@ -37,9 +39,30 @@ export function createInteractionHud(scene, options = {}) {
     event?.stopPropagation?.();
     pointer?.event?.stopPropagation?.();
     latchedInteract = true;
+    heldPointerId = pointer?.id ?? pointer?.event?.pointerId ?? null;
+    heldDomPointerId = pointer?.event?.pointerId ?? null;
   };
+  const onPointerEnd = (pointer) => {
+    const pointerId = pointer?.id ?? pointer?.event?.pointerId ?? null;
+    if (heldPointerId === null || pointerId === heldPointerId) heldPointerId = null;
+  };
+  const onNativePointerEnd = (event) => {
+    if (heldDomPointerId === null || event?.pointerId === heldDomPointerId) {
+      heldPointerId = null;
+      heldDomPointerId = null;
+    }
+  };
+  const onBlur = () => { heldPointerId = null; heldDomPointerId = null; latchedInteract = false; };
   promptHit.on("pointerdown", onPointerDown);
   dialogueHit.on("pointerdown", onPointerDown);
+  scene.input.on("pointerup", onPointerEnd);
+  scene.input.on("pointerupoutside", onPointerEnd);
+  scene.input.on("pointercancel", onPointerEnd);
+  globalThis.window?.addEventListener?.("blur", onBlur);
+  globalThis.window?.addEventListener?.("pointerup", onNativePointerEnd);
+  globalThis.window?.addEventListener?.("pointercancel", onNativePointerEnd);
+  globalThis.document?.addEventListener?.("fullscreenchange", onBlur);
+  globalThis.document?.addEventListener?.("visibilitychange", onBlur);
   promptHit.disableInteractive();
   dialogueHit.disableInteractive();
 
@@ -80,6 +103,8 @@ export function createInteractionHud(scene, options = {}) {
     for (const t of [speakerText, bodyText, actionText, promptText]) t.setVisible(false);
 
     if (suppressed) {
+      heldPointerId = null;
+      latchedInteract = false;
       promptRect = null;
       promptHit.disableInteractive();
       dialogueHit.disableInteractive();
@@ -133,7 +158,11 @@ export function createInteractionHud(scene, options = {}) {
       messageTimer = scene.time.delayedCall(duration, () => { messageTimer = null; if (promptState?.message) { promptState = null; redraw(true); } });
     },
     hideDialogue() { dialogueState = null; redraw(); },
-    setSuppressed(value) { suppressed = Boolean(value); redraw(true); },
+    setSuppressed(value) {
+      suppressed = Boolean(value);
+      if (suppressed) onBlur();
+      redraw(true);
+    },
     setCooldownProgress(value) {
       const next = Math.min(1, Math.max(0, Number(value) || 0));
       if (next === cooldownProgress) return;
@@ -162,6 +191,7 @@ export function createInteractionHud(scene, options = {}) {
       };
     },
     consumeInteractPressed() { const pressed = latchedInteract; latchedInteract = false; return pressed; },
+    isInteractHeld() { return heldPointerId !== null; },
     isPointInHud(x, y) { return Boolean(!suppressed && ((dialogueState && isPointInRect(x, y, DIALOGUE_RECT)) || (promptState && promptRect && isPointInRect(x, y, promptRect)))); },
     destroy() {
       if (destroyed) return;
@@ -169,6 +199,15 @@ export function createInteractionHud(scene, options = {}) {
       unsubscribe?.();
       if (messageTimer !== null) scene.time.removeEvent(messageTimer);
       promptHit.off("pointerdown", onPointerDown); dialogueHit.off("pointerdown", onPointerDown);
+      scene.input.off("pointerup", onPointerEnd);
+      scene.input.off("pointerupoutside", onPointerEnd);
+      scene.input.off("pointercancel", onPointerEnd);
+      globalThis.window?.removeEventListener?.("blur", onBlur);
+      globalThis.window?.removeEventListener?.("pointerup", onNativePointerEnd);
+      globalThis.window?.removeEventListener?.("pointercancel", onNativePointerEnd);
+      globalThis.document?.removeEventListener?.("fullscreenchange", onBlur);
+      globalThis.document?.removeEventListener?.("visibilitychange", onBlur);
+      onBlur();
       promptHit.destroy(); dialogueHit.destroy(); graphics.destroy();
       speakerText.destroy(); bodyText.destroy(); actionText.destroy(); promptText.destroy();
     },

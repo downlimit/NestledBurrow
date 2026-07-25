@@ -21,7 +21,7 @@ export class CharacterVisual {
     this.idleFrameIndex = idleFrameIndex;
     this.facingHysteresis = facingHysteresis;
     this.lastFacing = "down";
-    this.sleepingPose = null;
+    this.presentationPose = null;
     this.sleepMarker = null;
     this.sleepMarkerBase = null;
     this.lowEnergyMarker = null;
@@ -38,8 +38,8 @@ export class CharacterVisual {
   }
 
   update(snapshot, movementState, movementConfig) {
-    if (this.sleepingPose) {
-      this.applySleepingPose();
+    if (this.presentationPose) {
+      this.applyPresentationPose();
       return;
     }
     this.sprite.setPosition(snapshot.position.x, snapshot.position.y);
@@ -72,9 +72,16 @@ export class CharacterVisual {
     }
   }
 
-  setSleepingPose(pose) {
-    this.sleepingPose = pose ? { x: pose.x, y: pose.y, facing: pose.facing ?? "right", angle: pose.angle ?? -90 } : null;
-    if (this.sleepingPose) this.applySleepingPose();
+  setPresentationPose(pose) {
+    this.presentationPose = pose ? {
+      x: pose.x,
+      y: pose.y,
+      facing: pose.facing ?? "down",
+      angle: pose.angle ?? 0,
+      depth: pose.depth,
+      showSleepMarker: Boolean(pose.showSleepMarker),
+    } : null;
+    if (this.presentationPose) this.applyPresentationPose();
     else {
       this.sprite.setAngle?.(0);
       this.sprite.setOrigin?.(0.5, 1);
@@ -97,20 +104,21 @@ export class CharacterVisual {
     this.scene.tweens?.add?.({ targets: this.lowEnergyMarker, x: { from: x, to: x - 1 }, y: { from: y, to: y - 1 }, duration: 1000, yoyo: true, repeat: -1 });
   }
 
-  applySleepingPose() {
-    const idleFrame = this.frames[this.sleepingPose.facing][this.idleFrameIndex];
+  applyPresentationPose() {
+    const idleFrame = this.frames[this.presentationPose.facing][this.idleFrameIndex];
     this.sprite.anims.stop();
     applyFrameReference(this.sprite, idleFrame);
     this.sprite.setOrigin?.(0.5, 0.5);
-    this.sprite.setAngle?.(this.sleepingPose.angle);
-    this.sprite.setPosition(this.sleepingPose.x, this.sleepingPose.y);
-    this.sprite.setDepth(501 + Math.round(this.sleepingPose.y));
-    this.updateSleepMarker();
+    this.sprite.setAngle?.(this.presentationPose.angle);
+    this.sprite.setPosition(this.presentationPose.x, this.presentationPose.y);
+    this.sprite.setDepth(this.presentationPose.depth ?? 501 + Math.round(this.presentationPose.y));
+    if (this.presentationPose.showSleepMarker) this.updateSleepMarker();
+    else this.destroySleepMarker();
   }
 
   updateSleepMarker() {
-    const x = this.sleepingPose.x - 1;
-    const y = this.sleepingPose.y - 14;
+    const x = this.presentationPose.x - 1;
+    const y = this.presentationPose.y - 14;
     if (!this.sleepMarker && this.scene.add?.graphics) {
       this.sleepMarker = this.scene.add.graphics();
       this.sleepMarker.fillStyle(0xf2eadc, 0.95).fillRect(0, 0, 5, 1).fillRect(3, 1, 1, 1).fillRect(2, 2, 1, 1).fillRect(1, 3, 1, 1).fillRect(0, 4, 5, 1);
@@ -118,7 +126,7 @@ export class CharacterVisual {
     if (!this.sleepMarker || this.sleepMarkerBase?.x === x && this.sleepMarkerBase?.y === y) return;
     this.scene.tweens?.killTweensOf?.(this.sleepMarker);
     this.sleepMarkerBase = { x, y };
-    this.sleepMarker.setPosition(x, y).setDepth(502 + Math.round(this.sleepingPose.y));
+    this.sleepMarker.setPosition(x, y).setDepth(502 + Math.round(this.presentationPose.y));
     this.scene.tweens?.add?.({ targets: this.sleepMarker, x: { from: x, to: x - 1 }, y: { from: y, to: y - 1 }, duration: 1000, yoyo: true, repeat: -1 });
   }
 

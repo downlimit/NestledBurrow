@@ -5,12 +5,14 @@ import { LARGE_RESOURCE_HP_MULTIPLIER } from "./resourceDomain.js";
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
 const FIELDS = Object.freeze([
-  Object.freeze({ key: "axeDamage", label: "Axe damage", min: 0, max: 999, step: 1 }),
-  Object.freeze({ key: "smallLogChopHp", label: "Small log chop HP", min: 1, max: 99, step: 1 }),
-  Object.freeze({ key: "universalHitCooldownSeconds", label: "Universal hit cooldown", min: 0, max: 30, step: 0.1 }),
-  Object.freeze({ key: "minimumFatigueSpeedMultiplier", label: "Minimum fatigue speed", min: 0.05, max: 1, step: 0.05 }),
-  Object.freeze({ key: "sleepTimeScale", label: "Sleep time scale", min: 1, max: 64, step: 1 }),
-  Object.freeze({ key: "sleepEnergyPerGameHour", label: "Sleep energy / game hour", min: 0, max: 999, step: 0.5 }),
+  Object.freeze({ key: "axeDamage", label: "Урон топора", min: 0, max: 999, step: 1 }),
+  Object.freeze({ key: "smallLogChopHp", label: "Прочность малого бревна", min: 1, max: 99, step: 1 }),
+  Object.freeze({ key: "universalHitCooldownSeconds", label: "Перезарядка удара, с", min: 0, max: 30, step: 0.1 }),
+  Object.freeze({ key: "minimumFatigueSpeedMultiplier", label: "Мин. скорость при усталости", min: 0.05, max: 1, step: 0.05 }),
+  Object.freeze({ key: "sleepTimeScale", label: "Скорость времени во сне", min: 1, max: 64, step: 1 }),
+  Object.freeze({ key: "sleepEnergyPerGameHour", label: "Энергия сна за игровой час", min: 0, max: 999, step: 0.5 }),
+  Object.freeze({ key: "backPointFollowRate", label: "Камера: скорость точки B", min: 0.1, max: 20, step: 0.1 }),
+  Object.freeze({ key: "cameraLeadTransitionSeconds", label: "Камера: переход B→F, с", min: 0.1, max: 10, step: 0.1 }),
 ]);
 
 export function loadMovementDebugConfig() { return {}; }
@@ -33,20 +35,20 @@ export class MovementDebugPanel {
     const toggle = documentRef.createElement("button");
     toggle.type = "button";
     toggle.className = "balance-debug-toggle";
-    toggle.textContent = "BAL";
-    toggle.title = "Balance tuning";
-    toggle.setAttribute("aria-label", "Toggle balance tuning");
+    toggle.textContent = "ОТЛ";
+    toggle.title = "Отладка";
+    toggle.setAttribute("aria-label", "Открыть отладочную панель");
     toggle.setAttribute("aria-expanded", "false");
     toggle.addEventListener("click", () => this.setOpen(!this.open));
 
     const panel = documentRef.createElement("section");
     panel.className = "movement-debug-panel";
-    panel.setAttribute("aria-label", "Balance tuning");
+    panel.setAttribute("aria-label", "Отладочная панель");
     panel.hidden = true;
     panel.addEventListener("pointerdown", stopEvent);
     panel.addEventListener("keydown", stopEvent);
     const title = documentRef.createElement("strong");
-    title.textContent = "Balance tuning";
+    title.textContent = "Отладка";
     panel.append(title);
 
     for (const field of FIELDS) this.appendInput(panel, field);
@@ -61,7 +63,7 @@ export class MovementDebugPanel {
 
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
-    for (const [label, handler] of [["Reset balance run", onResetBalanceRun], ["Refill energy", onRefillEnergy], ["Reset defaults", () => this.resetDefaults()]]) {
+    for (const [label, handler] of [["Сбросить баланс-забег", onResetBalanceRun], ["Восполнить энергию", onRefillEnergy], ["Вернуть значения по умолчанию", () => this.resetDefaults()]]) {
       const button = documentRef.createElement("button");
       button.type = "button";
       button.textContent = label;
@@ -115,12 +117,12 @@ export class MovementDebugPanel {
       const input = this.inputs.get(field.key);
       if (input) input.value = String(this.gameplayTuning[field.key]);
     }
-    if (this.derived) this.derived.textContent = `Large log chop HP ${Math.round(this.gameplayTuning.smallLogChopHp * LARGE_RESOURCE_HP_MULTIPLIER)}`;
+    if (this.derived) this.derived.textContent = `Прочность большого бревна: ${Math.round(this.gameplayTuning.smallLogChopHp * LARGE_RESOURCE_HP_MULTIPLIER)}`;
   }
 
   updateStatus(snapshot = this.getStatusSnapshot()) {
     if (!this.status || !snapshot) return;
-    this.status.textContent = [`time ${snapshot.clock ?? "--:--"}`, `energy ${Math.floor(snapshot.energy ?? 0)}`, `small logs ${snapshot.smallLogsCleared ?? 0}`, `wood ${snapshot.wood ?? 0} stone ${snapshot.stone ?? 0} ruby ${snapshot.rubies ?? 0}`].join("\n");
+    this.status.textContent = [`время ${snapshot.clock ?? "--:--"}`, `энергия ${Math.floor(snapshot.energy ?? 0)}`, `малые брёвна ${snapshot.smallLogsCleared ?? 0}`, `дерево ${snapshot.wood ?? 0} камень ${snapshot.stone ?? 0} рубины ${snapshot.rubies ?? 0}`].join("\n");
   }
 
   destroy() {

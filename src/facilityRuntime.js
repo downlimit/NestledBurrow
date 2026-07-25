@@ -57,6 +57,18 @@ export function createFacilityRuntime(scene, { worldLayout }) {
     getActiveId() {
       return activeFacilityId;
     },
+    getPresentationPose() {
+      if (!activeFacilityId) return null;
+      const facility = getFacility(activeFacilityId);
+      if (!facility || !["shower", "toilet"].includes(facility.facilityType)) return null;
+      return {
+        x: facility.position.x,
+        y: facility.position.y,
+        facing: "down",
+        angle: 0,
+        depth: 501 + Math.round(facility.position.y),
+      };
+    },
     isUsing() {
       return activeFacilityId !== null;
     },

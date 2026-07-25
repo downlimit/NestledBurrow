@@ -2,6 +2,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
 
 export const JOYSTICK = {
   baseRadius: 21,
+  sprintRadius: 33,
   knobRadius: 9,
   maxOffset: 15,
   activationRadius: 31,
@@ -48,10 +49,11 @@ export function isInsideJoystickActivation(pointerX, _pointerY, gameWidth = GAME
 }
 
 export function clampJoystickCenter(pointerX, pointerY, config = JOYSTICK, bounds = { width: GAME_WIDTH, height: GAME_HEIGHT }) {
-  const left = config.baseRadius;
-  const right = Math.max(left, bounds.width / 2 - config.baseRadius);
-  const top = config.baseRadius;
-  const bottom = Math.max(top, bounds.height - config.baseRadius);
+  const outerRadius = config.sprintRadius ?? config.baseRadius;
+  const left = outerRadius;
+  const right = Math.max(left, bounds.width / 2 - outerRadius);
+  const top = outerRadius;
+  const bottom = Math.max(top, bounds.height - outerRadius);
 
   return {
     x: Math.min(Math.max(pointerX, left), right),

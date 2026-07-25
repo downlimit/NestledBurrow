@@ -29,6 +29,7 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
+const cameraFollowSource = fs.readFileSync(path.join(root, "src/cameraFollowRuntime.js"), "utf8");
 const visualConfigSource = fs.readFileSync(path.join(root, "src/visualConfig.js"), "utf8");
 const visualProfilesSource = fs.readFileSync(path.join(root, "src/characterVisualProfiles.js"), "utf8");
 const characterVisualSource = fs.readFileSync(path.join(root, "src/characterVisual.js"), "utf8");
@@ -130,7 +131,8 @@ assert(!/ROOM_SCALE|PLAYER_SCALE|Phaser\.Scale\.FIT/.test(mainSource));
 assert(/Phaser\.Scale\.MAX_ZOOM/.test(mainSource), "display zoom remains integer");
 assert(/Phaser\.Scale\.Events\.RESIZE/.test(mainSource), "zoom is recalculated after resize");
 assert(/getMaxZoom\(\)/.test(mainSource), "integer zoom comes from Phaser max zoom");
-assert(/startFollow\(this\.player, true, 1, 1\)/.test(mainSource), "camera follow uses rounded pixels");
+assert(/new CameraFollowRuntime\(this,/.test(mainSource), "scene composes the camera follow runtime");
+assert(/startFollow\(this\.followTarget, true, 1, 1\)/.test(cameraFollowSource), "camera follow uses a rounded target");
 assert(!/scroll[XY]\s*=\s*Math\.round/.test(mainSource), "camera follow is not overwritten manually");
 assert(/pixelArt:\s*true/.test(mainSource));
 assert(/antialias:\s*false/.test(mainSource));

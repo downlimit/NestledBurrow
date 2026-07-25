@@ -56,7 +56,8 @@ assert(!/moveWithCollision/.test(characterSource), "Character delegates world co
 assert(!/PLAYER_SPEED/.test(worldConfigSource), "worldConfig does not export player speed");
 assert(!/createNpcMovementConfig/.test(characterSource), "legacy NPC movement helper is removed");
 assert(/this\.player = this\.characterSystem\.require\("player"\)\.sprite/.test(mainSource), "camera target is looked up through the character registry");
-assert(/startFollow\(this\.player, true, 1, 1\)/.test(mainSource), "camera target remains the player sprite");
+assert(/new CameraFollowRuntime\(this,/.test(mainSource), "WorldScene composes the dedicated camera-follow runtime");
+assert(!/startFollow\(this\.player/.test(mainSource), "camera no longer follows the player sprite directly");
 assert(!/this\.characters\s*=/.test(mainSource), "WorldScene does not keep a mutable character array registry");
 assert(!/this\.characters\.forEach/.test(mainSource), "WorldScene does not update a mutable character array directly");
 assert(/this\.characterSystem\?\.update\((delta|worldDeltaMs|substepMs)\)/.test(mainSource), "WorldScene updates characters through CharacterSystem");

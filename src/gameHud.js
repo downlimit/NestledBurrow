@@ -88,6 +88,7 @@ export function createGameHud(scene, options) {
     onConfirmationChange = () => {},
     audioSettings,
     getGameplayState = () => null,
+    isCoarsePointer = () => false,
   } = options;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const energyBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0);
@@ -109,6 +110,7 @@ export function createGameHud(scene, options) {
   let energyFlow = null;
   let energyArrowState = null;
   let hoveredNeedId = null;
+  let pinnedNeedId = null;
   let needsRowsState = [];
 
   const optionsHit = createZone(scene, OPTIONS_HIT_AREA);
@@ -120,11 +122,26 @@ export function createGameHud(scene, options) {
   const cancelHit = createZone(scene, NEW_GAME_CANCEL_HIT_AREA).disableInteractive();
   const needHits = NEED_ROW_AREAS.map((rect, index) => {
     const zone = createZone(scene, rect).disableInteractive();
-    zone.on("pointerover", () => { hoveredNeedId = NEED_ROW_IDS[index]; render(); });
-    zone.on("pointerout", () => { hoveredNeedId = null; render(); });
-    zone.on("pointerdown", stop);
+    zone.on("pointerover", () => { if (!isCoarsePointer()) { hoveredNeedId = NEED_ROW_IDS[index]; render(); } });
+    zone.on("pointerout", () => { if (!isCoarsePointer()) { hoveredNeedId = null; render(); } });
+    zone.on("pointerdown", (pointer, _x, _y, event) => {
+      stop(pointer, event);
+      if (!isCoarsePointer()) return;
+      const needId = NEED_ROW_IDS[index];
+      pinnedNeedId = pinnedNeedId === needId ? null : needId;
+      render();
+    });
     return zone;
   });
+  const onScenePointerDown = (pointer) => {
+    if (!isCoarsePointer() || !pinnedNeedId) return;
+    const point = { x: pointer?.x, y: pointer?.y };
+    if (NEED_ROW_AREAS.some((rect) => isPointInRect(point.x, point.y, rect))) return;
+    if (isPointInRect(point.x, point.y, NEED_TOOLTIP_AREA)) return;
+    pinnedNeedId = null;
+    render();
+  };
+  scene.input.on("pointerdown", onScenePointerDown);
 
   const optionsText = createText(scene);
   const languageText = createText(scene);
@@ -263,8 +280,10 @@ export function createGameHud(scene, options) {
     const gameplay = getGameplayState?.();
     if (gameplay) {
       renderClock(gameplay);
-      renderResources(gameplay);
-      if (!optionsOpen) renderNeeds(gameplay);
+      if (!optionsOpen) {
+        renderResources(gameplay);
+        renderNeeds(gameplay);
+      }
     }
     if (optionsOpen) renderOptionsPanel();
   }
@@ -320,14 +339,15 @@ export function createGameHud(scene, options) {
     energyCritical = energy.ratio < 0.15;
     energyFlow = gameplay.energyFlow ?? null;
     energyArrowState = energyFlow;
-    if (hoveredNeedId) renderNeedTooltip();
+    if (hoveredNeedId || pinnedNeedId) renderNeedTooltip();
   }
 
   function renderNeedTooltip() {
+    const needId = pinnedNeedId ?? hoveredNeedId;
     graphics.fillStyle(HUD_COLORS.panel, 0.97).fillRect(NEED_TOOLTIP_AREA.x, NEED_TOOLTIP_AREA.y, NEED_TOOLTIP_AREA.width, NEED_TOOLTIP_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(NEED_TOOLTIP_AREA.x + 0.5, NEED_TOOLTIP_AREA.y + 0.5, NEED_TOOLTIP_AREA.width - 1, NEED_TOOLTIP_AREA.height - 1);
-    setManagedTextStyle(needTooltipText, scene, textStyle({ fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } }))
-      .setText(localization.t(`hud:needs.${hoveredNeedId}.tooltip`))
+    setManagedTextStyle(needTooltipText, scene, textStyle({ fontSize: "7px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12, useAdvancedWrap: true } }))
+      .setText(localization.t(`hud:needs.${needId}.tooltip`))
       .setVisible(true)
       .setPosition(NEED_TOOLTIP_AREA.x + 6, NEED_TOOLTIP_AREA.y + 6);
   }
@@ -382,7 +402,10 @@ export function createGameHud(scene, options) {
       if (active) zone.setInteractive({ useHandCursor: true });
       else zone.disableInteractive();
     }
-    if (!active) hoveredNeedId = null;
+    if (!active) {
+      hoveredNeedId = null;
+      pinnedNeedId = null;
+    }
   }
 
   function setOptionsPanelInteractive(active) {
@@ -455,6 +478,7 @@ export function createGameHud(scene, options) {
         energyShakeActive,
         needsRows: needsRowsState,
         hoveredNeedId,
+        pinnedNeedId,
         tooltipVisible: needTooltipText.visible,
       };
     },
@@ -488,7 +512,7 @@ export function createGameHud(scene, options) {
       return isPointInRect(x, y, OPTIONS_HIT_AREA)
         || Boolean(optionsOpen && isPointInRect(x, y, OPTIONS_PANEL_AREA))
         || Boolean(!optionsOpen && isPointInRect(x, y, NEEDS_HUD_AREA))
-        || Boolean(hoveredNeedId && isPointInRect(x, y, NEED_TOOLTIP_AREA))
+        || Boolean((hoveredNeedId || pinnedNeedId) && isPointInRect(x, y, NEED_TOOLTIP_AREA))
         || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));
     },
     destroy() {
@@ -496,6 +520,7 @@ export function createGameHud(scene, options) {
       destroyed = true;
       if (confirmingNewGame) onConfirmationChange(false);
       unsubscribe?.();
+      scene.input.off("pointerdown", onScenePointerDown);
       for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
       scene.tweens.killTweensOf(energyArrowGraphics);
