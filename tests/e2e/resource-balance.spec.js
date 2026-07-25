@@ -32,7 +32,7 @@ test("balance panel is compact, scrollable and applies live resource tuning", as
   await boot(page);
   const toggle = page.locator(".balance-debug-toggle");
   await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveText("BAL");
+  await expect(toggle).toHaveText("ОТЛ");
   expect(await toggle.evaluate((element) => ({ width: element.offsetWidth, height: element.offsetHeight }))).toEqual({ width: 36, height: 24 });
   await expect(page.locator(".movement-debug-panel")).toBeHidden();
   await toggle.click({ force: true });
