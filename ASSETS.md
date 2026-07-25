@@ -18,7 +18,7 @@ The following exact blobs were uploaded by the user to `asset-inbox/incoming` an
 | --- | --- | --- |
 | `public/assets/audio/music/NestledBurrow_Ambient01.mp3` | `incoming/suno-song-3693411c.mp3` | `fe0ca6344d6dec08a0db0cff61e3832baa864265` |
 | `public/assets/audio/music/NestledBurrow_Ambient02.mp3` | `incoming/suno-song-9d54e725.mp3` | `86f62c53ddef908809a1f9d410cf04c71bc0c6da` |
-| `public/assets/audio/music/NestledBurrow_Ambient03.mp3` | `incoming/suno-song-c021cde4.mp3` | `c54abb765f04f337946c9617ca271a2f0f3c3716` |
+| `public/assets/audio/music/NestledBurrow_Ambient03.mp3` | `incoming/suno-song-c021cde4.mp3` | `c54abb765f04f337946c9617ca2f0f3c3716` |
 | `public/assets/audio/music/NestledBurrow_Ambient04.mp3` | `incoming/suno-song-c322d726.mp3` | `1bfeb7c5e3a5ba782395373a1511ee2c04668d9f` |
 | `public/assets/audio/music/NestledBurrow_Ambient05.mp3` | `incoming/suno-song-e6c3f46b.mp3` | `5c09c9bcff72b14f69f78085472d35de7a6c9886` |
 | `public/assets/audio/music/NestledBurrow_Ambient06.mp3` | `incoming/suno-song-ee08dca2.mp3` | `188d62946399f80a9cd936797215eecef4799b63` |
