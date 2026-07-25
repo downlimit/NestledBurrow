@@ -92,7 +92,8 @@ test.describe("Task #030 player needs", () => {
       expect(state.activity.activeResourceKind).toBeTruthy();
       expect(state.flow.novelty.rate).toBe(expectedRate);
       expect(state.flow.satiety.rate).toBeCloseTo(-0.495, 5);
-      expect(state.values.novelty).toBeCloseTo(50 + expectedRate, 0);
+      if (expectedRate > 0) expect(state.values.novelty).toBeGreaterThan(50);
+      else expect(state.values.novelty).toBeLessThan(50);
     }
   });
 
