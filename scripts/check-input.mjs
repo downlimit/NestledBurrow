@@ -188,7 +188,7 @@ near(
   1,
   "actual component uses production joystick math outside canvas",
 );
-assert.equal(joystick.isSprinting(), true, "raw pointer distance beyond the 33 px ring enables sprint");
+assert.equal(joystick.isSprinting(), true, "raw pointer distance beyond the 54.45 px ring enables sprint");
 canvas.emit("pointerleave", {});
 assert.equal(joystick.activeJoystickPointerId, 1, "boundary leave does not reset");
 canvas.emit("lostpointercapture", { pointerId: 1 });
