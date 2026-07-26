@@ -1,3 +1,4 @@
+import { BED_ASSET } from "./debrisConfig.js";
 import { TILE_SIZE } from "./worldConfig.js";
 
 export const FACILITY_INTERACTION_KIND = "use-facility";
@@ -40,6 +41,8 @@ export const FACILITIES = Object.freeze([
 ]);
 
 export function preloadFacilityAssets(scene, baseUrl = import.meta.env.BASE_URL) {
-  for (const asset of Object.values(FACILITY_ASSETS)) scene.load.image(asset.key, `${baseUrl}${asset.path}`);
+  for (const asset of [...Object.values(FACILITY_ASSETS), BED_ASSET]) {
+    scene.load.image(asset.key, `${baseUrl}${asset.path}`);
+  }
 }
 export function getFacility(facilityId) { return FACILITIES.find((facility) => facility.id === facilityId) ?? null; }
