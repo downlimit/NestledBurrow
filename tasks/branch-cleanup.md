@@ -16,7 +16,7 @@ Remove stale remote branches from `origin` without deleting active, protected, p
 
 ## Required procedure
 
-1. Read `AGENTS.md`, especially `Branch lifecycle`.
+1. Read `AGENTS.md`, especially `Context and setup` and `GitHub`.
 2. Run `git fetch --prune`.
 3. List all remote branches and all open, closed and merged pull requests associated with them.
 4. For every branch, inspect:
