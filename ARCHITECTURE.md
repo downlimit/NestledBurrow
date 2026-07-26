@@ -3,333 +3,167 @@
 
 ## Назначение
 
-`ARCHITECTURE.md` — канонический долгоживущий адрес для оценки runtime-архитектуры, принятых направлений её развития и очереди архитектурных улучшений.
+`ARCHITECTURE.md` хранит долгоживущую оценку runtime-архитектуры, подтверждённые границы и условные точки следующего выделения. Фактическое состояние всегда сверяется с актуальным `main`; продуктовая зрелость принадлежит `GAME.md`.
 
-Документ предназначен прежде всего для Lead-чата. Он описывает подтверждённое направление, но не выдаёт запланированную работу за уже опубликованную реализацию. Фактическое состояние всегда проверяется по `main`, исходникам и `PROJECT.md`.
+## Общая оценка
 
-## Базовая оценка
+Архитектура соответствует раннему playable-прототипу и не требует полной перестройки. Проект развивается законченными функциональными slices: временный локальный код допустим для проверки ощущения, а новая универсальная граница вводится после повторного реального use case.
 
-Текущая архитектура соответствует стадии раннего игрового прототипа и не требует полной перестройки.
+Устойчивые разделения:
 
-Устойчивые границы:
-
-- чистая velocity-based математика движения отделена от Phaser;
-- параметры движения задаются именованными actor profiles;
-- collision resolver получает явный environment contract;
-- `CharacterMotor` владеет movement/controller/collision без Phaser;
-- `CharacterVisual` владеет sprite/facing/animation/depth;
-- `CharacterSystem` предоставляет stable-ID registry, ordered update и runtime-free snapshots;
-- player и patrol controllers используют общий `ControllerCommand`;
-- NPC spawn и patrol-маршруты задаются декларативно;
-- `GameSessionState` сериализуется в JSON и не содержит runtime-ссылок;
+- `CharacterMotor` владеет runtime-free movement/controller/collision;
+- `CharacterVisual` владеет Phaser sprite, facing, animation и depth;
+- `CharacterSystem` предоставляет stable-ID registry и ordered update;
+- player и patrol controllers возвращают общий `ControllerCommand`;
+- actor/visual profiles декларативны;
+- collision resolver получает environment contract;
+- `GameSessionState` JSON-safe и versioned;
 - interaction targeting является чистой детерминированной функцией;
-- `InteractionRuntime` связывает snapshots, session operations и presenter;
-- `InteractionHud` изолирует Phaser-представление диалога и mobile tap lifecycle;
-- `MobileJoystick`, `MovementDebugPanel` и `CameraFollowRuntime` имеют самостоятельное lifecycle ownership.
+- `InteractionRuntime` отделён от `InteractionHud`;
+- `GameHud`, `MobileJoystick`, `MovementDebugPanel`, `CameraFollowRuntime` и `BuildModeRuntime` имеют собственное lifecycle ownership;
+- needs, facilities, resources и audio имеют выделенные domain/config/runtime-модули.
 
-Существующий movement core следует расширять эволюционно.
+## Главный текущий риск: `WorldScene` / `src/main.js`
 
-## Главный архитектурный риск
-
-`WorldScene` остаётся composition root и всё ещё координирует:
+`WorldScene` остаётся composition root, но сейчас координирует больше, чем простой wiring:
 
 - preload и world rendering;
-- создание runtime-систем;
+- создание и связывание runtime-систем;
 - keyboard/action sampling;
-- camera follow и integer zoom;
-- fullscreen;
-- screen-space HUD;
-- browser lifecycle listeners и cleanup.
+- needs/resource/facility/sleep update;
+- build-mode world preview, placement и demolition presentation;
+- camera presentation sync;
+- audio lifecycle;
+- autosave, reset и E2E bridge;
+- browser listeners и cleanup.
 
-При текущем масштабе это допустимо. Language switching, fullscreen и будущий `NEW GAME` создают реальную причину выделить компактный `GameHud`, но не универсальный UI framework.
+Это допустимо для работающего прототипа, однако Task #030–#034 подтвердили рост цены изменений в этом файле. Решение — не общий rewrite, а локальное выделение при следующем содержательном use case.
 
-## Принятые архитектурные направления
+## Условные границы для следующих Лидов
 
-### 1. Общая команда персонажа
+### Build mode
 
-Контроллер возвращает:
+При следующей задаче, которая существенно меняет build mode, Лид обязан проверить фактический `main` и включить в ТЗ локальное выделение build-mode rendering/orchestration, если новая логика иначе снова разрастается в `WorldScene`.
 
-```js
-{
-  moveDirection: { x, y },
-  aimDirection: { x, y } | null,
-  actions: {
-    interact: false,
-    primary: false,
-    secondary: false,
-  },
-}
-```
+Предпочтительное направление:
 
-Контроллер получает изолированный snapshot вместо mutable `Character`. Locomotion, orientation, aim и действия не смешиваются.
+- `BuildModeRuntime` владеет UI/input state, gestures, selection, scroll, prediction и undo lifecycle;
+- catalog/placement metadata остаются в `buildAssetCatalog` и связанных definitions;
+- world-facing build renderer/coordinator получает явные callbacks/contracts от scene;
+- `WorldScene` создаёт компонент и передаёт world/facility/resource owners, но не хранит его внутреннюю state machine.
 
-### 2. Разгрузка `WorldScene`
+Это правило не требует отдельного рефакторинга без gameplay-задачи и не разрешает одновременно переписывать всю world architecture.
 
-Уже выделены:
+### Facilities и presentation camera
 
-- `MobileJoystick`;
-- `MovementDebugPanel`;
-- `CharacterSystem`;
-- `InteractionRuntime`;
-- `InteractionHud`.
+При следующей задаче, которая одновременно меняет facilities, presentation pose, motor position или camera follow, Лид проверяет возможность выделить только coordination boundary:
 
-Следующая оправданная граница:
+- facility runtime владеет объектом, collider и use lifecycle;
+- presentation pose не мутирует безопасную motor position;
+- `CameraFollowRuntime` получает presentation position через один явный adapter;
+- sleep/wake и interaction candidate остаются самостоятельными контрактами;
+- `WorldScene` только связывает эти результаты.
 
-- `GameHud` — build label, fullscreen, language control, будущий `NEW GAME`, общие screen-space hit areas и cleanup.
+Не создавать универсальную animation/presentation framework до второго отличающегося паттерна.
 
-`WorldScene` создаёт системы и связывает зависимости, но не становится владельцем их внутренней логики.
+## Принятые направления
 
-### 3. Actor profiles и визуалы
+### Controller и движение
 
-Player и villager используют явные immutable profiles. Movement и visual data разделены.
+Контроллер возвращает нормализованный `ControllerCommand` с `moveDirection`, optional `aimDirection` и действиями. Он получает snapshot вместо mutable `Character`.
 
-- NPC используют прогулочный movement profile примерно с третью скорости игрока;
-- разные персонажи могут иметь разные visual profiles при общем movement profile;
-- animation prefixes должны исключать конфликт Phaser animations;
-- preload собирает texture keys из реально используемых visual profiles;
-- visual diversity не должна дублировать movement/collision configuration.
+`CharacterMotor` хранит position, movement state/config, controller, collision footprint и blocked axes. `CharacterVisual` синхронизирует presentation из motor snapshot. HP, quests, inventory и save logic в motor/visual не добавляются.
 
-Будущие `guard`, `meleeEnemy` и `rangedEnemy` расширяют тот же контракт только при появлении соответствующей роли.
+Текущий axis-separated substep collision resolver сохраняется, пока dash, knockback или быстрые сущности не докажут необходимость замены.
 
-### 4. Locomotion, orientation и animation
+### Facing и animation
 
-Семантика:
-
-- `moveDirection` — команда перемещения;
+- `moveDirection` — команда;
 - `velocity` — фактическое движение;
-- `facingDirection` — continuous ориентация;
-- `aimDirection` — направление целевой системы;
-- cardinal facing принадлежит visual layer.
+- `facingDirection` — continuous orientation;
+- cardinal/diagonal frame selection принадлежит visual layer;
+- walk cadence: `step A → neutral → step B → neutral`;
+- после остановки sprite явно возвращается в neutral frame текущего facing.
 
-Walk animation использует явно проверенную последовательность:
+Назначение pixel frames подтверждается по PNG и contact sheet, а не угадывается по имени или порядку.
 
-```text
-step A → neutral → step B → neutral
-```
+### World geometry
 
-После прекращения движения sprite обязан явно перейти в neutral frame текущего facing независимо от последней фазы animation.
+Активный environment использует Basic Village. Таверна построена на 16 px world cells, стены — на рёбрах между клетками; render и collision используют общую edge-геометрию. Resource placement сохраняет собственный 8 px grid.
 
-Назначение source frames подтверждается визуально по PNG, а не выводится из имени или числового порядка файла.
+`worldConfig` хранит устойчивые размеры и atlas mappings. `worldLayout` собирает production composition и collision environment. Полное разделение `WorldDefinition` / `WorldRuntime` / `WorldRenderer` вводится только когда переходы между пространствами или повторное авторство мира создадут фактическую потребность.
 
-### 5. Collision environment
+Tiled/LDtk не вводятся без подтверждённой проблемы ручного авторинга.
 
-Collision functions получают:
+### Build mode
 
-```js
-{
-  bounds: { left, top, right, bottom },
-  cellSize,
-  isBlockedCell(x, y),
-}
-```
+`BuildModeRuntime` и `buildAssetCatalog` уже существуют. Режим поддерживает локализованную library, placement/drag prediction, demolition, grouped undo, surfaces, walls, furniture и дерево. Постройки пока runtime-only и не меняют save schema.
 
-Текущий axis-separated substep resolver сохраняется, пока dash, knockback или быстрые сущности не докажут необходимость замены.
+Следующее расширение не должно добавлять ещё один параллельный catalog, placement grid или renderer path.
 
-### 6. Character aggregate
+### Session и persistence
 
-- `CharacterMotor` хранит position, movement state/config, controller, collision footprint и blocked axes;
-- `CharacterVisual` хранит Phaser sprite, facing, animation и depth;
-- `Character` связывает motor и visual;
-- `CharacterSystem` управляет registry и update.
+`GameSessionState` хранит только JSON-safe устойчивое gameplay state. Persistence использует versioned envelope, validation, явные migrations и fresh-state fallback. Presentation preferences — язык, звук и debug tuning — хранятся отдельно и переживают `NEW GAME`.
 
-HP, quests, inventory, save logic и dialogue state не добавляются в motor или visual.
+Новая save schema является Strict-задачей. Runtime-only experimentation допустима без преждевременного persistence, если граница явно названа.
 
-### 7. World definition/runtime/renderer
+### Needs, resources и facilities
 
-По мере появления переходов мир разделяется на:
+- needs rates/flow и clamps принадлежат pure domain/config;
+- resources используют immutable profiles и общий interaction/action contract;
+- facilities декларативно задают sprite, footprint, collider и optional presentation pose;
+- world runtime хранит stable IDs и teardown;
+- HUD показывает состояние, но не вычисляет gameplay.
 
-- `WorldDefinition` — layers, markers, spawn, collisions, zones;
-- `WorldRuntime` — collision queries, triggers и entity registry;
-- `WorldRenderer` — Phaser representation и depth.
+Не строить универсальный inventory/tool/facility framework до появления второго содержательно отличающегося цикла.
 
-Tiled или LDtk вводятся только после подтверждённой проблемы ручного авторинга.
+### Interaction и dialogue
 
-### 8. Session state и persistence
+Interaction descriptors immutable и JSON-like. Targeting учитывает radius, facing, priority, distance и stable ID. `InteractionRuntime` выбирает candidate, разрешает dialogue/action и применяет persistent transition; Phaser presentation принадлежит HUD/runtime-компонентам.
 
-`GameSessionState` хранит version, current world, player/entity IDs, flags и dialogue progress. Он не хранит Phaser objects, functions, Maps/Sets или frame-level positions без подтверждённой необходимости.
+User-facing текст не хранится в session state. Session хранит stable IDs и progress.
 
-Persistence вводится вместе с первым содержательным мини-квестом:
+### Camera
 
-- versioned save envelope;
-- strict validation;
-- явные migrations;
-- safe fallback при повреждённом или неизвестном save;
-- сохранение только устойчивого прогресса;
-- `NEW GAME` создаёт чистое session state и удаляет progress save;
-- язык и другие presentation preferences не входят в `GameSessionState` и переживают `NEW GAME`.
+`CameraFollowRuntime` владеет B/F/C и невидимой follow target. Он получает presentation-позицию после visual update; sleep и facility pose не должны перемещать безопасную motor position. Camera bounds и integer zoom остаются у scene.
 
-### 9. Interaction и dialogue runtime
+### HUD и локализация
 
-Interaction descriptor является immutable JSON-like data с stable ID, entity ID, kind, radius, priority, facing policy и payload.
+`GameHud` уже выделен и владеет screen-space controls, needs/resources, options/new-game lifecycle и hit areas. `InteractionHud` владеет prompts/dialogue. Layout измеряет фактический текст и поддерживает native `320×180` и coarse-pointer mobile.
 
-`InteractionRuntime`:
+Локализация использует i18next, ICU и JSON namespaces. Runtime font — Pixelify Sans с Latin/Cyrillic subsets из pinned package. Gameplay/config хранит translation keys, а не готовые строки.
 
-- получает свежие snapshots;
-- выбирает доступную цель;
-- запускает и продвигает dialogue;
-- применяет декларативные completion effects;
-- сообщает controllers об active dialogue entity;
-- не хранит Phaser objects.
+### Audio
 
-User-facing текст не хранится в session state. Session хранит только stable dialogue/content IDs и progress indices.
+`audioRuntime` владеет playlist/no-repeat/crossfade и применением master/music volume к активным трекам. Canonical user audio paths и provenance принадлежат `ASSETS.md`. UI плейлиста и отдельная музыкальная система не вводятся без продуктовой необходимости.
 
-Первый содержательный slice:
+### Browser evidence
 
-1. home NPC выдаёт поручение;
-2. street NPC отвечает;
-3. session flags меняют доступные реплики;
-4. возвращение к home NPC завершает поручение;
-5. после завершения оба NPC имеют короткие repeat-реплики.
+Node contract checks являются основным доказательством pure logic. Playwright проверяет интегрированные desktop/mobile flows, persistence, input и отсутствие page errors. Visual feel подтверждается preview пользователем; хрупкие pixel-diff baselines не вводятся.
 
-До второго содержательно отличающегося паттерна отдельная универсальная quest system не вводится.
+## Реализованные архитектурные шаги
 
-### 10. Patrol behavior
+- общий `ControllerCommand`, actor profiles и collision environment;
+- `CharacterMotor` / `CharacterVisual` / `CharacterSystem`;
+- `MobileJoystick`, `MovementDebugPanel`, `CameraFollowRuntime`;
+- JSON-safe session, versioned persistence и `NEW GAME`;
+- `InteractionRuntime`, `InteractionHud`, dialogue/quest slice;
+- i18next RU/EN и Pixelify Sans;
+- `GameHud`, needs/resource/facility/audio runtimes;
+- edge-grid world geometry;
+- `BuildModeRuntime` и asset catalog;
+- desktop/mobile Browser E2E.
 
-Waypoint поддерживает optional `waitMs`:
-
-- смысловые точки ждут примерно 2000–3000 ms;
-- pass-through точки используют `waitMs: 0`;
-- dialogue pause замораживает движение, wait timer и blocked timer;
-- blocked fallback не изображает успешное достижение точки.
-
-Route validation и blocked recovery добавляются раньше pathfinding. A* не вводится без реальной необходимости.
-
-### 11. Локализация
-
-Локализация является отдельным framework-agnostic application service, а Phaser отвечает только за presentation.
-
-Принятый стек:
-
-- `i18next` — orchestration, locale fallback, namespaces и resource lifecycle;
-- `i18next-browser-languagedetector` — browser detection и отдельное сохранение language preference;
-- `i18next-icu` — ICU MessageFormat для plural/select/interpolation;
-- официальный `i18next-cli` — extraction, lint, locale sync и status;
-- JSON resources по locale и namespace;
-- Phaser `Text` с локально поставляемыми Unicode fonts для пользовательского текста.
-
-Правила:
-
-- stable semantic keys вместо английских фраз как ключей;
-- namespaces минимум `common`, `hud`, `dialogue`, позднее `quest`;
-- полный переводимый message хранится единым ICU message, без concatenation из фрагментов;
-- supported locales задаются registry с BCP-47 code, display label, direction и font key;
-- начальный язык: сохранённая preference → browser locale → fallback `en`;
-- preference хранится отдельно от progress save;
-- language change обновляет уже видимый HUD/dialogue без перезапуска сцены;
-- `document.documentElement.lang` и `dir` синхронизируются с выбранной locale;
-- missing key, missing locale entry, invalid ICU message и пустой перевод являются validation failure;
-- production не показывает пустую строку; fallback идёт в `en`, а development делает defect заметным;
-- runtime/gameplay data хранит translation keys, а не готовый локализованный текст;
-- локализация не зависит от Phaser и тестируется в Node;
-- cloud TMS/backend не вводится сейчас, но resource layout должен позволять подключить его без переписывания callers.
-
-Для `en` и `ru` используется локально bundled OFL/Apache/CC0 font с проверенным Latin/Cyrillic coverage. Locale registry допускает отдельные font packs для будущих writing systems.
-
-Ручное расширение самодельного 5×7 glyph map не является основным путём многоязычного текста. Pixel graphics/icons могут остаться кастомными, а пользовательские строки должны использовать Unicode-capable text rendering.
-
-### 12. HUD presentation
-
-`GameHud` владеет:
-
-- build label;
-- fullscreen;
-- language toggle;
-- будущим `NEW GAME`;
-- объединёнными HUD hit areas;
-- cleanup.
-
-Localized labels не полагаются на fixed English widths. Layout измеряет фактический текст, поддерживает wrapping, safe margins и mobile tap areas.
-
-Phaser `Text` обновляется только при изменении UI/content state или языка, не каждый frame.
-
-### 13. Browser-level проверки
-
-После появления localization, touch HUD, persistence и mini-quest browser-level risk достаточен для Playwright.
-
-Playwright должен проверять:
-
-- desktop keyboard lifecycle;
-- coarse/touch pointer lifecycle;
-- locale detection и language switching;
-- fullscreen/resize coexistence;
-- полный quest flow;
-- reload persistence;
-- `NEW GAME` с сохранением language preference;
-- отсутствие console/page errors.
-
-Используются отдельные desktop и mobile projects с locale/touch/device emulation. Screenshot artifacts полезны для review; хрупкие pixel-diff baselines не вводятся без стабильной rendering environment.
-
-Unit/contract tests остаются основным доказательством pure logic.
-
-### 14. Presentation camera follow
-
-`CameraFollowRuntime` владеет внутренними точками B/F/C и отдельной невидимой follow target. После visual update он получает presentation-позицию игрока: поэтому sleep и facility visual-pose корректно кадрируются, не изменяя безопасную motor position.
-
-- B догоняет P frame-rate-independent экспоненциальной интерполяцией;
-- F зеркально продолжает вектор B→P;
-- C плавно смешивает B и F по фактической скорости персонажа;
-- start, restart и explicit hard relocation сбрасывают B/F/C в P;
-- camera bounds и integer zoom остаются собственностью `WorldScene`.
-
-Tuning B/F является debug presentation preference в `localStorage`; он не входит в `GameSessionState` и не требует migration save.
-
-## Реализованные шаги
-
-1. Введён `ControllerCommand`.
-2. Player и patrol controllers переведены на общий contract.
-3. Выделен `MobileJoystick`.
-4. Выделен `MovementDebugPanel`.
-5. Runtime-компоненты подключены через composition root.
-6. Введены actor profiles `player` и `villager`.
-7. Collision resolver переведён на environment contract.
-8. Удалены legacy room sources; Basic Village является активным environment.
-9. `Character` разделён на `CharacterMotor` и `CharacterVisual`.
-10. Введён `CharacterSystem`.
-11. Введён JSON-сериализуемый `GameSessionState`.
-12. Введены immutable interaction descriptors и pure targeting.
-13. Session state подключён к composition root.
-14. Реализован первый `TALK` → three-line dialogue lifecycle.
-15. Введены `InteractionRuntime` и `InteractionHud`.
-16. HUD exclusion покрывает dialogue panel.
-17. Villager получил прогулочную скорость, waypoint waits и естественные multi-point маршруты.
-18. Visual repair закрепил four-phase cadence и явный возврат в neutral idle frame.
-19. Введены i18next localization service, EN/RU namespaces, Unicode Rubik и `GameHud`.
-20. Введены pure neighbor quest domain и versioned session persistence.
-21. Fan-in подключил локализованный playable quest, auto-save/load и `NEW GAME`, сохраняющий язык.
-22. Desktop/mobile Playwright проверяет language lifecycle, полный quest flow, reload persistence, reset и touch dialogue start.
-
-Visual repair, localization/progress fan-out и playable fan-in опубликованы как законченная функциональная волна.
-
-## Приоритетная очередь
-
-### Следующая безопасная волна
-
-1. Interaction с объектом, отличным от NPC.
-2. Zones/triggers и переход между двумя пространствами.
-3. Разделение world definition/runtime/renderer по фактической потребности переходов.
-4. Новые behavior states и route recovery по реальному контенту.
-5. Новые actor/visual types только по появившейся игровой роли.
-
-## Ограничения
-
-До подтверждённой необходимости не вводятся:
+## Не вводить без доказанной необходимости
 
 - полноценный ECS;
 - глобальный event bus;
 - dependency injection framework;
-- массовая миграция на TypeScript;
+- массовую миграцию на TypeScript;
 - Phaser Physics вместо текущего movement/collision core;
 - A* pathfinding;
 - Tiled или LDtk;
-- крупный механический перенос структуры каталогов;
-- собственный самодельный localization framework;
-- locale-specific `if/else` в gameplay/HUD callers;
-- строковая concatenation переводимых предложений;
-- cloud TMS или runtime translation service;
-- универсальная quest system до второго содержательного паттерна.
-
-Архитектура развивается законченными functional slices. Fan-out/fan-in применяется здесь потому, что localization/UI и pure progress/persistence имеют разные области владения, но сходятся в одном playable loop.
-
-## Текущий implementation status
-
-Movement/collision core, actor profiles, `CharacterSystem`, локализованный interaction/dialogue runtime, neighbor mini-quest, versioned persistence, `GameHud`, `NEW GAME` и desktop/mobile browser evidence реализованы. Следующий продуктовый шаг — interaction с не-NPC объектом и zones/transitions между пространствами.
+- крупный механический перенос каталогов;
+- самодельный localization framework;
+- cloud TMS/runtime translation service;
+- универсальную quest/inventory/facility/build framework до второго реального паттерна.
