@@ -145,20 +145,22 @@ The earlier Kenney Roguelike/RPG room and continuous-world atlases remain histor
 
 The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `76767a4fc6e5a7386118b044b5a99e02f24b0a07`, identical to the existing runtime file, and is intentionally not duplicated.
 
-## User-uploaded facility sprites
+## User-uploaded furniture sprites
 
 - **Provenance:** exact project PNG files uploaded by the user to `asset-inbox/incoming`; no external copy or substitute was used.
 - **Delivery:** each runtime path references the exact uploaded Git blob without resampling, recoloring, recompression or derived exports.
-- **Runtime integration:** Task #034 replaces the current procedural shower, toilet and dining-table drawings with these files.
+- **Runtime integration:** Task #034 replaced the procedural shower, toilet and dining-table runtime drawings. The bed follow-up and build-mode correction use the same canonical PNGs for runtime furniture, library thumbnails, placement ghosts and demolition tint.
 
 | Runtime file | Source upload | Native size | Git blob SHA |
 | --- | --- | ---: | --- |
+| `public/assets/project/facilities/NestledBurrow_Bed.png` | `incoming/bed.png` | `16×16` | `d828dec6d5056daa5cafbb3c173cfa0e8554b507` |
 | `public/assets/project/facilities/NestledBurrow_Toilet.png` | `incoming/bathroom_toilet.png` | `16×16` | `d9f28cfc22467f365700cf7617d2d0f298fac17f` |
 | `public/assets/project/facilities/NestledBurrow_Bathtub.png` | `incoming/bathroom_bathtub.png` | `32×32` | `8e987e03a7e8047df01e915e5b964bf5a6069906` |
 | `public/assets/project/facilities/NestledBurrow_DiningTableFeast.png` | `incoming/dining_table_feast.png` | `48×16` | `57af651f65f6c6f4ff1ccac55f11819d0832efa3` |
 
 | Runtime file | Byte length | SHA-256 |
 | --- | ---: | --- |
+| `NestledBurrow_Bed.png` | 2,415 | `5046a56d0e9cd13b8f85b34aaea3487fa0fb5626e880ce3179e3428dc8f35e91` |
 | `NestledBurrow_Toilet.png` | 2,433 | `09634a14f5b7bac4327c698f910994e7cce4fd21f37a7c4a7be80dbbbb4ce2b7` |
 | `NestledBurrow_Bathtub.png` | 4,534 | `afe4fee0f9100bfd23435a178ceaa4249be3afa5ef929e73b061f10789b637ff` |
 | `NestledBurrow_DiningTableFeast.png` | 4,101 | `5d26b665750241e94cfcc313e20385b5bb26c734fd663b7b559af626d3dd1316` |
