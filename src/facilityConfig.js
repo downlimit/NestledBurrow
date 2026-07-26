@@ -7,14 +7,26 @@ export const FACILITY_ASSETS = Object.freeze({
   table: Object.freeze({ key: "facility.dining-table-feast", path: "assets/project/facilities/NestledBurrow_DiningTableFeast.png", width: 48, height: 16 }),
 });
 
-function point(tileX, tileY) { return Object.freeze({ x: tileX * TILE_SIZE + TILE_SIZE / 2, y: tileY * TILE_SIZE + TILE_SIZE / 2 }); }
-
-function facility({ id, type, tile, useTile, prompt, stopPrompt }) {
+export function createFacilityDefinition({ id, type, tile, useTile }) {
   const asset = FACILITY_ASSETS[type];
-  const footprint = Object.freeze({ x: tile.x * TILE_SIZE, y: tile.y * TILE_SIZE, width: asset.width, height: asset.height });
+  if (!asset) throw new Error(`Unknown facility type: ${type}`);
+  const labels = {
+    shower: ["hud:interaction.shower", "hud:interaction.leaveShower"],
+    toilet: ["hud:interaction.toilet", "hud:interaction.leaveToilet"],
+    table: ["hud:interaction.eat", "hud:interaction.stopEating"],
+  };
+  const [prompt, stopPrompt] = labels[type];
+  const footprint = Object.freeze({
+    x: tile.x * TILE_SIZE,
+    y: tile.y * TILE_SIZE,
+    width: asset.width,
+    height: asset.height,
+  });
   return Object.freeze({
     id, entityId: id, roomId: "home", kind: FACILITY_INTERACTION_KIND, facilityType: type,
-    position: point(tile.x, tile.y), usePosition: point(useTile.x, useTile.y), footprint,
+    position: Object.freeze({ x: footprint.x + TILE_SIZE / 2, y: footprint.y + TILE_SIZE / 2 }),
+    usePosition: Object.freeze({ x: useTile.x * TILE_SIZE + TILE_SIZE / 2, y: useTile.y * TILE_SIZE + TILE_SIZE / 2 }),
+    footprint,
     visual: Object.freeze({ key: asset.key, path: asset.path, x: footprint.x, y: footprint.y, width: asset.width, height: asset.height }),
     presentationPose: ["shower", "toilet"].includes(type) ? Object.freeze({ x: footprint.x + asset.width / 2, y: footprint.y + asset.height / 2, facing: "down", angle: 0, depth: 501 + footprint.y + asset.height }) : null,
     radius: 42, priority: 20, requiresFacing: false, facingDotThreshold: -1, prompt, stopPrompt, payload: Object.freeze({ facilityId: id }),
@@ -22,9 +34,9 @@ function facility({ id, type, tile, useTile, prompt, stopPrompt }) {
 }
 
 export const FACILITIES = Object.freeze([
-  facility({ id: "home-shower-01", type: "shower", tile: { x: 22, y: 14 }, useTile: { x: 24, y: 15 }, prompt: "hud:interaction.shower", stopPrompt: "hud:interaction.leaveShower" }),
-  facility({ id: "home-toilet-01", type: "toilet", tile: { x: 22, y: 20 }, useTile: { x: 24, y: 21 }, prompt: "hud:interaction.toilet", stopPrompt: "hud:interaction.leaveToilet" }),
-  facility({ id: "home-table-01", type: "table", tile: { x: 40, y: 20 }, useTile: { x: 38, y: 21 }, prompt: "hud:interaction.eat", stopPrompt: "hud:interaction.stopEating" }),
+  createFacilityDefinition({ id: "home-shower-01", type: "shower", tile: { x: 22, y: 14 }, useTile: { x: 24, y: 15 } }),
+  createFacilityDefinition({ id: "home-toilet-01", type: "toilet", tile: { x: 22, y: 20 }, useTile: { x: 24, y: 21 } }),
+  createFacilityDefinition({ id: "home-table-01", type: "table", tile: { x: 40, y: 20 }, useTile: { x: 38, y: 21 } }),
 ]);
 
 export function preloadFacilityAssets(scene, baseUrl = import.meta.env.BASE_URL) {

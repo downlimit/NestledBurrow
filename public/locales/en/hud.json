@@ -11,6 +11,29 @@
   "options": {
     "title": "Options"
   },
+  "buildMode": {
+    "title": "BUILD MODE",
+    "groups": {
+      "tools": "Tools",
+      "ground": "Ground and paths",
+      "walls": "Walls and corners",
+      "furniture": "Furniture",
+      "decorations": "Decorations"
+    },
+    "assets": {
+      "demolish": "Demolish",
+      "grass": "Grass",
+      "path": "Path",
+      "parquet": "Parquet",
+      "carpet": "Carpet",
+      "wall": "Wall",
+      "bed": "Bed",
+      "shower": "Shower",
+      "toilet": "Toilet",
+      "table": "Table",
+      "tree": "Tree"
+    }
+  },
   "interaction": {
     "talk": "Talk",
     "next": "Next",

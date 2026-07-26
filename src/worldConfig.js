@@ -19,15 +19,21 @@ export const HOUSE = Object.freeze({
   y: 11,
   columns: 26,
   rows: 17,
-  doorWidth: 2,
+  doorWidth: 3,
 });
 
 export const DOOR_LEFT = HOUSE.x + Math.floor((HOUSE.columns - HOUSE.doorWidth) / 2);
-export const DOOR_Y = HOUSE.y + HOUSE.rows - 1;
+export const DOOR_Y = HOUSE.y + HOUSE.rows;
 
 export const OUTDOOR_FRAMES = Object.freeze({
   grass: 0,
   grassDetails: Object.freeze([1, 2, 12, 13, 14, 24, 25, 26]),
+  grassOuterCorners: Object.freeze({
+    topLeft: 18,
+    topRight: 19,
+    bottomLeft: 30,
+    bottomRight: 31,
+  }),
   pathTop: Object.freeze([3, 4, 5]),
   pathMiddle: Object.freeze([15, 16, 17]),
   pathBottom: Object.freeze([27, 28, 29]),
@@ -39,8 +45,22 @@ export const HOUSE_FRAMES = Object.freeze({
   topRight: 2,
   sideLeft: 3,
   sideRight: 4,
+  wallLeftCap: 12,
+  wallMiddle: 13,
+  wallRightCap: 14,
   bottomLeft: 24,
   bottom: 25,
   bottomRight: 26,
   floor: 66,
+  carpet: Object.freeze({
+    topLeft: 57,
+    top: 58,
+    topRight: 59,
+    left: 69,
+    center: 70,
+    right: 71,
+    bottomLeft: 81,
+    bottom: 82,
+    bottomRight: 83,
+  }),
 });

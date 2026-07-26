@@ -24,6 +24,14 @@ export function clampVectorLength(vector, maxLength = 1) {
   return { x: vector.x * scale, y: vector.y * scale };
 }
 
+export function isPlayerMovementSuppressed({
+  sleeping = false,
+  facilityActive = false,
+  dialogueActive = false,
+} = {}) {
+  return sleeping || facilityActive || dialogueActive;
+}
+
 export function getJoystickState(pointerX, pointerY, center, config = JOYSTICK) {
   const dx = pointerX - center.x;
   const dy = pointerY - center.y;

@@ -11,6 +11,29 @@
   "options": {
     "title": "Опции"
   },
+  "buildMode": {
+    "title": "РЕЖИМ СТРОИТЕЛЬСТВА",
+    "groups": {
+      "tools": "Инструменты",
+      "ground": "Земля и дорожки",
+      "walls": "Стены и углы",
+      "furniture": "Мебель",
+      "decorations": "Декорации"
+    },
+    "assets": {
+      "demolish": "Снос",
+      "grass": "Трава",
+      "path": "Дорожка",
+      "parquet": "Паркет",
+      "carpet": "Ковёр",
+      "wall": "Стена",
+      "bed": "Кровать",
+      "shower": "Душ",
+      "toilet": "Туалет",
+      "table": "Стол",
+      "tree": "Дерево"
+    }
+  },
   "interaction": {
     "talk": "Говорить",
     "next": "Дальше",
