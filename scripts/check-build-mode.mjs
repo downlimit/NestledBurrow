@@ -39,6 +39,7 @@ class DisplayStub {
 
 const keyboardListeners = new Map();
 const inputListeners = new Map();
+const sceneEventListeners = new Map();
 const scene = {
   add: {
     graphics: () => new DisplayStub(),
@@ -54,6 +55,11 @@ const scene = {
       on(type, listener) { keyboardListeners.set(type, listener); },
       off(type, listener) { if (keyboardListeners.get(type) === listener) keyboardListeners.delete(type); },
     },
+  },
+  events: {
+    on(type, listener) { sceneEventListeners.set(type, listener); },
+    off(type, listener) { if (sceneEventListeners.get(type) === listener) sceneEventListeners.delete(type); },
+    emit(type, ...args) { sceneEventListeners.get(type)?.(...args); },
   },
 };
 const localizationListeners = new Set();
@@ -160,6 +166,20 @@ keyboardListeners.get("keydown-Z")({ ctrlKey: true, repeat: false, preventDefaul
 assert.equal(undoPrevented, true, "Ctrl+Z is captured while build mode is active");
 assert.equal(undoCount, 1, "Ctrl+Z requests one editor undo");
 
+const placementsBeforePanelDrag = placements.length;
+scene.input.emit("pointerdown", { x: 20, y: 110, id: 91, event: { timeStamp: 10 } });
+scene.input.emit("pointermove", { x: 23, y: 70, id: 91, event: { timeStamp: 30 } });
+assert(runtime.getState().scrollOffset > 0, "vertical touch drag scrolls the build library");
+assert.equal(placements.length, placementsBeforePanelDrag, "panel drag never starts world placement");
+const offsetAfterDrag = runtime.getState().scrollOffset;
+scene.input.emit("pointerup", { x: 23, y: 70, id: 91, event: { timeStamp: 31 } });
+scene.events.emit("update", 0, 16);
+assert(runtime.getState().scrollOffset >= offsetAfterDrag, "release carries a bounded scroll inertia");
+scene.input.emit("pointerdown", { x: 20, y: 100, id: 92, event: { timeStamp: 40 } });
+scene.input.emit("pointercancel", { id: 92 });
+assert.equal(runtime.panelDrag, null, "pointer cancellation clears the panel gesture");
+runtime.setScrollOffset(0);
+
 scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
 assert.deepEqual(demolitionPreviews.at(-1), { x: 32, y: 48, rawX: 35, rawY: 50 }, "demolition hover identifies the precise target before click");
 scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
@@ -167,8 +187,13 @@ assert.deepEqual(demolitions[0], { point: { x: 32, y: 48, rawX: 35, rawY: 50 }, 
 scene.input.emit("pointermove", { x: 220, worldX: 49, worldY: 50, isDown: true });
 assert.equal(demolitions[1].onlyType, "wall", "demolition drag locks to the first removed object type");
 scene.input.emit("pointerup", {});
+function selectLibraryItem(entry) {
+  const pointer = { x: entry.x + 1, y: entry.baseY + 1, id: 3, event: { timeStamp: 10 } };
+  scene.input.emit("pointerdown", pointer);
+  scene.input.emit("pointerup", pointer);
+}
 const pathEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "path");
-pathEntry.hit.emit("pointerdown");
+selectLibraryItem(pathEntry);
 assert.equal(runtime.getState().selectedId, "path", "library selection is explicit");
 scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
 assert.equal(placements.length, 0, "pointerdown creates only a build preview");
@@ -189,7 +214,7 @@ assert.deepEqual(placements.map(({ point }) => ({ x: point.x, y: point.y })), [
   { x: 80, y: 48 },
 ], "paint drag commits all predicted cells on pointerup");
 const wallEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "wall");
-wallEntry.hit.emit("pointerdown");
+selectLibraryItem(wallEntry);
 const placementsBeforeWallDrag = placements.length;
 scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 40 });
 assert.equal(placements.length, placementsBeforeWallDrag, "wall placement waits for the gesture direction");
@@ -241,6 +266,7 @@ assert.equal(runtime.isActive(), false, "the compact close button dismisses buil
 runtime.destroy();
 assert.equal(keyboardListeners.size, 0, "cleanup removes the Tab listener");
 assert.equal(inputListeners.size, 0, "cleanup removes placement and scroll listeners");
+assert.equal(sceneEventListeners.size, 0, "cleanup removes scroll inertia updates");
 assert.equal(localizationListeners.size, 0, "cleanup removes localization subscription");
 assert.equal(runtime.grid.destroyed, true);
 assert.equal(runtime.openButton.destroyed, true);

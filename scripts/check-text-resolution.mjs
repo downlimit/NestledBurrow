@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createManagedText, getIntegerTextResolution, refreshSceneTextResolution, refreshTextResolution, withTextResolution } from "../src/textResolution.js";
+import { createManagedText, getIntegerTextResolution, getUnsupportedGlyphs, refreshSceneTextResolution, refreshTextResolution, withTextResolution } from "../src/textResolution.js";
 
 const scene = { scale: { zoom: 4.8 } };
 assert.equal(getIntegerTextResolution(scene), 4, "text render resolution follows integer game display zoom");
@@ -12,6 +12,12 @@ assert.equal(text.resolution, 4, "existing text object resolution is refreshed")
 assert.equal(updated, 1, "text texture/metrics are updated after resolution changes");
 
 const helper = readFileSync("src/textResolution.js", "utf8");
+for (const locale of ["en", "ru"]) {
+  const buildMode = JSON.parse(readFileSync(`public/locales/${locale}/hud.json`, "utf8")).buildMode;
+  for (const value of [buildMode.title, ...Object.values(buildMode.groups), ...Object.values(buildMode.assets)]) {
+    assert.deepEqual(getUnsupportedGlyphs(value), [], `${locale} build-mode text has complete pixel glyph coverage: ${value}`);
+  }
+}
 assert(helper.includes('scene.scale?.on?.("resize", refresh)'), "resize refreshes managed text resolution");
 assert(helper.includes('addEventListener?.("fullscreenchange", refresh)'), "fullscreen changes refresh managed text resolution");
 assert(helper.includes("Math.trunc"), "text resolution and coordinates use integers");

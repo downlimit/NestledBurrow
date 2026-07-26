@@ -85,6 +85,10 @@ export function withTextResolution(scene, style = {}) {
   return { ...style, resolution: getIntegerTextResolution(scene) };
 }
 
+export function getUnsupportedGlyphs(value) {
+  return [...new Set([...String(value ?? "")].filter((char) => !Object.hasOwn(GLYPHS, char)))];
+}
+
 function createPixelText(scene, x, y, text, style) {
   const graphics = scene.add.graphics();
   graphics.scene = scene;
