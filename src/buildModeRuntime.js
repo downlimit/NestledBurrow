@@ -147,6 +147,7 @@ export class BuildModeRuntime {
     onActionBegin = () => {},
     onActionEnd = () => {},
     onUndo = () => {},
+    isActivationAllowed = () => true,
   } = {}) {
     this.scene = scene;
     this.localization = localization;
@@ -160,6 +161,7 @@ export class BuildModeRuntime {
     this.onActionBegin = onActionBegin;
     this.onActionEnd = onActionEnd;
     this.onUndo = onUndo;
+    this.isActivationAllowed = isActivationAllowed;
     this.active = false;
     this.selectedId = BUILD_ASSET_GROUPS[0].items[0].id;
     this.objects = [];
@@ -175,6 +177,7 @@ export class BuildModeRuntime {
     this.onTab = (event) => {
       if (!shouldToggleBuildMode(event)) return;
       event?.preventDefault?.();
+      if (!this.active && !this.isActivationAllowed()) return;
       this.toggle();
     };
     this.onWorldPointer = (pointer) => {
@@ -229,7 +232,9 @@ export class BuildModeRuntime {
       OPEN_BUTTON.size,
       OPEN_BUTTON.size,
     ).setOrigin(0).setScrollFactor(0).setDepth(PANEL_DEPTH + 5).setInteractive();
-    this.openButtonHit.on("pointerdown", () => this.setActive(true));
+    this.openButtonHit.on("pointerdown", () => {
+      if (this.isActivationAllowed()) this.setActive(true);
+    });
 
     this.closeButton = this.scene.add.graphics().setDepth(PANEL_DEPTH + 4).setScrollFactor(0).setVisible(false);
     this.closeButton
@@ -598,6 +603,7 @@ export class BuildModeRuntime {
 
   setActive(value) {
     const next = Boolean(value);
+    if (next && !this.active && !this.isActivationAllowed()) return;
     if (next === this.active) return;
     this.active = next;
     this.grid.setVisible(next);

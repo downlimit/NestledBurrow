@@ -79,7 +79,9 @@ export function createInteractionRuntime({
         return;
       }
       currentCandidate = null;
-      if (result?.status === "insufficient-energy") {
+      if (result?.messageKey) {
+        presenter?.showMessage?.({ messageKey: result.messageKey });
+      } else if (result?.status === "insufficient-energy") {
         presenter?.showMessage?.({ messageKey: "hud:interaction.notEnoughEnergy" });
       } else if (result?.status === "wake-failed") {
         presenter?.showMessage?.({ messageKey: "hud:interaction.wakeFailed" });

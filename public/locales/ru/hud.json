@@ -52,7 +52,15 @@
     "toilet": "Использовать туалет",
     "leaveToilet": "Слезть с туалета",
     "eat": "Поесть",
-    "stopEating": "Перестать есть"
+    "stopEating": "Перестать есть",
+    "startPreparation": "Начать подготовку",
+    "startFrying": "Начать жарку",
+    "serveDish": "Выставить блюдо",
+    "takeDish": "Снять блюдо",
+    "noRawPotatoes": "Нет сырого картофеля",
+    "noPreparedPotatoes": "Нет подготовленного картофеля",
+    "noCookedDish": "Нет готового блюда",
+    "servingTableOccupied": "Сервировочный стол занят"
   },
   "progress": {
     "newGame": "Новая игра",
@@ -68,6 +76,25 @@
   },
   "resources": {
     "energy": "ЭН {current}/{max}"
+  },
+  "kitchen": {
+    "raw": "СЫР",
+    "prepared": "ПОДГ",
+    "dishes": "БЛЮД",
+    "facilities": {
+      "cuttingTable": "Разделочный стол",
+      "gasStove": "Газовая плита",
+      "servingTable": "Сервировочный стол"
+    }
+  },
+  "cooking": {
+    "attempt": "Постараться",
+    "preparation": "Подготовка",
+    "frying": "Жарка",
+    "time": "ВРЕМЯ",
+    "combo": "КОМБО",
+    "success": "Успех!",
+    "miss": "Промах"
   },
   "needs": {
     "novelty": {

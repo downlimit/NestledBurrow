@@ -28,8 +28,9 @@ export function isPlayerMovementSuppressed({
   sleeping = false,
   facilityActive = false,
   dialogueActive = false,
+  cookingActive = false,
 } = {}) {
-  return sleeping || facilityActive || dialogueActive;
+  return sleeping || facilityActive || dialogueActive || cookingActive;
 }
 
 export function getJoystickState(pointerX, pointerY, center, config = JOYSTICK) {

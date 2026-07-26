@@ -2,8 +2,9 @@ import { RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
 import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
 import { DEFAULT_NEEDS, normalizeNeeds } from "./needsDomain.js";
+import { normalizeKitchenState } from "./cookingDomain.js";
 
-export const SESSION_STATE_VERSION = 3;
+export const SESSION_STATE_VERSION = 4;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
@@ -129,7 +130,17 @@ function normalizeGameplayState(value = {}) {
     const progress = normalizeProgress(input.progress, Boolean(input.cleared) ? 1 : 0, `Resource ${resourceId}.progress`);
     setOwn(resourceNodes, resourceId, { cleared: progress >= 1, progress });
   }
-  return { currentEnergy, maximumEnergy, wood, stone, rubies, resourceNodes, worldTimeSeconds, needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS) };
+  return {
+    currentEnergy,
+    maximumEnergy,
+    wood,
+    stone,
+    rubies,
+    resourceNodes,
+    worldTimeSeconds,
+    needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
+    kitchen: normalizeKitchenState(value.kitchen ?? {}),
+  };
 }
 
 function normalizeNonNegativeNumber(value, fallback, label) {

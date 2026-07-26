@@ -45,13 +45,18 @@ assert.equal(computeNeedRates({ npcNearby: true }, tuning).dialogue, 0.5, "one o
 const clamped = { novelty: 99, satiety: 1, toilet: 99, lustre: 1, dialogue: 99 };
 applyNeedsUpdate(clamped, 10, { facility: "shower", npcNearby: true }, tuning);
 assert.deepEqual(clamped, { novelty: 96.5, satiety: 0, toilet: 97.875, lustre: 100, dialogue: 100 }, "atomic update clamps every need to 0..100");
-assert.equal(new Set(FACILITIES.map((item) => item.id)).size, 3, "facilities have stable unique IDs");
-assert.deepEqual(FACILITIES.map((item) => item.facilityType), ["shower", "toilet", "table"]);
-assert.deepEqual(FACILITIES.map((item) => item.stopPrompt), [
+assert.equal(new Set(FACILITIES.map((item) => item.id)).size, 6, "facilities have stable unique IDs");
+assert.deepEqual(FACILITIES.map((item) => item.facilityType), ["shower", "toilet", "table", "cutting-table", "gas-stove", "serving-table"]);
+assert.deepEqual(FACILITIES.slice(0, 3).map((item) => item.stopPrompt), [
   "hud:interaction.leaveShower",
   "hud:interaction.leaveToilet",
   "hud:interaction.stopEating",
-], "every facility exposes the logical stop action");
+], "toggle facilities expose the logical stop action");
+assert.deepEqual(FACILITIES.slice(3).map((item) => [item.prompt, item.stopPrompt]), [
+  ["hud:interaction.startPreparation", "hud:interaction.startPreparation"],
+  ["hud:interaction.startFrying", "hud:interaction.startFrying"],
+  ["hud:interaction.serveDish", "hud:interaction.takeDish"],
+], "kitchen facilities expose their initial actions and serving reversal");
 assert(FACILITIES.every((item) => Object.isFrozen(item) && Object.isFrozen(item.usePosition)), "facility registry is immutable");
 
 console.log("needs checks passed: rates, priorities, clamp, arrows tuning and facilities");
