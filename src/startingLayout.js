@@ -217,14 +217,6 @@ function restoreFacilities(scene, definitions) {
     }
   }
   for (const definition of definitions) {
-    if (definition.id.startsWith("editor-")) {
-      const restored = runtime.add(definition.facilityType, {
-        x: definition.footprint.x,
-        y: definition.footprint.y,
-      });
-      if (!restored) throw new Error(`Failed to restore facility ${definition.id}`);
-      continue;
-    }
     const restored = runtime.getDefinition(definition.id)
       ? runtime.replace(definition)
       : runtime.restore(definition);
@@ -238,15 +230,7 @@ function restoreBeds(scene, definitions) {
   if (!runtime) return;
   for (const current of runtime.getBedDefinitions()) runtime.removeBed(current.id);
   for (const definition of definitions) {
-    if (definition.id.startsWith("editor-bed-")) {
-      const restored = runtime.addBed({
-        x: definition.position.x - TILE_SIZE / 2,
-        y: definition.position.y - TILE_SIZE / 2,
-      });
-      if (!restored) throw new Error(`Failed to restore bed ${definition.id}`);
-    } else if (!runtime.restoreBed(definition)) {
-      throw new Error(`Failed to restore bed ${definition.id}`);
-    }
+    if (!runtime.restoreBed(definition)) throw new Error(`Failed to restore bed ${definition.id}`);
   }
 }
 
