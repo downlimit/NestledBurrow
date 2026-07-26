@@ -73,6 +73,8 @@ import { drawFacility } from "./facilityPreviewVisuals.js";
 import { applyNeedsUpdate } from "./needsDomain.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
+import { COOKING_STEP_TYPES, toggleServingDish } from "./cookingDomain.js";
+import { createCookingRuntime } from "./cookingRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
@@ -161,6 +163,7 @@ class WorldScene extends Phaser.Scene {
     this.createMovementDebugPanel();
     this.createDayNightRuntime();
     this.createHud();
+    this.createCookingRuntime();
     this.attachSceneListeners();
     this.createJoystick();
     this.createBuildMode();
@@ -346,8 +349,9 @@ class WorldScene extends Phaser.Scene {
         ...(this.sleeping && !this.exhaustedSleeping ? [this.getSleepingWakeInteraction()] : []),
         ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
       ],
-      isInteractionAllowed: (definition) => !this.facilityRuntime?.isUsing()
-        || (definition.kind === FACILITY_INTERACTION_KIND && definition.id === this.facilityRuntime.getActiveId()),
+      isInteractionAllowed: (definition) => !this.cookingRuntime?.isActive?.()
+        && (!this.facilityRuntime?.isUsing()
+          || (definition.kind === FACILITY_INTERACTION_KIND && definition.id === this.facilityRuntime.getActiveId())),
       runWorldObjectInteraction: (candidate) => this.runWorldObjectInteraction(candidate),
       presenter: this.interactionHud,
     });
@@ -358,11 +362,35 @@ class WorldScene extends Phaser.Scene {
   }
 
   createFacilityRuntime() {
-    this.facilityRuntime = createFacilityRuntime(this, { worldLayout: this.worldLayout });
+    this.facilityRuntime = createFacilityRuntime(this, {
+      worldLayout: this.worldLayout,
+      getKitchenState: () => this.sessionState?.gameplay?.kitchen,
+    });
   }
 
   runWorldObjectInteraction(candidate) {
     if (candidate.kind === FACILITY_INTERACTION_KIND) {
+      const facility = this.facilityRuntime.getDefinition(candidate.payload.facilityId);
+      if (facility?.facilityType === "cutting-table" || facility?.facilityType === "gas-stove") {
+        const stepType = facility.facilityType === "cutting-table"
+          ? COOKING_STEP_TYPES.preparation
+          : COOKING_STEP_TYPES.frying;
+        const result = this.cookingRuntime.start(stepType);
+        this.suppressNextInteract = true;
+        this.interactionRuntime?.refresh?.();
+        return result;
+      }
+      if (facility?.facilityType === "serving-table") {
+        const result = toggleServingDish(this.sessionState.gameplay.kitchen);
+        if (result.mutated) {
+          this.facilityRuntime.syncKitchenVisuals();
+          this.gameHud?.render?.();
+          this.saveSession();
+        }
+        this.suppressNextInteract = true;
+        this.interactionRuntime?.refresh?.();
+        return result;
+      }
       const player = this.characterSystem.require(this.sessionState.playerId);
       const result = this.facilityRuntime.toggle(candidate.payload.facilityId, player.motor);
       this.syncFacilityPresentationPose();
@@ -501,11 +529,40 @@ class WorldScene extends Phaser.Scene {
       isCoarsePointer: () => this.isCoarsePointer(),
       getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, energyFlow: this.getEnergyFlow(), needsFlow: this.needsFlow }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
+      onOptionsChange: (active) => this.cookingRuntime?.setInputSuppressed?.(active),
       onConfirmationChange: (active) => {
         this.interactionHud?.setSuppressed?.(active);
+        this.cookingRuntime?.setInputSuppressed?.(active);
         if (!active) this.interactionRuntime?.refresh?.();
       },
       onNewGame: () => this.startNewGame(),
+    });
+  }
+
+  createCookingRuntime() {
+    this.cookingRuntime = createCookingRuntime(this, {
+      sessionState: this.sessionState,
+      localization: this.localization,
+      onActiveChange: (active) => {
+        this.gameHud?.setGameplayOverlayActive?.(active);
+        this.interactionHud?.setSuppressed?.(active);
+        this.mobileJoystick?.reset?.();
+        if (active) {
+          const player = this.characterSystem?.require?.(this.sessionState.playerId);
+          if (player?.motor?.movement?.velocity) {
+            player.motor.movement.velocity.x = 0;
+            player.motor.movement.velocity.y = 0;
+          }
+        } else {
+          this.interactionRuntime?.refresh?.();
+        }
+      },
+      onPersistentMutation: () => {
+        this.facilityRuntime?.syncKitchenVisuals?.();
+        this.gameHud?.render?.();
+        this.interactionRuntime?.refresh?.();
+        this.saveSession();
+      },
     });
   }
 
@@ -549,6 +606,7 @@ class WorldScene extends Phaser.Scene {
       onActionBegin: () => this.beginBuildAction(),
       onActionEnd: () => this.endBuildAction(),
       onUndo: () => this.undoBuildAction(),
+      isActivationAllowed: () => !this.cookingRuntime?.isActive?.(),
       onModeChange: (active) => {
         this.gameHud?.setSuppressed?.(active);
         this.interactionHud?.setSuppressed?.(active);
@@ -1594,7 +1652,9 @@ class WorldScene extends Phaser.Scene {
   }
 
   isHudPoint(x, y) {
-    return Boolean(this.gameHud?.isPointInHud(x, y)) || Boolean(this.interactionHud?.isPointInHud(x, y));
+    return Boolean(this.gameHud?.isPointInHud(x, y))
+      || Boolean(this.interactionHud?.isPointInHud(x, y))
+      || Boolean(this.cookingRuntime?.isPointInHud?.(x, y));
   }
 
   startNewGame() {
@@ -1650,6 +1710,11 @@ class WorldScene extends Phaser.Scene {
       expireHitCooldown: () => { this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; },
       getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID), definitions: RESOURCE_OBJECTS, bed: this.debrisRuntime?.getBedDefinition?.() ?? null, beds: this.debrisRuntime?.getBedDefinitions?.() ?? [], wakeTile: BED_WAKE_TILE }),
       getFacilityState: () => ({ definitions: this.facilityRuntime?.getDefinitions?.() ?? FACILITIES, activeId: this.facilityRuntime?.getActiveId?.() ?? null }),
+      getCookingState: () => this.cookingRuntime?.getState?.() ?? null,
+      attemptCooking: () => this.cookingRuntime?.attempt?.(),
+      completeCooking: () => this.cookingRuntime?.completeForTest?.(),
+      alignCookingMarker: () => this.cookingRuntime?.alignMarkerForTest?.(),
+      newGame: () => this.startNewGame(),
       getNeedsState: () => ({ values: JSON.parse(JSON.stringify(this.sessionState.gameplay.needs)), flow: JSON.parse(JSON.stringify(this.needsFlow ?? {})), activity: this.getNeedsActivityContext() }),
       setNeeds: (values) => {
         for (const [id, value] of Object.entries(values ?? {})) {
@@ -1668,7 +1733,7 @@ class WorldScene extends Phaser.Scene {
         this.isRunning = Boolean(running);
       },
       advanceGameplayTime: (milliseconds) => this.updateGameplayTime(Math.max(0, Number(milliseconds) || 0)),
-      getRuntimeState: () => ({ sleeping: this.sleeping, exhaustedSleeping: this.exhaustedSleeping, timeScale: this.simulationScale }),
+      getRuntimeState: () => ({ sleeping: this.sleeping, exhaustedSleeping: this.exhaustedSleeping, cookingActive: this.cookingRuntime?.isActive?.() ?? false, timeScale: this.simulationScale }),
       setWorldTimeSeconds: (value) => { this.sessionState.gameplay.worldTimeSeconds = Math.max(0, Number(value) || 0); this.updateDayNightLighting(); this.gameHud?.render(); },
       getClockText: () => formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()),
       getDayNightState: () => ({ color: dayNightMultiplyColor(this.sessionState.gameplay.worldTimeSeconds), worldTimeSeconds: this.sessionState.gameplay.worldTimeSeconds }),
@@ -1748,6 +1813,8 @@ class WorldScene extends Phaser.Scene {
     this.debrisRuntime = null;
     this.facilityRuntime?.destroy();
     this.facilityRuntime = null;
+    this.cookingRuntime?.destroy();
+    this.cookingRuntime = null;
     this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
     this.interactionHud?.destroy();
@@ -1851,6 +1918,7 @@ class WorldScene extends Phaser.Scene {
     this.sampleFrameActions();
     const realDeltaMs = delta;
     this.updateGameplayTime(realDeltaMs);
+    this.cookingRuntime?.update?.(realDeltaMs);
     let worldDeltaMs = realDeltaMs * (this.simulationScale ?? 1);
     this.setNpcAnimationTimeScale(this.simulationScale ?? 1);
     while (worldDeltaMs > 0) {
@@ -1870,7 +1938,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   sampleFrameActions() {
-    if (this.buildMode?.isActive?.()) {
+    if (this.buildMode?.isActive?.() || this.cookingRuntime?.isActive?.()) {
       this.isRunning = false;
       this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
       return;
@@ -2020,6 +2088,7 @@ class WorldScene extends Phaser.Scene {
       sleeping: this.sleeping,
       facilityActive: this.facilityRuntime?.isUsing(),
       dialogueActive: this.interactionRuntime?.isDialogueActive(),
+      cookingActive: this.cookingRuntime?.isActive?.(),
     })) return { x: 0, y: 0 };
     const left = this.cursors.left.isDown || this.wasd.A.isDown;
     const right = this.cursors.right.isDown || this.wasd.D.isDown;

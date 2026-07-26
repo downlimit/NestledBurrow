@@ -27,6 +27,7 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
 export const OPTIONS_BUILD_LABEL = Object.freeze({ x: 14, y: 102 });
 export const RESOURCE_HUD_AREA = Object.freeze({ x: 210, y: 38, width: 40, height: 68 });
 export const NEEDS_HUD_AREA = Object.freeze({ x: 252, y: 38, width: 60, height: 68 });
+export const KITCHEN_HUD_AREA = Object.freeze({ x: 210, y: 108, width: 102, height: 30 });
 export const ENERGY_HUD_AREA = NEEDS_HUD_AREA;
 export const NEED_ROW_IDS = Object.freeze(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
 export const NEED_ROW_SYMBOLS = Object.freeze(["N", "E", "S", "T", "L", "D"]);
@@ -86,6 +87,7 @@ export function createGameHud(scene, options) {
     onLanguageChange = () => {},
     onNewGame = () => {},
     onConfirmationChange = () => {},
+    onOptionsChange = () => {},
     audioSettings,
     getGameplayState = () => null,
     isCoarsePointer = () => false,
@@ -102,6 +104,7 @@ export function createGameHud(scene, options) {
   let fullscreenHandler = null;
   let languageLatched = false;
   let optionsOpen = false;
+  let gameplayOverlayActive = false;
   let draggingChannel = null;
   let energyFillHeight = 0;
   let energyRatio = 0;
@@ -159,6 +162,11 @@ export function createGameHud(scene, options) {
   const woodValueText = createText(scene, { fontSize: "8px" });
   const stoneValueText = createText(scene, { fontSize: "8px" });
   const rubyValueText = createText(scene, { fontSize: "8px" });
+  const kitchenTexts = [
+    createText(scene, { fontSize: "7px" }),
+    createText(scene, { fontSize: "7px" }),
+    createText(scene, { fontSize: "7px" }),
+  ];
   const needTooltipText = createText(scene, { fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } });
   const woodIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
   const stoneIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
@@ -192,6 +200,7 @@ export function createGameHud(scene, options) {
     stop(pointer, event);
     if (confirmingNewGame) return;
     optionsOpen = !optionsOpen;
+    onOptionsChange(optionsOpen);
     render();
   });
   optionsPanelHit.on("pointerdown", stop);
@@ -216,6 +225,7 @@ export function createGameHud(scene, options) {
     if (confirmingNewGame || !optionsOpen) return;
     confirmingNewGame = true;
     optionsOpen = false;
+    onOptionsChange(false);
     onConfirmationChange(true);
     render();
   });
@@ -254,7 +264,7 @@ export function createGameHud(scene, options) {
   }
 
   function hideManagedObjects() {
-    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, needTooltipText, ...Object.values(soundTexts)]) {
+    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) {
       text.setVisible(false);
     }
     woodIcon.setVisible(false);
@@ -286,9 +296,10 @@ export function createGameHud(scene, options) {
     const gameplay = getGameplayState?.();
     if (gameplay) {
       renderClock(gameplay);
-      if (!optionsOpen) {
+      if (!optionsOpen && !gameplayOverlayActive) {
         renderResources(gameplay);
         renderNeeds(gameplay);
+        renderKitchen(gameplay);
       }
     }
     if (optionsOpen) renderOptionsPanel();
@@ -313,6 +324,23 @@ export function createGameHud(scene, options) {
     woodIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodIcon.x, RESOURCE_HUD_LAYOUT.woodIcon.y);
     stoneIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.stoneIcon.x, RESOURCE_HUD_LAYOUT.stoneIcon.y);
     rubyIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyIcon.x, RESOURCE_HUD_LAYOUT.rubyIcon.y);
+  }
+
+  function renderKitchen(gameplay) {
+    const kitchen = gameplay.kitchen ?? {};
+    graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(KITCHEN_HUD_AREA.x, KITCHEN_HUD_AREA.y, KITCHEN_HUD_AREA.width, KITCHEN_HUD_AREA.height);
+    graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(KITCHEN_HUD_AREA.x + 0.5, KITCHEN_HUD_AREA.y + 0.5, KITCHEN_HUD_AREA.width - 1, KITCHEN_HUD_AREA.height - 1);
+    const rows = [
+      ["raw", kitchen.rawPotatoes],
+      ["prepared", kitchen.preparedPotatoes],
+      ["dishes", kitchen.cookedDishes],
+    ];
+    rows.forEach(([key, value], index) => {
+      setManagedTextStyle(kitchenTexts[index], scene, textStyle({ fontSize: "7px" }))
+        .setText(`${localization.t(`hud:kitchen.${key}`)} ${Number(value) || 0}`)
+        .setVisible(true)
+        .setPosition(KITCHEN_HUD_AREA.x + 5, KITCHEN_HUD_AREA.y + 2 + index * 9);
+    });
   }
 
   function renderNeeds(gameplay) {
@@ -480,8 +508,13 @@ export function createGameHud(scene, options) {
       if (suppressed) {
         if (confirmingNewGame) onConfirmationChange(false);
         confirmingNewGame = false;
+        if (optionsOpen) onOptionsChange(false);
         optionsOpen = false;
       }
+      render();
+    },
+    setGameplayOverlayActive(value) {
+      gameplayOverlayActive = Boolean(value);
       render();
     },
     triggerEnergyShake,
@@ -491,6 +524,7 @@ export function createGameHud(scene, options) {
         woodText: woodValueText.text,
         stoneText: stoneValueText.text,
         rubyText: rubyValueText.text,
+        kitchenTexts: kitchenTexts.map((text) => text.text),
         icons: { wood: woodIcon.visible, stone: stoneIcon.visible, ruby: rubyIcon.visible },
         energyRatio,
         energyFillHeight,
@@ -517,6 +551,7 @@ export function createGameHud(scene, options) {
           options: OPTIONS_HIT_AREA,
           clock: CLOCK_HUD_AREA,
           resources: RESOURCE_HUD_AREA,
+          kitchen: KITCHEN_HUD_AREA,
           energy: ENERGY_HUD_AREA,
           needs: NEEDS_HUD_AREA,
           needRows: NEED_ROW_AREAS,
@@ -550,7 +585,7 @@ export function createGameHud(scene, options) {
       for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
       scene.tweens.killTweensOf(energyArrowGraphics);
-      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
+      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
       woodIcon.destroy();
       stoneIcon.destroy();
       rubyIcon.destroy();

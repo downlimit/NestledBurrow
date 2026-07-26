@@ -76,6 +76,7 @@ const previewClears = [];
 const demolitionPreviews = [];
 const actionEvents = [];
 let undoCount = 0;
+let activationAllowed = true;
 const runtime = new BuildModeRuntime(scene, {
   localization,
   worldBounds: { left: 0, top: 0, right: WORLD_WIDTH, bottom: WORLD_HEIGHT },
@@ -90,6 +91,7 @@ const runtime = new BuildModeRuntime(scene, {
   onDemolitionPreview: (point) => demolitionPreviews.push(point),
   onActionBegin: (type) => actionEvents.push(`begin:${type}`),
   onActionEnd: () => actionEvents.push("end"),
+  isActivationAllowed: () => activationAllowed,
   onUndo: () => { undoCount += 1; },
 });
 
@@ -262,6 +264,12 @@ runtime.openButtonHit.emit("pointerdown");
 assert.equal(runtime.isActive(), true, "the minimal opener activates build mode without Tab");
 runtime.closeButtonHit.emit("pointerdown");
 assert.equal(runtime.isActive(), false, "the compact close button dismisses build mode");
+activationAllowed = false;
+runtime.openButtonHit.emit("pointerdown");
+assert.equal(runtime.isActive(), false, "runtime lock blocks the build opener during exclusive gameplay");
+keyboardListeners.get("keydown-TAB")?.({ repeat: false, preventDefault() {} });
+assert.equal(runtime.isActive(), false, "runtime lock blocks Tab during exclusive gameplay");
+activationAllowed = true;
 
 runtime.destroy();
 assert.equal(keyboardListeners.size, 0, "cleanup removes the Tab listener");
@@ -274,15 +282,15 @@ assert.equal(runtime.closeButton.destroyed, true);
 
 const editableWorld = createWorldLayout();
 const facilityRuntime = createFacilityRuntime(scene, { worldLayout: editableWorld });
-assert.equal(facilityRuntime.getDefinitions().length, 3);
+assert.equal(facilityRuntime.getDefinitions().length, 6);
 const placedFacility = facilityRuntime.add("table", { x: 480, y: 320 });
 assert(placedFacility, "furniture placement creates a live facility");
-assert.equal(facilityRuntime.getDefinitions().length, 4);
+assert.equal(facilityRuntime.getDefinitions().length, 7);
 assert.equal(editableWorld.isBlockedBox({ left: 480, right: 512, top: 320, bottom: 352 }), true, "placed furniture registers collision");
 assert.equal(facilityRuntime.removeAt({ x: 480, y: 320 }), true, "demolition removes placed furniture");
-assert.equal(facilityRuntime.getDefinitions().length, 3);
+assert.equal(facilityRuntime.getDefinitions().length, 6);
 assert.equal(facilityRuntime.restore(placedFacility), true, "undo can restore demolished furniture with the same definition");
-assert.equal(facilityRuntime.getDefinitions().length, 4);
+assert.equal(facilityRuntime.getDefinitions().length, 7);
 facilityRuntime.destroy();
 
 console.log("build mode checks passed: Tab toggle, crisp managed text, scrolling, explicit wall gestures, undo, demolition, 16 px grid, lifecycle and cleanup");

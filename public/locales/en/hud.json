@@ -52,7 +52,15 @@
     "toilet": "Use toilet",
     "leaveToilet": "Get off toilet",
     "eat": "Eat",
-    "stopEating": "Stop eating"
+    "stopEating": "Stop eating",
+    "startPreparation": "Start preparation",
+    "startFrying": "Start frying",
+    "serveDish": "Serve dish",
+    "takeDish": "Take dish back",
+    "noRawPotatoes": "No raw potatoes",
+    "noPreparedPotatoes": "No prepared potatoes",
+    "noCookedDish": "No cooked dish",
+    "servingTableOccupied": "Serving table occupied"
   },
   "progress": {
     "newGame": "New game",
@@ -68,6 +76,25 @@
   },
   "resources": {
     "energy": "EN {current}/{max}"
+  },
+  "kitchen": {
+    "raw": "RAW",
+    "prepared": "PREP",
+    "dishes": "DISH",
+    "facilities": {
+      "cuttingTable": "Cutting table",
+      "gasStove": "Gas stove",
+      "servingTable": "Serving table"
+    }
+  },
+  "cooking": {
+    "attempt": "Try hard",
+    "preparation": "Preparation",
+    "frying": "Frying",
+    "time": "TIME",
+    "combo": "COMBO",
+    "success": "Success!",
+    "miss": "Miss"
   },
   "needs": {
     "novelty": {

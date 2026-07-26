@@ -31,6 +31,7 @@ assert.equal(isPlayerMovementSuppressed({ buildModeActive: true }), false, "buil
 assert.equal(isPlayerMovementSuppressed({ sleeping: true }), true);
 assert.equal(isPlayerMovementSuppressed({ facilityActive: true }), true);
 assert.equal(isPlayerMovementSuppressed({ dialogueActive: true }), true);
+assert.equal(isPlayerMovementSuppressed({ cookingActive: true }), true);
 
 const center = { x: 60, y: 70 };
 const centered = getJoystickState(center.x, center.y, center);

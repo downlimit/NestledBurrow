@@ -1,15 +1,18 @@
 import {
   createFacilityDefinition,
   FACILITIES,
+  PLATED_DISH_ASSET,
 } from "./facilityConfig.js";
 import { TILE_SIZE } from "./worldConfig.js";
+import { getKitchenFacilityPrompt } from "./cookingDomain.js";
 
-export function createFacilityRuntime(scene, { worldLayout }) {
+export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null }) {
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
   const visuals = new Map();
   let activeFacilityId = null;
   let destroyed = false;
   let editorId = 0;
+  let platedDishVisual = null;
 
   function createVisual(facility, { validateFootprint = true } = {}) {
     if ((validateFootprint && worldLayout.isBlockedBox(boundsFor(facility)))
@@ -37,6 +40,7 @@ export function createFacilityRuntime(scene, { worldLayout }) {
       type: facilityType,
       tile,
       useTile: { x: tile.x + 2, y: tile.y + 1 },
+      editable: true,
     });
     if (!createVisual(definition)) return null;
     definitions.set(definition.id, definition);
@@ -45,7 +49,7 @@ export function createFacilityRuntime(scene, { worldLayout }) {
 
   function remove(id) {
     const definition = definitions.get(id);
-    if (!definition) return false;
+    if (!definition || definition.editable === false) return false;
     if (activeFacilityId === id) activeFacilityId = null;
     visuals.get(id)?.destroy();
     visuals.delete(id);
@@ -73,7 +77,7 @@ export function createFacilityRuntime(scene, { worldLayout }) {
 
   function getDemolitionTargetAt(point) {
     const definition = getDefinitionAt(point);
-    if (!definition) return null;
+    if (!definition || definition.editable === false) return null;
     const visual = visuals.get(definition.id);
     return visual
       ? {
@@ -90,11 +94,30 @@ export function createFacilityRuntime(scene, { worldLayout }) {
       throw new Error(`Facility ${facility.id} use position must remain walkable`);
     }
   }
+  const servingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
+  if (servingTable) {
+    platedDishVisual = scene.add.image(
+      servingTable.footprint.x + servingTable.footprint.width / 2,
+      servingTable.footprint.y + 5,
+      PLATED_DISH_ASSET.key,
+    ).setOrigin(0.5, 0.5).setDepth(501 + servingTable.visual.y + servingTable.visual.height).setVisible(false);
+  }
+
+  function syncKitchenVisuals() {
+    platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish));
+  }
+  syncKitchenVisuals();
 
   return {
     getInteractionDefinitions() {
       if (destroyed) return [];
-      if (!activeFacilityId) return [...definitions.values()];
+      if (!activeFacilityId) {
+        const kitchen = getKitchenState();
+        return [...definitions.values()].map((facility) => {
+          const prompt = kitchen ? getKitchenFacilityPrompt(facility.facilityType, kitchen) : null;
+          return prompt ? { ...facility, prompt } : facility;
+        });
+      }
       const facility = definitions.get(activeFacilityId);
       return facility ? [{ ...facility, prompt: facility.stopPrompt }] : [];
     },
@@ -104,6 +127,7 @@ export function createFacilityRuntime(scene, { worldLayout }) {
     getDefinitions() {
       return [...definitions.values()];
     },
+    syncKitchenVisuals,
     add,
     remove,
     removeAt,
@@ -113,6 +137,9 @@ export function createFacilityRuntime(scene, { worldLayout }) {
     toggle(facilityId, playerMotor) {
       const facility = definitions.get(facilityId);
       if (!facility || destroyed) return { status: "unknown-facility", mutated: false };
+      if (["cutting-table", "gas-stove", "serving-table"].includes(facility.facilityType)) {
+        return { status: "handled-by-cooking", mutated: false };
+      }
       if (activeFacilityId === facilityId) {
         activeFacilityId = null;
         return { status: "stopped", mutated: false };
@@ -153,6 +180,8 @@ export function createFacilityRuntime(scene, { worldLayout }) {
         worldLayout.clearWorldObjectCollider(id);
       }
       visuals.clear();
+      platedDishVisual?.destroy?.();
+      platedDishVisual = null;
       definitions.clear();
     },
   };
