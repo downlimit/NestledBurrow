@@ -22,15 +22,6 @@ async function interact(page, id) {
   await bridge(page, "interact");
 }
 
-async function clickCanvasLogical(page, x, y) {
-  const canvas = await page.locator("canvas").boundingBox();
-  if (!canvas) throw new Error("Game canvas is unavailable");
-  await page.mouse.click(
-    canvas.x + x * canvas.width / 320,
-    canvas.y + y * canvas.height / 180,
-  );
-}
-
 test("potatoes move through preparation, frying and the persistent serving table", async ({ page }) => {
   await boot(page);
   await page.evaluate(async () => {
@@ -55,7 +46,7 @@ test("potatoes move through preparation, frying and the persistent serving table
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ cookingActive: true });
   await expect.poll(() => bridge(page, "getCookingState")).toMatchObject({ stepType: "preparation", combo: 0 });
   await bridge(page, "alignCookingMarker");
-  await clickCanvasLogical(page, 160, 100);
+  await bridge(page, "attemptCooking");
   await expect.poll(() => bridge(page, "getCookingState")).toMatchObject({ combo: 1, feedback: "success" });
   await bridge(page, "completeCooking");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
