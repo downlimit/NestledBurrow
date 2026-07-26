@@ -46,6 +46,9 @@ requireText(agents, [
   "scripts/run-python-check.mjs",
   "OS temp directory",
   "Do not blindly repeat an entire command or suite elevated",
+  "When resuming accepted existing local work",
+  "Never open a knowingly stale-base PR",
+  "one final-head CI cycle",
   "Create one non-draft PR",
   "wait until every job for the current head SHA is terminal",
   "Task #<number> — <name>",
@@ -91,16 +94,20 @@ requireText(fastLoop, [
   "Feedback-фаза не имеет искусственного лимита времени",
   "## Ретроспектива Task #030–#035",
   "### Решения Task #036",
+  "## Ретроспектива публикации Task #035",
+  "### Решение Task #037",
+  "disposable stale-base CI",
   "### P0",
   "### P1",
   "### P2",
 ], "FAST_LOOP.md");
 
 requireText(roadmap, [
-  "Следующий свободный номер:** `Task #037`",
+  "Следующий свободный номер:** `Task #038`",
+  "Task #037 — Не тратить CI на заведомо устаревшую базу",
   "Task #036 — Ускорить публикацию и стабилизировать Windows-инструменты",
-  "Task #035 — Исправить мобильное меню строительства и джойстик",
-  "Заблокировано` публикацией",
+  "Task #035 — Исправить мобильное меню строительства и джойстик (PR #136)",
+  "**Статус:** `Принято`",
 ], "ROADMAP.md");
 
 requireText(prTemplate, ["# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
@@ -154,7 +161,7 @@ requireText(playwrightConfig, [
 assert(!existsSync(".github/workflows/auto-merge-clean-pr.yml"), "review-gated auto-merge workflow must stay removed");
 
 for (const [label, text, limit] of [
-  ["AGENTS.md", agents, 11000],
+  ["AGENTS.md", agents, 12000],
   ["AGENTS.override.md", override, 1500],
   ["LEAD.md", lead, 8500],
   ["REVIEW.md", review, 7000],
@@ -164,4 +171,4 @@ for (const [label, text, limit] of [
   assert(text.length <= limit, `${label} exceeds the fast-loop size budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: unlimited product feedback, fast accepted publication, portable Windows tooling and CI-to-merge completion are enforced");
+console.log("documentation contracts passed: unlimited product feedback, one-CI accepted publication, portable Windows tooling and CI-to-merge completion are enforced");
