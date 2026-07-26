@@ -1,11 +1,12 @@
 import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./resourceConfig.js";
 import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { LARGE_RESOURCE_HP_MULTIPLIER } from "./resourceDomain.js";
+import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
 import {
   applyStartingLayout,
   findBuildTreeColliderSelection,
   loadStartingLayout,
-  saveStartingLayout,
+  saveStartingLayoutToProject,
 } from "./startingLayout.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
@@ -175,7 +176,7 @@ export class MovementDebugPanel {
   restoreStartingLayout() {
     if (this.destroyed || !this.scene) return;
     try {
-      const layout = loadStartingLayout(this.storage);
+      const layout = loadStartingLayout(this.storage, STARTING_LAYOUT_DEFAULT);
       if (!layout) {
         this.setLayoutStatus("Стартовая расстановка: базовая");
         return;
@@ -195,12 +196,12 @@ export class MovementDebugPanel {
       const scene = await this.resolveWorldScene();
       if (!scene) throw new Error("World scene is unavailable");
       this.scene = scene;
-      const layout = saveStartingLayout(scene, this.storage);
+      const layout = await saveStartingLayoutToProject(scene, { storage: this.storage });
       const count = layout.buildObjects.length + layout.facilities.length + layout.beds.length;
-      this.setLayoutStatus(`Стартовая расстановка сохранена: ${count} объектов`);
+      this.setLayoutStatus(`Стартовая расстановка сохранена в проекте: ${count} объектов`);
     } catch (error) {
       console.warn("Starting layout save failed", error);
-      this.setLayoutStatus("Ошибка сохранения стартовой расстановки", true);
+      this.setLayoutStatus("Ошибка сохранения: запустите локальный dev-preview", true);
     } finally {
       if (this.layoutSaveButton) this.layoutSaveButton.disabled = false;
     }
@@ -222,7 +223,7 @@ export class MovementDebugPanel {
   setLayoutStatus(message, error = false) {
     if (!this.layoutStatus) return;
     this.layoutStatus.textContent = message;
-    this.layoutStatus.dataset.status = error ? "error" : "ok";
+    if (this.layoutStatus.dataset) this.layoutStatus.dataset.status = error ? "error" : "ok";
   }
 
   appendInput(panel, field) {
