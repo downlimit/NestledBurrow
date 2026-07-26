@@ -45,11 +45,11 @@ Use one strong proof per material risk. A successful proof remains valid until i
 
 Environment/evidence:
 
-- Run `npm ci` only for missing dependencies or dependency/lock changes. Install Python requirements only when absent/changed.
-- Use at most one temporary validation worktree for a real dirty/locked conflict.
-- On deterministic failure, diagnose the exact canonical command. Run it once on current `main` only when base classification matters; skip alternate launch paths and unchanged reruns.
-- The focused E2E launcher owns Vite, readiness, and shutdown.
-- Prefer assertions/stable fixtures over moving NPCs, live clocks, or whole-session equality. Use runtime for feel; maximum two screenshots.
+- Install dependencies only when missing or changed.
+- Use one temporary validation worktree only for a dirty/locked conflict.
+- Diagnose deterministic failure with its canonical command; compare current `main` once only when base matters.
+- The focused E2E launcher owns Vite, readiness and shutdown.
+- Prefer stable assertions over moving NPCs, live clocks or whole-session equality. Use runtime for feel; maximum two screenshots. For new or changed visible text, verify RU/EN glyphs, wrapping, clipping and overlap at native `320×180` and coarse-pointer mobile.
 - Keep successful logs compact; load full output only on failure.
 
 ## Preview acceptance
