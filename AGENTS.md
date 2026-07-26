@@ -23,6 +23,8 @@ Before editing:
 
 For a dirty/shared checkout or another active task, use one isolated worktree; never switch the shared checkout. Create and use the worktree with one normal user/permission level. Do not mix elevated and non-elevated Git, npm, Vite or cleanup operations in the same worktree.
 
+When resuming accepted existing local work after `main` may have advanced, re-read the current `origin/main` version of this contract, fetch, and make the accepted commit a descendant of current `origin/main` before the first push or PR, using rebase or cherry-pick as appropriate. Resolve conflicts and rerun only proofs whose inputs changed. Never open a knowingly stale-base PR or spend CI on a disposable head merely to discover that branch protection requires an update; the normal route has one final-head CI cycle.
+
 ## Scope
 
 - **Micro:** complete low-risk docs, text metadata, or local `.bat`/`.cmd` launchers that cannot affect runtime, dependencies, or deployment.
