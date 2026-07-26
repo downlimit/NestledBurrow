@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const checkArgs = process.argv.slice(2);
@@ -23,7 +23,7 @@ for (const [name, value] of [
   ["NESTLEDBURROW_PYTHON", process.env.NESTLEDBURROW_PYTHON],
   ["PYTHON", process.env.PYTHON],
 ]) {
-  if (value) addCandidate(isAbsolute(value) ? value : value, [], name);
+  if (value) addCandidate(value, [], name);
 }
 
 function collectPythonExecutables(root, depth = 2) {
