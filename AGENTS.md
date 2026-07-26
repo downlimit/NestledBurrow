@@ -50,6 +50,7 @@ Environment/evidence:
 - On deterministic failure, diagnose the exact canonical command. Run it once on current `main` only when base classification matters; skip alternate launch paths and unchanged reruns.
 - The focused E2E launcher owns Vite, readiness, and shutdown.
 - Prefer assertions/stable fixtures over moving NPCs, live clocks, or whole-session equality. Use runtime for feel; maximum two screenshots.
+- Any new or changed player-visible text must be checked in RU and EN at native `320×180` and in a coarse-pointer smartphone viewport. Verify glyph coverage, wrapping, clipping, overlap and competing hit areas; add one focused regression proof only when the risk cannot be asserted structurally.
 - Keep successful logs compact; load full output only on failure.
 
 ## Preview acceptance
