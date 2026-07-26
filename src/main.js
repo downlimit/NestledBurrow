@@ -2009,9 +2009,29 @@ class WorldScene extends Phaser.Scene {
         const bed = this.debrisRuntime?.getBedDefinition?.(entityId);
         const sign = entityId === TAVERN_SIGN.id ? { position: TAVERN_SIGN.interactionPosition } : null;
         const target = resource ? { position: resource.position } : bed ? { position: bed.position } : facility ? { position: facility.position } : sign ?? this.characterSystem.getSnapshot(entityId);
+        if (!target?.position) throw new Error(`Unknown E2E placement target: ${entityId}`);
         const player = this.characterSystem.require(this.sessionState.playerId);
-        player.motor.position = { x: target.position.x - 12, y: target.position.y };
-        player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
+        const directions = [
+          { x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
+          { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
+          { x: -Math.SQRT1_2, y: Math.SQRT1_2 }, { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+        ];
+        let placed = false;
+        for (const distance of [12, 20, 28, 34]) {
+          for (const direction of directions) {
+            player.motor.position = {
+              x: target.position.x + direction.x * distance,
+              y: target.position.y + direction.y * distance,
+            };
+            player.motor.movement = createMovementState({ facing: { x: -direction.x, y: -direction.y } });
+            this.interactionRuntime?.update?.({ actions: { interact: false, primary: false, secondary: false } });
+            if (this.interactionRuntime?.getCurrentCandidate?.()?.entityId === entityId) {
+              placed = true;
+              break;
+            }
+          }
+          if (placed) break;
+        }
         player.visual.setPresentationPose(null);
         this.cameraRuntime?.reset(player.motor.position);
         this.interactionRuntime?.refresh?.();

@@ -35,6 +35,7 @@ assert.equal(BED_ASSET.key, "furniture.bed");
 assert.equal(BED_ASSET.width, 16);
 assert.equal(BED_ASSET.height, 16);
 assert.deepEqual(BED_OBJECT.position, { x: 520, y: 328 }, "the accepted live bed position is the default layout");
+assert(BED_OBJECT.priority > 20, "the bed remains selectable inside its smaller radius beside priority-20 facilities");
 assert(existsSync(bedPath));
 assert.equal(statSync(bedPath).size, 2415);
 assert.equal(createHash("sha256").update(readFileSync(bedPath)).digest("hex"), "5046a56d0e9cd13b8f85b34aaea3487fa0fb5626e880ce3179e3428dc8f35e91");
