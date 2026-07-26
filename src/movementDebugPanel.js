@@ -1,6 +1,12 @@
 import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./resourceConfig.js";
 import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { LARGE_RESOURCE_HP_MULTIPLIER } from "./resourceDomain.js";
+import {
+  applyStartingLayout,
+  findBuildTreeColliderSelection,
+  loadStartingLayout,
+  saveStartingLayout,
+} from "./startingLayout.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
@@ -30,6 +36,9 @@ export class MovementDebugPanel {
     this.inputs = new Map();
     this.open = false;
     this.destroyed = false;
+    this.scene = null;
+    this.treeColliderPointerListener = null;
+    this.startingLayoutRestoreListener = null;
     if (!this.enabled) return;
 
     const toggle = documentRef.createElement("button");
@@ -104,14 +113,26 @@ export class MovementDebugPanel {
     this.colliderEditor = colliderEditor;
     this.colliderEditorStatus = colliderEditorStatus;
 
+    this.layoutStatus = documentRef.createElement("output");
+    this.layoutStatus.className = "movement-debug-status";
+    panel.append(this.layoutStatus);
+
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
-    for (const [label, handler] of [["Сбросить баланс-забег", onResetBalanceRun], ["Восполнить энергию", onRefillEnergy], ["Добавить готовое блюдо", onAddCookedDish], ["Вернуть значения по умолчанию", () => this.resetDefaults()]]) {
+    const actionDefinitions = [
+      ["Сохранить расстановку как стартовую", () => this.persistStartingLayout()],
+      ["Сбросить баланс-забег", onResetBalanceRun],
+      ["Восполнить энергию", onRefillEnergy],
+      ["Добавить готовое блюдо", onAddCookedDish],
+      ["Вернуть значения по умолчанию", () => this.resetDefaults()],
+    ];
+    for (const [label, handler] of actionDefinitions) {
       const button = documentRef.createElement("button");
       button.type = "button";
       button.textContent = label;
       button.addEventListener("click", handler);
       actions.append(button);
+      if (label === "Сохранить расстановку как стартовую") this.layoutSaveButton = button;
     }
     panel.append(actions);
     documentRef.body.append(toggle, panel);
@@ -119,6 +140,89 @@ export class MovementDebugPanel {
     this.panel = panel;
     this.syncInputs();
     this.updateStatus();
+
+    if (typeof window !== "undefined" && documentRef === globalThis.document) {
+      void this.attachSceneRuntime();
+    }
+  }
+
+  async resolveWorldScene() {
+    if (this.scene && !this.scene.sys?.isDestroyed?.()) return this.scene;
+    const module = await import("phaser");
+    const Phaser = module.default ?? module;
+    for (const game of Phaser.GAMES ?? []) {
+      const scene = game?.scene?.getScene?.("world") ?? game?.scene?.keys?.world ?? null;
+      if (scene) return scene;
+    }
+    return null;
+  }
+
+  async attachSceneRuntime() {
+    try {
+      const scene = await this.resolveWorldScene();
+      if (!scene || this.destroyed) return;
+      this.scene = scene;
+      this.treeColliderPointerListener = (pointer) => this.selectTreeColliderFromVisualBounds(pointer);
+      scene.input?.on?.("pointerdown", this.treeColliderPointerListener);
+      this.startingLayoutRestoreListener = () => this.restoreStartingLayout();
+      scene.events?.once?.("update", this.startingLayoutRestoreListener);
+    } catch (error) {
+      console.warn("Starting layout authoring unavailable", error);
+      this.setLayoutStatus("Стартовая расстановка недоступна", true);
+    }
+  }
+
+  restoreStartingLayout() {
+    if (this.destroyed || !this.scene) return;
+    try {
+      const layout = loadStartingLayout(this.storage);
+      if (!layout) {
+        this.setLayoutStatus("Стартовая расстановка: базовая");
+        return;
+      }
+      applyStartingLayout(this.scene, layout);
+      this.setLayoutStatus("Стартовая расстановка загружена");
+    } catch (error) {
+      console.warn("Starting layout restore failed", error);
+      this.setLayoutStatus("Ошибка загрузки стартовой расстановки", true);
+    }
+  }
+
+  async persistStartingLayout() {
+    if (this.layoutSaveButton) this.layoutSaveButton.disabled = true;
+    this.setLayoutStatus("Сохранение стартовой расстановки…");
+    try {
+      const scene = await this.resolveWorldScene();
+      if (!scene) throw new Error("World scene is unavailable");
+      this.scene = scene;
+      const layout = saveStartingLayout(scene, this.storage);
+      const count = layout.buildObjects.length + layout.facilities.length + layout.beds.length;
+      this.setLayoutStatus(`Стартовая расстановка сохранена: ${count} объектов`);
+    } catch (error) {
+      console.warn("Starting layout save failed", error);
+      this.setLayoutStatus("Ошибка сохранения стартовой расстановки", true);
+    } finally {
+      if (this.layoutSaveButton) this.layoutSaveButton.disabled = false;
+    }
+  }
+
+  selectTreeColliderFromVisualBounds(pointer) {
+    const scene = this.scene;
+    if (!this.colliderEditCheckbox?.checked || !scene || scene.buildMode?.isActive?.()) return;
+    const point = { x: Number(pointer.worldX ?? pointer.x), y: Number(pointer.worldY ?? pointer.y) };
+    const entry = findBuildTreeColliderSelection(scene, point);
+    if (!entry) return;
+    const center = {
+      x: (entry.rect.left + entry.rect.right) / 2,
+      y: (entry.rect.top + entry.rect.bottom) / 2,
+    };
+    scene.beginColliderEditPointer?.({ ...pointer, worldX: center.x, worldY: center.y });
+  }
+
+  setLayoutStatus(message, error = false) {
+    if (!this.layoutStatus) return;
+    this.layoutStatus.textContent = message;
+    this.layoutStatus.dataset.status = error ? "error" : "ok";
   }
 
   appendInput(panel, field) {
@@ -185,10 +289,18 @@ export class MovementDebugPanel {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.scene && this.treeColliderPointerListener) {
+      this.scene.input?.off?.("pointerdown", this.treeColliderPointerListener);
+    }
+    if (this.scene && this.startingLayoutRestoreListener) {
+      this.scene.events?.off?.("update", this.startingLayoutRestoreListener);
+    }
     this.toggleButton?.remove(); this.panel?.remove(); this.inputs.clear();
     this.toggleButton = null; this.panel = null; this.status = null;
+    this.layoutStatus = null; this.layoutSaveButton = null;
     this.colliderCheckbox = null;
     this.colliderEditCheckbox = null; this.colliderEditor = null; this.colliderEditorStatus = null;
+    this.scene = null; this.treeColliderPointerListener = null; this.startingLayoutRestoreListener = null;
   }
 }
 
