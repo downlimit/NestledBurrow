@@ -32,24 +32,71 @@ assert.equal(
   WORLD_COLUMNS * WORLD_ROWS + (WORLD_ROWS - DOOR_Y) * 3,
   "ground contains one base tile per cell plus the three-tile path overlay",
 );
-assert.equal(layout.houseFloorTiles.length > 0, true);
+assert.equal(layout.houseFloorTiles.length, HOUSE.columns * HOUSE.rows, "floor fills the canonical interior footprint");
 assert(
-  layout.houseFloorTiles.every((tile) => tile.frame === HOUSE_FRAMES.floor),
-  "the interior uses the verified fully opaque floor tile without transparent gaps",
+  layout.houseFloorTiles.every((tile) => (
+    tile.frame === HOUSE_FRAMES.floor
+    && tile.x * TILE_SIZE >= layout.houseFootprint.left
+    && (tile.x + 1) * TILE_SIZE <= layout.houseFootprint.right
+    && tile.y * TILE_SIZE >= layout.houseFootprint.top
+    && (tile.y + 1) * TILE_SIZE <= layout.houseFootprint.bottom
+  )),
+  "floor cells stay inside the canonical footprint",
 );
-assert.equal(layout.houseWallTiles.length > 0, true);
+assert.equal(layout.houseWallTiles.length, layout.wallEdges.length - 4, "four room corners share their horizontal and vertical edge visuals");
+assert.deepEqual(
+  [...layout.houseWallTiles.flatMap((tile) => tile.edgeIds)].sort(),
+  [...layout.wallEdges.map((edge) => edge.id)].sort(),
+  "every collision edge is represented by exactly one wall visual",
+);
+assert.equal(layout.wallColliders.length, layout.wallEdges.length, "every wall edge owns one thin matching collider");
+assert(layout.wallColliders.every((rect) => (
+  (rect.right - rect.left === TILE_SIZE && rect.bottom - rect.top === 4)
+  || (rect.right - rect.left === 4 && rect.bottom - rect.top === TILE_SIZE)
+)), "wall colliders follow the same thin grid edges as the construction brush");
+assert(layout.houseWallTiles.every((tile) => (
+  [
+      HOUSE_FRAMES.topLeft,
+      HOUSE_FRAMES.top,
+      HOUSE_FRAMES.topRight,
+      HOUSE_FRAMES.bottomLeft,
+      HOUSE_FRAMES.bottom,
+      HOUSE_FRAMES.bottomRight,
+  ].includes(tile.frame)
+    ? tile.worldX === (
+      [HOUSE_FRAMES.topLeft, HOUSE_FRAMES.bottomLeft].includes(tile.frame)
+        ? tile.x - TILE_SIZE / 2
+        : [HOUSE_FRAMES.topRight, HOUSE_FRAMES.bottomRight].includes(tile.frame)
+          ? tile.x + TILE_SIZE / 2
+          : tile.x
+    )
+      && tile.worldY === (tile.side === "top" ? tile.y : tile.y - TILE_SIZE)
+    : tile.frame === (tile.side === "left" ? HOUSE_FRAMES.wallLeftCap : HOUSE_FRAMES.wallRightCap)
+      && tile.worldX === tile.x - TILE_SIZE / 2
+      && tile.worldY === tile.y
+)), "initial walls use complete edge and corner sprites on the construction grid");
+const wallCaps = layout.houseWallTiles.filter((tile) => [
+  HOUSE_FRAMES.topLeft,
+  HOUSE_FRAMES.topRight,
+  HOUSE_FRAMES.bottomLeft,
+  HOUSE_FRAMES.bottomRight,
+].includes(tile.frame));
+assert(wallCaps.every((tile) => (
+  tile.supplements.length === 1
+  && tile.supplements[0].cropWidth === TILE_SIZE / 2
+)), "each shifted wall cap fills its remaining half-edge with a cropped middle segment");
 assert.equal(layout.decorationTiles.length, 48, "four 3x4 trees are present");
 
-for (let x = DOOR_LEFT; x < DOOR_LEFT + HOUSE.doorWidth; x += 1) {
-  for (let offset = 0; offset < 2; offset += 1) {
-    assert.equal(isBlockedCell(layout, x * 2 + offset, DOOR_Y * 2), false, "doorway is open in diagnostic layout data");
-    assert.equal(layout.isBlockedCell(x * 2 + offset, DOOR_Y * 2), false, "doorway is open through environment query");
-  }
-}
+assert.equal(layout.doorway.left, DOOR_LEFT * TILE_SIZE);
+assert.equal(layout.doorway.right, (DOOR_LEFT + HOUSE.doorWidth) * TILE_SIZE);
+assert.equal(layout.wallEdges.some((edge) => (
+  edge.side === "bottom" && edge.x >= layout.doorway.left && edge.x < layout.doorway.right
+)), false, "doorway is a gap in the bottom edge set");
+const firstPathTile = layout.groundTiles[WORLD_COLUMNS * WORLD_ROWS];
+const pathCenterX = (firstPathTile.x + 1.5) * TILE_SIZE;
+assert.equal(pathCenterX - layout.doorway.centerX, 0, "doorway and path centerlines are identical");
 
 const expectedBlockedCells = [
-  [HOUSE.x, HOUSE.y],
-  [HOUSE.x + HOUSE.columns - 1, HOUSE.y + 5],
   [7 + 1, 6 + 3],
   [52 + 1, 7 + 3],
   [8 + 1, 33 + 3],
@@ -105,8 +152,8 @@ assert(routeSteps < routeStepLimit, "walkable route does not stall");
 assert(position.y >= layout.outdoorTarget.y - routeStep, "route reaches the outdoor path");
 
 const wallY = (HOUSE.y + 5) * TILE_SIZE + TILE_SIZE - 2;
-const nearLeftWallX = (HOUSE.x + 1) * TILE_SIZE + TILE_SIZE / 2;
-const minimumInteriorCenterX = (HOUSE.x + 1) * TILE_SIZE + footWidth / 2;
+const nearLeftWallX = HOUSE.x * TILE_SIZE + TILE_SIZE + TILE_SIZE / 2;
+const minimumInteriorCenterX = HOUSE.x * TILE_SIZE + 2 + footWidth / 2;
 const wallStart = { x: nearLeftWallX, y: wallY };
 
 const wallResult = moveWithCollision(wallStart, { x: -TILE_SIZE * 2, y: 0 }, layout, footWidth, footDepth);
@@ -123,6 +170,28 @@ const boundsResult = moveWithCollision({ x: footWidth / 2, y: footDepth }, { x: 
 assert.deepEqual(boundsResult.position, { x: footWidth / 2, y: footDepth }, "world bounds clamp correctly");
 assert.deepEqual(boundsResult.blockedAxes, { x: true, y: true }, "world bounds report both blocked axes even for a single small step");
 assert.equal(collides({ x: 1, y: footDepth }, layout, footWidth, footDepth), true, "world edges block the foot box");
+assert.equal(
+  collides({ x: layout.doorway.centerX, y: layout.houseFootprint.bottom + footDepth }, layout, footWidth, footDepth),
+  false,
+  "doorway remains walkable through the thin bottom-edge collision",
+);
+assert.equal(
+  collides({ x: layout.doorway.left - TILE_SIZE / 2, y: layout.houseFootprint.bottom + footDepth }, layout, footWidth, footDepth),
+  true,
+  "the neighboring bottom wall edge remains blocked",
+);
+
+const editableLayout = createWorldLayout();
+const removableEdge = editableLayout.wallEdges.find((edge) => edge.side === "left" && edge.index === 5);
+const removablePoint = {
+  x: editableLayout.houseFootprint.left - footWidth / 2,
+  y: removableEdge.y + TILE_SIZE / 2,
+};
+assert.equal(collides(removablePoint, editableLayout, footWidth, footDepth), true, "wall segment collider is active before demolition");
+editableLayout.removeWallEdges([removableEdge.id]);
+assert.equal(collides(removablePoint, editableLayout, footWidth, footDepth), false, "demolishing a wall segment removes its matching collider");
+editableLayout.restoreWallEdges([removableEdge.id]);
+assert.equal(collides(removablePoint, editableLayout, footWidth, footDepth), true, "undo restores the demolished wall collider");
 
 let queryCount = 0;
 const artificial = createGridCollisionEnvironment({

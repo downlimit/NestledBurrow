@@ -3,10 +3,14 @@ import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
 import { cellKey } from "./worldLayout.js";
 import { drawResource } from "./resourceVisuals.js";
+import { TILE_SIZE } from "./worldConfig.js";
 
 export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   const visuals = new Map();
-  let bedGraphics = null;
+  const bedDefinitions = new Map();
+  const bedVisuals = new Map();
+  let nextBedId = 0;
+  let sleepingBedId = null;
   let sleeping = false;
   let destroyed = false;
 
@@ -78,20 +82,92 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     scene.tweens.add({ targets: graphics, alpha: 0, scaleY: 0.55, duration: 160, ease: "Quad.easeOut", onComplete: () => { graphics.destroy(); visuals.delete(resourceId); onComplete(); } });
   }
 
-  function createBed() {
-    if (worldLayout.isBlockedCell(BED_WAKE_TILE.x * 2, BED_WAKE_TILE.y * 2)) throw new Error("BED_WAKE_TILE must remain walkable");
-    for (let y = 28; y < 30; y += 1) for (let x = 64; x < 66; x += 1) worldLayout.blocked.add(cellKey(x, y));
-    bedGraphics = scene.add.graphics().setPosition(BED_OBJECT.position.x - 8, BED_OBJECT.position.y - 8).setDepth(500 + BED_OBJECT.position.y);
-    drawBed(bedGraphics);
+  function createBed(definition) {
+    const bounds = bedBounds(definition);
+    worldLayout.setWorldObjectCollider(definition.id, bounds);
+    const graphics = scene.add.graphics().setPosition(bounds.left, bounds.top).setDepth(500 + definition.position.y);
+    drawBed(graphics);
+    bedDefinitions.set(definition.id, definition);
+    bedVisuals.set(definition.id, graphics);
   }
 
-  function setSleeping(active) { sleeping = Boolean(active); }
+  function getBedDefinitionAt(point) {
+    return [...bedDefinitions.values()].reverse().find((bed) => contains(bedBounds(bed), point)) ?? null;
+  }
+
+  function removeBed(id) {
+    if (sleeping) return false;
+    const definition = bedDefinitions.get(id);
+    if (!definition) return false;
+    bedVisuals.get(id)?.destroy();
+    bedVisuals.delete(id);
+    bedDefinitions.delete(id);
+    worldLayout.clearWorldObjectCollider(id);
+    return true;
+  }
+
+  function removeBedAt(point) {
+    const definition = getBedDefinitionAt(point);
+    return definition ? removeBed(definition.id) : false;
+  }
+
+  function restoreBed(definition) {
+    if (!definition || bedDefinitions.has(definition.id) || worldLayout.isBlockedBox(bedBounds(definition))) return false;
+    createBed(definition);
+    return true;
+  }
+
+  function getBedDemolitionTargetAt(point) {
+    const definition = getBedDefinitionAt(point);
+    if (!definition) return null;
+    const visual = bedVisuals.get(definition.id);
+    return visual ? { targets: [visual], bounds: bedBounds(definition), kind: "bed" } : null;
+  }
+
+  function addBed(point) {
+    const id = `editor-bed-${++nextBedId}`;
+    const definition = Object.freeze({
+      ...BED_OBJECT,
+      id,
+      entityId: id,
+      position: Object.freeze({ x: point.x + 8, y: point.y + 8 }),
+      wakePosition: Object.freeze({ x: point.x + 8, y: point.y + TILE_SIZE + 8 }),
+      payload: Object.freeze({ bedId: id }),
+    });
+    if (worldLayout.isBlockedBox(bedBounds(definition))) return null;
+    createBed(definition);
+    return definition;
+  }
+
+  function setSleeping(active, bedId = null) {
+    sleeping = Boolean(active);
+    sleepingBedId = sleeping ? bedId : null;
+  }
 
   RESOURCE_OBJECTS.forEach(createVisual);
-  createBed();
+  if (worldLayout.isBlockedCell(BED_WAKE_TILE.x * 2, BED_WAKE_TILE.y * 2)) throw new Error("BED_WAKE_TILE must remain walkable");
+  createBed(BED_OBJECT);
 
   return {
-    getInteractionDefinitions() { return [...RESOURCE_OBJECTS.filter(isPresent), sleeping ? { ...BED_OBJECT, prompt: "hud:interaction.wake" } : BED_OBJECT]; },
+    getInteractionDefinitions() {
+      const beds = [...bedDefinitions.values()].map((definition) => (
+        sleeping && definition.id === sleepingBedId
+          ? { ...definition, prompt: "hud:interaction.wake" }
+          : definition
+      ));
+      return [...RESOURCE_OBJECTS.filter(isPresent), ...beds];
+    },
+    getBedDefinition(id = null) {
+      if (id) return bedDefinitions.get(id) ?? null;
+      return bedDefinitions.values().next().value ?? null;
+    },
+    getBedDefinitions() { return [...bedDefinitions.values()]; },
+    addBed,
+    removeBed,
+    removeBedAt,
+    restoreBed,
+    getBedDefinitionAt,
+    getBedDemolitionTargetAt,
     isPresent(id) { const definition = RESOURCE_OBJECTS.find((item) => item.id === (id ?? RESOURCE_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },
     getVisualState(id) {
       const graphics = visuals.get(id);
@@ -99,10 +175,39 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     },
     hitWithFeedback, clearWithFeedback, setSleeping,
     rebuild() { for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); RESOURCE_OBJECTS.forEach(createVisual); },
-    destroy() { destroyed = true; for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); bedGraphics?.destroy(); for (const definition of RESOURCE_OBJECTS) setBlocked(definition, false); },
+    destroy() {
+      destroyed = true;
+      for (const graphics of visuals.values()) graphics.destroy();
+      visuals.clear();
+      for (const graphics of bedVisuals.values()) graphics.destroy();
+      for (const definition of bedDefinitions.values()) worldLayout.clearWorldObjectCollider(definition.id);
+      bedVisuals.clear();
+      bedDefinitions.clear();
+      for (const definition of RESOURCE_OBJECTS) setBlocked(definition, false);
+    },
   };
 }
 
-function drawBed(graphics) {
-  graphics.fillStyle(0x5c3a2a, 1).fillRect(1, 3, 14, 10).fillStyle(0x315c8a, 1).fillRect(3, 5, 11, 7).fillStyle(0xf2eadc, 1).fillRect(3, 5, 4, 3).fillStyle(0x2b1d18, 1).fillRect(1, 13, 2, 2).fillRect(13, 13, 2, 2);
+export function drawBed(graphics, tint = null) {
+  const color = (value) => tint ?? value;
+  graphics.fillStyle(color(0x5c3a2a), 1).fillRect(1, 3, 14, 10)
+    .fillStyle(color(0x315c8a), 1).fillRect(3, 5, 11, 7)
+    .fillStyle(color(0xf2eadc), 1).fillRect(3, 5, 4, 3)
+    .fillStyle(color(0x2b1d18), 1).fillRect(1, 13, 2, 2).fillRect(13, 13, 2, 2);
+}
+
+function bedBounds(definition) {
+  return {
+    left: definition.position.x - 8,
+    right: definition.position.x + 8,
+    top: definition.position.y - 8,
+    bottom: definition.position.y + 8,
+  };
+}
+
+function contains(bounds, point) {
+  return point.x >= bounds.left
+    && point.x < bounds.right
+    && point.y >= bounds.top
+    && point.y < bounds.bottom;
 }

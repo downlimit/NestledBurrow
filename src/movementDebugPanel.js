@@ -105,6 +105,13 @@ export class MovementDebugPanel {
     this.toggleButton?.setAttribute("aria-expanded", String(this.open));
   }
 
+  setSuppressed(value) {
+    const suppressed = Boolean(value);
+    if (suppressed) this.setOpen(false);
+    if (this.toggleButton) this.toggleButton.hidden = suppressed;
+    if (this.panel) this.panel.hidden = suppressed || !this.open;
+  }
+
   resetDefaults() {
     Object.assign(this.gameplayTuning, normalizeGameplayTuning(DEFAULT_GAMEPLAY_TUNING));
     clearGameplayDebugTuning(this.storage);

@@ -96,6 +96,7 @@ export function createGameHud(scene, options) {
   const buildLabel = compactBuildLabel(buildId);
 
   let destroyed = false;
+  let suppressed = false;
   let confirmingNewGame = false;
   let fullscreenHud = null;
   let fullscreenHandler = null;
@@ -267,6 +268,11 @@ export function createGameHud(scene, options) {
     energyBarGraphics.clear();
     energyArrowGraphics.clear();
     hideManagedObjects();
+    if (suppressed) {
+      fullscreenHud?.graphics?.clear?.();
+      updateInteractivity();
+      return;
+    }
 
     if (confirmingNewGame) renderConfirmation();
     else renderNormalHud();
@@ -382,6 +388,16 @@ export function createGameHud(scene, options) {
   }
 
   function updateInteractivity() {
+    if (suppressed) {
+      optionsHit.disableInteractive();
+      setOptionsPanelInteractive(false);
+      setNeedsInteractive(false);
+      confirmHit.disableInteractive();
+      cancelHit.disableInteractive();
+      fullscreenHud?.hit?.disableInteractive?.();
+      return;
+    }
+    fullscreenHud?.hit?.setInteractive?.({ useHandCursor: true });
     if (confirmingNewGame) {
       optionsHit.disableInteractive();
       setOptionsPanelInteractive(false);
@@ -459,6 +475,15 @@ export function createGameHud(scene, options) {
 
   return {
     render,
+    setSuppressed(value) {
+      suppressed = Boolean(value);
+      if (suppressed) {
+        if (confirmingNewGame) onConfirmationChange(false);
+        confirmingNewGame = false;
+        optionsOpen = false;
+      }
+      render();
+    },
     triggerEnergyShake,
     getResourceState() {
       return {
@@ -505,6 +530,7 @@ export function createGameHud(scene, options) {
       };
     },
     isPointInHud(x, y) {
+      if (suppressed) return false;
       if (confirmingNewGame) {
         return isPointInRect(x, y, NEW_GAME_CONFIRM_PANEL)
           || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));

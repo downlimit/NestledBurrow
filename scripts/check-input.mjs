@@ -6,6 +6,7 @@ import {
   clampVectorLength,
   getJoystickState,
   isInsideJoystickActivation,
+  isPlayerMovementSuppressed,
   isTouchJoystickSupported,
 } from "../src/input.js";
 import { MobileJoystick } from "../src/mobileJoystick.js";
@@ -29,6 +30,10 @@ assert.deepEqual(clampJoystickCenter(GAME_WIDTH / 2 - 1, GAME_HEIGHT - 1), {
 });
 assert.equal(isInsideJoystickActivation(GAME_WIDTH / 2 - 0.1, 90), true);
 assert.equal(isInsideJoystickActivation(GAME_WIDTH / 2, 90), false);
+assert.equal(isPlayerMovementSuppressed({ buildModeActive: true }), false, "build mode keeps WASD movement enabled");
+assert.equal(isPlayerMovementSuppressed({ sleeping: true }), true);
+assert.equal(isPlayerMovementSuppressed({ facilityActive: true }), true);
+assert.equal(isPlayerMovementSuppressed({ dialogueActive: true }), true);
 
 const center = { x: 60, y: 70 };
 const centered = getJoystickState(center.x, center.y, center);
