@@ -1,8 +1,9 @@
-import { BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
+import { BED_ASSET, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
 import { cellKey } from "./worldLayout.js";
 import { drawResource } from "./resourceVisuals.js";
+import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
 import { TILE_SIZE } from "./worldConfig.js";
 
 export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
@@ -189,11 +190,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
 }
 
 export function drawBed(graphics, tint = null) {
-  const color = (value) => tint ?? value;
-  graphics.fillStyle(color(0x5c3a2a), 1).fillRect(1, 3, 14, 10)
-    .fillStyle(color(0x315c8a), 1).fillRect(3, 5, 11, 7)
-    .fillStyle(color(0xf2eadc), 1).fillRect(3, 5, 4, 3)
-    .fillStyle(color(0x2b1d18), 1).fillRect(1, 13, 2, 2).fillRect(13, 13, 2, 2);
+  return bindSpriteVisual(graphics, BED_ASSET, tint);
 }
 
 function bedBounds(definition) {
