@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const checkArgs = process.argv.slice(2);
@@ -23,7 +23,7 @@ for (const [name, value] of [
   ["NESTLEDBURROW_PYTHON", process.env.NESTLEDBURROW_PYTHON],
   ["PYTHON", process.env.PYTHON],
 ]) {
-  if (value) addCandidate(resolve(value), [], name);
+  if (value) addCandidate(isAbsolute(value) ? value : value, [], name);
 }
 
 function collectPythonExecutables(root, depth = 2) {
@@ -62,6 +62,8 @@ if (process.platform === "win32") {
     join(dirname(executableDir), "python_embed"),
     process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Programs", "Python"),
     process.env.USERPROFILE && join(process.env.USERPROFILE, ".pyenv", "pyenv-win", "versions"),
+    process.env.USERPROFILE && join(process.env.USERPROFILE, "scoop", "apps", "python"),
+    process.env.ProgramFiles && join(process.env.ProgramFiles, "Python"),
   ]) {
     collectPythonExecutables(root);
   }
