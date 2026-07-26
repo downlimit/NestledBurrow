@@ -24,7 +24,12 @@ const cleanup = () => {
   clearTimeout(timeout);
   stop(testProcess);
   stop(server);
-  if (!keepArtifacts) rmSync(runtimeDir, { recursive: true, force: true });
+  if (keepArtifacts) return;
+  try {
+    rmSync(runtimeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch (error) {
+    console.warn(`Focused E2E temp cleanup deferred: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 const reserveFreePort = () => new Promise((resolvePort, reject) => {
