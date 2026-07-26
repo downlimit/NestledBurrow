@@ -39,6 +39,7 @@ Task #018 заняла около 34 минут, израсходовала бо
 - [x] После зелёного CI обычная задача заканчивается merge и актуальным `main`.
 - [x] Пользователь не обслуживает ветки, PR, CI или merge.
 - [x] Feedback пользователя не ограничивается и не оценивается как waste.
+- [x] Принятая локальная работа обновляется до текущего `origin/main` до первого push/PR; disposable stale-base CI запрещён.
 
 ### P1 — player-visible и runtime
 
@@ -69,9 +70,10 @@ Task #018 заняла около 34 минут, израсходовала бо
 → managed preview
 → любое нужное число feedback-итераций
 → пользовательское `принято`
+→ preflight актуального origin/main
 → минимальная Fast-публикация или один Strict gate
 → Ready PR с auto-merge
-→ полный GitHub CI
+→ один final-head GitHub CI
 → один repair только при реальном failure
 → merge и актуальный main
 ```
@@ -116,6 +118,17 @@ Task #025 показала: промежуточные publication checks обе
 - Preview и focused-E2E state/artifacts перемещены в OS temp.
 - Worktree не смешивает elevated и normal operations.
 - Архитектурные сигналы build-mode и facility/camera закреплены в `ARCHITECTURE.md` и `LEAD.md`.
+
+## Ретроспектива публикации Task #035
+
+Task #035 была принята и уже имела локальный commit, но её старая Codex-сессия опубликовала PR до обновления ветки на новый `main`. Первый зелёный CI оказался одноразовым: branch protection потребовал rebase, после которого весь CI прошёл второй раз. PR жил 10 минут 21 секунду, тогда как финальный CI и merge после запуска runner заняли около двух минут.
+
+### Решение Task #037
+
+- При возобновлении принятой локальной работы сначала перечитать актуальный `origin/main:AGENTS.md`.
+- До первого push/PR сделать accepted commit потомком текущего `origin/main`.
+- Не открывать заведомо stale PR ради проверки mergeability или branch protection.
+- Нормальный publication route содержит один final-head CI; второй допустим только после реального repair или неожиданного конфликта.
 
 ## Когда снова менять процесс
 
