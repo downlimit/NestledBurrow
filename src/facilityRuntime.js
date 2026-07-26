@@ -6,7 +6,7 @@ import {
 import { TILE_SIZE } from "./worldConfig.js";
 import { getKitchenFacilityPrompt } from "./cookingDomain.js";
 
-export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null }) {
+export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null, isServingDishReserved = () => false }) {
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
   const visuals = new Map();
   let activeFacilityId = null;
@@ -22,7 +22,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
         top: facility.usePosition.y - 2,
         bottom: facility.usePosition.y + 2,
       })) return false;
-    worldLayout.setWorldObjectCollider(facility.id, boundsFor(facility));
+    worldLayout.setWorldObjectCollider(facility.id, boundsFor(facility), `facility:${facility.facilityType}`);
     const image = scene.add.image(facility.visual.x, facility.visual.y, facility.visual.key)
       .setOrigin(0, 0)
       .setDepth(500 + facility.visual.y + facility.visual.height);
@@ -75,10 +75,63 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     return true;
   }
 
+  function replace(definition) {
+    if (!definition) return false;
+    const previous = definitions.get(definition.id);
+    if (previous) {
+      if (activeFacilityId === previous.id) activeFacilityId = null;
+      visuals.get(previous.id)?.destroy();
+      visuals.delete(previous.id);
+      definitions.delete(previous.id);
+      worldLayout.clearWorldObjectCollider(previous.id);
+    }
+    if (restore(definition)) {
+      syncKitchenVisuals();
+      return true;
+    }
+    if (previous) {
+      restore(previous);
+      syncKitchenVisuals();
+    }
+    return false;
+  }
+
+  function move(id, point) {
+    const previous = definitions.get(id);
+    if (!previous) return null;
+    const oldTile = { x: previous.footprint.x / TILE_SIZE, y: previous.footprint.y / TILE_SIZE };
+    const oldUseTile = {
+      x: Math.floor(previous.usePosition.x / TILE_SIZE),
+      y: Math.floor(previous.usePosition.y / TILE_SIZE),
+    };
+    const tile = { x: Math.floor(point.x / TILE_SIZE), y: Math.floor(point.y / TILE_SIZE) };
+    const current = createFacilityDefinition({
+      id: previous.id,
+      type: previous.facilityType,
+      tile,
+      useTile: { x: tile.x + oldUseTile.x - oldTile.x, y: tile.y + oldUseTile.y - oldTile.y },
+      editable: previous.editable,
+    });
+    return replace(current) ? { previous, current } : null;
+  }
+
   function getDemolitionTargetAt(point) {
     const definition = getDefinitionAt(point);
     if (!definition || definition.editable === false) return null;
     const visual = visuals.get(definition.id);
+    return visual
+      ? {
+          targets: [visual],
+          bounds: boundsFor(definition),
+          kind: "facility",
+          facilityType: definition.facilityType,
+        }
+      : null;
+  }
+
+  function getMoveTargetAt(point) {
+    const definition = getDefinitionAt(point);
+    const visual = definition ? visuals.get(definition.id) : null;
     return visual
       ? {
           targets: [visual],
@@ -104,7 +157,11 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   }
 
   function syncKitchenVisuals() {
-    platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish));
+    const currentServingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
+    if (currentServingTable) platedDishVisual
+      ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2, currentServingTable.footprint.y + 5)
+      ?.setDepth?.(501 + currentServingTable.visual.y + currentServingTable.visual.height);
+    platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish) && !isServingDishReserved());
   }
   syncKitchenVisuals();
 
@@ -124,6 +181,9 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     getDefinition(id) {
       return definitions.get(id) ?? null;
     },
+    getDefinitionByType(facilityType) {
+      return [...definitions.values()].find((facility) => facility.facilityType === facilityType) ?? null;
+    },
     getDefinitions() {
       return [...definitions.values()];
     },
@@ -132,8 +192,11 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     remove,
     removeAt,
     restore,
+    replace,
+    move,
     getDefinitionAt,
     getDemolitionTargetAt,
+    getMoveTargetAt,
     toggle(facilityId, playerMotor) {
       const facility = definitions.get(facilityId);
       if (!facility || destroyed) return { status: "unknown-facility", mutated: false };

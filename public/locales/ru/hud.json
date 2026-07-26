@@ -22,6 +22,7 @@
     },
     "assets": {
       "demolish": "Снос",
+      "move": "Переставить",
       "grass": "Трава",
       "path": "Дорожка",
       "parquet": "Паркет",
@@ -60,7 +61,9 @@
     "noRawPotatoes": "Нет сырого картофеля",
     "noPreparedPotatoes": "Нет подготовленного картофеля",
     "noCookedDish": "Нет готового блюда",
-    "servingTableOccupied": "Сервировочный стол занят"
+    "servingTableOccupied": "Сервировочный стол занят",
+    "openTavern": "Открыть таверну",
+    "closeTavern": "Закрыть таверну"
   },
   "progress": {
     "newGame": "Новая игра",
@@ -81,6 +84,7 @@
     "raw": "СЫР",
     "prepared": "ПОДГ",
     "dishes": "БЛЮД",
+    "coins": "МОН",
     "facilities": {
       "cuttingTable": "Разделочный стол",
       "gasStove": "Газовая плита",

@@ -141,6 +141,10 @@ export class BuildModeRuntime {
     onModeChange = () => {},
     onPlace = () => ({ status: "ignored" }),
     onDemolish = () => ({ status: "ignored" }),
+    onMoveStart = () => ({ status: "ignored" }),
+    onMove = () => ({ status: "ignored" }),
+    onMovePreview = () => {},
+    onMoveHover = () => {},
     onPreview = () => {},
     onPreviewClear = () => {},
     onDemolitionPreview = () => {},
@@ -155,6 +159,10 @@ export class BuildModeRuntime {
     this.onModeChange = onModeChange;
     this.onPlace = onPlace;
     this.onDemolish = onDemolish;
+    this.onMoveStart = onMoveStart;
+    this.onMove = onMove;
+    this.onMovePreview = onMovePreview;
+    this.onMoveHover = onMoveHover;
     this.onPreview = onPreview;
     this.onPreviewClear = onPreviewClear;
     this.onDemolitionPreview = onDemolitionPreview;
@@ -474,13 +482,22 @@ export class BuildModeRuntime {
     if (!item) return;
     const point = this.getActionPoint(pointer, item);
     this.actionOpen = true;
-    this.onActionBegin(item.mode === "demolish" ? "demolish" : "place");
+    this.onActionBegin(item.mode ?? "place");
     if (item.mode === "demolish") {
       this.onPreviewClear();
       const result = this.onDemolish(point, null);
       this.drag = result?.status === "removed"
         ? { mode: "demolish", demolitionType: result.type, lastPoint: point }
         : null;
+      return;
+    }
+    if (item.mode === "move") {
+      this.onPreviewClear();
+      const result = this.onMoveStart(point);
+      this.drag = result?.status === "picked"
+        ? { mode: "move", item, target: result.target, lastPoint: point }
+        : null;
+      if (this.drag) this.onMovePreview(this.drag.target, point);
       return;
     }
     if (item.placement === "wall" && item.dragPaint) {
@@ -517,6 +534,12 @@ export class BuildModeRuntime {
         : getBuildDragPoints(this.drag.lastPoint, point);
       for (const dragPoint of points) this.onDemolish(dragPoint, this.drag.demolitionType);
       this.drag.lastPoint = point;
+      return;
+    }
+    if (this.drag.mode === "move") {
+      const point = this.getActionPoint(pointer, item);
+      this.drag.lastPoint = point;
+      this.onMovePreview(this.drag.target, point);
       return;
     }
     if (!item.dragPaint) return;
@@ -560,6 +583,7 @@ export class BuildModeRuntime {
   }
 
   endPointerDrag() {
+    if (this.drag?.mode === "move") this.onMove(this.drag.target, this.drag.lastPoint);
     if (this.drag?.mode === "place") {
       if (this.drag.item.placement === "wall") {
         if (this.drag.wallAxis && this.drag.points.length > 1) {
@@ -595,6 +619,11 @@ export class BuildModeRuntime {
     if (item.mode === "demolish") {
       this.onPreviewClear();
       this.onDemolitionPreview(point);
+      return;
+    }
+    if (item.mode === "move") {
+      this.onPreviewClear();
+      this.onMoveHover(point);
       return;
     }
     this.onPreviewClear();

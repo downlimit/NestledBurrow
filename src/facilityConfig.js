@@ -55,12 +55,12 @@ export function createFacilityDefinition({ id, type, tile, useTile, editable = t
 }
 
 export const FACILITIES = Object.freeze([
-  createFacilityDefinition({ id: "home-shower-01", type: "shower", tile: { x: 22, y: 14 }, useTile: { x: 24, y: 15 } }),
-  createFacilityDefinition({ id: "home-toilet-01", type: "toilet", tile: { x: 22, y: 20 }, useTile: { x: 24, y: 21 } }),
-  createFacilityDefinition({ id: "home-table-01", type: "table", tile: { x: 40, y: 20 }, useTile: { x: 38, y: 21 } }),
-  createFacilityDefinition({ id: "home-cutting-table-01", type: "cutting-table", tile: { x: 26, y: 12 }, useTile: { x: 27, y: 13 }, editable: false }),
-  createFacilityDefinition({ id: "home-gas-stove-01", type: "gas-stove", tile: { x: 29, y: 12 }, useTile: { x: 30, y: 13 }, editable: false }),
-  createFacilityDefinition({ id: "home-serving-table-01", type: "serving-table", tile: { x: 35, y: 12 }, useTile: { x: 36, y: 13 }, editable: false }),
+  createFacilityDefinition({ id: "home-shower-01", type: "shower", tile: { x: 27, y: 20 }, useTile: { x: 29, y: 21 } }),
+  createFacilityDefinition({ id: "home-toilet-01", type: "toilet", tile: { x: 33, y: 20 }, useTile: { x: 35, y: 21 } }),
+  createFacilityDefinition({ id: "home-table-01", type: "table", tile: { x: 36, y: 26 }, useTile: { x: 34, y: 27 } }),
+  createFacilityDefinition({ id: "home-cutting-table-01", type: "cutting-table", tile: { x: 29, y: 21 }, useTile: { x: 30, y: 22 }, editable: false }),
+  createFacilityDefinition({ id: "home-gas-stove-01", type: "gas-stove", tile: { x: 31, y: 20 }, useTile: { x: 32, y: 21 }, editable: false }),
+  createFacilityDefinition({ id: "home-serving-table-01", type: "serving-table", tile: { x: 33, y: 26 }, useTile: { x: 34, y: 27 }, editable: false }),
 ]);
 
 export function preloadFacilityAssets(scene, baseUrl = import.meta.env.BASE_URL) {

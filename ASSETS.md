@@ -164,3 +164,13 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
 | `NestledBurrow_Toilet.png` | 2,433 | `09634a14f5b7bac4327c698f910994e7cce4fd21f37a7c4a7be80dbbbb4ce2b7` |
 | `NestledBurrow_Bathtub.png` | 4,534 | `afe4fee0f9100bfd23435a178ceaa4249be3afa5ef929e73b061f10789b637ff` |
 | `NestledBurrow_DiningTableFeast.png` | 4,101 | `5d26b665750241e94cfcc313e20385b5bb26c734fd663b7b559af626d3dd1316` |
+
+## Project-authored tavern sign
+
+- **Provenance:** generated for Task #039 with OpenAI image generation from the user's art direction, then accepted by the user in the playable preview.
+- **Runtime file:** `public/assets/project/facilities/NestledBurrow_TavernSign.png`.
+- **Runtime role:** two-frame open/closed tavern advertising sign spritesheet.
+- **Geometry:** 64×32 PNG; two horizontal 32×32 frames aligned to the 16 px world grid.
+- **Byte length:** `2,981`.
+- **SHA-256:** `47b15a21480a0096e4541900425dd0d870d9f50d1401d12832a6828abeaef154`.
+- **Integrity check:** `scripts/check-guest.mjs` verifies the committed dimensions and exact bytes.

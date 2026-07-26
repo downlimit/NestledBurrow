@@ -79,11 +79,12 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   expect(afterSecond.gameplay.currentEnergy).toBeLessThanOrEqual(afterFirst.gameplay.currentEnergy);
   expect(afterSecond.gameplay.resourceNodes["yard-ruby-01"].progress).toBe(afterFirst.gameplay.resourceNodes["yard-ruby-01"].progress);
 
+  await bridge(page, "setEnergy", 20);
   await placeNear(page, "home-bed-01");
   await bridge(page, "interact");
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: true, timeScale: 32 });
   await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { prompt: "hud:interaction.wake" } });
-  await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ x: 520, y: 231, angle: -90, textureKey: "tile_0269" });
+  await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ x: 520, y: 327, angle: -90, textureKey: "tile_0269" });
   await bridge(page, "wakeUp");
 
   const canvas = await page.locator("canvas").boundingBox();

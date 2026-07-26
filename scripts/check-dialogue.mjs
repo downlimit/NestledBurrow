@@ -95,9 +95,15 @@ placeNear("home-npc");
 completeCurrentDialogue();
 assert.equal(saves.length, 3, "repeat dialogue does not write unchanged progress");
 assert.deepEqual(JSON.parse(JSON.stringify(session)), session, "session remains JSON serializable after full loop");
+const presenterHidesBeforeDestroy = { prompts: presenter.hiddenPrompts, dialogues: presenter.hiddenDialogues };
 runtime.destroy();
 runtime.destroy();
 assert.equal(runtime.getCurrentCandidate(), null, "destroy is idempotent");
+assert.deepEqual(
+  { prompts: presenter.hiddenPrompts, dialogues: presenter.hiddenDialogues },
+  presenterHidesBeforeDestroy,
+  "runtime teardown releases its presenter without redrawing scene-owned HUD objects",
+);
 
 const wakePresenter = {
   messages: [],

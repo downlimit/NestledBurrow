@@ -13,6 +13,7 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     labelKey: "hud:buildMode.groups.tools",
     items: Object.freeze([
       Object.freeze({ id: "demolish", mode: "demolish", icon: "demolish", labelKey: "hud:buildMode.assets.demolish" }),
+      Object.freeze({ id: "move", mode: "move", icon: "move", labelKey: "hud:buildMode.assets.move" }),
     ]),
   }),
   Object.freeze({

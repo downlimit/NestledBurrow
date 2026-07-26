@@ -19,7 +19,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const fresh = createFreshGameSessionState();
 assert.deepEqual(fresh.gameplay.kitchen, DEFAULT_KITCHEN_STATE, "fresh game starts with the canonical kitchen stock");
 assert.equal(fresh.version, SESSION_STATE_VERSION);
-assert.equal(SAVE_SCHEMA_VERSION, 4);
+assert.equal(SAVE_SCHEMA_VERSION, 6);
 
 const legacyState = clone(fresh);
 legacyState.version = 3;
@@ -46,7 +46,7 @@ successStep.markerPosition = successStep.targetPosition + successStep.targetWidt
 const success = attemptCookingStep(successStep, () => 0.25);
 assert.equal(success.status, "success");
 assert.equal(success.activeStep.combo, 1);
-assert.equal(success.activeStep.remainingSeconds, 66);
+assert.equal(success.activeStep.remainingSeconds, COOKING_MINIGAME_CONFIG.durationSeconds - 3);
 assert(success.activeStep.targetWidth < COOKING_MINIGAME_CONFIG.initialTargetWidth, "success shrinks the target");
 assert(success.activeStep.targetPosition >= 0 && success.activeStep.targetPosition + success.activeStep.targetWidth <= 1, "target remains contained");
 
@@ -63,7 +63,7 @@ assert.equal(miss.activeStep.targetPosition, missStep.targetPosition, "miss keep
 let minimumStep = createCookingStep(COOKING_STEP_TYPES.frying, () => 0);
 for (let index = 0; index < 20; index += 1) {
   minimumStep.markerPosition = minimumStep.targetPosition + minimumStep.targetWidth / 2;
-  minimumStep.remainingSeconds = 69;
+  minimumStep.remainingSeconds = COOKING_MINIGAME_CONFIG.durationSeconds;
   minimumStep = attemptCookingStep(minimumStep, () => 0).activeStep;
 }
 assert.equal(minimumStep.targetWidth, COOKING_MINIGAME_CONFIG.minimumTargetWidth, "target width respects its minimum");

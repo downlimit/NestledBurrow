@@ -18,7 +18,7 @@ const FIELDS = Object.freeze([
 export function loadMovementDebugConfig() { return {}; }
 
 export class MovementDebugPanel {
-  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
+  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
     this.enabled = Boolean(enabled);
     this.gameplayTuning = gameplayTuning;
     this.onGameplayTuningChange = onGameplayTuningChange;
@@ -61,9 +61,52 @@ export class MovementDebugPanel {
     this.status.className = "movement-debug-status";
     panel.append(this.status);
 
+    const colliderLabel = documentRef.createElement("label");
+    const colliderName = documentRef.createElement("span");
+    colliderName.textContent = "Показывать коллайдеры";
+    const colliderCheckbox = documentRef.createElement("input");
+    colliderCheckbox.type = "checkbox";
+    colliderCheckbox.addEventListener("change", () => onColliderVisibilityChange(Boolean(colliderCheckbox.checked)));
+    colliderLabel.append(colliderName, colliderCheckbox);
+    panel.append(colliderLabel);
+    this.colliderCheckbox = colliderCheckbox;
+
+    const colliderEditLabel = documentRef.createElement("label");
+    const colliderEditName = documentRef.createElement("span");
+    colliderEditName.textContent = "Редактировать коллайдеры";
+    const colliderEditCheckbox = documentRef.createElement("input");
+    colliderEditCheckbox.type = "checkbox";
+    colliderEditCheckbox.addEventListener("change", () => {
+      const active = Boolean(colliderEditCheckbox.checked);
+      if (active && !colliderCheckbox.checked) {
+        colliderCheckbox.checked = true;
+        onColliderVisibilityChange(true);
+      }
+      this.colliderEditor.hidden = !active;
+      onColliderEditModeChange(active);
+    });
+    colliderEditLabel.append(colliderEditName, colliderEditCheckbox);
+    panel.append(colliderEditLabel);
+    this.colliderEditCheckbox = colliderEditCheckbox;
+
+    const colliderEditor = documentRef.createElement("div");
+    colliderEditor.className = "collider-debug-editor";
+    colliderEditor.hidden = true;
+    const colliderEditorStatus = documentRef.createElement("output");
+    colliderEditorStatus.textContent = "Кликните по объекту";
+    colliderEditor.append(colliderEditorStatus);
+    const colliderConfirm = documentRef.createElement("button");
+    colliderConfirm.type = "button";
+    colliderConfirm.textContent = "Подтвердить";
+    colliderConfirm.addEventListener("click", onColliderDraftConfirm);
+    colliderEditor.append(colliderConfirm);
+    panel.append(colliderEditor);
+    this.colliderEditor = colliderEditor;
+    this.colliderEditorStatus = colliderEditorStatus;
+
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
-    for (const [label, handler] of [["Сбросить баланс-забег", onResetBalanceRun], ["Восполнить энергию", onRefillEnergy], ["Вернуть значения по умолчанию", () => this.resetDefaults()]]) {
+    for (const [label, handler] of [["Сбросить баланс-забег", onResetBalanceRun], ["Восполнить энергию", onRefillEnergy], ["Добавить готовое блюдо", onAddCookedDish], ["Вернуть значения по умолчанию", () => this.resetDefaults()]]) {
       const button = documentRef.createElement("button");
       button.type = "button";
       button.textContent = label;
@@ -132,11 +175,20 @@ export class MovementDebugPanel {
     this.status.textContent = [`время ${snapshot.clock ?? "--:--"}`, `энергия ${Math.floor(snapshot.energy ?? 0)}`, `малые брёвна ${snapshot.smallLogsCleared ?? 0}`, `дерево ${snapshot.wood ?? 0} камень ${snapshot.stone ?? 0} рубины ${snapshot.rubies ?? 0}`].join("\n");
   }
 
+  setColliderEditorState(state) {
+    if (!this.colliderEditorStatus) return;
+    this.colliderEditorStatus.textContent = state?.id
+      ? `${state.id}\n${Math.round(state.width)} × ${Math.round(state.height)} px`
+      : "Кликните по объекту";
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
     this.toggleButton?.remove(); this.panel?.remove(); this.inputs.clear();
     this.toggleButton = null; this.panel = null; this.status = null;
+    this.colliderCheckbox = null;
+    this.colliderEditCheckbox = null; this.colliderEditor = null; this.colliderEditorStatus = null;
   }
 }
 

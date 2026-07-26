@@ -11,7 +11,7 @@ export const DEFAULT_KITCHEN_STATE = Object.freeze({
 });
 
 export const COOKING_MINIGAME_CONFIG = Object.freeze({
-  durationSeconds: 69,
+  durationSeconds: 45,
   markerSpeedPerSecond: 0.72,
   initialTargetWidth: 0.24,
   minimumTargetWidth: 0.08,

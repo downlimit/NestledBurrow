@@ -155,8 +155,6 @@ export function createInteractionRuntime({
       if (destroyed) return;
       destroyed = true;
       currentCandidate = null;
-      presenter?.hidePrompt?.();
-      presenter?.hideDialogue?.();
       presenter = null;
       characterSystem = null;
       sessionState = null;

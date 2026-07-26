@@ -127,6 +127,16 @@ function overlaps(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
+function applyColliderOverride(base, offsets) {
+  if (!offsets) return Object.freeze({ ...base });
+  return Object.freeze({
+    left: base.left + offsets.left,
+    right: base.right + offsets.right,
+    top: base.top + offsets.top,
+    bottom: base.bottom + offsets.bottom,
+  });
+}
+
 function addTree(tiles, blocked, x, y, variant) {
   const base = variant * 3;
   const depth = 500 + (y + 4) * TILE_SIZE;
@@ -161,6 +171,9 @@ export function createWorldLayout() {
   const decorationTiles = [];
   const blocked = new Set();
   const resourceColliders = new Map();
+  const baseResourceColliders = new Map();
+  const resourceColliderGroups = new Map();
+  const colliderOverrides = new Map();
   const houseGeometry = createHouseGeometry();
   const originalWallEdges = new Map(houseGeometry.wallEdges.map((edge) => [edge.id, edge]));
   const wallEdges = new Map(houseGeometry.wallEdges.map((edge) => [edge.id, edge]));
@@ -216,12 +229,40 @@ export function createWorldLayout() {
     houseFootprint: houseGeometry.footprint,
     wallEdges: houseGeometry.wallEdges,
     get wallColliders() { return [...wallColliders.values()].map(({ rect }) => rect); },
+    get objectColliders() { return [...resourceColliders.values()]; },
+    getWorldObjectColliders() {
+      return [...resourceColliders].map(([id, rect]) => ({
+        id,
+        groupKey: resourceColliderGroups.get(id) ?? id,
+        rect,
+        base: baseResourceColliders.get(id) ?? rect,
+      }));
+    },
     doorway: houseGeometry.doorway,
-    setResourceCollider(id, rect) { resourceColliders.set(id, Object.freeze({ ...rect })); },
-    clearResourceCollider(id) { resourceColliders.delete(id); },
+    setResourceCollider(id, rect, groupKey = id) {
+      const base = Object.freeze({ ...rect });
+      baseResourceColliders.set(id, base);
+      resourceColliderGroups.set(id, groupKey);
+      resourceColliders.set(id, applyColliderOverride(base, colliderOverrides.get(groupKey)));
+    },
+    clearResourceCollider(id) { baseResourceColliders.delete(id); resourceColliderGroups.delete(id); resourceColliders.delete(id); },
     getResourceCollider(id) { return resourceColliders.get(id) ?? null; },
-    setWorldObjectCollider(id, rect) { resourceColliders.set(id, Object.freeze({ ...rect })); },
-    clearWorldObjectCollider(id) { resourceColliders.delete(id); },
+    setWorldObjectCollider(id, rect, groupKey = id) { this.setResourceCollider(id, rect, groupKey); },
+    clearWorldObjectCollider(id) { this.clearResourceCollider(id); },
+    setColliderOverride(groupKey, offsets) {
+      const normalized = Object.freeze({
+        left: Number(offsets?.left) || 0,
+        right: Number(offsets?.right) || 0,
+        top: Number(offsets?.top) || 0,
+        bottom: Number(offsets?.bottom) || 0,
+      });
+      colliderOverrides.set(groupKey, normalized);
+      for (const [id, base] of baseResourceColliders) {
+        if (resourceColliderGroups.get(id) === groupKey) {
+          resourceColliders.set(id, applyColliderOverride(base, normalized));
+        }
+      }
+    },
     removeWallEdges(ids) {
       const removed = new Set(ids);
       for (const id of ids) {
