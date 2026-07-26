@@ -90,4 +90,8 @@ Strict lane нужен для persistence/schema migration, central state owners
 
 ## Пользовательские файлы
 
-Для внешнего бинарника Лид следует `BINARY_IMPORT.md`: проверяет attachment, импортирует фактический runtime-файл и передаёт Codex точный путь. Остальные задачи не читают binary-import инфраструктуру.
+Если пользователь просит «ссылку на заливку», Лид сразу отвечает этой ссылкой без повторного поиска:
+
+[Загрузить файлы в `asset-inbox/incoming`](https://github.com/downlimit/NestledBurrow/upload/asset-inbox/incoming)
+
+Для внешнего бинарника Лид следует `BINARY_IMPORT.md`: проверяет attachment, импортирует фактический runtime-файл и передаёт Codex точный путь. После подтверждённой browser-загрузки и просьбы использовать файл в задаче Лид сам переносит тот же Git blob в каноническую runtime-папку и даёт ему имя по конвенции соседних assets того же типа; исходное случайное имя upload-файла не становится runtime-именем. Остальные задачи не читают binary-import инфраструктуру.
