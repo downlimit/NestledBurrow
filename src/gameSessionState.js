@@ -4,7 +4,7 @@ import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, adv
 import { DEFAULT_NEEDS, normalizeNeeds } from "./needsDomain.js";
 import { normalizeKitchenState } from "./cookingDomain.js";
 
-export const SESSION_STATE_VERSION = 4;
+export const SESSION_STATE_VERSION = 6;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
@@ -140,7 +140,15 @@ function normalizeGameplayState(value = {}) {
     worldTimeSeconds,
     needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
     kitchen: normalizeKitchenState(value.kitchen ?? {}),
+    tavernOpen: normalizeBoolean(value.tavernOpen, false, "Tavern open"),
+    coins: normalizeNonNegativeInteger(value.coins, 0, "Coins"),
   };
+}
+
+function normalizeBoolean(value, fallback, label) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+  return value;
 }
 
 function normalizeNonNegativeNumber(value, fallback, label) {

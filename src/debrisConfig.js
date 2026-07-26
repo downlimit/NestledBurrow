@@ -13,7 +13,7 @@ export const BED_ASSET = Object.freeze({
 });
 export const BED_OBJECT = Object.freeze({
   id: BED_OBJECT_ID, entityId: BED_OBJECT_ID, roomId: "home", kind: BED_INTERACTION_KIND,
-  position: Object.freeze({ x: 32 * TILE_SIZE + TILE_SIZE / 2, y: 14 * TILE_SIZE + TILE_SIZE / 2 }),
+  position: Object.freeze({ x: 32 * TILE_SIZE + TILE_SIZE / 2, y: 20 * TILE_SIZE + TILE_SIZE / 2 }),
   radius: 26, priority: 2, requiresFacing: true, facingDotThreshold: -0.2,
   prompt: "hud:interaction.sleep", payload: Object.freeze({ bedId: BED_OBJECT_ID }),
 });

@@ -7,6 +7,8 @@ import {
 } from "../src/movementDebugPanel.js";
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "../src/movementConfig.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
+import { COLLIDER_DEBUG_STORAGE_KEY, loadColliderDebugOverrides, saveColliderDebugOverrides } from "../src/colliderDebugOverrides.js";
+import { getColliderResizeEdges, resizeColliderDraft } from "../src/colliderResize.js";
 
 class EventTargetStub {
   constructor() {
@@ -310,6 +312,10 @@ let storage = createStorage();
 let gameplayTuning = { maximumEnergy: 100, axeDamage: 1, smallLogChopHp: 7, energyPerHit: 1, awakeDrainAmount: 0.5, awakeWalkDrainAmount: 1.5, awakeRunDrainAmount: 3, universalHitCooldownSeconds: 0.66, minimumFatigueSpeedMultiplier: 0.25, sleepTimeScale: 32, sleepEnergyPerGameHour: 12.5, realSecondsPerGameDay: 1440 };
 let changeCalls = 0;
 let resetCalls = 0;
+let addCookedDishCalls = 0;
+let colliderVisibility = null;
+let colliderEditMode = null;
+let colliderConfirmCalls = 0;
 let panel = new MovementDebugPanel({ enabled: false, gameplayTuning, documentRef: documentStub, storage });
 assert.equal(documentStub.body.children.length, 0, "disabled debug controls are absent");
 assert.deepEqual(loadMovementDebugConfig({ enabled: true, storage }), {}, "legacy movement overrides are no longer exposed");
@@ -319,6 +325,10 @@ panel = new MovementDebugPanel({
   enabled: true, gameplayTuning, documentRef: documentStub, storage,
   onGameplayTuningChange: () => changeCalls++,
   onResetBalanceRun: () => resetCalls++,
+  onAddCookedDish: () => addCookedDishCalls++,
+  onColliderVisibilityChange: (visible) => { colliderVisibility = visible; },
+  onColliderEditModeChange: (active) => { colliderEditMode = active; },
+  onColliderDraftConfirm: () => { colliderConfirmCalls += 1; },
   getStatusSnapshot: () => ({ clock: "06:00", energy: 100, smallLogsCleared: 2, wood: 2, stone: 1, rubies: 0 }),
 });
 assert.equal(documentStub.body.children.length, 2, "enabled debug creates a toggle and panel");
@@ -340,6 +350,27 @@ assert(panel.status.textContent.includes("время 06:00") && panel.status.tex
 const resetButton = panel.panel.children.at(-1).children[0];
 resetButton.emit("click");
 assert.equal(resetCalls, 1, "balance reset action is wired");
+const addCookedDishButton = panel.panel.children.at(-1).children[2];
+addCookedDishButton.emit("click");
+assert.equal(addCookedDishCalls, 1, "debug cooked-dish action is wired");
+panel.colliderCheckbox.checked = true;
+panel.colliderCheckbox.emit("change");
+assert.equal(colliderVisibility, true, "debug collider checkbox enables collider rendering");
+panel.colliderEditCheckbox.checked = true;
+panel.colliderEditCheckbox.emit("change");
+assert.equal(colliderEditMode, true, "collider edit checkbox enables window-style resizing");
+assert.equal(panel.colliderEditor.hidden, false);
+panel.setColliderEditorState({ id: "home-table-01", width: 47, height: 16 });
+assert(panel.colliderEditorStatus.textContent.includes("47 × 16 px"));
+panel.colliderEditor.children.at(-1).emit("click");
+assert.equal(colliderConfirmCalls, 1, "collider confirmation action is wired");
+
+assert.deepEqual(getColliderResizeEdges({ x: 10, y: 20 }, { left: 10, right: 30, top: 20, bottom: 40 }), { left: true, right: false, top: true, bottom: false }, "collider corner exposes both window resize edges");
+assert.deepEqual(resizeColliderDraft({ left: 10, right: 30, top: 20, bottom: 40 }, { left: false, right: true, top: false, bottom: true }, { x: -3, y: 2 }), { left: 10, right: 27, top: 20, bottom: 42 }, "dragging a corner resizes at one-pixel precision");
+const colliderStorage = createStorage();
+assert.equal(saveColliderDebugOverrides({ table: { left: -1, right: 2, top: 0, bottom: 1 } }, colliderStorage), true);
+assert(colliderStorage.getItem(COLLIDER_DEBUG_STORAGE_KEY));
+assert.deepEqual(loadColliderDebugOverrides(colliderStorage).table, { left: -1, right: 2, top: 0, bottom: 1 }, "collider overrides survive the next launch");
 panel.resetDefaults();
 assert.equal(gameplayTuning.smallLogChopHp, 7, "defaults restore production preset");
 const panelNode = panel.panel;

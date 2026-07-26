@@ -1,6 +1,6 @@
 import { createFreshGameSessionState, normalizeGameSessionState, SESSION_STATE_VERSION } from "./gameSessionState.js";
 
-export const SAVE_SCHEMA_VERSION = 4;
+export const SAVE_SCHEMA_VERSION = 6;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -38,6 +38,8 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 1) envelope = migrateV1Envelope(envelope);
   if (envelope.schemaVersion === 2) envelope = migrateV2Envelope(envelope);
   if (envelope.schemaVersion === 3) envelope = migrateV3Envelope(envelope);
+  if (envelope.schemaVersion === 4) envelope = migrateV4Envelope(envelope);
+  if (envelope.schemaVersion === 5) envelope = migrateV5Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -54,6 +56,8 @@ const migrationRegistry = new Map([
   [1, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [2, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [3, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [4, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [5, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -96,6 +100,24 @@ function migrateV3Envelope(envelope) {
     cookedDishes: 0,
     servingTableHasDish: false,
   };
+  state.gameplay = gameplay;
+  state.version = 4;
+  return { schemaVersion: 4, state };
+}
+
+function migrateV4Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  gameplay.tavernOpen = false;
+  state.gameplay = gameplay;
+  state.version = 5;
+  return { schemaVersion: 5, state };
+}
+
+function migrateV5Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  gameplay.coins = 0;
   state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };

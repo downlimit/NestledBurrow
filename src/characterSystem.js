@@ -30,6 +30,14 @@ export class CharacterSystem {
     return Array.from(this.charactersById.values());
   }
 
+  remove(id) {
+    const character = this.charactersById.get(id);
+    if (!character) return false;
+    this.charactersById.delete(id);
+    character.destroy?.();
+    return true;
+  }
+
   getSnapshot(id) {
     return this.require(id).getSnapshot();
   }

@@ -166,6 +166,7 @@ export function createGameHud(scene, options) {
     createText(scene, { fontSize: "7px" }),
     createText(scene, { fontSize: "7px" }),
     createText(scene, { fontSize: "7px" }),
+    createText(scene, { fontSize: "7px" }),
   ];
   const needTooltipText = createText(scene, { fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } });
   const woodIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
@@ -334,12 +335,13 @@ export function createGameHud(scene, options) {
       ["raw", kitchen.rawPotatoes],
       ["prepared", kitchen.preparedPotatoes],
       ["dishes", kitchen.cookedDishes],
+      ["coins", gameplay.coins],
     ];
     rows.forEach(([key, value], index) => {
-      setManagedTextStyle(kitchenTexts[index], scene, textStyle({ fontSize: "7px" }))
+      setManagedTextStyle(kitchenTexts[index], scene, textStyle({ fontSize: "6px" }))
         .setText(`${localization.t(`hud:kitchen.${key}`)} ${Number(value) || 0}`)
         .setVisible(true)
-        .setPosition(KITCHEN_HUD_AREA.x + 5, KITCHEN_HUD_AREA.y + 2 + index * 9);
+        .setPosition(KITCHEN_HUD_AREA.x + 5, KITCHEN_HUD_AREA.y + 1 + index * 7);
     });
   }
 

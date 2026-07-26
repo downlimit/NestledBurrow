@@ -18,6 +18,7 @@ for (const locale of ["en", "ru"]) {
     assert.deepEqual(getUnsupportedGlyphs(value), [], `${locale} build-mode text has complete pixel glyph coverage: ${value}`);
   }
 }
+assert.deepEqual(getUnsupportedGlyphs("... :D :( >:["), [], "guest reactions have complete pixel glyph coverage");
 assert(helper.includes('scene.scale?.on?.("resize", refresh)'), "resize refreshes managed text resolution");
 assert(helper.includes('addEventListener?.("fullscreenchange", refresh)'), "fullscreen changes refresh managed text resolution");
 assert(helper.includes("Math.trunc"), "text resolution and coordinates use integers");
@@ -106,8 +107,11 @@ for (const sample of [
 
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
+const main = readFileSync("src/main.js", "utf8");
 assert(gameHud.includes("createManagedText"), "HUD text surfaces use shared text resolution contract");
 assert(interactionHud.includes("createManagedText"), "dialogue and interaction text surfaces use shared text resolution contract");
+assert(main.includes("const reaction = createManagedText"), "guest reactions use the shared pixel text renderer");
+assert(main.includes("drawPixelThumb") && !main.includes("Segoe UI Emoji"), "meal-complete feedback uses a custom pixel thumb without OS emoji rasterization");
 assert(interactionHud.includes("speakerText") && interactionHud.includes("bodyText") && interactionHud.includes("promptText"), "dialogue speaker, body and prompt text surfaces are covered");
 assert(gameHud.includes("confirmMessageText") && gameHud.includes("soundTexts"), "confirmation modal and sound panel text surfaces are covered");
 

@@ -99,3 +99,18 @@ canvas {
   grid-template-columns: 1fr;
   gap: 6px;
 }
+
+.collider-debug-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.collider-debug-editor[hidden] {
+  display: none;
+}
+
+.collider-debug-editor output,
+.collider-debug-editor button:last-child {
+  grid-column: 1 / -1;
+}

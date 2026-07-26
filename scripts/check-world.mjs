@@ -182,6 +182,19 @@ assert.equal(
 );
 
 const editableLayout = createWorldLayout();
+editableLayout.setWorldObjectCollider("debug-object", { left: 20, right: 36, top: 20, bottom: 36 }, "debug:asset");
+editableLayout.setWorldObjectCollider("debug-object-neighbor", { left: 60, right: 76, top: 20, bottom: 36 }, "debug:asset");
+editableLayout.setColliderOverride("debug:asset", { left: -1, right: 2, top: 0, bottom: 1 });
+assert.deepEqual(editableLayout.getWorldObjectColliders().find(({ id }) => id === "debug-object").rect, { left: 19, right: 38, top: 20, bottom: 37 }, "confirmed collider overrides update live world collision");
+assert.deepEqual(editableLayout.getWorldObjectColliders().find(({ id }) => id === "debug-object-neighbor").rect, { left: 59, right: 78, top: 20, bottom: 37 }, "one asset-profile edit immediately updates every existing instance");
+editableLayout.clearWorldObjectCollider("debug-object");
+editableLayout.setWorldObjectCollider("debug-object", { left: 40, right: 56, top: 40, bottom: 56 }, "debug:asset");
+assert.deepEqual(editableLayout.getWorldObjectColliders().find(({ id }) => id === "debug-object").rect, { left: 39, right: 58, top: 40, bottom: 57 }, "collider override follows an object after it moves");
+editableLayout.setWorldObjectCollider("debug-object-future", { left: 80, right: 96, top: 40, bottom: 56 }, "debug:asset");
+assert.deepEqual(editableLayout.getWorldObjectColliders().find(({ id }) => id === "debug-object-future").rect, { left: 79, right: 98, top: 40, bottom: 57 }, "future instances inherit their asset-profile collider override");
+editableLayout.clearWorldObjectCollider("debug-object");
+editableLayout.clearWorldObjectCollider("debug-object-neighbor");
+editableLayout.clearWorldObjectCollider("debug-object-future");
 const removableEdge = editableLayout.wallEdges.find((edge) => edge.side === "left" && edge.index === 5);
 const removablePoint = {
   x: editableLayout.houseFootprint.left - footWidth / 2,

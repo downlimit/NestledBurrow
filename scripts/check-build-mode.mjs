@@ -74,6 +74,9 @@ const demolitions = [];
 const previews = [];
 const previewClears = [];
 const demolitionPreviews = [];
+const moves = [];
+const movePreviews = [];
+const moveHovers = [];
 const actionEvents = [];
 let undoCount = 0;
 let activationAllowed = true;
@@ -89,6 +92,10 @@ const runtime = new BuildModeRuntime(scene, {
   onPreview: (item, points) => previews.push({ item, points }),
   onPreviewClear: () => previewClears.push(true),
   onDemolitionPreview: (point) => demolitionPreviews.push(point),
+  onMoveStart: (point) => ({ status: "picked", target: { id: "movable-bed", point } }),
+  onMove: (target, point) => moves.push({ target, point }),
+  onMovePreview: (target, point) => movePreviews.push({ target, point }),
+  onMoveHover: (point) => moveHovers.push(point),
   onActionBegin: (type) => actionEvents.push(`begin:${type}`),
   onActionEnd: () => actionEvents.push("end"),
   isActivationAllowed: () => activationAllowed,
@@ -190,10 +197,20 @@ scene.input.emit("pointermove", { x: 220, worldX: 49, worldY: 50, isDown: true }
 assert.equal(demolitions[1].onlyType, "wall", "demolition drag locks to the first removed object type");
 scene.input.emit("pointerup", {});
 function selectLibraryItem(entry) {
-  const pointer = { x: entry.x + 1, y: entry.baseY + 1, id: 3, event: { timeStamp: 10 } };
+  runtime.setScrollOffset(Math.max(0, entry.baseY - 140));
+  const pointer = { x: entry.x + 1, y: entry.baseY - runtime.getState().scrollOffset + 1, id: 3, event: { timeStamp: 10 } };
   scene.input.emit("pointerdown", pointer);
   scene.input.emit("pointerup", pointer);
 }
+const moveEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "move");
+selectLibraryItem(moveEntry);
+scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
+assert.deepEqual(moveHovers.at(-1), { x: 32, y: 48, rawX: 35, rawY: 50 }, "move hover searches only for movable objects");
+scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+assert.deepEqual(movePreviews.at(-1).point, { x: 64, y: 80, rawX: 67, rawY: 82 }, "move drag previews the snapped destination");
+scene.input.emit("pointerup", {});
+assert.deepEqual(moves.at(-1).point, { x: 64, y: 80, rawX: 67, rawY: 82 }, "move drag commits once on release");
 const pathEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "path");
 selectLibraryItem(pathEntry);
 assert.equal(runtime.getState().selectedId, "path", "library selection is explicit");
@@ -283,14 +300,17 @@ assert.equal(runtime.closeButton.destroyed, true);
 const editableWorld = createWorldLayout();
 const facilityRuntime = createFacilityRuntime(scene, { worldLayout: editableWorld });
 assert.equal(facilityRuntime.getDefinitions().length, 6);
-const placedFacility = facilityRuntime.add("table", { x: 480, y: 320 });
+const placedFacility = facilityRuntime.add("table", { x: 640, y: 400 });
 assert(placedFacility, "furniture placement creates a live facility");
 assert.equal(facilityRuntime.getDefinitions().length, 7);
-assert.equal(editableWorld.isBlockedBox({ left: 480, right: 512, top: 320, bottom: 352 }), true, "placed furniture registers collision");
-assert.equal(facilityRuntime.removeAt({ x: 480, y: 320 }), true, "demolition removes placed furniture");
+assert.equal(editableWorld.isBlockedBox({ left: 640, right: 672, top: 400, bottom: 432 }), true, "placed furniture registers collision");
+assert.equal(facilityRuntime.removeAt({ x: 640, y: 400 }), true, "demolition removes placed furniture");
 assert.equal(facilityRuntime.getDefinitions().length, 6);
 assert.equal(facilityRuntime.restore(placedFacility), true, "undo can restore demolished furniture with the same definition");
 assert.equal(facilityRuntime.getDefinitions().length, 7);
+const movedFacility = facilityRuntime.move(placedFacility.id, { x: 640, y: 368 });
+assert(movedFacility && facilityRuntime.getDefinition(placedFacility.id).footprint.y === 368, "move relocates furniture without cloning its ID");
+assert.equal(facilityRuntime.replace(movedFacility.previous), true, "move undo restores the original furniture position");
 facilityRuntime.destroy();
 
 console.log("build mode checks passed: Tab toggle, crisp managed text, scrolling, explicit wall gestures, undo, demolition, 16 px grid, lifecycle and cleanup");

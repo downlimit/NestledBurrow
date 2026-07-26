@@ -36,7 +36,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
       right: definition.cell.x * PLACEMENT_CELL_SIZE + width - rightInset,
       top: definition.cell.y * PLACEMENT_CELL_SIZE + topInset,
       bottom: definition.cell.y * PLACEMENT_CELL_SIZE + height,
-    });
+    }, `resource:${definition.profileId}`);
   };
 
   function createVisual(definition) {
@@ -85,7 +85,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
 
   function createBed(definition) {
     const bounds = bedBounds(definition);
-    worldLayout.setWorldObjectCollider(definition.id, bounds);
+    worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed");
     const graphics = scene.add.graphics().setPosition(bounds.left, bounds.top).setDepth(500 + definition.position.y);
     drawBed(graphics);
     bedDefinitions.set(definition.id, definition);
@@ -116,6 +116,26 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     if (!definition || bedDefinitions.has(definition.id) || worldLayout.isBlockedBox(bedBounds(definition))) return false;
     createBed(definition);
     return true;
+  }
+
+  function replaceBed(definition) {
+    if (!definition) return false;
+    const previous = bedDefinitions.get(definition.id);
+    if (previous && !removeBed(previous.id)) return false;
+    if (restoreBed(definition)) return true;
+    if (previous) restoreBed(previous);
+    return false;
+  }
+
+  function moveBed(id, point) {
+    const previous = bedDefinitions.get(id);
+    if (!previous || sleeping) return null;
+    const current = Object.freeze({
+      ...previous,
+      position: Object.freeze({ x: point.x + 8, y: point.y + 8 }),
+      wakePosition: Object.freeze({ x: point.x + 8, y: point.y + TILE_SIZE + 8 }),
+    });
+    return replaceBed(current) ? { previous, current } : null;
   }
 
   function getBedDemolitionTargetAt(point) {
@@ -167,6 +187,8 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     removeBed,
     removeBedAt,
     restoreBed,
+    replaceBed,
+    moveBed,
     getBedDefinitionAt,
     getBedDemolitionTargetAt,
     isPresent(id) { const definition = RESOURCE_OBJECTS.find((item) => item.id === (id ?? RESOURCE_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },

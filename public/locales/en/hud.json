@@ -22,6 +22,7 @@
     },
     "assets": {
       "demolish": "Demolish",
+      "move": "Move",
       "grass": "Grass",
       "path": "Path",
       "parquet": "Parquet",
@@ -60,7 +61,9 @@
     "noRawPotatoes": "No raw potatoes",
     "noPreparedPotatoes": "No prepared potatoes",
     "noCookedDish": "No cooked dish",
-    "servingTableOccupied": "Serving table occupied"
+    "servingTableOccupied": "Serving table occupied",
+    "openTavern": "Open tavern",
+    "closeTavern": "Close tavern"
   },
   "progress": {
     "newGame": "New game",
@@ -81,6 +84,7 @@
     "raw": "RAW",
     "prepared": "PREP",
     "dishes": "DISH",
+    "coins": "COIN",
     "facilities": {
       "cuttingTable": "Cutting table",
       "gasStove": "Gas stove",

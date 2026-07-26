@@ -46,11 +46,14 @@ import {
 import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
+import { createManagedText } from "./textResolution.js";
 import { createAudioSettingsStore } from "./audioSettings.js";
 import { PhaserAudioRuntime, preloadMusicPlaylist } from "./audioRuntime.js";
 import { HUD_DEPTH } from "./hud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
+import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./colliderDebugOverrides.js";
+import { getColliderResizeEdges, resizeColliderDraft } from "./colliderResize.js";
 import { createBuildModeRuntime } from "./buildModeRuntime.js";
 import {
   BUILD_CARPET_FRAME_BY_MASK,
@@ -66,7 +69,7 @@ import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.
 import { DEFAULT_RESOURCE_ID, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
 import { createDebrisRuntime } from "./debrisRuntime.js";
-import { FACILITY_INTERACTION_KIND, FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
+import { FACILITY_INTERACTION_KIND, FACILITIES, PLATED_DISH_ASSET, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
 import { drawBed } from "./debrisRuntime.js";
 import { drawFacility } from "./facilityPreviewVisuals.js";
@@ -75,6 +78,11 @@ import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
 import { COOKING_STEP_TYPES, toggleServingDish } from "./cookingDomain.js";
 import { createCookingRuntime } from "./cookingRuntime.js";
+import { createCoinRuntime } from "./coinRuntime.js";
+import { createGuestController } from "./guestController.js";
+import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_KIND } from "./guestConfig.js";
+import { createGuestRuntime } from "./guestRuntime.js";
+import { createTavernSignRuntime } from "./tavernSignRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
@@ -93,6 +101,10 @@ class WorldScene extends Phaser.Scene {
   preload() {
     preloadMusicPlaylist(this, import.meta.env.BASE_URL);
     preloadFacilityAssets(this, import.meta.env.BASE_URL);
+    this.load.spritesheet(TAVERN_SIGN_ASSET.key, `${import.meta.env.BASE_URL}${TAVERN_SIGN_ASSET.path}`, {
+      frameWidth: TAVERN_SIGN_ASSET.frameWidth,
+      frameHeight: TAVERN_SIGN_ASSET.frameHeight,
+    });
     this.getUsedCharacterVisualProfiles().forEach((visualProfile) => {
       this.preloadCharacterVisualProfile(visualProfile);
     });
@@ -140,6 +152,11 @@ class WorldScene extends Phaser.Scene {
   create() {
     this.movementDebugEnabled = true;
     this.worldLayout = createWorldLayout();
+    this.colliderOverrides = migrateColliderOverrideGroups(loadColliderDebugOverrides(window.localStorage));
+    saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
+    for (const [id, offsets] of Object.entries(this.colliderOverrides)) {
+      this.worldLayout.setColliderOverride(id, offsets);
+    }
     this.characterSystem = createCharacterSystem({ collisionEnvironment: this.worldLayout });
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.renderWorld();
@@ -152,6 +169,7 @@ class WorldScene extends Phaser.Scene {
     this.createSessionAndInteractionRuntime();
     this.createDebrisRuntime();
     this.createFacilityRuntime();
+    this.createTavernRuntime();
     this.sleeping = false;
     this.exhaustedSleeping = false;
     this.isRunning = false;
@@ -346,10 +364,13 @@ class WorldScene extends Phaser.Scene {
       getStaticInteractionDefinitions: () => [
         ...(this.debrisRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.facilityRuntime?.getInteractionDefinitions?.() ?? []),
+        ...(this.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.sleeping && !this.exhaustedSleeping ? [this.getSleepingWakeInteraction()] : []),
         ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
       ],
       isInteractionAllowed: (definition) => !this.cookingRuntime?.isActive?.()
+        && !(this.facilityRuntime?.getDefinition?.(definition.payload?.facilityId)?.facilityType === "serving-table"
+          && this.guestRuntime?.isDishReserved?.())
         && (!this.facilityRuntime?.isUsing()
           || (definition.kind === FACILITY_INTERACTION_KIND && definition.id === this.facilityRuntime.getActiveId())),
       runWorldObjectInteraction: (candidate) => this.runWorldObjectInteraction(candidate),
@@ -365,10 +386,133 @@ class WorldScene extends Phaser.Scene {
     this.facilityRuntime = createFacilityRuntime(this, {
       worldLayout: this.worldLayout,
       getKitchenState: () => this.sessionState?.gameplay?.kitchen,
+      isServingDishReserved: () => this.guestRuntime?.isDishReserved?.() ?? false,
     });
   }
 
+  createTavernRuntime() {
+    this.coinRuntime = createCoinRuntime(this, {
+      getPlayerPosition: () => this.playerCharacter?.motor?.position,
+      onCollect: () => {
+        this.sessionState.gameplay.coins += 1;
+        this.gameHud?.render?.();
+        this.saveSession();
+      },
+    });
+    this.tavernSignRuntime = createTavernSignRuntime(this, {
+      getTavernOpen: () => this.sessionState?.gameplay?.tavernOpen,
+      worldLayout: this.worldLayout,
+    });
+    const actorProfile = getActorProfile(GUEST_CONFIG.profileId);
+    const visualProfile = getCharacterVisualProfile(GUEST_CONFIG.visualProfileId);
+    this.guestRuntime = createGuestRuntime({
+      config: { ...GUEST_CONFIG, createController: createGuestController },
+      worldLayout: this.worldLayout,
+      createGuest: (controller) => {
+        const character = createCharacter(this, {
+          id: GUEST_CONFIG.id,
+          spawn: GUEST_CONFIG.points.spawn,
+          controller,
+          movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
+          actorProfile,
+          visualProfile,
+        });
+        character.sprite.setTint?.(GUEST_CONFIG.tint);
+        return this.characterSystem.add(character);
+      },
+      removeGuest: (id) => this.characterSystem.remove(id),
+      getTavernOpen: () => this.sessionState.gameplay.tavernOpen,
+      getKitchenState: () => this.sessionState.gameplay.kitchen,
+      getServicePoint: () => this.facilityRuntime?.getDefinitionByType?.("serving-table")?.usePosition
+        ?? GUEST_CONFIG.points.insideDoor,
+      getSeatPoint: () => this.facilityRuntime?.getDefinitionByType?.("table")?.usePosition
+        ?? this.facilityRuntime?.getDefinitionByType?.("serving-table")?.usePosition
+        ?? GUEST_CONFIG.points.insideDoor,
+      onReservationChange: () => {
+        this.facilityRuntime?.syncKitchenVisuals?.();
+        this.interactionRuntime?.refresh?.();
+      },
+      onDishConsumed: ({ position }) => {
+        this.facilityRuntime?.syncKitchenVisuals?.();
+        this.coinRuntime?.spawn?.(position);
+        this.gameHud?.render?.();
+        this.saveSession();
+      },
+      createFeedback: (character) => this.createGuestFeedback(character),
+    });
+  }
+
+  createGuestFeedback(character) {
+    const marker = this.add.graphics().setDepth(900);
+    const reactionStyle = {
+      fontSize: "7px",
+      color: "#f7e7a1",
+    };
+    const reaction = createManagedText(this, 0, 0, "", reactionStyle).setDepth(902).setVisible(false);
+    const reactionOutline = [[-1, 0], [1, 0], [0, -1], [0, 1]].map(([x, y]) => ({
+      x, y,
+      visual: createManagedText(this, 0, 0, "", { ...reactionStyle, color: "#100b0e" })
+        .setDepth(901)
+        .setAlpha(0.72)
+        .setVisible(false),
+    }));
+    const thumb = this.add.graphics().setDepth(902).setVisible(false);
+    drawPixelThumb(thumb);
+    const carriedDish = this.add.image(0, 0, PLATED_DISH_ASSET.key)
+      .setScale(1, 0.5)
+      .setDepth(901)
+      .setVisible(false);
+    let state = "";
+    return {
+      set: (next) => {
+        state = next;
+        const reactionText = state === "checking" ? "..."
+          : state === "open-reaction" ? ":D"
+            : state === "closed-reaction" ? ":("
+              : state === "empty-reaction" ? ">:[" : "";
+        const color = ["closed-reaction", "empty-reaction"].includes(state) ? "#ef8b78" : "#f7e7a1";
+        reaction.setText(reactionText).setStyle({ color }).setVisible(Boolean(reactionText));
+        for (const outline of reactionOutline) outline.visual.setText(reactionText).setVisible(Boolean(reactionText));
+        thumb.setVisible(state === "meal-complete");
+        carriedDish.setVisible(["carrying", "eating"].includes(state));
+      },
+      update: () => {
+        const position = character.motor.position;
+        const anchorX = Math.round(position.x);
+        const anchorY = Math.round(position.y - 25);
+        const reactionX = anchorX - Math.floor(reaction.width / 2);
+        const reactionY = anchorY - reaction.height;
+        reaction.setPosition(reactionX, reactionY).setDepth(902 + Math.round(position.y));
+        for (const outline of reactionOutline) outline.visual
+          .setPosition(reactionX + outline.x, reactionY + outline.y)
+          .setDepth(901 + Math.round(position.y));
+        thumb.setPosition(anchorX - 4, anchorY - 8).setDepth(902 + Math.round(position.y));
+        carriedDish.setPosition(anchorX, Math.round(position.y - 19)).setDepth(901 + Math.round(position.y));
+        marker.clear();
+        if (["waiting", "eating"].includes(state)) {
+          const color = state === "waiting" ? 0xf3c969 : state === "eating" ? 0x8bd17c : 0xe7e1c5;
+          marker.fillStyle(color, 1).fillRect(position.x - 2, position.y - 23, 4, 2);
+          if (state === "waiting") marker.fillRect(position.x + 3, position.y - 23, 1, 1);
+        }
+      },
+      destroy: () => {
+        marker.destroy();
+        reaction.destroy();
+        for (const outline of reactionOutline) outline.visual.destroy();
+        thumb.destroy();
+        carriedDish.destroy();
+      },
+    };
+  }
+
   runWorldObjectInteraction(candidate) {
+    if (candidate.kind === TAVERN_SIGN_KIND) {
+      this.sessionState.gameplay.tavernOpen = !this.sessionState.gameplay.tavernOpen;
+      this.tavernSignRuntime?.sync?.();
+      this.interactionRuntime?.refresh?.();
+      this.suppressNextInteract = true;
+      return { status: this.sessionState.gameplay.tavernOpen ? "opened" : "closed", mutated: true };
+    }
     if (candidate.kind === FACILITY_INTERACTION_KIND) {
       const facility = this.facilityRuntime.getDefinition(candidate.payload.facilityId);
       if (facility?.facilityType === "cutting-table" || facility?.facilityType === "gas-stove") {
@@ -500,6 +644,15 @@ class WorldScene extends Phaser.Scene {
         this.gameHud?.render?.();
       },
       onRefillEnergy: () => { refillEnergy(this.sessionState); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.saveSession(); },
+      onAddCookedDish: () => {
+        this.sessionState.gameplay.kitchen.cookedDishes += 1;
+        this.gameHud?.render?.();
+        this.interactionRuntime?.refresh?.();
+        this.saveSession();
+      },
+      onColliderVisibilityChange: (visible) => this.setColliderDebugVisible(visible),
+      onColliderEditModeChange: (active) => this.setColliderEditMode(active),
+      onColliderDraftConfirm: () => this.confirmColliderDraft(),
       onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
       getStatusSnapshot: () => {
         if (!this.playerCharacter) return null;
@@ -513,10 +666,128 @@ class WorldScene extends Phaser.Scene {
         };
       },
     });
+    this.onColliderEditPointerDown = (pointer) => this.beginColliderEditPointer(pointer);
+    this.onColliderEditPointerMove = (pointer) => this.continueColliderEditPointer(pointer);
+    this.onColliderEditPointerUp = () => { this.colliderResizeDrag = null; };
+    this.input.on("pointerdown", this.onColliderEditPointerDown);
+    this.input.on("pointermove", this.onColliderEditPointerMove);
+    this.input.on("pointerup", this.onColliderEditPointerUp);
   }
 
   updateMovementDebugStatus() {
     this.movementDebugPanel?.updateStatus();
+  }
+
+  setColliderDebugVisible(visible) {
+    this.colliderDebugVisible = Boolean(visible);
+    if (!this.colliderDebugGraphics) this.colliderDebugGraphics = this.add.graphics().setDepth(8970);
+    this.colliderDebugGraphics.setVisible(this.colliderDebugVisible);
+    this.renderColliderDebug();
+  }
+
+  setColliderEditMode(active) {
+    this.colliderEditEnabled = Boolean(active);
+    if (this.colliderEditEnabled) this.setColliderDebugVisible(true);
+    else {
+      this.colliderEditSelection = null;
+      this.movementDebugPanel?.setColliderEditorState?.(null);
+      this.renderColliderDebug();
+    }
+  }
+
+  beginColliderEditPointer(pointer) {
+    if (!this.colliderEditEnabled || this.buildMode?.isActive?.()) return;
+    const point = { x: Number(pointer.worldX ?? pointer.x), y: Number(pointer.worldY ?? pointer.y) };
+    let selection = this.colliderEditSelection;
+    let edges = selection ? getColliderResizeEdges(point, selection.draft) : null;
+    if (edges) {
+      this.colliderResizeDrag = { edges, startPoint: point, startDraft: { ...selection.draft } };
+      return;
+    }
+    const entry = this.worldLayout.getWorldObjectColliders()
+      .filter(({ rect }) => point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom)
+      .sort((a, b) => ((a.rect.right - a.rect.left) * (a.rect.bottom - a.rect.top))
+        - ((b.rect.right - b.rect.left) * (b.rect.bottom - b.rect.top)))[0];
+    if (!entry) return;
+    this.colliderEditSelection = { id: entry.id, groupKey: entry.groupKey, base: { ...entry.base }, draft: { ...entry.rect } };
+    selection = this.colliderEditSelection;
+    edges = getColliderResizeEdges(point, selection.draft);
+    if (edges) this.colliderResizeDrag = { edges, startPoint: point, startDraft: { ...selection.draft } };
+    this.syncColliderEditorPanel();
+    this.renderColliderDebug();
+  }
+
+  continueColliderEditPointer(pointer) {
+    if (!this.colliderEditEnabled || !this.colliderResizeDrag || !pointer.isDown || !this.colliderEditSelection) return;
+    const point = { x: Number(pointer.worldX ?? pointer.x), y: Number(pointer.worldY ?? pointer.y) };
+    this.colliderEditSelection.draft = resizeColliderDraft(
+      this.colliderResizeDrag.startDraft,
+      this.colliderResizeDrag.edges,
+      { x: point.x - this.colliderResizeDrag.startPoint.x, y: point.y - this.colliderResizeDrag.startPoint.y },
+    );
+    this.syncColliderEditorPanel();
+    this.renderColliderDebug();
+  }
+
+  confirmColliderDraft() {
+    const selection = this.colliderEditSelection;
+    if (!selection) return { status: "empty" };
+    const offsets = {
+      left: selection.draft.left - selection.base.left,
+      right: selection.draft.right - selection.base.right,
+      top: selection.draft.top - selection.base.top,
+      bottom: selection.draft.bottom - selection.base.bottom,
+    };
+    this.colliderOverrides[selection.groupKey] = offsets;
+    this.worldLayout.setColliderOverride(selection.groupKey, offsets);
+    saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
+    this.colliderEditSelection.draft = { ...this.worldLayout.getWorldObjectColliders().find(({ id }) => id === selection.id)?.rect };
+    this.syncColliderEditorPanel();
+    this.renderColliderDebug();
+    return { status: "saved", id: selection.id };
+  }
+
+  syncColliderEditorPanel() {
+    const selection = this.colliderEditSelection;
+    this.movementDebugPanel?.setColliderEditorState?.(selection ? {
+      id: selection.groupKey,
+      width: selection.draft.right - selection.draft.left,
+      height: selection.draft.bottom - selection.draft.top,
+    } : null);
+  }
+
+  renderColliderDebug() {
+    const graphics = this.colliderDebugGraphics;
+    if (!graphics) return;
+    graphics.clear();
+    if (!this.colliderDebugVisible) return;
+    graphics.fillStyle(0xffb24d, 0.22);
+    for (const cell of this.worldLayout.blocked) {
+      const [x, y] = cell.split(",").map(Number);
+      graphics.fillRect(x * this.worldLayout.cellSize, y * this.worldLayout.cellSize, this.worldLayout.cellSize, this.worldLayout.cellSize);
+    }
+    graphics.lineStyle(1, 0xff4f63, 0.95);
+    for (const box of [...this.worldLayout.wallColliders, ...this.worldLayout.objectColliders]) {
+      graphics.strokeRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+    }
+    graphics.lineStyle(1, 0x54d8ff, 0.95);
+    for (const character of this.characterSystem?.values?.() ?? []) {
+      const box = getFootBox(character.motor.position, character.footWidth, character.footDepth);
+      graphics.strokeRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+    }
+    const draft = this.colliderEditSelection?.draft;
+    if (draft) {
+      graphics.lineStyle(1, 0x62ff91, 1);
+      graphics.strokeRect(draft.left, draft.top, draft.right - draft.left, draft.bottom - draft.top);
+      graphics.fillStyle(0x62ff91, 1);
+      for (const [x, y] of [
+        [draft.left, draft.top], [(draft.left + draft.right) / 2, draft.top], [draft.right, draft.top],
+        [draft.left, (draft.top + draft.bottom) / 2], [draft.right, (draft.top + draft.bottom) / 2],
+        [draft.left, draft.bottom], [(draft.left + draft.right) / 2, draft.bottom], [draft.right, draft.bottom],
+      ]) {
+        graphics.fillRect(x - 1, y - 1, 3, 3);
+      }
+    }
   }
 
   createHud() {
@@ -600,6 +871,13 @@ class WorldScene extends Phaser.Scene {
       worldBounds: this.worldLayout.bounds,
       onPlace: (item, point, context) => this.applyBuildPlacement(item, point, context),
       onDemolish: (point, onlyType) => this.applyBuildDemolition(point, onlyType),
+      onMoveStart: (point) => {
+        const target = this.getBuildMoveTarget(point);
+        return target ? { status: "picked", target } : { status: "ignored" };
+      },
+      onMove: (target, point) => this.applyBuildMove(target, point),
+      onMovePreview: (target, point) => this.renderBuildMovePreview(target, point),
+      onMoveHover: (point) => this.renderBuildMoveHover(point),
       onPreview: (item, points) => this.renderBuildPreview(item, points),
       onPreviewClear: () => this.clearBuildPreview(),
       onDemolitionPreview: (point) => this.renderBuildDemolitionHighlight(point),
@@ -653,6 +931,54 @@ class WorldScene extends Phaser.Scene {
     const result = this.demolishBuildObject(point, onlyType);
     this.recordBuildUndo(result?.undo);
     return result;
+  }
+
+  getBuildMoveTarget(point) {
+    const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
+    const facility = this.facilityRuntime?.getDefinitionAt?.(hitPoint);
+    if (facility) return { kind: "facility", definition: facility };
+    const bed = this.debrisRuntime?.getBedDefinitionAt?.(hitPoint);
+    return bed ? { kind: "bed", definition: bed } : null;
+  }
+
+  applyBuildMove(target, point) {
+    if (!target?.definition) return { status: "ignored" };
+    const result = target.kind === "facility"
+      ? this.facilityRuntime?.move?.(target.definition.id, point)
+      : target.kind === "bed" ? this.debrisRuntime?.moveBed?.(target.definition.id, point) : null;
+    if (!result) return { status: "blocked" };
+    this.recordBuildUndo(() => {
+      if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
+      else this.debrisRuntime?.replaceBed?.(result.previous);
+      this.facilityRuntime?.syncKitchenVisuals?.();
+      this.interactionRuntime?.refresh?.();
+    });
+    this.facilityRuntime?.syncKitchenVisuals?.();
+    this.interactionRuntime?.refresh?.();
+    return { status: "moved" };
+  }
+
+  renderBuildMovePreview(target, point) {
+    this.clearBuildPreview();
+    if (!target?.definition) return;
+    const graphics = this.add.graphics().setPosition(point.x, point.y).setDepth(8988).setAlpha(0.58);
+    if (target.kind === "bed") drawBed(graphics, 0x7dff9a);
+    else drawFacility(graphics, target.definition.facilityType, 0x7dff9a);
+    this.buildPreviewObjects.push(graphics);
+  }
+
+  renderBuildMoveHover(point) {
+    this.clearBuildPreview();
+    const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
+    const target = this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
+      ?? this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
+    if (!target) return;
+    const targets = target.targets.map((object) => ({ target: object, alpha: object.alpha ?? 1 }));
+    for (const { target: object } of targets) {
+      object.setTint?.(0x68ff8c);
+      object.setAlpha?.(0.82);
+    }
+    this.buildDemolitionHighlight = { targets, overlay: null };
   }
 
   undoBuildAction() {
@@ -930,7 +1256,8 @@ class WorldScene extends Phaser.Scene {
       for (const sprite of sprites) sprite.destroy();
       return { status: "blocked" };
     }
-    if (collider) this.worldLayout.setWorldObjectCollider(id, collider);
+    const colliderGroup = collider ? `build:${item.placement ?? item.id}` : null;
+    if (collider) this.worldLayout.setWorldObjectCollider(id, collider, colliderGroup);
     this.buildPlacedObjects.set(id, {
       id,
       kind: item.placement ?? "placed",
@@ -940,6 +1267,7 @@ class WorldScene extends Phaser.Scene {
       bounds,
       collider: Boolean(collider),
       colliderBounds: collider ? { ...collider } : null,
+      colliderGroup,
     });
     return { status: "placed", id };
   }
@@ -1054,7 +1382,7 @@ class WorldScene extends Phaser.Scene {
       return { status: "blocked" };
     }
     const id = `editor-wall-node-${++this.nextBuildObjectId}`;
-    this.worldLayout.setWorldObjectCollider(id, nodeCollider);
+    this.worldLayout.setWorldObjectCollider(id, nodeCollider, "build:wall-node");
     this.buildPlacedObjects.set(id, {
       id,
       kind: "wall-node",
@@ -1069,6 +1397,7 @@ class WorldScene extends Phaser.Scene {
       },
       collider: true,
       colliderBounds: nodeCollider,
+      colliderGroup: "build:wall-node",
       textureKey: item.textureKey,
     });
     this.buildWallNodes.set(key, id);
@@ -1092,7 +1421,7 @@ class WorldScene extends Phaser.Scene {
     if (this.buildWallEdges.has(edge)) return null;
     const { bounds, collider } = this.getBuildWallEdgeGeometry(point);
     const id = `editor-wall-${++this.nextBuildObjectId}`;
-    this.worldLayout.setWorldObjectCollider(id, collider);
+    this.worldLayout.setWorldObjectCollider(id, collider, "build:wall");
     this.buildPlacedObjects.set(id, {
       id,
       kind: "wall",
@@ -1102,6 +1431,7 @@ class WorldScene extends Phaser.Scene {
       bounds,
       collider: true,
       colliderBounds: collider,
+      colliderGroup: "build:wall",
       textureKey: item.textureKey,
     });
     this.buildWallEdges.set(edge, id);
@@ -1463,7 +1793,7 @@ class WorldScene extends Phaser.Scene {
     const restored = { ...placed, sprites: [] };
     this.buildPlacedObjects.set(restored.id, restored);
     if (restored.collider && restored.colliderBounds) {
-      this.worldLayout.setWorldObjectCollider(restored.id, restored.colliderBounds);
+      this.worldLayout.setWorldObjectCollider(restored.id, restored.colliderBounds, restored.colliderGroup ?? restored.id);
     }
     if (restored.kind === "wall") {
       this.buildWallEdges.set(this.buildWallEdgeKey(restored.point), restored.id);
@@ -1677,7 +2007,8 @@ class WorldScene extends Phaser.Scene {
         const resource = RESOURCE_OBJECTS.find((item) => item.id === entityId);
         const facility = this.facilityRuntime?.getDefinition?.(entityId);
         const bed = this.debrisRuntime?.getBedDefinition?.(entityId);
-        const target = resource ? { position: resource.position } : bed ? { position: bed.position } : facility ? { position: facility.position } : this.characterSystem.getSnapshot(entityId);
+        const sign = entityId === TAVERN_SIGN.id ? { position: TAVERN_SIGN.interactionPosition } : null;
+        const target = resource ? { position: resource.position } : bed ? { position: bed.position } : facility ? { position: facility.position } : sign ?? this.characterSystem.getSnapshot(entityId);
         const player = this.characterSystem.require(this.sessionState.playerId);
         player.motor.position = { x: target.position.x - 12, y: target.position.y };
         player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
@@ -1711,6 +2042,10 @@ class WorldScene extends Phaser.Scene {
       getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID), definitions: RESOURCE_OBJECTS, bed: this.debrisRuntime?.getBedDefinition?.() ?? null, beds: this.debrisRuntime?.getBedDefinitions?.() ?? [], wakeTile: BED_WAKE_TILE }),
       getFacilityState: () => ({ definitions: this.facilityRuntime?.getDefinitions?.() ?? FACILITIES, activeId: this.facilityRuntime?.getActiveId?.() ?? null }),
       getCookingState: () => this.cookingRuntime?.getState?.() ?? null,
+      getTavernState: () => ({ open: this.sessionState.gameplay.tavernOpen, sign: this.tavernSignRuntime?.getState?.(), guest: this.guestRuntime?.getState?.() }),
+      getCoinState: () => this.coinRuntime?.getState?.() ?? [],
+      forceGuestSpawn: () => this.guestRuntime?.forceSpawn?.(),
+      setServingDish: (present) => { this.sessionState.gameplay.kitchen.servingTableHasDish = Boolean(present); this.facilityRuntime?.syncKitchenVisuals?.(); },
       attemptCooking: () => this.cookingRuntime?.attempt?.(),
       completeCooking: () => this.cookingRuntime?.completeForTest?.(),
       alignCookingMarker: () => this.cookingRuntime?.alignMarkerForTest?.(),
@@ -1741,7 +2076,7 @@ class WorldScene extends Phaser.Scene {
       getResourceNodeState: (id) => JSON.parse(JSON.stringify(this.sessionState.gameplay.resourceNodes[id])),
       getResourceVisualState: (id) => this.debrisRuntime?.getVisualState?.(id) ?? null,
       getResourceCollider: (id) => this.worldLayout?.getResourceCollider?.(id) ?? null,
-      getCharacterSnapshot: (id) => this.characterSystem.getSnapshot(id),
+      getCharacterSnapshot: (id) => this.characterSystem.has(id) ? this.characterSystem.getSnapshot(id) : null,
       getPlayerMovementState: () => ({ targetMultiplier: this.playerCharacter?.motor?.targetSpeedMultiplier, effectiveMultiplier: this.playerCharacter?.motor?.effectiveSpeedMultiplier, runSpeedMultiplier: this.playerCharacter?.motor?.runSpeedMultiplier }),
       getPlayerVisualState: () => {
         const sprite = this.playerCharacter?.sprite;
@@ -1813,6 +2148,12 @@ class WorldScene extends Phaser.Scene {
     this.debrisRuntime = null;
     this.facilityRuntime?.destroy();
     this.facilityRuntime = null;
+    this.guestRuntime?.destroy();
+    this.guestRuntime = null;
+    this.coinRuntime?.destroy();
+    this.coinRuntime = null;
+    this.tavernSignRuntime?.destroy();
+    this.tavernSignRuntime = null;
     this.cookingRuntime?.destroy();
     this.cookingRuntime = null;
     this.interactionRuntime?.destroy();
@@ -1821,6 +2162,14 @@ class WorldScene extends Phaser.Scene {
     this.interactionHud = null;
     this.movementDebugPanel?.destroy();
     this.movementDebugPanel = null;
+    if (this.onColliderEditPointerDown) this.input.off("pointerdown", this.onColliderEditPointerDown);
+    if (this.onColliderEditPointerMove) this.input.off("pointermove", this.onColliderEditPointerMove);
+    if (this.onColliderEditPointerUp) this.input.off("pointerup", this.onColliderEditPointerUp);
+    this.onColliderEditPointerDown = null;
+    this.onColliderEditPointerMove = null;
+    this.onColliderEditPointerUp = null;
+    this.colliderDebugGraphics?.destroy();
+    this.colliderDebugGraphics = null;
     this.characterSystem?.destroy();
     this.characterSystem = null;
     this.gameHud?.destroy();
@@ -1923,7 +2272,9 @@ class WorldScene extends Phaser.Scene {
     this.setNpcAnimationTimeScale(this.simulationScale ?? 1);
     while (worldDeltaMs > 0) {
       const substepMs = Math.min(50, worldDeltaMs);
+      this.guestRuntime?.update(substepMs);
       this.characterSystem?.update(substepMs);
+      this.coinRuntime?.update(substepMs);
       worldDeltaMs -= substepMs;
     }
     this.syncFacilityPresentationPose();
@@ -1935,6 +2286,7 @@ class WorldScene extends Phaser.Scene {
     this.interactionRuntime?.update({ actions: this.frameActions });
     this.interactionHud?.setCooldownProgress?.(this.getInteractionCooldownProgress());
     this.updateMovementDebugStatus();
+    this.renderColliderDebug();
   }
 
   sampleFrameActions() {
@@ -2127,3 +2479,36 @@ async function bootstrap() {
 void bootstrap().catch((error) => {
   console.error("Failed to bootstrap NestledBurrow", error);
 });
+
+function migrateColliderOverrideGroups(overrides) {
+  const migrated = {};
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    const resource = RESOURCE_OBJECTS.find((definition) => definition.id === key);
+    const facility = FACILITIES.find((definition) => definition.id === key);
+    const groupKey = resource
+      ? `resource:${resource.profileId}`
+      : facility ? `facility:${facility.facilityType}`
+        : key === BED_OBJECT.id ? "furniture:bed"
+          : key === TAVERN_SIGN.id ? "facility:tavern-sign" : key;
+    migrated[groupKey] = value;
+  }
+  return migrated;
+}
+
+function drawPixelThumb(graphics) {
+  const pattern = ["0011000", "0011000", "0011111", "1111111", "1111111", "0111110", "0011100"];
+  const pixels = new Set();
+  pattern.forEach((row, y) => [...row].forEach((value, x) => { if (value === "1") pixels.add(`${x},${y}`); }));
+  graphics.fillStyle(0x100b0e, 0.72);
+  for (const key of pixels) {
+    const [x, y] = key.split(",").map(Number);
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      if (!pixels.has(`${x + dx},${y + dy}`)) graphics.fillRect(x + dx, y + dy, 1, 1);
+    }
+  }
+  graphics.fillStyle(0xf7e7a1, 1);
+  for (const key of pixels) {
+    const [x, y] = key.split(",").map(Number);
+    graphics.fillRect(x, y, 1, 1);
+  }
+}
