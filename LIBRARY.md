@@ -3,330 +3,221 @@
 
 ## Назначение
 
-`LIBRARY.md` — необязательная карта важных адресов проекта. Она помогает найти нужную область, не читая весь репозиторий и все Markdown-файлы подряд.
+`LIBRARY.md` — необязательная карта устойчивых адресов. Она помогает найти владельца системы без чтения всего репозитория. Это не источник продуктового статуса, баланса или следующей задачи.
 
-Этот файл не является обязательным входом для Лида, Интегратора или Codex.
+Новый project-чат сначала читает `PROJECT.md`. Лид затем следует `LEAD.md`, Интегратор — `REVIEW.md`, Codex — прямому prompt и `AGENTS.md`. Эта карта открывается только для поиска конкретной области.
 
-## Когда читать
+## Канонические документы
 
-- **Любой новый чат** сначала читает `PROJECT.md`.
-- **Лид** затем читает `LEAD.md` и открывает `LIBRARY.md` только когда нужно найти конкретную область проекта.
-- **Интегратор** затем читает `REVIEW.md` и открывает карту для адресов, затронутых очередью PR.
-- **Codex** сначала читает прямой промпт и `AGENTS.md`; карта нужна только когда из промпта и структуры репозитория неясно расположение системы.
-- Файл из `tasks/` читается только при прямой ссылке на него.
+| Документ | Владеет |
+|---|---|
+| `PROJECT.md` | bootstrap, роли и опубликованный технический контекст |
+| `GAME.md` | продуктовый вижн, фактическая зрелость и пользовательский verdict |
+| `ROADMAP.md` | активная/следующая работа и Task numbers |
+| `LEAD.md` | перевод замысла в компактное ТЗ и выбор Fast/Strict |
+| `ARCHITECTURE.md` | подтверждённые runtime-границы и условные точки выделения |
+| `REVIEW.md` | независимая приёмка, repair и merge нескольких/сложных PR |
+| `AGENTS.md` | исполнение Codex, preview, proportional validation и delivery |
+| `FAST_LOOP.md` | человеческие ретроспективы скорости; не обязательный контекст Codex |
+| `ASSETS.md` | provenance, лицензии, размеры и hashes runtime assets |
+| `BINARY_IMPORT.md` | Lead-owned доставка пользовательских binary blobs |
+| `tasks/*.md` | только явно указанная большая/возобновляемая задача |
 
-## Контракты документов
+Один изменяемый факт имеет одного владельца. Эта карта описывает адрес и ответственность, но не дублирует подробные правила.
 
-| Документ | Аудитория | Канонически владеет |
-|---|---|---|
-| `PROJECT.md` | все новые project-чаты | bootstrap, выбор роли, опубликованное состояние и устойчивые решения |
-| `LEAD.md` | Lead-чат | обсуждение, архитектура задач, parallel batches и Codex prompt metadata |
-| `ARCHITECTURE.md` | Lead-чат | оценка runtime-архитектуры, принятые направления и приоритетная очередь улучшений |
-| `REVIEW.md` | Integrator-чат | поиск всех PR, dependency order, ревью, repair, merge, публикация и documentation drift |
-| `AGENTS.md` | Codex | исполнение задачи, scope, checks, branch и delivery metadata |
-| `LIBRARY.md` | роли по необходимости | карта важных адресов и назначение файлов |
-| `ASSETS.md` | задачи с внешними ассетами | источники, лицензии, hashes и asset policy |
-| `tasks/*.md` | только явно указанная сложная задача | долговечный task-specific контракт |
-
-Один факт должен иметь одного канонического владельца. Другие документы ссылаются на него, а не копируют полный текст.
-
-## Управление проектом
-
-### `PROJECT.md`
-
-Общий bootstrap. Новый чат читает его первым, выбирает роль по фразе пользователя и переходит к `LEAD.md` или `REVIEW.md`.
-
-### `LEAD.md`
-
-Контракт постоянного Лида: живое обсуждение, актуализация продуктовых решений, подготовка одиночных и параллельных Codex-задач, owned/shared paths и fan-out/fan-in.
-
-### `ARCHITECTURE.md`
-
-Каноническая архитектурная оценка runtime-проекта, подтверждённые направления развития, уже реализованные архитектурные шаги и оставшаяся приоритетная очередь. Лид открывает документ перед постановкой архитектурных задач и сверяет его с фактическим `main`.
-
-### `REVIEW.md`
-
-Контракт постоянного Интегратора. Команда `проверь все PR` запускает обработку всей открытой очереди в `main` без передачи пользователем wave, номеров PR или merge order.
-
-### `AGENTS.md`
-
-Единственный обязательный репозиторный документ Codex для обычной реализации. Содержит Integration metadata и границы параллельной задачи.
-
-### `tasks/TEMPLATE.md`
-
-Необязательный шаблон для крупных, рискованных, многоэтапных, возобновляемых или повторно используемых задач. Обычная итерация использует прямой промпт без task-файла.
-
-### `tasks/branch-cleanup.md`
-
-Отдельная maintenance-задача безопасного удаления старых remote-веток. Не должна запускаться как побочный эффект обычной реализации.
-
-### `.github/pull_request_template.md`
-
-Адаптивный отчёт финального PR: Integration metadata, review class, scope, lifecycle, применимые checks, runtime evidence, limitations и documentation drift confirmation.
-
-### `ASSETS.md`
-
-Канонический список внешних ассетов. Basic Village зафиксирован как основной набор окружения; Kenney character section хранит hashes, deterministic diagonal builder/audit и активный eight-direction runtime boundary.
-
-## Runtime
+## Composition root
 
 ### `src/main.js`
 
-Phaser composition root непрерывного мира: создаёт layout, `CharacterSystem`, локализованный `GameHud`/`InteractionHud`, загружает versioned session через persistence и связывает neighbor quest resolver/effects с `InteractionRuntime`; координирует input, camera, runtime update, auto-save, `NEW GAME` и cleanup.
+Phaser `WorldScene`: preload и создание runtime-компонентов, wiring world/session/input/HUD/audio, общий update, autosave/reset и E2E bridge. Build-mode world rendering/orchestration и часть facility/camera coordination пока сходятся здесь; условные точки следующего выделения находятся в `ARCHITECTURE.md`.
 
-### `src/actorProfiles.js`
-
-Канонический registry неизменяемых actor profiles. Сейчас содержит стабильные ID `player` и `villager`, явные production movement значения, строгий lookup и debug-only policy для синхронизации villager tuning с player debug config без зависимости production данных от mutable runtime state.
-
-### `src/characterVisualProfiles.js`
-
-Канонический registry неизменяемых visual profiles персонажей. Объединяет player cardinal images с diagonal spritesheet и cardinal/diagonal NPC sheets, stable visual IDs, уникальные texture/animation keys, normalized eight-facing frame-reference mapping, collision footprint presentation values и helpers для Phaser texture/frame boundary.
-
-### `src/character.js`
-
-Совместимый aggregate игрока и NPC: создаёт `CharacterMotor` и `CharacterVisual`, связывает motor update с visual update и делегирует прежние getters для sprite, movement, collision footprint, facing и profile data.
-
-### `src/characterMotor.js`
-
-Runtime-free motor персонажа: stable ID/profile ID, controller, plain position, movement state/config, collision footprint, blocked axes, movement/collision integration, замороженный controller context и immutable snapshots без Phaser refs.
-
-### `src/characterFacing.js`
-
-Чистый восьмисекторный quantizer visual facing: фиксированный clockwise порядок cardinal/diagonal направлений, угловая нормализация с wrap-around и history-aware hysteresis вокруг текущего сектора.
-
-### `src/characterVisual.js`
-
-Phaser-представление персонажа: sprite, resolved visual profile, eight-sector facing quantization/hysteresis, walk/idle animation selection через normalized frame references, сохранение последнего направления после остановки, depth sorting, position sync из motor snapshot и idempotent destroy.
-
-### `src/characterSystem.js`
-
-Stable-ID insertion-ordered registry персонажей: add/lookup/require, ordered update через общий collision environment, runtime-free snapshots и lifecycle destroy. Duplicate IDs и required unknown IDs завершаются явной ошибкой.
+## Character и движение
 
 ### `src/controllerCommand.js`
 
-Каноническая форма команды персонажа: нормализованные `moveDirection`, optional `aimDirection` и boolean actions `interact`, `primary`, `secondary`.
+Нормализованная команда персонажа: движение, optional aim и boolean actions.
 
 ### `src/controllers.js`
 
-`PlayerController` и `PatrolController` возвращают общий `ControllerCommand`. Player получает input/aim/actions callbacks; patrol ведёт NPC по loop или ping-pong waypoint-маршрутам, обрабатывает tolerance/blocked-waypoint fallback и поддерживает optional pause policy без продвижения waypoint/timer.
+Player/patrol controllers над snapshots и общим `ControllerCommand`.
 
-### `src/npcConfig.js`
+### `src/actorProfiles.js`
 
-Декларативные profile ID, spawn-точки и маршруты домашнего loop-NPC и уличного ping-pong-NPC.
+Immutable movement/profile registry персонажей.
 
-### `src/gameSessionState.js`
+### `src/characterVisualProfiles.js`
 
-Plain JSON-сериализуемая session-модель и canonical fresh/normalize boundary: version, current world, player/entity IDs, global/entity flags, transient dialogue state, stone и общий `resourceNodes` progress `0..1`. Reserved object-property IDs обрабатываются как собственные данные без prototype mutation.
+Immutable visual profiles, cardinal/diagonal textures, frame references и animation keys.
 
-### `src/resourceDomain.js`
+### `src/characterMotor.js`
 
-Единый immutable registry профилей малых/крупных брёвен, камней и рубиновой жилы: `chop/mine/mow`, action HP, производный множитель `1.6`, награды, visual/SFX/prompt и чистая операция нормализованной работы.
+Runtime-free position, movement state/config, controller, footprint и collision integration.
 
-### `src/resourceConfig.js`
+### `src/characterVisual.js`
 
-Production balance preset, 8 px placement grid и стабильная композиция resource nodes с profile IDs, позициями и interaction descriptors.
+Phaser presentation: sprite, eight-direction facing, animation, depth и position sync.
 
-### `src/sessionPersistence.js`
+### `src/character.js`
 
-Версионированный save envelope и adapter над Storage: load/save/clear, strict validation, явная migration schema v1 → v2 для частично расчищенных узлов, durable flags only и safe fresh-state recovery для empty/corrupt/unsupported saves.
+Aggregate, связывающий motor и visual.
 
-### `src/neighborQuest.js`
+### `src/characterSystem.js`
 
-Pure domain первого мини-квеста: stable stages, entity/dialogue/flag/resolver IDs, deterministic dialogue resolution и idempotent completion transitions.
+Stable-ID registry, ordered update, snapshots и lifecycle.
 
-### `src/interaction.js`
+### `src/characterMovement.js`, `src/movement.js`, `src/collisionEnvironment.js`
 
-Immutable interaction-target descriptors и чистый выбор лучшей доступной цели по radius, facing, priority, distance и stable ID tie-break. Payload defensively клонируется как строгий JSON-like graph: только plain objects, dense arrays и JSON primitives без non-finite numbers, class instances или cycles.
+Чистая математика скорости и axis-separated collision через явный environment contract.
 
-### `src/interactionConfig.js`
+### `src/input.js`, `src/mobileJoystick.js`
 
-Неизменяемые runtime interaction definitions без статической world position. Home/street NPC используют общий stable quest resolver ID, локализованный `TALK` prompt и JSON-like payload.
+Чистая joystick math и runtime touch/coarse-pointer lifecycle.
 
-### `src/dialogueConfig.js`
+### `src/cameraFollowRuntime.js`
 
-Неизменяемые локализуемые definitions для всех стадий neighbor quest и strict own-key lookup. Session хранит только stable dialogue ID и line index, а presenter получает translation-key descriptors.
-
-### `src/interactionRuntime.js`
-
-Phaser-agnostic coordinator локализованного quest dialogue lifecycle: получает snapshots, выбирает candidate, разрешает dialogue ID через injected resolver, применяет pure completion transition, вызывает auto-save только при persistent mutation и передаёт presenter translation-key descriptors.
-
-### `src/interactionHud.js`
-
-Phaser Unicode presenter boundary для локализованных `TALK` prompt и dialogue panel: locale font, live language redraw, latched mobile tap, pointer guard, полная joystick exclusion и idempotent cleanup.
-
-### `src/gameHud.js`
-
-Единый владелец screen-space build/fullscreen/language/`NEW GAME` UI: locale-aware Phaser Text, канонические wood/stone/ruby visuals, confirmation lifecycle, hit-area exclusion, language preference preservation и cleanup.
-
-### `src/localization/index.js`
-
-Framework-independent i18next application service: browser locale detection, EN fallback, namespace loading, ICU, separate language persistence, `html lang/dir` sync, subscriptions и lifecycle destroy.
-
-### `public/locales/{en,ru}`
-
-Канонические JSON resources `common`, `hud`, `dialogue` с semantic keys и namespace parity.
-
-### `src/input.js`
-
-Чистая логика мобильного ввода: touch/coarse-pointer detection, зона активации, runtime-центр джойстика, clamp, dead zone, аналоговая сила и ограничение входного вектора.
-
-### `src/mobileJoystick.js`
-
-Runtime-компонент мобильного джойстика: Phaser/native/window listeners, one-pointer ownership, pointer capture и fallback, HUD exclusion, safety reset, графика, direction state и полный cleanup.
+Presentation camera B/F/C и отдельная follow target без мутации motor position.
 
 ### `src/movementDebugPanel.js`
 
-Компактная DOM-панель баланса: автоматически доступна в dev и через `?movementDebug=1`, открывается 4×4 кнопкой, ограничена viewport и scroll, меняет согласованные resource/sleep параметры, показывает live status и выполняет balance/refill/default resets.
+Dev/runtime tuning UI, живущий отдельно от gameplay save.
 
-### `src/fullscreen.js`
-
-Helper стандартного Fullscreen API: поддержка, active state, безопасный вход/выход и rejected Promise.
-
-### `src/hud.js`
-
-Переиспользуемый Phaser screen-space HUD: 5×7 bitmap glyphs, reusable `drawBitmapTextInto`, compact build label, fullscreen-иконка, pixel-aligned placement, colors и hit-area helpers.
-
-### `src/movementConfig.js`
-
-Ссылка на канонический player movement profile, диапазоны runtime-тюнинга, cloning и нормализация конфигурации движения относительно явного base config.
-
-### `src/characterMovement.js`
-
-Переиспользуемое состояние и интегратор движения: desired direction, velocity, разгон, торможение, разворот, facing/aim, delta cap и создание mutable runtime config из явного base profile.
-
-### `src/collisionEnvironment.js`
-
-Контракт collision environment и фабрика grid-среды: finite bounds, положительный `cellSize`, обязательный blocking query либо удобный `blockedCells` collection.
-
-### `src/movement.js`
-
-Foot-box collision и axis-separated sliding по переданному collision environment. Resolver использует environment bounds/cell size/blocking query, поддерживает non-zero origin и не импортирует глобальные размеры мира.
-
-### `src/visualConfig.js`
-
-Активные cardinal/diagonal character frames, diagonal texture key, foot box, angular facing hysteresis и скорость анимации. Legacy room exports удалены.
+## Мир и строительство
 
 ### `src/worldConfig.js`
 
-Размеры экрана, мира и тайла; параметры дома и двери; пути и frame-индексы Basic Village. Actor movement values здесь не хранятся.
+Устойчивые размеры экрана/мира/тайла, Basic Village paths и semantic frame mappings.
 
 ### `src/worldLayout.js`
 
-Сборка мира: ground, path, интерьер, стены, деревья, spawn, outdoor target и diagnostic blocked set. Возвращает production collision environment с bounds, cell size и blocking query.
+Production composition, edge-grid tavern geometry, doorway/path, environment objects и collision queries.
 
-## Проверки и инструменты
+### `src/buildAssetCatalog.js`
 
-### `scripts/manage-task-preview.mjs`
+Канонический catalog доступных build assets и placement metadata.
 
-Запускает один detached task-preview на стабильном свободном порту, хранит PID/URL/logs в ignored `artifacts`, проверяет HTTP и живой canvas 320×180, повторно использует здоровый процесс и поддерживает `start/status/stop`.
+### `src/buildModeRuntime.js`
 
-### `scripts/run-focused-e2e.mjs`
+Build-mode UI/input state: library, selection, touch scroll/inertia, placement gestures, prediction, demolition и grouped undo lifecycle.
 
-Владеет отдельным временным Vite-процессом для focused Browser E2E, резервирует свободный порт, ждёт readiness и завершает только собственные test/server процессы.
+### `src/facilityPreviewVisuals.js`
 
-### `scripts/check-doc-contracts.mjs`
+Общий adapter canonical furniture sprites для build thumbnails, ghosts и demolition tint.
 
-Проверяет role bootstrap, отдельные Lead/Integrator/Codex contracts, команду `проверь все PR`, dynamic GitHub tool discovery, Integration metadata и отсутствие blanket context loading для Codex.
+## Gameplay state
 
-### `scripts/check-input.mjs`
+### `src/gameSessionState.js`
 
-Проверяет чистую joystick math и production `MobileJoystick`: activation, clamp, dead zone, analog strength, one-pointer ownership, HUD exclusion, drag за пределами canvas, lost-capture fallback, matching release и cleanup listeners.
+JSON-safe fresh/normalize boundary текущей save schema: world/player IDs, flags, needs/resources и устойчивый progress без Phaser refs.
 
-### `scripts/check-runtime-components.mjs`
+### `src/sessionPersistence.js`
 
-Contract checks для `MobileJoystick` и `MovementDebugPanel`: support detection, native/Phaser pointer lifecycle, safety resets, listener cleanup, tuning/persistence/reset/copy/status, idempotent destroy и завершение async clipboard после уничтожения панели.
+Versioned envelope, validation, migrations, save/load/clear и safe fallback.
 
-### `scripts/check-fullscreen.mjs`
+### `src/needsDomain.js`
 
-Mock-проверки Fullscreen API helper.
+Pure needs values/rates/clamps и flow semantics. Gameplay timing остаётся вне HUD.
 
-### `scripts/check-hud.mjs`
+### `src/resourceDomain.js`, `src/resourceConfig.js`
 
-Bitmap glyph coverage, build label, fullscreen hit area, reusable interaction HUD objects, prompt/dialogue mobile tap latch, full visible dialogue-panel joystick exclusion и cleanup.
+Immutable resource profiles, actions/rewards/balance и stable world definitions.
 
-### `scripts/check-progress.mjs`
+### `src/debrisRuntime.js`
 
-Pure checks neighbor quest stages/transitions и versioned persistence load/save/clear/recovery behavior.
+Resource/bed world objects, individual progress, colliders, visuals и teardown.
 
-### `scripts/check-localization.mjs`
+### `src/facilityConfig.js`, `src/facilityRuntime.js`
 
-Namespace/key parity, non-empty translations, ICU samples, locale normalization, bundled Rubik/OFL presence и exact font SHA-256.
+Canonical furniture assets, footprints, colliders, optional presentation pose и use lifecycle.
 
-### `playwright.config.js` и `tests/e2e/localized-loop.spec.js`
+## Interaction, HUD и localization
 
-Desktop/mobile Chromium evidence для locale detection/persistence, полного quest flow, reload save, localized `NEW GAME`, mobile touch dialogue start и live keyboard smoke диагонального facing с idle preservation.
+### `src/interaction.js`
 
-### `scripts/check-movement.mjs`
+Immutable descriptors и чистый deterministic target selection.
 
-Max speed, diagonal normalization, acceleration, braking, reverse, turn, blocked axes, aim, tuning limits, delta cap, canonical player profile identity и независимые mutable runtime configs.
+### `src/interactionConfig.js`, `src/dialogueConfig.js`, `src/neighborQuest.js`
 
-### `scripts/check-character.mjs`
+Stable IDs, dialogue definitions и pure quest transitions.
 
-Проверяет actor profiles, controller command/snapshot isolation, `CharacterMotor` movement/collision/snapshots, чистый eight-sector quantizer с wrap-around/hysteresis, `CharacterVisual` diagonal facing/animation/depth/destroy, aggregate compatibility, `CharacterSystem` registry/order/update/snapshots/lifecycle, NPC patrols, dialogue pause policy и WorldScene integration.
+### `src/interactionRuntime.js`
 
-### `scripts/check-interaction.mjs`
+Framework-agnostic candidate/action/dialogue coordination и persistent effects.
 
-Проверяет canonical session shape, entity/flag/dialogue operations, reserved IDs, JSON round-trip, immutable interaction descriptors, strict payload validation, defensive copying, radius/facing filtering и deterministic priority/distance/ID ranking.
+### `src/interactionHud.js`
 
-### `scripts/check-dialogue.mjs`
+Phaser prompts/dialogue, mobile tap lifecycle и HUD exclusion.
 
-Проверяет immutable dialogue/interaction config, strict dialogue lookup включая inherited object keys, dynamic target positions, approach/facing/prompt, start/advance/close lifecycle, selected-NPC pause, completion flag, replay, session JSON round-trip и idempotent runtime destroy.
+### `src/gameHud.js`
 
-### `scripts/check-character-diagonals.py`
+Screen-space needs/resources, options, language/audio/fullscreen/`NEW GAME`, build-menu presentation и hit-area lifecycle.
 
-Неразрушающий asset audit: изолированно пересобирает player/home/street diagonal sheets, проверяет RGBA 48×64, все 36 непустых кадров, exact committed bytes/SHA-256 и генерирует nearest-neighbor contact sheet.
+### `src/localization/index.js`
 
-### `scripts/check-visual.mjs`
+i18next service: locale detection, EN fallback, ICU, preference persistence и live subscriptions.
 
-Проверяет удаление legacy room sources/atlases, pixel grid, Basic Village hashes, schema v2 cardinal/diagonal NPC manifest, все восемь frame maps, уникальность texture keys, approved diagonal hashes, declarative resources, integer zoom и camera contract.
+### `public/locales/{en,ru}`
 
-### `scripts/check-world.mjs`
+Canonical `common`, `hud` и `dialogue` JSON namespaces.
 
-Проверяет production и искусственные collision environments, bounds/cell size/blocking query, doorway, spawn/waypoint walkability, collision, sliding, anti-tunneling, blocked axes и non-zero origin.
+Runtime font подключается из pinned `@fontsource/pixelify-sans` Latin/Cyrillic package subsets; font binaries не копируются в tracked runtime paths.
 
-### `scripts/check-room-preview.py`
+## Audio и assets
 
-Генерирует:
+### `src/audioRuntime.js`, `src/audioSettings.js`
 
-- `artifacts/world-overview.png`
-- `artifacts/camera-indoor.png`
-- `artifacts/camera-outdoor.png`
-- `artifacts/top-wall-detail.png`
+Playlist/no-repeat/crossfade runtime и отдельные master/music preferences.
 
-Indoor/outdoor camera previews включают соответствующего NPC. Использует зависимости из `requirements-dev.txt`; локальная ошибка установки не разрешает самодельную замену Pillow.
+### `ASSETS.md`
 
-### `scripts/audit-spritesheet.py`
+Basic Village, character sheets, Pixelify Sans package и user-uploaded music/furniture provenance.
 
-Аудит spritesheet: геометрия, кадры, CSV, SHA-256 и contact sheets.
-
-### `requirements-dev.txt`
-
-Канонические Python-зависимости визуальных проверок.
+## Проверки и локальные инструменты
 
 ### `package.json`
 
-Команды managed task-preview, focused E2E, сборки и полного набора documentation/input/runtime-components/fullscreen/HUD/movement/character/character-diagonals/interaction/dialogue/visual/world проверок.
+Канонические команды build, targeted checks, managed preview и E2E.
 
-## Инфраструктура
+### `scripts/run-python-check.mjs`
+
+Portable Python 3 resolver для Windows/Linux checks. Использует explicit env override, стандартный launcher/PATH или известный bundled runtime без ручного поиска в каждой задаче.
+
+### `scripts/manage-task-preview.mjs`
+
+Один detached preview на стабильном task-порту; state/logs живут в OS temp, а status подтверждает HTTP, page errors и canvas 320×180.
+
+### `scripts/run-focused-e2e.mjs`
+
+Владеет отдельными Vite/Playwright processes и OS-temp outputs. Удаляет artifacts при успехе и сохраняет диагностический путь только при failure.
+
+### `scripts/check-*.mjs`, `scripts/check-*.py`
+
+Targeted contract checks. Каждый check доказывает свою область; полный `npm run check` является Strict/local repository gate, а не default после принятого Fast-preview.
+
+Ключевые группы:
+
+- `check-needs`, `check-clock-cycle`, `check-progress` — state/rates/persistence;
+- `check-input`, `check-mobile-camera`, `check-movement`, `check-character` — input/movement/presentation;
+- `check-build-mode`, `check-world`, `check-facilities` — geometry/editor/furniture;
+- `check-hud`, `check-text-resolution`, `check-localization` — layout/glyphs/RU-EN parity;
+- `check-audio`, `check-binary-import`, `check-visual`, Python sprite/world audits — assets and rendering contracts.
+
+### `playwright.config.js`, `tests/e2e/*`
+
+Desktop/mobile integrated browser evidence. Full suite принадлежит PR CI; local focused spec используется только для скрытого риска, не доказанного preview или более дешёвым check.
+
+## CI и публикация
 
 ### `.github/workflows/pr-check.yml`
 
-Классифицирует scope, параллельно запускает Validate и Browser E2E для runtime-маршрута и загружает тяжёлые diagnostic artifacts только при failure.
+Классифицирует scope и параллельно запускает Validate/Browser E2E для runtime/strict. Diagnostic artifacts загружаются только при failure.
 
 ### `.github/workflows/deploy-pages.yml`
 
-Публикует GitHub Pages, создаёт `/version.json`, проверяет опубликованный SHA и выставляет `pages/live`.
+Публикует Pages и проверяет опубликованный SHA.
 
-### Настройки GitHub
+## Правила карты
 
-- `main` защищён от удаления и force-push.
-- Automatic head-branch deletion удаляет обычные merged ветки.
-- Persistent `release/*`, `archive/*` и `keep/*` требуют отдельной repository-side protection.
-
-## Правила развития карты
-
-- Добавлять адрес только для самостоятельной и реально используемой области.
-- Обновлять карту при добавлении, удалении, переименовании или существенной смене ответственности файла.
-- Не обновлять карту ради каждой мелкой поведенческой правки.
-- Не дублировать подробные правила из `PROJECT.md`, `LEAD.md`, `AGENTS.md`, `REVIEW.md` или `ASSETS.md`.
-- Не создавать пустые разделы «на будущее».
+- Добавлять адрес только для самостоятельной реально используемой области.
+- Обновлять при добавлении, удалении, переименовании или существенной смене ответственности.
+- Не фиксировать здесь «следующий шаг», текущий баланс, конкретный Task status или быстро меняющиеся числа.
+- Не копировать подробные правила из канонических документов.

@@ -1,17 +1,20 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 const startedAt = Date.now();
 const viteCli = resolve("node_modules/vite/bin/vite.js");
 const playwrightCli = resolve("node_modules/@playwright/test/cli.js");
 const timeoutMs = 120_000;
+const runtimeDir = mkdtempSync(join(tmpdir(), "NestledBurrow-focused-e2e-"));
 let url;
 let server;
 let testProcess;
 let timeout;
 let forcedExitCode;
+let keepArtifacts = false;
 
 const elapsed = () => `${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
 const stop = (child) => {
@@ -21,6 +24,12 @@ const cleanup = () => {
   clearTimeout(timeout);
   stop(testProcess);
   stop(server);
+  if (keepArtifacts) return;
+  try {
+    rmSync(runtimeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch (error) {
+    console.warn(`Focused E2E temp cleanup deferred: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 const reserveFreePort = () => new Promise((resolvePort, reject) => {
@@ -55,6 +64,7 @@ async function main() {
   timeout = setTimeout(() => {
     console.error(`Focused E2E exceeded ${timeoutMs / 1000}s; terminating owned processes.`);
     forcedExitCode = 124;
+    keepArtifacts = true;
     cleanup();
   }, timeoutMs);
 
@@ -69,27 +79,39 @@ async function main() {
   console.log(`Focused E2E server ready after ${elapsed()}`);
 
   testProcess = spawn(process.execPath, [playwrightCli, "test", ...process.argv.slice(2)], {
-    env: { ...process.env, PW_BASE_URL: url, PW_REUSE_SERVER: "1" },
+    env: {
+      ...process.env,
+      PW_BASE_URL: url,
+      PW_REUSE_SERVER: "1",
+      PW_OUTPUT_DIR: join(runtimeDir, "test-results"),
+      PW_REPORT_DIR: join(runtimeDir, "playwright-report"),
+    },
     stdio: "inherit",
   });
   const exitCode = await new Promise((resolveExit) => testProcess.once("exit", (code) => resolveExit(code ?? 1)));
   process.exitCode = forcedExitCode ?? exitCode;
+  keepArtifacts = process.exitCode !== 0;
   console.log(`Focused E2E finished with code ${exitCode} after ${elapsed()}`);
+  if (keepArtifacts) console.error(`Focused E2E artifacts retained at ${runtimeDir}`);
 }
 
 process.once("SIGINT", () => {
   forcedExitCode = 130;
+  keepArtifacts = true;
   cleanup();
 });
 process.once("SIGTERM", () => {
   forcedExitCode = 143;
+  keepArtifacts = true;
   cleanup();
 });
 
 try {
   await main();
 } catch (error) {
+  keepArtifacts = true;
   console.error(error instanceof Error ? error.message : error);
+  console.error(`Focused E2E artifacts retained at ${runtimeDir}`);
   process.exitCode = forcedExitCode ?? 1;
 } finally {
   cleanup();

@@ -1,13 +1,16 @@
+import { createHash } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 
 const root = process.cwd();
-const artifactsDir = resolve("artifacts");
-const statePath = resolve(artifactsDir, "task-preview.json");
-const stdoutPath = resolve(artifactsDir, "task-preview.out.log");
-const stderrPath = resolve(artifactsDir, "task-preview.err.log");
+const worktreeKey = createHash("sha1").update(root).digest("hex").slice(0, 12);
+const runtimeDir = join(tmpdir(), "NestledBurrow", "task-preview", worktreeKey);
+const statePath = join(runtimeDir, "task-preview.json");
+const stdoutPath = join(runtimeDir, "task-preview.out.log");
+const stderrPath = join(runtimeDir, "task-preview.err.log");
 const viteCli = resolve("node_modules/vite/bin/vite.js");
 const command = process.argv[2] ?? "start";
 
@@ -104,14 +107,14 @@ async function smokeCanvas(url) {
 
   let browser;
   try {
-    mkdirSync(artifactsDir, { recursive: true });
+    mkdirSync(runtimeDir, { recursive: true });
     const launchCwd = process.cwd();
     try {
-      process.chdir(artifactsDir);
+      process.chdir(runtimeDir);
       browser = await chromium.launch({
         headless: true,
         args: ["--disable-logging"],
-        env: { ...process.env, CHROME_LOG_FILE: resolve(artifactsDir, "task-preview.chromium.log") },
+        env: { ...process.env, CHROME_LOG_FILE: join(runtimeDir, "task-preview.chromium.log") },
       });
     } finally {
       process.chdir(launchCwd);
@@ -181,7 +184,7 @@ async function start() {
   child.unref();
 
   const state = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     cwd: root,
     pid: child.pid,
     port,
@@ -189,6 +192,7 @@ async function start() {
     branch: identity.branch,
     head: identity.head,
     startedAt: new Date().toISOString(),
+    runtimeDir,
     stdoutPath,
     stderrPath,
   };
@@ -222,7 +226,7 @@ function stop() {
   }
   if (state.cwd !== root) throw new Error("Refusing to stop preview from another worktree");
   terminate(state.pid);
-  rmSync(statePath, { force: true });
+  rmSync(runtimeDir, { recursive: true, force: true });
   console.log(`Task preview stopped: ${state.url}`);
 }
 

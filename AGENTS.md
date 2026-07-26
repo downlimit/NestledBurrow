@@ -21,7 +21,7 @@ Before editing:
 3. Inspect the owner and consumers of changed contracts.
 4. Preserve unrelated user work; avoid unrelated cleanup.
 
-For a dirty/shared checkout or another active task, use one isolated worktree; never switch the shared checkout. Default to Medium reasoning; raise only for concrete architecture/strict-risk ambiguity.
+For a dirty/shared checkout or another active task, use one isolated worktree; never switch the shared checkout. Create and use the worktree with one normal user/permission level. Do not mix elevated and non-elevated Git, npm, Vite or cleanup operations in the same worktree.
 
 ## Scope
 
@@ -31,22 +31,30 @@ For a dirty/shared checkout or another active task, use one isolated worktree; n
 
 Use the smallest clean solution; add no dependency, framework, asset, docs, or infrastructure without need.
 
+User feedback and the time needed to evaluate feel are product work, not process waste. Do not limit feedback rounds or split a coherent result merely to make metrics look smaller. If feedback invalidates an explicit scope exclusion or adds another independent runtime contract, restate the current observable result and boundary in at most five lines, then continue in the same Task unless the user requests a split or a real strict-risk dependency requires one.
+
 For a changed public identifier, behavior/rate, save field, localization key, action, selector, fixture, E2E helper, or config value: search once for the old value, field name, exact expectations, and aliases; classify matches; update real consumers and targeted coverage; confirm no accidental stale expectation. Never weaken a valid test for CI.
 
 ## Validation
 
-Use one strong proof per material risk. A successful proof remains valid until its relevant inputs change.
+Use one strong proof per material risk. A successful proof remains valid until its relevant inputs change. User acceptance does not invalidate successful checks, and a publication phase must not rerun unchanged evidence.
 
 **Feedback gate:** batch current remarks into one pass. A healthy managed preview is the default proof. Add one smallest named check only for hidden behavior it cannot prove. Defer status/diff review, `git diff --check`, build, docs/scope checks, full suites, screenshots, and E2E until acceptance.
 
-**Micro-feedback:** during preview, `без дополнительных проверок` or equivalent for an existing presentation value: make the edit, reuse proof, health-check preview; skip build, checks, screenshots, E2E. Excludes persistence/schema, public IDs, input/collision, dependencies, workflow/security, and new behavior/architecture; otherwise run the risk check and state why.
+**Micro-feedback:** during preview, `без дополнительных проверок` or equivalent for an existing presentation value: make the edit, reuse proof, health-check preview; skip build, checks, screenshots, E2E. Excludes persistence/schema, public IDs, input/collision, dependencies, workflow/security, and new behavior/architecture; otherwise run the one risk check and state why.
 
-**Publication gate:** inspect scope/full diff once. Micro: diff-check plus relevant docs/launcher check. Routine: changed-risk checks plus build when absent. Strict: `npm run check` plus missing task proof. Docs/process: docs, diff-check, and relevant workflow inspection. Full E2E belongs to PR CI; focused local E2E only covers unproven interaction risk.
+**Fast publication after `принято`:** immediately acknowledge that the playable result is accepted and no user action is needed. Stop preview, inspect changed files/full diff once, and run only still-unproven targeted checks for code changed since the last valid proof. A final healthy preview already proves browser startup and the visible result, so skip local `npm run check`, full/focused E2E and a standalone production build unless the task specifically changes bundling, dependencies or another risk unavailable to PR CI. Reach the Ready PR with minimal active work; the normal target is a few minutes, while CI wait is separate.
+
+**Strict publication:** run `npm run check` once plus only missing task-specific proof. Focused local E2E is exceptional: use it only when a changed hidden interaction/state path cannot be proven by preview or a cheaper contract check. The existence of a related E2E spec alone is not a reason to run it. Full E2E belongs to PR CI.
+
+**Micro/docs/process publication:** run the relevant documentation/launcher check and `git diff --check`; workflow changes also require direct workflow inspection. Do not promote a docs-only change to runtime validation.
 
 Environment/evidence:
 
-- Install dependencies only when missing or changed.
-- Use one temporary validation worktree only for a dirty/locked conflict.
+- Install dependencies only when missing or changed; prefer the existing npm cache.
+- Python checks are invoked through `scripts/run-python-check.mjs`; do not manually hunt for or hard-code a bundled Python path.
+- Managed preview and focused-E2E operational state belongs in the OS temp directory, not writable repository paths.
+- On `EPERM` or access denied, inspect the exact owned path once. Do not blindly repeat an entire command or suite elevated. Recreate an unusable worktree in a user-writable temp location under the same permission level, then rerun only the failed canonical command.
 - Diagnose deterministic failure with its canonical command; compare current `main` once only when base matters.
 - The focused E2E launcher owns Vite, readiness and shutdown.
 - Prefer stable assertions over moving NPCs, live clocks or whole-session equality. Use runtime for feel; maximum two screenshots. For new or changed visible text, verify RU/EN glyphs, wrapping, clipping and overlap at native `320×180` and coarse-pointer mobile.
@@ -59,12 +67,10 @@ Required for player-visible gameplay, HUD/UI, input, scenes, localization, anima
 1. Codex implements one feedback batch, starts `npm run preview:task`, then status-confirms its exact URL, HTTP, page errors, and live 320×180 canvas.
 2. Handoff: clickable URL plus compact summary. Codex owns server startup; the user receives no shell startup command. Reuse this URL through feedback.
 3. Before explicit `принято`: edit batch → live refresh → status → handoff. Extra checks follow the feedback gate. No full diff, stage, commit, push, PR, auto-merge, or merge.
-4. Test servers use separate free ports and leave preview running. On status failure, inspect recorded PID/log once, repair, and reverify the canonical URL. A stop permission failure repeats the same command with process permission; state remains until success.
-5. After `принято`: stop preview, execute the publication gate once, commit, push, create one Ready PR, wait for final-head CI, and merge. A player-visible repair returns to feedback acceptance.
+4. Test servers use separate free ports and leave preview running. On status failure, inspect recorded PID/log once, repair, and reverify the canonical URL. A stop permission failure follows the environment rule above; state remains until success.
+5. After `принято`: follow the applicable Fast or Strict publication route once, commit, push, create one Ready PR, enable native auto-merge, and let final-head CI gate the merge. A player-visible repair returns to feedback acceptance only when it changes the accepted experience.
 
-If no local/cloud preview URL is available, report the blocker and stop before publication.
-
-Automation never replaces the user's runtime/visual verdict.
+If no local/cloud preview URL is available, report the blocker and stop before publication. Automation never replaces the user's runtime/visual verdict.
 
 ## GitHub
 
@@ -73,9 +79,7 @@ Automation never replaces the user's runtime/visual verdict.
 - Micro PR classification may skip gameplay/Browser E2E while preserving required check names.
 - Wait for final-head CI; repair deterministic failures in the same branch/PR. Interactive runtime/input/HUD/localization/scene/persistence/E2E-hook changes require green final-head Browser E2E.
 - Before pushing a CI repair, wait until every job for the current head SHA is terminal and collect all deterministic failures into one repair pass.
-- If local Chromium is unavailable, create the completed Ready PR and use canonical PR E2E. Diagnose its exact assertion; compare that command with current `main` once.
-- Load only failing steps and assertions from remote logs. Poll CI at least 45 seconds apart.
-- Enable native auto-merge on a validated Ready PR when supported and only after `принято` when gated. Prefer auto-merge plus one bounded status wait over repeated polling. CI remains the gate; never add repair/auto-merge workflows.
+- Load only failing steps and assertions from remote logs. Poll CI at least 45 seconds apart. Prefer native auto-merge plus one bounded status wait over repeated polling.
 - After required CI passes, merge and fast-forward local `main` unless prohibited.
 - Never request Codex review or create issues, replacement PRs, or extra branches unless asked.
 
