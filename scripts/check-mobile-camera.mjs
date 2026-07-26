@@ -5,8 +5,8 @@ import { JOYSTICK, clampJoystickCenter } from "../src/input.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
 assert.equal(JOYSTICK.sprintRadius, 54.45, "mobile sprint threshold is enlarged by a further 10 percent to 54.45 logical pixels");
-assert.deepEqual(clampJoystickCenter(0, 0), { x: 54.45, y: 54.45 });
-assert.deepEqual(clampJoystickCenter(GAME_WIDTH, GAME_HEIGHT), { x: GAME_WIDTH / 2 - 54.45, y: GAME_HEIGHT - 54.45 });
+assert.deepEqual(clampJoystickCenter(0, 0), { x: 0, y: 0 });
+assert.deepEqual(clampJoystickCenter(GAME_WIDTH, GAME_HEIGHT), { x: GAME_WIDTH, y: GAME_HEIGHT });
 
 assert.deepEqual(normalizeCameraTuning({ backPointFollowRate: -1, cameraLeadTransitionSeconds: 99 }), {
   backPointFollowRate: 0.1,

@@ -20,14 +20,11 @@ assert.equal(isTouchJoystickSupported({ maxTouchPoints: 1 }), true);
 assert.equal(isTouchJoystickSupported({ maxTouchPoints: 0, coarsePointer: true }), true);
 assert.equal(isTouchJoystickSupported({ maxTouchPoints: 0, coarsePointer: false }), false);
 assert.deepEqual(clampJoystickCenter(80, 90), { x: 80, y: 90 });
-assert.deepEqual(clampJoystickCenter(2, 1), {
-  x: JOYSTICK.sprintRadius,
-  y: JOYSTICK.sprintRadius,
-});
+assert.deepEqual(clampJoystickCenter(2, 1), { x: 2, y: 1 }, "edge touch remains the joystick center");
 assert.deepEqual(clampJoystickCenter(GAME_WIDTH / 2 - 1, GAME_HEIGHT - 1), {
-  x: GAME_WIDTH / 2 - JOYSTICK.sprintRadius,
-  y: GAME_HEIGHT - JOYSTICK.sprintRadius,
-});
+  x: GAME_WIDTH / 2 - 1,
+  y: GAME_HEIGHT - 1,
+}, "the center is never shifted away from an edge");
 assert.equal(isInsideJoystickActivation(GAME_WIDTH / 2 - 0.1, 90), true);
 assert.equal(isInsideJoystickActivation(GAME_WIDTH / 2, 90), false);
 assert.equal(isPlayerMovementSuppressed({ buildModeActive: true }), false, "build mode keeps WASD movement enabled");
@@ -127,7 +124,7 @@ function createGraphicStub() {
     visible: false,
     x: 0,
     y: 0,
-    setStrokeStyle() { return this; },
+    setStrokeStyle(width, color, alpha) { this.strokeStyle = { width, color, alpha }; return this; },
     setDepth() { return this; },
     setScrollFactor() { return this; },
     setVisible(value) { this.visible = value; return this; },
@@ -203,6 +200,7 @@ assert.equal(joystick.activeJoystickPointerId, 1, "nonmatching release ignored")
 windowRef.emit("pointerup", { pointerId: 1, cancelable: true, preventDefault() {} });
 assert.deepEqual(joystick.getDirection(), { x: 0, y: 0 }, "matching release resets");
 assert.equal(joystick.isSprinting(), false, "matching release clears sprint");
+assert.equal(joystick.sprintRing.strokeStyle?.alpha ?? 0.36, 0.36, "sprint ring stroke uses the requested 0.36 alpha");
 
 joystick.destroy();
 assert.equal(

@@ -57,14 +57,7 @@ export function isInsideJoystickActivation(pointerX, _pointerY, gameWidth = GAME
 }
 
 export function clampJoystickCenter(pointerX, pointerY, config = JOYSTICK, bounds = { width: GAME_WIDTH, height: GAME_HEIGHT }) {
-  const outerRadius = config.sprintRadius ?? config.baseRadius;
-  const left = outerRadius;
-  const right = Math.max(left, bounds.width / 2 - outerRadius);
-  const top = outerRadius;
-  const bottom = Math.max(top, bounds.height - outerRadius);
-
-  return {
-    x: Math.min(Math.max(pointerX, left), right),
-    y: Math.min(Math.max(pointerY, top), bottom),
-  };
+  // The ring is intentionally allowed to clip at the viewport edge.  Keeping
+  // the center under the finger also guarantees a fresh press starts at rest.
+  return { x: pointerX, y: pointerY };
 }

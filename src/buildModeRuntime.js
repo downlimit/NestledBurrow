@@ -24,6 +24,8 @@ const CLOSE_BUTTON = Object.freeze({
   y: PANEL.y + 4,
   size: 16,
 });
+const PANEL_DRAG_THRESHOLD = 6;
+const PANEL_INERTIA_FRICTION = 0.004;
 
 export const BUILD_GRID = Object.freeze({
   step: TILE_SIZE,
@@ -163,6 +165,8 @@ export class BuildModeRuntime {
     this.objects = [];
     this.scrollOffset = 0;
     this.drag = null;
+    this.panelDrag = null;
+    this.scrollVelocity = 0;
     this.actionOpen = false;
     this.grid = scene.add.graphics().setDepth(8990).setVisible(false);
     this.drawGrid();
@@ -173,12 +177,21 @@ export class BuildModeRuntime {
       event?.preventDefault?.();
       this.toggle();
     };
-    this.onWorldPointer = (pointer) => this.beginPointerDrag(pointer);
+    this.onWorldPointer = (pointer) => {
+      if (this.beginPanelDrag(pointer)) return;
+      this.beginPointerDrag(pointer);
+    };
     this.onPointerMove = (pointer) => {
-      if (this.drag) this.continuePointerDrag(pointer);
+      if (this.panelDrag) this.continuePanelDrag(pointer);
+      else if (this.drag) this.continuePointerDrag(pointer);
       else this.updateHoverPreview(pointer);
     };
-    this.onPointerUp = (pointer) => this.endPointerDrag(pointer);
+    this.onPointerUp = (pointer) => {
+      if (this.panelDrag) this.endPanelDrag(pointer);
+      else this.endPointerDrag(pointer);
+    };
+    this.onPointerCancel = () => this.cancelPanelDrag();
+    this.onSceneUpdate = (_time, delta) => this.updateScrollInertia(delta);
     this.onUndoKey = (event) => {
       if (!this.active || this.actionOpen || event?.repeat || (!event?.ctrlKey && !event?.metaKey)) return;
       event?.preventDefault?.();
@@ -193,7 +206,10 @@ export class BuildModeRuntime {
     scene.input.on("pointerdown", this.onWorldPointer);
     scene.input.on("pointermove", this.onPointerMove);
     scene.input.on("pointerup", this.onPointerUp);
+    scene.input.on("pointerupoutside", this.onPointerUp);
+    scene.input.on("pointercancel", this.onPointerCancel);
     scene.input.on("wheel", this.onWheel);
+    scene.events?.on?.("update", this.onSceneUpdate);
     this.unsubscribe = localization?.subscribe?.(() => this.renderLibrary());
   }
 
@@ -256,11 +272,7 @@ export class BuildModeRuntime {
           .setDepth(PANEL_DEPTH + 3)
           .setScrollFactor(0);
         hit.disableInteractive();
-        hit.on("pointerdown", () => {
-          this.onPreviewClear();
-          this.selectedId = item.id;
-          this.renderLibrary();
-        });
+        hit.on("pointerdown", () => {});
         this.objects.push({
           type: "item",
           item,
@@ -317,6 +329,72 @@ export class BuildModeRuntime {
   setScrollOffset(value) {
     this.scrollOffset = Math.max(0, Math.min(this.maxScrollOffset, Math.round(value)));
     this.renderLibrary();
+  }
+
+  isPanelContentPoint(pointer) {
+    return this.active
+      && pointer.x >= PANEL.x && pointer.x <= PANEL.x + PANEL.width
+      && pointer.y >= PANEL.contentTop && pointer.y <= PANEL.contentBottom;
+  }
+
+  getPanelItemAt(x, y) {
+    return this.objects.find((entry) => entry.type === "item"
+      && y >= entry.baseY - this.scrollOffset
+      && y < entry.baseY - this.scrollOffset + 18
+      && x >= entry.x && x <= entry.x + 124);
+  }
+
+  beginPanelDrag(pointer) {
+    if (!this.isPanelContentPoint(pointer)) return false;
+    this.scrollVelocity = 0;
+    this.panelDrag = {
+      pointerId: pointer.id,
+      startY: pointer.y,
+      lastY: pointer.y,
+      lastTime: Number(pointer.event?.timeStamp ?? Date.now()),
+      moved: false,
+      item: this.getPanelItemAt(pointer.x, pointer.y),
+    };
+    return true;
+  }
+
+  continuePanelDrag(pointer) {
+    if (pointer.id !== this.panelDrag.pointerId) return;
+    const now = Number(pointer.event?.timeStamp ?? Date.now());
+    const deltaY = pointer.y - this.panelDrag.lastY;
+    const elapsed = Math.max(1, now - this.panelDrag.lastTime);
+    if (Math.abs(pointer.y - this.panelDrag.startY) >= PANEL_DRAG_THRESHOLD) this.panelDrag.moved = true;
+    if (this.panelDrag.moved) {
+      this.setScrollOffset(this.scrollOffset - deltaY);
+      this.scrollVelocity = -deltaY / elapsed;
+    }
+    this.panelDrag.lastY = pointer.y;
+    this.panelDrag.lastTime = now;
+  }
+
+  endPanelDrag(pointer) {
+    if (pointer.id !== this.panelDrag.pointerId) return;
+    const { moved, item } = this.panelDrag;
+    this.panelDrag = null;
+    if (!moved && item) {
+      this.onPreviewClear();
+      this.selectedId = item.item.id;
+      this.renderLibrary();
+    }
+  }
+
+  cancelPanelDrag() {
+    this.panelDrag = null;
+    this.scrollVelocity = 0;
+  }
+
+  updateScrollInertia(delta) {
+    if (this.panelDrag || Math.abs(this.scrollVelocity) < 0.001) return;
+    const next = this.scrollOffset + this.scrollVelocity * delta;
+    const clamped = Math.max(0, Math.min(this.maxScrollOffset, next));
+    this.setScrollOffset(clamped);
+    this.scrollVelocity *= Math.max(0, 1 - PANEL_INERTIA_FRICTION * delta);
+    if (clamped !== next || Math.abs(this.scrollVelocity) < 0.001) this.scrollVelocity = 0;
   }
 
   renderLibrary() {
@@ -538,6 +616,7 @@ export class BuildModeRuntime {
     }
     if (!next) {
       this.drag = null;
+      this.cancelPanelDrag();
       if (this.actionOpen) {
         this.actionOpen = false;
         this.onActionEnd();
@@ -583,7 +662,10 @@ export class BuildModeRuntime {
     this.scene.input.off("pointerdown", this.onWorldPointer);
     this.scene.input.off("pointermove", this.onPointerMove);
     this.scene.input.off("pointerup", this.onPointerUp);
+    this.scene.input.off("pointerupoutside", this.onPointerUp);
+    this.scene.input.off("pointercancel", this.onPointerCancel);
     this.scene.input.off("wheel", this.onWheel);
+    this.scene.events?.off?.("update", this.onSceneUpdate);
     this.unsubscribe?.();
     this.grid.destroy();
     this.panel.destroy();

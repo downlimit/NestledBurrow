@@ -41,7 +41,7 @@ export class MobileJoystick {
       .setVisible(false);
     this.sprintRing = scene.add
       .circle(0, 0, JOYSTICK.sprintRadius, 0xd9a58f, 0)
-      .setStrokeStyle(1, 0xd9a58f, 0.72)
+      .setStrokeStyle(1, 0xd9a58f, 0.36)
       .setDepth(8999)
       .setScrollFactor(0)
       .setVisible(false);
