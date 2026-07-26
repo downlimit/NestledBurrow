@@ -169,16 +169,34 @@ function restoreFacilities(scene, definitions) {
   const runtime = scene.facilityRuntime;
   if (!runtime) return;
   const desiredIds = new Set(definitions.map((definition) => definition.id));
-  for (const current of runtime.getDefinitions()) {
-    if (!desiredIds.has(current.id) && current.editable !== false) runtime.remove(current.id);
+  const currentDefinitions = runtime.getDefinitions();
+  for (const current of currentDefinitions) {
+    if (current.editable === false && !desiredIds.has(current.id)) {
+      throw new Error(`Starting layout is missing fixed facility ${current.id}`);
+    }
+  }
+  currentDefinitions.forEach((current, index) => {
+    const staged = runtime.move(current.id, { x: -10000 - index * 256, y: -10000 });
+    if (!staged) throw new Error(`Failed to stage facility ${current.id}`);
+  });
+  for (const current of currentDefinitions) {
+    if (!desiredIds.has(current.id) && current.editable !== false && !runtime.remove(current.id)) {
+      throw new Error(`Failed to remove facility ${current.id}`);
+    }
   }
   for (const definition of definitions) {
     if (definition.id.startsWith("editor-")) {
-      runtime.add(definition.facilityType, { x: definition.footprint.x, y: definition.footprint.y });
+      const restored = runtime.add(definition.facilityType, {
+        x: definition.footprint.x,
+        y: definition.footprint.y,
+      });
+      if (!restored) throw new Error(`Failed to restore facility ${definition.id}`);
       continue;
     }
-    if (runtime.getDefinition(definition.id)) runtime.replace(definition);
-    else runtime.restore(definition);
+    const restored = runtime.getDefinition(definition.id)
+      ? runtime.replace(definition)
+      : runtime.restore(definition);
+    if (!restored) throw new Error(`Failed to restore facility ${definition.id}`);
   }
   runtime.syncKitchenVisuals?.();
 }
