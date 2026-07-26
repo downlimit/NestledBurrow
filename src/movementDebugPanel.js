@@ -121,11 +121,11 @@ export class MovementDebugPanel {
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
     const actionDefinitions = [
-      ["Сохранить расстановку как стартовую", () => this.persistStartingLayout()],
       ["Сбросить баланс-забег", onResetBalanceRun],
       ["Восполнить энергию", onRefillEnergy],
       ["Добавить готовое блюдо", onAddCookedDish],
       ["Вернуть значения по умолчанию", () => this.resetDefaults()],
+      ["Сохранить расстановку как стартовую", () => this.persistStartingLayout()],
     ];
     for (const [label, handler] of actionDefinitions) {
       const button = documentRef.createElement("button");
