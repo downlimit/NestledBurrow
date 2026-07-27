@@ -1,4 +1,5 @@
 import { TILE_SIZE } from "./worldConfig.js";
+import { WALL_COLLIDER_GROUPS, wallColliderGroup } from "./buildWorldGeometry.js";
 
 export const STARTING_LAYOUT_STORAGE_KEY = "nestledBurrow.startingLayout";
 export const STARTING_LAYOUT_VERSION = 1;
@@ -69,9 +70,12 @@ function normalizeBuildObject(value, index) {
   if (value.textureKey !== undefined) normalized.textureKey = String(value.textureKey);
   if (collider) {
     normalized.colliderBounds = normalizeRect(value.colliderBounds, `buildObjects[${index}].colliderBounds`);
-    normalized.colliderGroup = typeof value.colliderGroup === "string" && value.colliderGroup
+    const storedGroup = typeof value.colliderGroup === "string" && value.colliderGroup
       ? value.colliderGroup
       : value.id;
+    normalized.colliderGroup = value.kind === "wall" && storedGroup === WALL_COLLIDER_GROUPS.legacy
+      ? wallColliderGroup(normalized.point.orientation)
+      : storedGroup;
   }
   return normalized;
 }

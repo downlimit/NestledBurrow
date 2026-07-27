@@ -11,7 +11,8 @@ import {
 import { PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND } from "./resourceConfig.js";
 import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
 import { TILE_SIZE } from "./worldConfig.js";
-import { saveAssetProfiles } from "./assetProfiles.js";
+import { assetDepthFromPivot } from "./buildWorldGeometry.js";
+import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
 
 export const PLANTED_TREE_PROFILE_ID = "tree-planted";
 
@@ -115,15 +116,18 @@ function isPlantedTreeObject(object) {
 function createTreeSprites(scene, object) {
   if (object.sprites?.length) return object.sprites;
   const sprites = [];
+  const profileKey = `resource:${object.item.resourceProfileId ?? PLANTED_TREE_PROFILE_ID}`;
+  const profile = scene.assetProfiles?.[profileKey];
+  const depth = assetDepthFromPivot(object.point, profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 });
   for (let row = 0; row < 4; row += 1) {
     for (let column = 0; column < 3; column += 1) {
-      const offset = scene.assetProfiles?.[`resource:${object.item.resourceProfileId ?? PLANTED_TREE_PROFILE_ID}`]?.visualOffset ?? { x: 0, y: 0 };
+      const offset = profile?.visualOffset ?? { x: 0, y: 0 };
       sprites.push(scene.add.image(
         object.point.x + column * TILE_SIZE + offset.x,
         object.point.y + row * TILE_SIZE + offset.y,
         object.item.textureKey,
         row * 9 + column,
-      ).setOrigin(0).setDepth(500 + object.point.y + 4 * TILE_SIZE));
+      ).setOrigin(0).setDepth(depth));
     }
   }
   object.sprites = sprites;
@@ -146,6 +150,7 @@ export function attachEditorAuthoringRuntime(scene, {
   const selectionBoundsById = new Map();
   let destroyed = false;
   let pivotSelection = null;
+  let visualOffsetSelection = null;
 
   scene.colliderOverrides = mergeColliderOverrides(COLLIDER_DEFAULTS, scene.colliderOverrides);
   for (const [groupKey, offsets] of Object.entries(scene.colliderOverrides)) {
@@ -192,8 +197,13 @@ export function attachEditorAuthoringRuntime(scene, {
     return object;
   }
 
-  function profileOffset(profileKey) {
+  function profileVisualOffset(profileKey) {
     const offset = scene.assetProfiles?.[profileKey]?.visualOffset;
+    return { x: Number(offset?.x) || 0, y: Number(offset?.y) || 0 };
+  }
+
+  function profileSnapAnchorOffset(profileKey) {
+    const offset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset;
     return { x: Number(offset?.x) || 0, y: Number(offset?.y) || 0 };
   }
 
@@ -213,6 +223,23 @@ export function attachEditorAuthoringRuntime(scene, {
       ...(scene.facilityRuntime?.getAuthoringInstances?.() ?? []),
       ...plantAuthoringInstances(),
     ].filter((instance) => scene.assetProfiles?.[instance.profileKey]);
+  }
+
+  function findAuthoringInstanceAt(point) {
+    return getAuthoringInstances()
+      .map((instance) => {
+        const visualOffset = profileVisualOffset(instance.profileKey);
+        const bounds = {
+          left: instance.bounds.left + visualOffset.x,
+          right: instance.bounds.right + visualOffset.x,
+          top: instance.bounds.top + visualOffset.y,
+          bottom: instance.bounds.bottom + visualOffset.y,
+        };
+        return { instance, bounds };
+      })
+      .filter(({ bounds }) => contains(bounds, point))
+      .sort((a, b) => ((a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top))
+        - ((b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top)))[0]?.instance ?? null;
   }
 
   function applyPlantOffset(profileKey, offset) {
@@ -244,27 +271,30 @@ export function attachEditorAuthoringRuntime(scene, {
     return offset;
   }
 
+  function applyProfileSnapAnchorOffset(profileKey, value) {
+    const offset = { x: Math.round(Number(value?.x) || 0), y: Math.round(Number(value?.y) || 0) };
+    const current = scene.assetProfiles?.[profileKey];
+    if (!current) return null;
+    scene.assetProfiles = Object.freeze({
+      ...scene.assetProfiles,
+      [profileKey]: Object.freeze({ ...current, snapAnchorOffset: Object.freeze(offset) }),
+    });
+    for (const instance of getAuthoringInstances()) {
+      if (instance.profileKey !== profileKey) continue;
+      const depth = assetDepthFromPivot(instance.anchor, offset);
+      for (const target of instance.targets) target.setDepth?.(depth);
+    }
+    scene.facilityRuntime?.syncKitchenVisuals?.();
+    return offset;
+  }
+
   function selectPivotAt(point) {
-    const candidates = getAuthoringInstances()
-      .map((instance) => {
-        const offset = profileOffset(instance.profileKey);
-        const bounds = {
-          left: instance.bounds.left + offset.x,
-          right: instance.bounds.right + offset.x,
-          top: instance.bounds.top + offset.y,
-          bottom: instance.bounds.bottom + offset.y,
-        };
-        return { instance, offset, bounds };
-      })
-      .filter(({ bounds }) => contains(bounds, point))
-      .sort((a, b) => ((a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top))
-        - ((b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top)));
-    const selected = candidates[0];
+    const selected = findAuthoringInstanceAt(point);
     pivotSelection = selected ? {
-      id: selected.instance.id,
-      profileKey: selected.instance.profileKey,
-      anchor: { ...selected.instance.anchor },
-      offset: { ...selected.offset },
+      id: selected.id,
+      profileKey: selected.profileKey,
+      anchor: { ...selected.anchor },
+      offset: profileSnapAnchorOffset(selected.profileKey),
     } : null;
     return pivotSelection ? { ...pivotSelection, marker: {
       x: pivotSelection.anchor.x + pivotSelection.offset.x,
@@ -274,7 +304,7 @@ export function attachEditorAuthoringRuntime(scene, {
 
   function setPivotOffset(value) {
     if (!pivotSelection) return null;
-    const offset = applyProfileVisualOffset(pivotSelection.profileKey, value);
+    const offset = applyProfileSnapAnchorOffset(pivotSelection.profileKey, value);
     pivotSelection = { ...pivotSelection, offset };
     return { ...pivotSelection, marker: {
       x: pivotSelection.anchor.x + offset.x,
@@ -422,7 +452,39 @@ export function attachEditorAuthoringRuntime(scene, {
 
   for (const object of scene.buildPlacedObjects?.values?.() ?? []) registerPlant(object);
   for (const profileKey of Object.keys(scene.assetProfiles ?? {})) {
-    applyProfileVisualOffset(profileKey, profileOffset(profileKey));
+    applyProfileVisualOffset(profileKey, profileVisualOffset(profileKey));
+  }
+
+  function visualOffsetSelectionState() {
+    if (!visualOffsetSelection) return null;
+    const offset = profileVisualOffset(visualOffsetSelection.profileKey);
+    return {
+      ...visualOffsetSelection,
+      offset,
+      displayBounds: {
+        left: visualOffsetSelection.bounds.left + offset.x,
+        right: visualOffsetSelection.bounds.right + offset.x,
+        top: visualOffsetSelection.bounds.top + offset.y,
+        bottom: visualOffsetSelection.bounds.bottom + offset.y,
+      },
+    };
+  }
+
+  function selectVisualOffsetAt(point) {
+    const selected = findAuthoringInstanceAt(point);
+    visualOffsetSelection = selected ? {
+      id: selected.id,
+      profileKey: selected.profileKey,
+      anchor: { ...selected.anchor },
+      bounds: { ...selected.bounds },
+    } : null;
+    return visualOffsetSelectionState();
+  }
+
+  function setVisualOffset(value) {
+    if (!visualOffsetSelection) return null;
+    applyProfileVisualOffset(visualOffsetSelection.profileKey, value);
+    return visualOffsetSelectionState();
   }
 
   return {
@@ -438,7 +500,7 @@ export function attachEditorAuthoringRuntime(scene, {
     async applyColliderDraftToProject() {
       if (destroyed) throw new Error("Authoring runtime is destroyed");
       const result = confirmColliderDraft();
-      if ((!result || result.status === "empty") && !pivotSelection) return result ?? { status: "empty" };
+      if ((!result || result.status === "empty") && !pivotSelection && !visualOffsetSelection) return result ?? { status: "empty" };
       saveAssetProfiles(scene.assetProfiles, storage);
       // The in-game authoring action is deliberately browser-local. Writing a
       // source module makes Vite reload the whole game and invalidates the
@@ -453,6 +515,18 @@ export function attachEditorAuthoringRuntime(scene, {
       if (!pivotSelection) return null;
       return setPivotOffset({ x: pivotSelection.offset.x + dx, y: pivotSelection.offset.y + dy });
     },
+    alignPivotToCollider(axis) {
+      if (!pivotSelection || !["x", "y"].includes(axis)) return null;
+      const collider = scene.worldLayout.getWorldObjectColliders()
+        .find((entry) => entry.id === pivotSelection.id)?.rect;
+      if (!collider) return null;
+      const centeredOffset = {
+        ...pivotSelection.offset,
+        [axis]: ((collider[axis === "x" ? "left" : "top"] + collider[axis === "x" ? "right" : "bottom"]) / 2)
+          - pivotSelection.anchor[axis],
+      };
+      return setPivotOffset(centeredOffset);
+    },
     getPivotSelection() {
       if (!pivotSelection) return null;
       return { ...pivotSelection, marker: {
@@ -461,6 +535,19 @@ export function attachEditorAuthoringRuntime(scene, {
       } };
     },
     clearPivotSelection() { pivotSelection = null; },
+    selectVisualOffsetAt,
+    setVisualOffset,
+    nudgeVisualOffset(dx, dy) {
+      if (!visualOffsetSelection) return null;
+      const offset = profileVisualOffset(visualOffsetSelection.profileKey);
+      return setVisualOffset({ x: offset.x + dx, y: offset.y + dy });
+    },
+    getVisualOffsetSelection: visualOffsetSelectionState,
+    resetVisualOffset() {
+      if (!visualOffsetSelection) return null;
+      return setVisualOffset(DEFAULT_ASSET_PROFILES[visualOffsetSelection.profileKey]?.visualOffset ?? { x: 0, y: 0 });
+    },
+    clearVisualOffsetSelection() { visualOffsetSelection = null; },
     getPlantDefinitions() {
       return [...plants.values()].map((object) => object.resourceDefinition);
     },

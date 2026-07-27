@@ -12,6 +12,7 @@ import {
   WORLD_WIDTH,
 } from "./worldConfig.js";
 import { PLACEMENT_CELL_SIZE } from "./resourceConfig.js";
+import { applyColliderOffsets, wallColliderGroup } from "./buildWorldGeometry.js";
 
 function blockTile(blocked, tileX, tileY) {
   for (let y = 0; y < 2; y += 1) for (let x = 0; x < 2; x += 1) blocked.add(cellKey(tileX * 2 + x, tileY * 2 + y));
@@ -127,16 +128,6 @@ function overlaps(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-function applyColliderOverride(base, offsets) {
-  if (!offsets) return Object.freeze({ ...base });
-  return Object.freeze({
-    left: base.left + offsets.left,
-    right: base.right + offsets.right,
-    top: base.top + offsets.top,
-    bottom: base.bottom + offsets.bottom,
-  });
-}
-
 function addTree(tiles, blocked, x, y, variant) {
   const base = variant * 3;
   const depth = 500 + (y + 4) * TILE_SIZE;
@@ -173,14 +164,25 @@ export function createWorldLayout() {
   const resourceColliders = new Map();
   const baseResourceColliders = new Map();
   const resourceColliderGroups = new Map();
+  const resourceColliderMetadata = new Map();
   const colliderOverrides = new Map();
   const houseGeometry = createHouseGeometry();
   const originalWallEdges = new Map(houseGeometry.wallEdges.map((edge) => [edge.id, edge]));
   const wallEdges = new Map(houseGeometry.wallEdges.map((edge) => [edge.id, edge]));
-  const wallColliders = new Map(houseGeometry.wallEdges.map((edge) => [
-    edge.id,
-    { rect: wallCollider(edge), edgeIds: [edge.id] },
-  ]));
+  const wallColliders = new Map(houseGeometry.wallEdges.map((edge) => {
+    const base = wallCollider(edge);
+    return [edge.id, {
+      rect: base,
+      base,
+      edgeIds: [edge.id],
+      groupKey: wallColliderGroup(edge.side === "top" || edge.side === "bottom" ? "horizontal" : "vertical"),
+      wallEdge: {
+        x: edge.x,
+        y: edge.y,
+        orientation: edge.side === "top" || edge.side === "bottom" ? "horizontal" : "vertical",
+      },
+    }];
+  }));
 
   for (let y = 0; y < WORLD_ROWS; y += 1) {
     for (let x = 0; x < WORLD_COLUMNS; x += 1) {
@@ -231,23 +233,43 @@ export function createWorldLayout() {
     get wallColliders() { return [...wallColliders.values()].map(({ rect }) => rect); },
     get objectColliders() { return [...resourceColliders.values()]; },
     getWorldObjectColliders() {
-      return [...resourceColliders].map(([id, rect]) => ({
-        id,
-        groupKey: resourceColliderGroups.get(id) ?? id,
-        rect,
-        base: baseResourceColliders.get(id) ?? rect,
-      }));
+      return [
+        ...[...wallColliders].map(([id, entry]) => ({ id, ...entry })),
+        ...[...resourceColliders].map(([id, rect]) => ({
+          id,
+          groupKey: resourceColliderGroups.get(id) ?? id,
+          rect,
+          base: baseResourceColliders.get(id) ?? rect,
+          ...(resourceColliderMetadata.get(id) ?? {}),
+        })),
+      ];
+    },
+    getBlockingColliders(box) {
+      return [
+        ...[...wallColliders].map(([id, entry]) => ({ id, ...entry })),
+        ...[...resourceColliders].map(([id, rect]) => ({
+          id,
+          groupKey: resourceColliderGroups.get(id) ?? id,
+          rect,
+          ...(resourceColliderMetadata.get(id) ?? {}),
+        })),
+      ].filter((entry) => overlaps(box, entry.rect));
     },
     doorway: houseGeometry.doorway,
-    setResourceCollider(id, rect, groupKey = id) {
+    getEffectiveCollider(rect, groupKey = null) {
+      return applyColliderOffsets(rect, colliderOverrides.get(groupKey));
+    },
+    setResourceCollider(id, rect, groupKey = id, metadata = null) {
       const base = Object.freeze({ ...rect });
       baseResourceColliders.set(id, base);
       resourceColliderGroups.set(id, groupKey);
-      resourceColliders.set(id, applyColliderOverride(base, colliderOverrides.get(groupKey)));
+      if (metadata) resourceColliderMetadata.set(id, Object.freeze({ ...metadata }));
+      else resourceColliderMetadata.delete(id);
+      resourceColliders.set(id, applyColliderOffsets(base, colliderOverrides.get(groupKey)));
     },
-    clearResourceCollider(id) { baseResourceColliders.delete(id); resourceColliderGroups.delete(id); resourceColliders.delete(id); },
+    clearResourceCollider(id) { baseResourceColliders.delete(id); resourceColliderGroups.delete(id); resourceColliderMetadata.delete(id); resourceColliders.delete(id); },
     getResourceCollider(id) { return resourceColliders.get(id) ?? null; },
-    setWorldObjectCollider(id, rect, groupKey = id) { this.setResourceCollider(id, rect, groupKey); },
+    setWorldObjectCollider(id, rect, groupKey = id, metadata = null) { this.setResourceCollider(id, rect, groupKey, metadata); },
     clearWorldObjectCollider(id) { this.clearResourceCollider(id); },
     setColliderOverride(groupKey, offsets) {
       const normalized = Object.freeze({
@@ -257,9 +279,12 @@ export function createWorldLayout() {
         bottom: Number(offsets?.bottom) || 0,
       });
       colliderOverrides.set(groupKey, normalized);
+      for (const entry of wallColliders.values()) {
+        if (entry.groupKey === groupKey) entry.rect = applyColliderOffsets(entry.base, normalized);
+      }
       for (const [id, base] of baseResourceColliders) {
         if (resourceColliderGroups.get(id) === groupKey) {
-          resourceColliders.set(id, applyColliderOverride(base, normalized));
+          resourceColliders.set(id, applyColliderOffsets(base, normalized));
         }
       }
     },
@@ -277,7 +302,19 @@ export function createWorldLayout() {
         const edge = originalWallEdges.get(id);
         if (!edge) continue;
         wallEdges.set(id, edge);
-        wallColliders.set(id, { rect: wallCollider(edge), edgeIds: [id] });
+        const base = wallCollider(edge);
+        const groupKey = wallColliderGroup(edge.side === "top" || edge.side === "bottom" ? "horizontal" : "vertical");
+        wallColliders.set(id, {
+          rect: applyColliderOffsets(base, colliderOverrides.get(groupKey)),
+          base,
+          edgeIds: [id],
+          groupKey,
+          wallEdge: {
+            x: edge.x,
+            y: edge.y,
+            orientation: edge.side === "top" || edge.side === "bottom" ? "horizontal" : "vertical",
+          },
+        });
       }
     },
     hasWallEdge(id) { return wallEdges.has(id); },

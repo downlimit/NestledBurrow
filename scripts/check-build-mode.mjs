@@ -80,6 +80,7 @@ const moveHovers = [];
 const actionEvents = [];
 let undoCount = 0;
 let activationAllowed = true;
+let movableHit = false;
 const runtime = new BuildModeRuntime(scene, {
   localization,
   worldBounds: { left: 0, top: 0, right: WORLD_WIDTH, bottom: WORLD_HEIGHT },
@@ -92,10 +93,12 @@ const runtime = new BuildModeRuntime(scene, {
   onPreview: (item, points) => previews.push({ item, points }),
   onPreviewClear: () => previewClears.push(true),
   onDemolitionPreview: (point) => demolitionPreviews.push(point),
-  onMoveStart: (point) => ({ status: "picked", target: { id: "movable-bed", point } }),
+  onMoveStart: (point) => movableHit
+    ? { status: "picked", target: { id: "movable-bed", point, placementPosition: { x: 32, y: 48 }, snapAnchorOffset: { x: 0, y: 0 } } }
+    : { status: "ignored" },
   onMove: (target, point) => moves.push({ target, point }),
   onMovePreview: (target, point) => movePreviews.push({ target, point }),
-  onMoveHover: (point) => moveHovers.push(point),
+  onMoveHover: (point) => { moveHovers.push(point); return movableHit; },
   onActionBegin: (type) => actionEvents.push(`begin:${type}`),
   onActionEnd: () => actionEvents.push("end"),
   isActivationAllowed: () => activationAllowed,
@@ -117,6 +120,7 @@ assert.deepEqual(getBuildDragPoints({ x: 32, y: 48 }, { x: 80, y: 48 }), [
   { x: 80, y: 48 },
 ]);
 assert.deepEqual(BUILD_ASSET_GROUPS.map((group) => group.id), ["tools", "ground", "walls", "furniture", "decorations"]);
+assert.deepEqual(BUILD_ASSET_GROUPS.find((group) => group.id === "tools").items.map((item) => item.id), ["demolish"], "moving existing objects needs no catalog tool");
 assert.deepEqual(BUILD_ASSET_GROUPS.find((group) => group.id === "walls").items.map((item) => item.id), ["wall"], "the library exposes one automatic wall brush");
 assert(BUILD_ASSET_GROUPS.find((group) => group.id === "ground").items.some((item) => item.id === "parquet"), "parquet is buildable");
 assert(BUILD_ASSET_GROUPS.find((group) => group.id === "ground").items.some((item) => item.id === "carpet"), "carpet is buildable");
@@ -163,17 +167,31 @@ let prevented = false;
 keyboardListeners.get("keydown-TAB")({ repeat: false, preventDefault: () => { prevented = true; } });
 assert.equal(prevented, true);
 assert.equal(runtime.isActive(), true);
-assert.equal(runtime.grid.visible, true);
+assert.equal(runtime.grid.visible, false, "construction grid remains hidden until its debug checkbox is enabled");
+runtime.setGridEnabled(true);
+assert.equal(runtime.grid.visible, true, "debug setting shows the construction grid immediately");
+runtime.setGridEnabled(false);
+assert.equal(runtime.grid.visible, false, "debug setting hides the construction grid immediately");
+assert.equal(runtime.getState().gridEnabled, false);
+runtime.setGridEnabled(true);
+assert.equal(runtime.grid.visible, true, "construction grid can be restored without reopening build mode");
 assert.equal(runtime.panel.visible, true);
 assert.equal(runtime.openButton.visible, false);
 assert.equal(runtime.closeButton.visible, true, "the open panel exposes a compact close button");
 assert(runtime.panel.depth > HUD_DEPTH, "the library renders above the day-night multiply overlay");
-assert.equal(runtime.getState().selectedId, "demolish");
+assert.equal(runtime.getState().selectedId, null, "opening build mode always starts in dedicated object-movement mode");
 assert(modeChanges.at(-1), "entering build mode emits its visibility lifecycle");
 let undoPrevented = false;
 keyboardListeners.get("keydown-Z")({ ctrlKey: true, repeat: false, preventDefault: () => { undoPrevented = true; } });
 assert.equal(undoPrevented, true, "Ctrl+Z is captured while build mode is active");
 assert.equal(undoCount, 1, "Ctrl+Z requests one editor undo");
+
+function selectLibraryItem(entry) {
+  runtime.setScrollOffset(Math.max(0, entry.baseY - 140));
+  const pointer = { x: entry.x + 1, y: entry.baseY - runtime.getState().scrollOffset + 1, id: 3, event: { timeStamp: 10 } };
+  scene.input.emit("pointerdown", pointer);
+  scene.input.emit("pointerup", pointer);
+}
 
 const placementsBeforePanelDrag = placements.length;
 scene.input.emit("pointerdown", { x: 20, y: 110, id: 91, event: { timeStamp: 10 } });
@@ -189,6 +207,8 @@ scene.input.emit("pointercancel", { id: 92 });
 assert.equal(runtime.panelDrag, null, "pointer cancellation clears the panel gesture");
 runtime.setScrollOffset(0);
 
+const demolishEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "demolish");
+selectLibraryItem(demolishEntry);
 scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
 assert.deepEqual(demolitionPreviews.at(-1), { x: 32, y: 48, rawX: 35, rawY: 50 }, "demolition hover identifies the precise target before click");
 scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
@@ -196,24 +216,20 @@ assert.deepEqual(demolitions[0], { point: { x: 32, y: 48, rawX: 35, rawY: 50 }, 
 scene.input.emit("pointermove", { x: 220, worldX: 49, worldY: 50, isDown: true });
 assert.equal(demolitions[1].onlyType, "wall", "demolition drag locks to the first removed object type");
 scene.input.emit("pointerup", {});
-function selectLibraryItem(entry) {
-  runtime.setScrollOffset(Math.max(0, entry.baseY - 140));
-  const pointer = { x: entry.x + 1, y: entry.baseY - runtime.getState().scrollOffset + 1, id: 3, event: { timeStamp: 10 } };
-  scene.input.emit("pointerdown", pointer);
-  scene.input.emit("pointerup", pointer);
-}
-const moveEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "move");
-selectLibraryItem(moveEntry);
-scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
-assert.deepEqual(moveHovers.at(-1), { x: 32, y: 48, rawX: 35, rawY: 50 }, "move hover searches only for movable objects");
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
-scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
-assert.deepEqual(movePreviews.at(-1).point, { x: 64, y: 80, rawX: 67, rawY: 82 }, "move drag previews the snapped destination");
-scene.input.emit("pointerup", {});
-assert.deepEqual(moves.at(-1).point, { x: 64, y: 80, rawX: 67, rawY: 82 }, "move drag commits once on release");
 const pathEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "path");
 selectLibraryItem(pathEntry);
+movableHit = true;
+const moveHoverCountBeforeSurface = moveHovers.length;
+scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
+assert.equal(moveHovers.length, moveHoverCountBeforeSurface, "ground brushes suppress existing-object move hover");
+const movesBeforeSurface = moves.length;
+scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+scene.input.emit("pointerup", {});
+assert.equal(moves.length, movesBeforeSurface, "ground brushes cannot pick up an existing object");
+movableHit = false;
 assert.equal(runtime.getState().selectedId, "path", "library selection is explicit");
+placements.length = 0;
 scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
 assert.equal(placements.length, 0, "pointerdown creates only a build preview");
 assert.deepEqual(previews.at(-1).points, [{ x: 32, y: 48, rawX: 35, rawY: 50 }], "the preview starts on the snapped world grid");
@@ -232,8 +248,54 @@ assert.deepEqual(placements.map(({ point }) => ({ x: point.x, y: point.y })), [
   { x: 64, y: 48 },
   { x: 80, y: 48 },
 ], "paint drag commits all predicted cells on pointerup");
+
+const bedEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "bed");
+selectLibraryItem(bedEntry);
+movableHit = true;
+const movesBeforeOccupiedPlacement = moves.length;
+const placementsBeforeOccupiedPlacement = placements.length;
+scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+assert.equal(runtime.drag?.mode, "place", "a selected catalog object stays in placement mode over an existing movable object");
+scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+scene.input.emit("pointerup", {});
+assert.equal(moves.length, movesBeforeOccupiedPlacement, "occupied placement never picks up the object under the cursor");
+assert.equal(placements.length, placementsBeforeOccupiedPlacement + 1, "occupied placement still delegates final validity to the world placement contract");
+
+selectLibraryItem(bedEntry);
+assert.equal(runtime.getState().selectedId, null, "clicking the selected catalog object again enters dedicated movement mode");
+const hoverCountBeforeMoveMode = moveHovers.length;
+scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
+assert.equal(moveHovers.length, hoverCountBeforeMoveMode + 1, "dedicated movement mode highlights an existing object under the cursor");
+scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+assert.deepEqual(
+  (({ x, y, rawX, rawY }) => ({ x, y, rawX, rawY }))(movePreviews.at(-1).point),
+  { x: 64, y: 80, rawX: 67, rawY: 82 },
+  "object placement modes preserve pointer-relative movement of existing objects",
+);
+scene.input.emit("pointerup", {});
+assert.deepEqual(
+  (({ x, y, rawX, rawY }) => ({ x, y, rawX, rawY }))(moves.at(-1).point),
+  { x: 64, y: 80, rawX: 67, rawY: 82 },
+  "existing-object movement commits the exact preview once on release",
+);
+
+runtime.setScrollOffset(Math.max(0, bedEntry.baseY - 140));
+const bedPanelY = bedEntry.baseY - runtime.getState().scrollOffset + 1;
+const placementsBeforeDirectDrag = placements.length;
+scene.input.emit("pointerdown", { x: bedEntry.x + 1, y: bedPanelY, id: 77, event: { timeStamp: 100 } });
+scene.input.emit("pointermove", { x: 190, y: bedPanelY, worldX: 96, worldY: 112, id: 77, isDown: true, event: { timeStamp: 116 } });
+assert.equal(runtime.panelDrag, null, "horizontal drag of a placeable asset leaves the catalog and starts world placement");
+assert.equal(runtime.drag?.mode, "place", "catalog drag always creates a new object even over an existing movable object");
+scene.input.emit("pointermove", { x: 220, y: bedPanelY, worldX: 128, worldY: 144, id: 77, isDown: true, event: { timeStamp: 132 } });
+scene.input.emit("pointerup", { id: 77 });
+assert.equal(placements.length, placementsBeforeDirectDrag + 1, "releasing a catalog drag places one new object at its final preview");
+movableHit = false;
+
 const wallEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "wall");
 selectLibraryItem(wallEntry);
+movableHit = true;
+const movesBeforeWall = moves.length;
 const placementsBeforeWallDrag = placements.length;
 scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 40 });
 assert.equal(placements.length, placementsBeforeWallDrag, "wall placement waits for the gesture direction");
@@ -245,6 +307,8 @@ assert.deepEqual(previews.at(-1).points.map(({ x, y }) => ({ x, y })), [
   { x: 32, y: 80 },
 ], "vertical wall preview follows adjacent grid vertices and ignores horizontal jitter");
 scene.input.emit("pointerup", {});
+assert.equal(moves.length, movesBeforeWall, "wall mode cannot pick up an existing object");
+movableHit = false;
 assert.deepEqual(placements.slice(placementsBeforeWallDrag).map(({ point }) => ({ x: point.x, y: point.y })), [
   { x: 32, y: 64 },
   { x: 32, y: 80 },
@@ -272,13 +336,14 @@ scene.input.emit("wheel", {}, [], 0, 1);
 assert(runtime.getState().scrollOffset > 0, "mouse wheel scrolls the asset library");
 runtime.toggle();
 assert.equal(runtime.isActive(), false);
-assert.equal(runtime.grid.visible, false);
+assert.equal(runtime.grid.visible, true, "grid visibility is independent from the build-mode panel");
 assert.equal(pathEntry.hit.interactive, false);
 assert.equal(modeChanges.at(-1), false, "leaving build mode restores the ordinary UI lifecycle");
 assert.equal(runtime.openButton.visible, true);
 assert.equal(runtime.closeButton.visible, false);
 runtime.openButtonHit.emit("pointerdown");
 assert.equal(runtime.isActive(), true, "the minimal opener activates build mode without Tab");
+assert.equal(runtime.getState().selectedId, null, "reopening the build menu clears the previous catalog selection");
 runtime.closeButtonHit.emit("pointerdown");
 assert.equal(runtime.isActive(), false, "the compact close button dismisses build mode");
 activationAllowed = false;

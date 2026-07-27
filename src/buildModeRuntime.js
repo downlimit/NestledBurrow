@@ -4,6 +4,7 @@ import { drawFacility } from "./facilityPreviewVisuals.js";
 import { HUD_DEPTH } from "./hud.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
 import { GAME_HEIGHT, TILE_SIZE } from "./worldConfig.js";
+import { createPlacementDragState, resolvePlacementDrag, snapPlacementPoint } from "./buildWorldGeometry.js";
 
 const PANEL = Object.freeze({
   x: 4,
@@ -26,6 +27,7 @@ const CLOSE_BUTTON = Object.freeze({
 });
 const PANEL_DRAG_THRESHOLD = 6;
 const PANEL_INERTIA_FRICTION = 0.004;
+const DIRECT_PLACEMENT_TYPES = Object.freeze(["bed", "facility", "tree"]);
 
 export const BUILD_GRID = Object.freeze({
   step: TILE_SIZE,
@@ -151,6 +153,7 @@ export class BuildModeRuntime {
     onActionBegin = () => {},
     onActionEnd = () => {},
     onUndo = () => {},
+    getPlacementAnchorOffset = () => ({ x: 0, y: 0 }),
     isActivationAllowed = () => true,
   } = {}) {
     this.scene = scene;
@@ -169,15 +172,17 @@ export class BuildModeRuntime {
     this.onActionBegin = onActionBegin;
     this.onActionEnd = onActionEnd;
     this.onUndo = onUndo;
+    this.getPlacementAnchorOffset = getPlacementAnchorOffset;
     this.isActivationAllowed = isActivationAllowed;
     this.active = false;
-    this.selectedId = BUILD_ASSET_GROUPS[0].items[0].id;
+    this.selectedId = null;
     this.objects = [];
     this.scrollOffset = 0;
     this.drag = null;
     this.panelDrag = null;
     this.scrollVelocity = 0;
     this.actionOpen = false;
+    this.gridEnabled = false;
     this.grid = scene.add.graphics().setDepth(8990).setVisible(false);
     this.drawGrid();
     this.createLibrary();
@@ -362,6 +367,7 @@ export class BuildModeRuntime {
     this.scrollVelocity = 0;
     this.panelDrag = {
       pointerId: pointer.id,
+      startX: pointer.x,
       startY: pointer.y,
       lastY: pointer.y,
       lastTime: Number(pointer.event?.timeStamp ?? Date.now()),
@@ -373,6 +379,22 @@ export class BuildModeRuntime {
 
   continuePanelDrag(pointer) {
     if (pointer.id !== this.panelDrag.pointerId) return;
+    const deltaX = pointer.x - this.panelDrag.startX;
+    const deltaFromStartY = pointer.y - this.panelDrag.startY;
+    const entry = this.panelDrag.item;
+    if (entry
+      && DIRECT_PLACEMENT_TYPES.includes(entry.item.placement)
+      && pointer.x > PANEL.x + PANEL.width
+      && deltaX >= PANEL_DRAG_THRESHOLD
+      && Math.abs(deltaX) > Math.abs(deltaFromStartY)) {
+      this.panelDrag = null;
+      this.scrollVelocity = 0;
+      this.onPreviewClear();
+      this.selectedId = entry.item.id;
+      this.renderLibrary();
+      this.beginPointerDrag(pointer);
+      return;
+    }
     const now = Number(pointer.event?.timeStamp ?? Date.now());
     const deltaY = pointer.y - this.panelDrag.lastY;
     const elapsed = Math.max(1, now - this.panelDrag.lastTime);
@@ -391,7 +413,7 @@ export class BuildModeRuntime {
     this.panelDrag = null;
     if (!moved && item) {
       this.onPreviewClear();
-      this.selectedId = item.item.id;
+      this.selectedId = this.selectedId === item.item.id ? null : item.item.id;
       this.renderLibrary();
     }
   }
@@ -462,28 +484,47 @@ export class BuildModeRuntime {
       .find((candidate) => candidate.id === this.selectedId);
   }
 
-  getActionPoint(pointer, item, demolitionType = null, wallAxis = null) {
+  getActionPoint(pointer, item = null, demolitionType = null, wallAxis = null) {
     const raw = {
       x: Number(pointer.worldX ?? pointer.x),
       y: Number(pointer.worldY ?? pointer.y),
     };
     let snapped;
-    if (wallAxis) snapped = snapBuildWallDragPoint(raw, wallAxis);
+    if (!item) snapped = snapBuildPoint(raw);
+    else if (wallAxis) snapped = snapBuildWallDragPoint(raw, wallAxis);
     else if (item.placement === "wall") snapped = snapBuildSurfacePoint(raw);
     else if (demolitionType === "wall") snapped = snapBuildWallEdge(raw);
     else if (item.placement === "tile" || item.placement === "carpet") snapped = snapBuildSurfacePoint(raw);
-    else snapped = snapBuildPoint(raw);
+    else if (["bed", "facility", "tree"].includes(item.placement)) {
+      snapped = snapPlacementPoint(raw, this.getPlacementAnchorOffset(item), TILE_SIZE);
+    } else snapped = snapBuildPoint(raw);
     return { ...snapped, rawX: raw.x, rawY: raw.y };
   }
 
   beginPointerDrag(pointer) {
     if (!this.active || pointer.x < PANEL.x + PANEL.width) return;
     const item = this.getSelectedItem();
-    if (!item) return;
     const point = this.getActionPoint(pointer, item);
+    if (!item) {
+      const moveResult = this.onMoveStart(point);
+      if (moveResult?.status !== "picked") return;
+      this.actionOpen = true;
+      this.onActionBegin("move");
+      this.onPreviewClear();
+      const pointerPosition = { x: point.rawX, y: point.rawY };
+      const dragState = createPlacementDragState({
+        placementPosition: moveResult.target.placementPosition,
+        pointer: pointerPosition,
+        snapAnchorOffset: moveResult.target.snapAnchorOffset,
+      });
+      const placement = resolvePlacementDrag(dragState, pointerPosition, TILE_SIZE);
+      this.drag = { mode: "move", item: null, target: moveResult.target, dragState, lastPoint: placement };
+      this.onMovePreview(this.drag.target, placement);
+      return;
+    }
     this.actionOpen = true;
-    this.onActionBegin(item.mode ?? "place");
     if (item.mode === "demolish") {
+      this.onActionBegin("demolish");
       this.onPreviewClear();
       const result = this.onDemolish(point, null);
       this.drag = result?.status === "removed"
@@ -491,15 +532,7 @@ export class BuildModeRuntime {
         : null;
       return;
     }
-    if (item.mode === "move") {
-      this.onPreviewClear();
-      const result = this.onMoveStart(point);
-      this.drag = result?.status === "picked"
-        ? { mode: "move", item, target: result.target, lastPoint: point }
-        : null;
-      if (this.drag) this.onMovePreview(this.drag.target, point);
-      return;
-    }
+    this.onActionBegin("place");
     if (item.placement === "wall" && item.dragPaint) {
       this.drag = {
         mode: "place",
@@ -537,12 +570,19 @@ export class BuildModeRuntime {
       return;
     }
     if (this.drag.mode === "move") {
-      const point = this.getActionPoint(pointer, item);
+      const raw = { x: Number(pointer.worldX ?? pointer.x), y: Number(pointer.worldY ?? pointer.y) };
+      const point = { ...resolvePlacementDrag(this.drag.dragState, raw, TILE_SIZE), rawX: raw.x, rawY: raw.y };
       this.drag.lastPoint = point;
       this.onMovePreview(this.drag.target, point);
       return;
     }
-    if (!item.dragPaint) return;
+    if (!item.dragPaint) {
+      const point = this.getActionPoint(pointer, item);
+      this.drag.lastPoint = point;
+      this.drag.points = [point];
+      this.onPreview(item, this.drag.points);
+      return;
+    }
     if (item.placement === "wall" && !this.drag.wallAxis) {
       const raw = {
         x: Number(pointer.worldX ?? pointer.x),
@@ -614,16 +654,15 @@ export class BuildModeRuntime {
       return;
     }
     const item = this.getSelectedItem();
-    if (!item) return;
     const point = this.getActionPoint(pointer, item);
+    if (!item) {
+      this.onPreviewClear();
+      this.onMoveHover(point);
+      return;
+    }
     if (item.mode === "demolish") {
       this.onPreviewClear();
       this.onDemolitionPreview(point);
-      return;
-    }
-    if (item.mode === "move") {
-      this.onPreviewClear();
-      this.onMoveHover(point);
       return;
     }
     this.onPreviewClear();
@@ -634,8 +673,9 @@ export class BuildModeRuntime {
     const next = Boolean(value);
     if (next && !this.active && !this.isActivationAllowed()) return;
     if (next === this.active) return;
+    if (next) this.selectedId = null;
     this.active = next;
-    this.grid.setVisible(next);
+    this.grid.setVisible(this.gridEnabled);
     this.panel.setVisible(next);
     this.selection.setVisible(next);
     this.openButton.setVisible(!next);
@@ -679,11 +719,17 @@ export class BuildModeRuntime {
     return this.active;
   }
 
+  setGridEnabled(value) {
+    this.gridEnabled = Boolean(value);
+    this.grid.setVisible(this.gridEnabled);
+  }
+
   getState() {
     return {
       active: this.active,
       selectedId: this.selectedId,
       scrollOffset: this.scrollOffset,
+      gridEnabled: this.gridEnabled,
       maxScrollOffset: this.maxScrollOffset,
       grid: BUILD_GRID,
       groupIds: BUILD_ASSET_GROUPS.map((group) => group.id),

@@ -6,6 +6,7 @@ import {
 } from "../src/gameSessionState.js";
 import {
   DAY_NIGHT_COLORS,
+  DAY_NIGHT_MULTIPLY_STRENGTH,
   DEFAULT_GAME_SECONDS_PER_REAL_SECOND,
   DEFAULT_START_TIME_SECONDS,
   LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER,
@@ -44,7 +45,11 @@ const exactColors = new Map([
   [6, DAY_NIGHT_COLORS.pink],
   [8, DAY_NIGHT_COLORS.orange],
 ]);
-for (const [hour, color] of exactColors) assert.equal(dayNightMultiplyColor(hour * 3600), color, `exact multiply color at ${hour}:00`);
+assert.equal(DAY_NIGHT_MULTIPLY_STRENGTH, 0.5, "multiply lighting keeps one named half-strength parameter");
+for (const [hour, color] of exactColors) {
+  assert.equal(dayNightMultiplyColor(hour * 3600, 1), color, `the hue curve remains exact at ${hour}:00`);
+  if (color !== DAY_NIGHT_COLORS.day) assert.notEqual(dayNightMultiplyColor(hour * 3600), color, `the ${hour}:00 multiply tint is blended toward white`);
+}
 assert.equal(dayNightMultiplyColor(9 * 3600), DAY_NIGHT_COLORS.day);
 for (const [hour, from, to] of [
   [17.5, DAY_NIGHT_COLORS.day, DAY_NIGHT_COLORS.orange],

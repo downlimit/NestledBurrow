@@ -4,6 +4,7 @@ export const DEFAULT_REAL_SECONDS_PER_GAME_DAY = 1440;
 export const DEFAULT_GAME_SECONDS_PER_REAL_SECOND = 60;
 export const LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER = 80;
 export const DEFAULT_SLEEP_SIMULATION_SCALE = 8;
+export const DAY_NIGHT_MULTIPLY_STRENGTH = 0.5;
 
 export const DAY_NIGHT_COLORS = Object.freeze({
   day: 0xffffff,
@@ -37,7 +38,7 @@ export function formatClock(worldTimeSeconds, language = "ru") {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-export function dayNightMultiplyColor(worldTimeSeconds) {
+function dayNightCurveColor(worldTimeSeconds) {
   const h = secondsOfDay(worldTimeSeconds) / 3600;
   if (h >= 9 && h < 17) return DAY_NIGHT_COLORS.day;
   if (h >= 17 && h < 18) return interpolateColor(DAY_NIGHT_COLORS.day, DAY_NIGHT_COLORS.orange, smoothstep(h - 17));
@@ -47,6 +48,10 @@ export function dayNightMultiplyColor(worldTimeSeconds) {
   if (h >= 4 && h < 6) return interpolateColor(DAY_NIGHT_COLORS.night, DAY_NIGHT_COLORS.pink, smoothstep((h - 4) / 2));
   if (h >= 6 && h < 8) return interpolateColor(DAY_NIGHT_COLORS.pink, DAY_NIGHT_COLORS.orange, smoothstep((h - 6) / 2));
   return interpolateColor(DAY_NIGHT_COLORS.orange, DAY_NIGHT_COLORS.day, smoothstep(h - 8));
+}
+
+export function dayNightMultiplyColor(worldTimeSeconds, strength = DAY_NIGHT_MULTIPLY_STRENGTH) {
+  return interpolateColor(DAY_NIGHT_COLORS.day, dayNightCurveColor(worldTimeSeconds), Math.max(0, Math.min(1, Number(strength) || 0)));
 }
 
 export function smoothstep(t) {

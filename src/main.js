@@ -54,7 +54,16 @@ import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./colliderDebugOverrides.js";
 import { loadAssetProfiles, saveAssetProfiles } from "./assetProfiles.js";
-import { getColliderResizeEdges, resizeColliderDraft } from "./colliderResize.js";
+import {
+  WALL_COLLIDER_GROUPS,
+  assetDepthFromPivot,
+  hasIncidentWall,
+  isWallPlacementBlocked,
+  migrateDirectionalWallOverrides,
+  placementMidpointOffset,
+  wallColliderGroup,
+} from "./buildWorldGeometry.js";
+import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./colliderResize.js";
 import { createBuildModeRuntime } from "./buildModeRuntime.js";
 import {
   BUILD_CARPET_FRAME_BY_MASK,
@@ -67,10 +76,10 @@ import {
   getBuildWallFrames,
 } from "./buildAssetCatalog.js";
 import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
-import { DEFAULT_RESOURCE_ID, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
+import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
 import { createDebrisRuntime } from "./debrisRuntime.js";
-import { FACILITY_INTERACTION_KIND, FACILITIES, PLATED_DISH_ASSET, preloadFacilityAssets } from "./facilityConfig.js";
+import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, PLATED_DISH_ASSET, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
 import { drawBed } from "./debrisRuntime.js";
 import { drawFacility } from "./facilityPreviewVisuals.js";
@@ -315,6 +324,16 @@ class WorldScene extends Phaser.Scene {
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
     this.interactKeys = this.input.keyboard.addKeys("SPACE");
     this.runKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.gameHudHidden = false;
+    this.gameHudConfirmationActive = false;
+    this.cookingOverlayActive = false;
+    this.onHudToggleKey = (event) => {
+      if (event?.repeat) return;
+      event?.preventDefault?.();
+      this.gameHudHidden = !this.gameHudHidden;
+      this.syncGameplayHudVisibility();
+    };
+    this.input.keyboard.on("keydown-X", this.onHudToggleKey);
     this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
   }
 
@@ -656,9 +675,14 @@ class WorldScene extends Phaser.Scene {
         this.saveSession();
       },
       onColliderVisibilityChange: (visible) => this.setColliderDebugVisible(visible),
+      onBuildGridVisibilityChange: (visible) => this.buildMode?.setGridEnabled?.(visible),
       onColliderEditModeChange: (active) => this.setColliderEditMode(active),
       onPivotEditModeChange: (active) => this.setPivotEditMode(active),
+      onVisualOffsetEditModeChange: (active) => this.setVisualOffsetEditMode(active),
       onColliderDraftConfirm: () => this.confirmColliderDraft(),
+      onColliderRound: () => this.roundSelectedCollider(),
+      onPivotAlign: (axis) => this.alignSelectedPivot(axis),
+      onVisualOffsetReset: () => this.resetSelectedVisualOffset(),
       onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
       getStatusSnapshot: () => {
         if (!this.playerCharacter) return null;
@@ -686,6 +710,14 @@ class WorldScene extends Phaser.Scene {
     this.input.on("pointermove", this.onPivotEditPointerMove);
     this.input.on("pointerup", this.onPivotEditPointerUp);
     this.input.keyboard.on("keydown", this.onPivotKeyDown);
+    this.onVisualOffsetEditPointerDown = (pointer) => this.beginVisualOffsetEditPointer(pointer);
+    this.onVisualOffsetEditPointerMove = (pointer) => this.continueVisualOffsetEditPointer(pointer);
+    this.onVisualOffsetEditPointerUp = () => { this.visualOffsetDrag = null; };
+    this.onVisualOffsetKeyDown = (event) => this.handleVisualOffsetKeyDown(event);
+    this.input.on("pointerdown", this.onVisualOffsetEditPointerDown);
+    this.input.on("pointermove", this.onVisualOffsetEditPointerMove);
+    this.input.on("pointerup", this.onVisualOffsetEditPointerUp);
+    this.input.keyboard.on("keydown", this.onVisualOffsetKeyDown);
   }
 
   updateMovementDebugStatus() {
@@ -701,7 +733,11 @@ class WorldScene extends Phaser.Scene {
 
   setColliderEditMode(active) {
     this.colliderEditEnabled = Boolean(active);
-    if (this.colliderEditEnabled) this.setColliderDebugVisible(true);
+    if (this.colliderEditEnabled) {
+      this.setColliderDebugVisible(true);
+      this.colliderEditSelection = null;
+      this.movementDebugPanel?.setColliderEditorState?.(null);
+    }
     else {
       this.colliderEditSelection = null;
       this.movementDebugPanel?.setColliderEditorState?.(null);
@@ -768,6 +804,30 @@ class WorldScene extends Phaser.Scene {
     return { status: "saved", id: selection.id };
   }
 
+  roundSelectedCollider() {
+    const selection = this.colliderEditSelection;
+    if (!selection) return { status: "empty" };
+    if (!this.assetProfiles?.[selection.groupKey]) return { status: "unsupported" };
+    selection.draft = roundColliderDraftToGrid(selection.draft, PLACEMENT_CELL_SIZE, 2);
+    this.syncColliderEditorPanel();
+    this.renderColliderDebug();
+    return { status: "rounded", id: selection.id, draft: { ...selection.draft } };
+  }
+
+  alignSelectedPivot(axis) {
+    const selection = this.movementDebugPanel?.authoringRuntime?.alignPivotToCollider?.(axis) ?? null;
+    this.movementDebugPanel?.setPivotEditorState?.(selection);
+    this.renderPivotDebug();
+    return selection;
+  }
+
+  resetSelectedVisualOffset() {
+    const selection = this.movementDebugPanel?.authoringRuntime?.resetVisualOffset?.() ?? null;
+    this.movementDebugPanel?.setVisualOffsetEditorState?.(selection);
+    this.renderVisualOffsetDebug();
+    return selection;
+  }
+
   syncColliderEditorPanel() {
     const selection = this.colliderEditSelection;
     this.movementDebugPanel?.setColliderEditorState?.(selection ? {
@@ -787,26 +847,40 @@ class WorldScene extends Phaser.Scene {
       const [x, y] = cell.split(",").map(Number);
       graphics.fillRect(x * this.worldLayout.cellSize, y * this.worldLayout.cellSize, this.worldLayout.cellSize, this.worldLayout.cellSize);
     }
-    graphics.lineStyle(1, 0xff4f63, 0.95);
+    graphics.lineStyle(1, 0xff4f63, 0.55);
     for (const box of [...this.worldLayout.wallColliders, ...this.worldLayout.objectColliders]) {
-      graphics.strokeRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+      const pixelBounds = getPixelColliderBounds(box);
+      graphics.strokeRect(
+        pixelBounds.left + 0.5,
+        pixelBounds.top + 0.5,
+        pixelBounds.right - pixelBounds.left,
+        pixelBounds.bottom - pixelBounds.top,
+      );
     }
-    graphics.lineStyle(1, 0x54d8ff, 0.95);
+    graphics.lineStyle(1, 0x54d8ff, 0.55);
     for (const character of this.characterSystem?.values?.() ?? []) {
       const box = getFootBox(character.motor.position, character.footWidth, character.footDepth);
       graphics.strokeRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
     }
     const draft = this.colliderEditSelection?.draft;
     if (draft) {
-      graphics.lineStyle(1, 0x62ff91, 1);
-      graphics.strokeRect(draft.left, draft.top, draft.right - draft.left, draft.bottom - draft.top);
-      graphics.fillStyle(0x62ff91, 1);
+      const pixelBounds = getPixelColliderBounds(draft);
+      const centerX = Math.round((pixelBounds.left + pixelBounds.right) / 2);
+      const centerY = Math.round((pixelBounds.top + pixelBounds.bottom) / 2);
+      graphics.lineStyle(1, 0x62ff91, 0.55);
+      graphics.strokeRect(
+        pixelBounds.left + 0.5,
+        pixelBounds.top + 0.5,
+        pixelBounds.right - pixelBounds.left,
+        pixelBounds.bottom - pixelBounds.top,
+      );
+      graphics.fillStyle(0xffffff, 1);
       for (const [x, y] of [
-        [draft.left, draft.top], [(draft.left + draft.right) / 2, draft.top], [draft.right, draft.top],
-        [draft.left, (draft.top + draft.bottom) / 2], [draft.right, (draft.top + draft.bottom) / 2],
-        [draft.left, draft.bottom], [(draft.left + draft.right) / 2, draft.bottom], [draft.right, draft.bottom],
+        [pixelBounds.left, pixelBounds.top], [centerX, pixelBounds.top], [pixelBounds.right, pixelBounds.top],
+        [pixelBounds.left, centerY], [pixelBounds.right, centerY],
+        [pixelBounds.left, pixelBounds.bottom], [centerX, pixelBounds.bottom], [pixelBounds.right, pixelBounds.bottom],
       ]) {
-        graphics.fillRect(x - 1, y - 1, 3, 3);
+        graphics.fillRect(x, y, 1, 1);
       }
     }
   }
@@ -823,7 +897,8 @@ class WorldScene extends Phaser.Scene {
       onLanguageChange: () => this.interactionRuntime?.refresh?.(),
       onOptionsChange: (active) => this.cookingRuntime?.setInputSuppressed?.(active),
       onConfirmationChange: (active) => {
-        this.interactionHud?.setSuppressed?.(active);
+        this.gameHudConfirmationActive = Boolean(active);
+        this.syncGameplayHudVisibility();
         this.cookingRuntime?.setInputSuppressed?.(active);
         if (!active) this.interactionRuntime?.refresh?.();
       },
@@ -836,8 +911,9 @@ class WorldScene extends Phaser.Scene {
       sessionState: this.sessionState,
       localization: this.localization,
       onActiveChange: (active) => {
+        this.cookingOverlayActive = Boolean(active);
         this.gameHud?.setGameplayOverlayActive?.(active);
-        this.interactionHud?.setSuppressed?.(active);
+        this.syncGameplayHudVisibility();
         this.mobileJoystick?.reset?.();
         if (active) {
           const player = this.characterSystem?.require?.(this.sessionState.playerId);
@@ -905,15 +981,20 @@ class WorldScene extends Phaser.Scene {
       onActionBegin: () => this.beginBuildAction(),
       onActionEnd: () => this.endBuildAction(),
       onUndo: () => this.undoBuildAction(),
+      getPlacementAnchorOffset: (item) => this.getBuildPlacementAnchorOffset(item),
       isActivationAllowed: () => !this.cookingRuntime?.isActive?.(),
       onModeChange: (active) => {
-        this.gameHud?.setSuppressed?.(active);
-        this.interactionHud?.setSuppressed?.(active);
+        this.syncGameplayHudVisibility();
         this.movementDebugPanel?.setSuppressed?.(active);
         this.mobileJoystick?.reset?.();
         if (!active) this.interactionRuntime?.refresh?.();
       },
     });
+    const syncBuildGridVisibility = () => this.buildMode?.setGridEnabled?.(
+      Boolean(this.movementDebugPanel?.buildGridCheckbox?.checked),
+    );
+    syncBuildGridVisibility();
+    globalThis.queueMicrotask?.(syncBuildGridVisibility);
   }
 
   beginBuildAction() {
@@ -957,9 +1038,55 @@ class WorldScene extends Phaser.Scene {
   getBuildMoveTarget(point) {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const facility = this.facilityRuntime?.getDefinitionAt?.(hitPoint);
-    if (facility) return { kind: "facility", definition: facility };
+    if (facility) {
+      const profileKey = `facility:${facility.facilityType}`;
+      return {
+        kind: "facility",
+        definition: facility,
+        profileKey,
+        placementPosition: { x: facility.footprint.x, y: facility.footprint.y },
+        snapAnchorOffset: this.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: 0, y: 0 },
+      };
+    }
     const bed = this.debrisRuntime?.getBedDefinitionAt?.(hitPoint);
-    return bed ? { kind: "bed", definition: bed } : null;
+    const bounds = bed ? this.debrisRuntime?.getBedBounds?.(bed.id) : null;
+    return bed && bounds ? {
+      kind: "bed",
+      definition: bed,
+      profileKey: "furniture:bed",
+      placementPosition: { x: bounds.left, y: bounds.top },
+      snapAnchorOffset: this.assetProfiles?.["furniture:bed"]?.snapAnchorOffset ?? { x: 0, y: 0 },
+    } : null;
+  }
+
+  getBuildPlacementAnchorOffset(item) {
+    const profileKey = item?.placement === "facility"
+      ? `facility:${item.facilityType}`
+      : item?.placement === "bed"
+        ? "furniture:bed"
+        : item?.resourceProfileId ? `resource:${item.resourceProfileId}` : null;
+    if (!profileKey) return { x: 0, y: 0 };
+    const placementPosition = { x: 0, y: 0 };
+    const baseCollider = item.placement === "facility"
+      ? { left: 0, right: FACILITY_ASSETS[item.facilityType].width, top: 0, bottom: FACILITY_ASSETS[item.facilityType].height }
+      : item.placement === "bed"
+        ? { left: 0, right: TILE_SIZE, top: 0, bottom: TILE_SIZE }
+        : { left: TILE_SIZE, right: TILE_SIZE * 2, top: TILE_SIZE * 3, bottom: TILE_SIZE * 4 };
+    const effectiveCollider = this.worldLayout.getEffectiveCollider(baseCollider, profileKey);
+    return placementMidpointOffset({
+      placementPosition,
+      pivotOffset: this.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: 0, y: 0 },
+      effectiveCollider,
+    });
+  }
+
+  syncGameplayHudVisibility() {
+    const buildActive = this.buildMode?.isActive?.() ?? false;
+    this.gameHud?.setSuppressed?.(this.gameHudHidden || buildActive);
+    this.interactionHud?.setSuppressed?.(
+      this.gameHudHidden || buildActive || this.cookingOverlayActive || this.gameHudConfirmationActive,
+    );
+    if (this.gameHudHidden) this.mobileJoystick?.reset?.();
   }
 
   applyBuildMove(target, point) {
@@ -982,7 +1109,8 @@ class WorldScene extends Phaser.Scene {
   renderBuildMovePreview(target, point) {
     this.clearBuildPreview();
     if (!target?.definition) return;
-    const graphics = this.add.graphics().setPosition(point.x, point.y).setDepth(8988).setAlpha(0.58);
+    const visualOffset = this.assetProfiles?.[target.profileKey]?.visualOffset ?? { x: 0, y: 0 };
+    const graphics = this.add.graphics().setPosition(point.x + visualOffset.x, point.y + visualOffset.y).setDepth(8988).setAlpha(0.58);
     if (target.kind === "bed") drawBed(graphics, 0x7dff9a);
     else drawFacility(graphics, target.definition.facilityType, 0x7dff9a);
     this.buildPreviewObjects.push(graphics);
@@ -993,13 +1121,14 @@ class WorldScene extends Phaser.Scene {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const target = this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
       ?? this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
-    if (!target) return;
+    if (!target) return false;
     const targets = target.targets.map((object) => ({ target: object, alpha: object.alpha ?? 1 }));
     for (const { target: object } of targets) {
       object.setTint?.(0x68ff8c);
       object.setAlpha?.(0.82);
     }
     this.buildDemolitionHighlight = { targets, overlay: null };
+    return true;
   }
 
   undoBuildAction() {
@@ -1023,13 +1152,41 @@ class WorldScene extends Phaser.Scene {
     this.buildDemolitionHighlight = null;
   }
 
-  addBuildPreviewImage(x, y, textureKey, frame, depth = 8988) {
+  addBuildPreviewImage(x, y, textureKey, frame, depth = 8988, tint = null) {
     const sprite = this.add.image(x, y, textureKey, frame)
       .setOrigin(0)
       .setDepth(depth)
       .setAlpha(0.52);
+    if (tint !== null) sprite.setTint(tint);
     this.buildPreviewObjects.push(sprite);
     return sprite;
+  }
+
+  isBuildObjectPlacementBlocked(item, point) {
+    let collider = null;
+    let profileKey = null;
+    if (item?.placement === "facility") {
+      const asset = FACILITY_ASSETS[item.facilityType];
+      collider = asset ? {
+        left: point.x,
+        right: point.x + asset.width,
+        top: point.y,
+        bottom: point.y + asset.height,
+      } : null;
+      profileKey = `facility:${item.facilityType}`;
+    } else if (item?.placement === "bed") {
+      collider = { left: point.x, right: point.x + TILE_SIZE, top: point.y, bottom: point.y + TILE_SIZE };
+      profileKey = "furniture:bed";
+    } else if (item?.placement === "tree") {
+      collider = {
+        left: point.x + TILE_SIZE,
+        right: point.x + 2 * TILE_SIZE,
+        top: point.y + 3 * TILE_SIZE,
+        bottom: point.y + 4 * TILE_SIZE,
+      };
+      profileKey = `resource:${item.resourceProfileId}`;
+    }
+    return Boolean(collider && this.worldLayout.isBlockedBox(this.worldLayout.getEffectiveCollider(collider, profileKey)));
   }
 
   renderBuildPreview(item, points) {
@@ -1059,22 +1216,29 @@ class WorldScene extends Phaser.Scene {
     }
     if (item.placement === "bed" || item.placement === "facility") {
       for (const point of uniquePoints) {
-        const graphics = this.add.graphics().setPosition(point.x, point.y).setDepth(8988).setAlpha(0.52);
-        if (item.placement === "bed") drawBed(graphics);
-        else drawFacility(graphics, item.facilityType);
+        const profileKey = item.placement === "bed" ? "furniture:bed" : `facility:${item.facilityType}`;
+        const visualOffset = this.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
+        const tint = this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null;
+        const graphics = this.add.graphics().setPosition(point.x + visualOffset.x, point.y + visualOffset.y).setDepth(8988).setAlpha(0.52);
+        if (item.placement === "bed") drawBed(graphics, tint);
+        else drawFacility(graphics, item.facilityType, tint);
         this.buildPreviewObjects.push(graphics);
       }
       return;
     }
     for (const point of uniquePoints) {
       if (item.placement === "tree") {
+        const visualOffset = this.assetProfiles?.[`resource:${item.resourceProfileId}`]?.visualOffset ?? { x: 0, y: 0 };
+        const tint = this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null;
         for (let row = 0; row < 4; row += 1) {
           for (let column = 0; column < 3; column += 1) {
             this.addBuildPreviewImage(
-              point.x + column * TILE_SIZE,
-              point.y + row * TILE_SIZE,
+              point.x + column * TILE_SIZE + visualOffset.x,
+              point.y + row * TILE_SIZE + visualOffset.y,
               item.textureKey,
               row * 9 + column,
+              8988,
+              tint,
             );
           }
         }
@@ -1257,27 +1421,33 @@ class WorldScene extends Phaser.Scene {
     const sprites = [];
     let bounds = { left: point.x, right: point.x + TILE_SIZE, top: point.y, bottom: point.y + TILE_SIZE };
     let collider = null;
+    let colliderGroup = null;
     if (item.placement === "tree") {
+      const profileKey = `resource:${item.resourceProfileId}`;
+      const profile = this.assetProfiles?.[profileKey];
+      const visualOffset = profile?.visualOffset ?? { x: 0, y: 0 };
+      const depth = assetDepthFromPivot(point, profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 });
       for (let row = 0; row < 4; row += 1) {
         for (let column = 0; column < 3; column += 1) {
           sprites.push(this.add.image(
-            point.x + column * TILE_SIZE,
-            point.y + row * TILE_SIZE,
+            point.x + column * TILE_SIZE + visualOffset.x,
+            point.y + row * TILE_SIZE + visualOffset.y,
             item.textureKey,
             row * 9 + column,
-          ).setOrigin(0).setDepth(500 + point.y + 4 * TILE_SIZE));
+          ).setOrigin(0).setDepth(depth));
         }
       }
       bounds = { left: point.x, right: point.x + 3 * TILE_SIZE, top: point.y, bottom: point.y + 4 * TILE_SIZE };
       collider = { left: point.x + TILE_SIZE, right: point.x + 2 * TILE_SIZE, top: point.y + 3 * TILE_SIZE, bottom: point.y + 4 * TILE_SIZE };
+      colliderGroup = profileKey;
     } else {
       sprites.push(this.add.image(point.x, point.y, item.textureKey, item.frame).setOrigin(0).setDepth(1));
     }
-    if (collider && this.worldLayout.isBlockedBox(collider)) {
+    if (collider && this.worldLayout.isBlockedBox(this.worldLayout.getEffectiveCollider(collider, colliderGroup))) {
       for (const sprite of sprites) sprite.destroy();
       return { status: "blocked" };
     }
-    const colliderGroup = collider ? `build:${item.placement ?? item.id}` : null;
+    colliderGroup ??= collider ? `build:${item.placement ?? item.id}` : null;
     if (collider) this.worldLayout.setWorldObjectCollider(id, collider, colliderGroup);
     this.buildPlacedObjects.set(id, {
       id,
@@ -1376,8 +1546,13 @@ class WorldScene extends Phaser.Scene {
     if (context.gesture === "drag" && context.previousPoint) {
       const edge = this.getBuildWallEdgeBetweenVertices(context.previousPoint, point);
       if (!edge || this.buildWallEdges.has(this.buildWallEdgeKey(edge))) return { status: "exists" };
-      const { collider, placementProbe } = this.getBuildWallEdgeGeometry(edge);
-      if (this.worldLayout.isBlockedBox(placementProbe) || this.doesPlayerOverlapBox(collider)) {
+      const { collider } = this.getBuildWallEdgeGeometry(edge);
+      if (isWallPlacementBlocked({
+        edge,
+        collider,
+        colliders: this.worldLayout.getBlockingColliders(collider),
+        tileSize: TILE_SIZE,
+      }) || this.doesPlayerOverlapBox(collider)) {
         return { status: "blocked" };
       }
       const id = this.addBuildWallEdge(item, edge);
@@ -1397,13 +1572,13 @@ class WorldScene extends Phaser.Scene {
       top: point.y - 2,
       bottom: point.y + 2,
     };
-    const overlapsExistingWall = this.hasBuildWallVertex(point);
-    if ((!overlapsExistingWall && this.worldLayout.isBlockedBox(nodeCollider))
+    if (hasIncidentWall(this.getBuildWallIncidents(point))
+      || this.worldLayout.isBlockedBox(nodeCollider)
       || this.doesPlayerOverlapBox(nodeCollider)) {
       return { status: "blocked" };
     }
     const id = `editor-wall-node-${++this.nextBuildObjectId}`;
-    this.worldLayout.setWorldObjectCollider(id, nodeCollider, "build:wall-node");
+    this.worldLayout.setWorldObjectCollider(id, nodeCollider, WALL_COLLIDER_GROUPS.node, { wallNode: { x: point.x, y: point.y } });
     this.buildPlacedObjects.set(id, {
       id,
       kind: "wall-node",
@@ -1418,7 +1593,7 @@ class WorldScene extends Phaser.Scene {
       },
       collider: true,
       colliderBounds: nodeCollider,
-      colliderGroup: "build:wall-node",
+      colliderGroup: WALL_COLLIDER_GROUPS.node,
       textureKey: item.textureKey,
     });
     this.buildWallNodes.set(key, id);
@@ -1440,9 +1615,9 @@ class WorldScene extends Phaser.Scene {
   addBuildWallEdge(item, point) {
     const edge = this.buildWallEdgeKey(point);
     if (this.buildWallEdges.has(edge)) return null;
-    const { bounds, collider } = this.getBuildWallEdgeGeometry(point);
+    const { bounds, baseCollider, groupKey } = this.getBuildWallEdgeGeometry(point);
     const id = `editor-wall-${++this.nextBuildObjectId}`;
-    this.worldLayout.setWorldObjectCollider(id, collider, "build:wall");
+    this.worldLayout.setWorldObjectCollider(id, baseCollider, groupKey, { wallEdge: { ...point } });
     this.buildPlacedObjects.set(id, {
       id,
       kind: "wall",
@@ -1451,8 +1626,8 @@ class WorldScene extends Phaser.Scene {
       sprites: [],
       bounds,
       collider: true,
-      colliderBounds: collider,
-      colliderGroup: "build:wall",
+      colliderBounds: baseCollider,
+      colliderGroup: groupKey,
       textureKey: item.textureKey,
     });
     this.buildWallEdges.set(edge, id);
@@ -1520,7 +1695,9 @@ class WorldScene extends Phaser.Scene {
     this.pivotEditEnabled = Boolean(active);
     if (!this.pivotDebugGraphics) this.pivotDebugGraphics = this.add.graphics().setDepth(8975);
     this.pivotDebugGraphics.setVisible(this.pivotEditEnabled);
-    if (!this.pivotEditEnabled) {
+    if (this.pivotEditEnabled) {
+      this.movementDebugPanel?.setPivotEditorState?.(null);
+    } else {
       this.pivotDrag = null;
       this.movementDebugPanel?.authoringRuntime?.clearPivotSelection?.();
       this.movementDebugPanel?.setPivotEditorState?.(null);
@@ -1581,6 +1758,72 @@ class WorldScene extends Phaser.Scene {
     graphics.fillRect(Math.round(marker.x), Math.round(marker.y), 1, 1);
   }
 
+  setVisualOffsetEditMode(active) {
+    this.visualOffsetEditEnabled = Boolean(active);
+    if (!this.visualOffsetDebugGraphics) this.visualOffsetDebugGraphics = this.add.graphics().setDepth(8975);
+    this.visualOffsetDebugGraphics.setVisible(this.visualOffsetEditEnabled);
+    if (this.visualOffsetEditEnabled) {
+      this.movementDebugPanel?.setVisualOffsetEditorState?.(null);
+    } else {
+      this.visualOffsetDrag = null;
+      this.movementDebugPanel?.authoringRuntime?.clearVisualOffsetSelection?.();
+      this.movementDebugPanel?.setVisualOffsetEditorState?.(null);
+    }
+    this.renderVisualOffsetDebug();
+  }
+
+  beginVisualOffsetEditPointer(pointer) {
+    if (!this.visualOffsetEditEnabled || this.buildMode?.isActive?.()) return;
+    const point = { x: Math.round(Number(pointer.worldX ?? pointer.x)), y: Math.round(Number(pointer.worldY ?? pointer.y)) };
+    const selection = this.movementDebugPanel?.authoringRuntime?.selectVisualOffsetAt?.(point);
+    if (!selection) {
+      this.movementDebugPanel?.setVisualOffsetEditorState?.(null);
+      this.renderVisualOffsetDebug();
+      return;
+    }
+    this.visualOffsetDrag = { startPoint: point, startOffset: { ...selection.offset } };
+    this.movementDebugPanel?.setVisualOffsetEditorState?.(selection);
+    this.renderVisualOffsetDebug();
+  }
+
+  continueVisualOffsetEditPointer(pointer) {
+    if (!this.visualOffsetEditEnabled || !this.visualOffsetDrag || !pointer.isDown) return;
+    const point = { x: Math.round(Number(pointer.worldX ?? pointer.x)), y: Math.round(Number(pointer.worldY ?? pointer.y)) };
+    const selection = this.movementDebugPanel?.authoringRuntime?.setVisualOffset?.({
+      x: this.visualOffsetDrag.startOffset.x + point.x - this.visualOffsetDrag.startPoint.x,
+      y: this.visualOffsetDrag.startOffset.y + point.y - this.visualOffsetDrag.startPoint.y,
+    });
+    this.movementDebugPanel?.setVisualOffsetEditorState?.(selection);
+    this.renderVisualOffsetDebug();
+  }
+
+  handleVisualOffsetKeyDown(event) {
+    if (!this.visualOffsetEditEnabled) return;
+    const delta = {
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+    }[event?.key];
+    if (!delta) return;
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    const selection = this.movementDebugPanel?.authoringRuntime?.nudgeVisualOffset?.(delta.x, delta.y);
+    this.movementDebugPanel?.setVisualOffsetEditorState?.(selection);
+    this.renderVisualOffsetDebug();
+  }
+
+  renderVisualOffsetDebug() {
+    const graphics = this.visualOffsetDebugGraphics;
+    if (!graphics) return;
+    graphics.clear();
+    if (!this.visualOffsetEditEnabled) return;
+    const bounds = this.movementDebugPanel?.authoringRuntime?.getVisualOffsetSelection?.()?.displayBounds;
+    if (!bounds) return;
+    graphics.lineStyle(1, 0x45e8ff, 0.9);
+    graphics.strokeRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+  }
+
   refreshBuildWallEdgesAtVertex(vertex) {
     for (const edge of [
       { x: vertex.x - TILE_SIZE, y: vertex.y, orientation: "horizontal" },
@@ -1595,13 +1838,12 @@ class WorldScene extends Phaser.Scene {
     const bounds = vertical
       ? { left: point.x - TILE_SIZE, right: point.x + TILE_SIZE, top: point.y, bottom: point.y + TILE_SIZE }
       : { left: point.x - TILE_SIZE / 2, right: point.x + TILE_SIZE * 1.5, top: point.y - TILE_SIZE, bottom: point.y };
-    const collider = vertical
+    const baseCollider = vertical
       ? { left: point.x - 2, right: point.x + 2, top: point.y, bottom: point.y + TILE_SIZE }
       : { left: point.x, right: point.x + TILE_SIZE, top: point.y - 2, bottom: point.y + 2 };
-    const placementProbe = vertical
-      ? { ...collider, top: collider.top + 2, bottom: collider.bottom - 2 }
-      : { ...collider, left: collider.left + 2, right: collider.right - 2 };
-    return { vertical, bounds, collider, placementProbe };
+    const groupKey = wallColliderGroup(point.orientation);
+    const collider = this.worldLayout.getEffectiveCollider(baseCollider, groupKey);
+    return { vertical, bounds, baseCollider, collider, groupKey };
   }
 
   getAdjacentBuildWallEdges(point) {
@@ -1877,9 +2119,14 @@ class WorldScene extends Phaser.Scene {
   restoreBuildPlacedObject(placed) {
     if (!placed || this.buildPlacedObjects.has(placed.id)) return false;
     const restored = { ...placed, sprites: [] };
+    if (restored.kind === "wall") restored.colliderGroup = wallColliderGroup(restored.point.orientation);
+    if (restored.kind === "wall-node") restored.colliderGroup = WALL_COLLIDER_GROUPS.node;
     this.buildPlacedObjects.set(restored.id, restored);
     if (restored.collider && restored.colliderBounds) {
-      this.worldLayout.setWorldObjectCollider(restored.id, restored.colliderBounds, restored.colliderGroup ?? restored.id);
+      const metadata = restored.kind === "wall"
+        ? { wallEdge: { ...restored.point } }
+        : restored.kind === "wall-node" ? { wallNode: { ...restored.point } } : null;
+      this.worldLayout.setWorldObjectCollider(restored.id, restored.colliderBounds, restored.colliderGroup ?? restored.id, metadata);
     }
     if (restored.kind === "wall") {
       this.buildWallEdges.set(this.buildWallEdgeKey(restored.point), restored.id);
@@ -1925,7 +2172,11 @@ class WorldScene extends Phaser.Scene {
             restored.point.y + row * TILE_SIZE,
             restored.item.textureKey,
             row * 9 + column,
-          ).setOrigin(0).setDepth(500 + restored.point.y + 4 * TILE_SIZE));
+          ).setOrigin(0).setDepth(assetDepthFromPivot(
+            restored.point,
+            this.assetProfiles?.[`resource:${restored.item.resourceProfileId}`]?.snapAnchorOffset
+              ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
+          )));
         }
       }
       return true;
@@ -2282,6 +2533,18 @@ class WorldScene extends Phaser.Scene {
     this.onPivotEditPointerMove = null;
     this.onPivotEditPointerUp = null;
     this.onPivotKeyDown = null;
+    if (this.onVisualOffsetEditPointerDown) this.input.off("pointerdown", this.onVisualOffsetEditPointerDown);
+    if (this.onVisualOffsetEditPointerMove) this.input.off("pointermove", this.onVisualOffsetEditPointerMove);
+    if (this.onVisualOffsetEditPointerUp) this.input.off("pointerup", this.onVisualOffsetEditPointerUp);
+    if (this.onVisualOffsetKeyDown) this.input.keyboard.off("keydown", this.onVisualOffsetKeyDown);
+    this.onVisualOffsetEditPointerDown = null;
+    this.onVisualOffsetEditPointerMove = null;
+    this.onVisualOffsetEditPointerUp = null;
+    this.onVisualOffsetKeyDown = null;
+    this.visualOffsetDebugGraphics?.destroy();
+    this.visualOffsetDebugGraphics = null;
+    if (this.onHudToggleKey) this.input.keyboard.off("keydown-X", this.onHudToggleKey);
+    this.onHudToggleKey = null;
     this.pivotDebugGraphics?.destroy();
     this.pivotDebugGraphics = null;
     this.colliderDebugGraphics?.destroy();
@@ -2609,7 +2872,7 @@ function migrateColliderOverrideGroups(overrides) {
           : key === TAVERN_SIGN.id ? "facility:tavern-sign" : key;
     migrated[groupKey] = value;
   }
-  return migrated;
+  return migrateDirectionalWallOverrides(migrated);
 }
 
 function drawPixelThumb(graphics) {
