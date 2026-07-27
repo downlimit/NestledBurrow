@@ -14,6 +14,11 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   let editorId = 0;
   let platedDishVisual = null;
 
+  function trackEditorId(id) {
+    const match = /^editor-.+-(\d+)$/.exec(id);
+    if (match) editorId = Math.max(editorId, Number(match[1]));
+  }
+
   function createVisual(facility, { validateFootprint = true } = {}) {
     if ((validateFootprint && worldLayout.isBlockedBox(boundsFor(facility)))
       || worldLayout.isBlockedBox({
@@ -72,6 +77,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   function restore(definition) {
     if (!definition || definitions.has(definition.id) || !createVisual(definition)) return false;
     definitions.set(definition.id, definition);
+    trackEditorId(definition.id);
     return true;
   }
 
@@ -143,6 +149,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   }
 
   for (const facility of definitions.values()) {
+    trackEditorId(facility.id);
     if (!createVisual(facility, { validateFootprint: false })) {
       throw new Error(`Facility ${facility.id} use position must remain walkable`);
     }
