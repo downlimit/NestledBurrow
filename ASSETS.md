@@ -156,14 +156,22 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
 | `public/assets/project/facilities/NestledBurrow_Bed.png` | `incoming/bed.png` | `16×16` | `d828dec6d5056daa5cafbb3c173cfa0e8554b507` |
 | `public/assets/project/facilities/NestledBurrow_Toilet.png` | `incoming/bathroom_toilet.png` | `16×16` | `d9f28cfc22467f365700cf7617d2d0f298fac17f` |
 | `public/assets/project/facilities/NestledBurrow_Bathtub.png` | `incoming/bathroom_bathtub.png` | `32×32` | `8e987e03a7e8047df01e915e5b964bf5a6069906` |
-| `public/assets/project/facilities/NestledBurrow_DiningTableFeast.png` | `incoming/dining_table_feast.png` | `48×16` | `57af651f65f6c6f4ff1ccac55f11819d0832efa3` |
 
 | Runtime file | Byte length | SHA-256 |
 | --- | ---: | --- |
 | `NestledBurrow_Bed.png` | 2,415 | `5046a56d0e9cd13b8f85b34aaea3487fa0fb5626e880ce3179e3428dc8f35e91` |
 | `NestledBurrow_Toilet.png` | 2,433 | `09634a14f5b7bac4327c698f910994e7cce4fd21f37a7c4a7be80dbbbb4ce2b7` |
 | `NestledBurrow_Bathtub.png` | 4,534 | `afe4fee0f9100bfd23435a178ceaa4249be3afa5ef929e73b061f10789b637ff` |
-| `NestledBurrow_DiningTableFeast.png` | 4,101 | `5d26b665750241e94cfcc313e20385b5bb26c734fd663b7b559af626d3dd1316` |
+
+## Project-authored dining table
+
+- **Provenance:** prepared by the Lead with OpenAI image generation from the user's art direction, brought to the exact `48×16` grid version, and delivered to Codex as an immutable runtime binary. Codex did not generate or modify the image.
+- **Runtime file:** `public/assets/project/facilities/NestledBurrow_DiningTableFeast.png`.
+- **Runtime role:** the three-cell dining table used by the world, build library and placement preview; it remains distinct from the serving table.
+- **Native size:** `48×16` RGBA PNG.
+- **Byte length:** 730.
+- **SHA-256:** `37fec3c3d5a521d8ac47592622fc79849c7e6b678fd9b4ae9086962365c54018`.
+- **Git blob SHA:** `d12b16c0e6f4554d77f48f0e73c4e3963c291fd9`.
 
 ## Project-authored tavern sign
 

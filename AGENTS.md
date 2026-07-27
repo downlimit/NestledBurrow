@@ -37,6 +37,13 @@ User feedback and the time needed to evaluate feel are product work, not process
 
 For a changed public identifier, behavior/rate, save field, localization key, action, selector, fixture, E2E helper, or config value: search once for the old value, field name, exact expectations, and aliases; classify matches; update real consumers and targeted coverage; confirm no accidental stale expectation. Never weaken a valid test for CI.
 
+## Visual assets
+
+- Do not invoke image generation or create polished game-art assets unless the task contains the exact sentence `Codex image generation explicitly allowed`.
+- Without that sentence, use only an exact Lead-supplied or already committed binary. Do not redraw, regenerate, reinterpret, replace, recompress, recolor or resize it unless the task explicitly requests that transformation.
+- A temporary placeholder is allowed only when the task explicitly permits a placeholder. If a required binary is absent, invalid or unverifiable, report a blocker before editing instead of generating a substitute.
+- For every visual-asset task, the handoff and final report must state either `Image generation was not invoked.` or quote the explicit permission that authorized it.
+
 ## Validation
 
 Use one strong proof per material risk. A successful proof remains valid until its relevant inputs change. User acceptance does not invalidate successful checks, and a publication phase must not rerun unchanged evidence.
