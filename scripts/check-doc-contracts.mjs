@@ -52,6 +52,9 @@ requireText(agents, [
   "Create one non-draft PR",
   "wait until every job for the current head SHA is terminal",
   "Task #<number> — <name>",
+  "## Visual assets",
+  "Codex image generation explicitly allowed",
+  "Image generation was not invoked.",
 ], "AGENTS.md");
 
 requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
@@ -64,6 +67,9 @@ requireText(lead, [
   "После `принято` Fast-задача",
   "Текущие сигналы",
   "Task #001 — Первая расчистка участка (PR #81)",
+  "одним непрерывным fenced-блоком `text`",
+  "## Visual assets",
+  "Лид не выдаёт Codex SHA сырого transport-объекта",
 ], "LEAD.md");
 
 requireText(architecture, [
@@ -103,7 +109,8 @@ requireText(fastLoop, [
 ], "FAST_LOOP.md");
 
 requireText(roadmap, [
-  "Следующий свободный номер:** `Task #042`",
+  "Следующий свободный номер:** `Task #043`",
+  "Task #042 — Запретить самогенерацию ассетов и обновить обеденный стол",
   "Task #041 — Надёжно сохранять веб-правки коллизий и топологии",
   "Task #040 — Каноническая стартовая расстановка, коллайдеры и посаженные деревья (PR #144)",
   "Task #037 — Не тратить CI на заведомо устаревшую базу",
@@ -173,4 +180,4 @@ for (const [label, text, limit] of [
   assert(text.length <= limit, `${label} exceeds the fast-loop size budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: unlimited product feedback, one-CI accepted publication, portable Windows tooling and CI-to-merge completion are enforced");
+console.log("documentation contracts passed: copy-paste Lead prompts, explicit asset-generation permission, one-CI accepted publication and portable tooling are enforced");
