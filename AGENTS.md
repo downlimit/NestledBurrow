@@ -1,102 +1,92 @@
 <!-- audience: codex -->
 # Codex rules
 
-## Route and identity
+## Route
 
-- Normal flow: user → Lead's compact architecture-aware brief → Codex delivery.
-- Player-visible work uses preview acceptance below. Other direct changes proceed through proportional validation, one Ready PR, final-head CI, same-branch repair, merge, and local `main`.
-- Stop before merge only for explicit `не сливать`, review/report-only work, or a real blocker. Never ask the user to operate GitHub.
-- Integrator is optional; use only when explicitly requested for independent acceptance or genuinely dependent PRs.
-- Report as `Task #<number> — <name>`; after PR creation add `(PR #<number>)`.
-- Preserve supplied Task number, branch, title, and Base SHA. If changing the repo without a Task number, find the next free one with one targeted `ROADMAP.md` lookup. Answer-only work needs none.
+- Normal flow: compact Lead brief → implementation → preview acceptance when visible → one Ready PR → final-head CI → merge.
+- Never ask the user to operate GitHub.
+- Stop before merge only for explicit `не сливать`, report-only work or a real blocker.
+- Draft PR before acceptance is allowed only by explicit user command; it is not a development or CI gate.
+- Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
 
-## Context and setup
+## Context
 
-Read the prompt, this file, `AGENTS.override.md`, and relevant source/tests/config. Open other project docs only to change their facts, allocate a Task number, or find an unresolved owner. Read asset contracts only for external/user binaries.
+Read:
 
-Before editing:
+1. the prompt;
+2. this file and `AGENTS.override.md`;
+3. only the system documents named in the prompt or selected through `LIBRARY.md`;
+4. relevant source, tests and config.
 
-1. Run `git fetch --prune`.
-2. Branch from supplied Base SHA or current `origin/main`; never do normal work on `main`.
-3. Inspect the owner and consumers of changed contracts.
-4. Preserve unrelated user work; avoid unrelated cleanup.
+Do not read `PROJECT.md`, `LEAD.md`, full `GAME.md`, full `ROADMAP.md`, `FAST_LOOP.md`, every `systems/*.md` or historical `tasks/*.md` unless the task explicitly changes their facts. Expand context only after finding a real dependency.
 
-For a dirty/shared checkout or another active task, use one isolated worktree; never switch the shared checkout. Create and use the worktree with one normal user/permission level. Do not mix elevated and non-elevated Git, npm, Vite or cleanup operations in the same worktree.
+Before editing: fetch, branch from supplied Base SHA/current `origin/main`, inspect owner and consumers, preserve unrelated work. Use one isolated normal-permission worktree when needed.
 
-When resuming accepted existing local work after `main` may have advanced, re-read the current `origin/main` version of this contract, fetch, and make the accepted commit a descendant of current `origin/main` before the first push or PR, using rebase or cherry-pick as appropriate. Resolve conflicts and rerun only proofs whose inputs changed. Never open a knowingly stale-base PR or spend CI on a disposable head merely to discover that branch protection requires an update; the normal route has one final-head CI cycle.
+When resuming accepted local work, reread current `origin/main:AGENTS.md`, fetch and make the accepted commit a descendant of current `origin/main` before first push/PR. Never spend CI on a knowingly stale head.
 
-## Scope
+## Scope and architecture
 
-- **Micro:** complete low-risk docs, text metadata, or local `.bat`/`.cmd` launchers that cannot affect runtime, dependencies, or deployment.
-- **Fast (default):** gameplay, UI, content, config, local refactors, bounded fixes.
-- **Strict:** persistence/schema, central state ownership, broad movement/input/collision contracts, dependencies, workflow/deployment/security, external assets/licensing, or dependent PRs.
+- **Micro:** docs, metadata or local launcher with no runtime/dependency/deployment effect.
+- **Fast:** gameplay, UI, content, config and bounded refactors.
+- **Strict:** persistence/schema, central ownership, broad input/collision, dependencies, workflows/security, external assets or dependent PRs.
 
-Use the smallest clean solution; add no dependency, framework, asset, docs, or infrastructure without need.
+Use the smallest clean solution. `src/main.js` is composition only. New domain logic, state machines, persistence, build/editor workflow or service orchestration belongs in a system owner/coordinator. `npm run check:architecture` enforces the current line ceiling; do not bypass it by minifying or compressing code.
 
-User feedback and the time needed to evaluate feel are product work, not process waste. Do not limit feedback rounds or split a coherent result merely to make metrics look smaller. If feedback invalidates an explicit scope exclusion or adds another independent runtime contract, restate the current observable result and boundary in at most five lines, then continue in the same Task unless the user requests a split or a real strict-risk dependency requires one.
+If an accepted change alters a stable system contract, update the corresponding `systems/*.md` in the same PR. Do not add task history or implementation diaries.
 
-For a changed public identifier, behavior/rate, save field, localization key, action, selector, fixture, E2E helper, or config value: search once for the old value, field name, exact expectations, and aliases; classify matches; update real consumers and targeted coverage; confirm no accidental stale expectation. Never weaken a valid test for CI.
+## Changed contracts
+
+For a changed identifier, rate, save field, localization key, action, selector, fixture, helper or config value: search once for old values and aliases, classify matches, update real consumers and targeted coverage. Never weaken a valid test for CI.
 
 ## Visual assets
 
-- Do not invoke image generation or create polished game-art assets unless the task contains the exact sentence `Codex image generation explicitly allowed`.
-- Without that sentence, use only an exact Lead-supplied or already committed binary. Do not redraw, regenerate, reinterpret, replace, recompress, recolor or resize it unless the task explicitly requests that transformation.
-- A temporary placeholder is allowed only when the task explicitly permits a placeholder. If a required binary is absent, invalid or unverifiable, report a blocker before editing instead of generating a substitute.
-- For every visual-asset task, the handoff and final report must state either `Image generation was not invoked.` or quote the explicit permission that authorized it.
+Do not generate polished game art unless the prompt contains exactly `Codex image generation explicitly allowed`.
+
+Otherwise use only exact supplied/committed binaries. Do not redraw, regenerate, reinterpret, recompress, recolor or resize unless explicitly requested. Missing required binary is a blocker. Final report states `Image generation was not invoked.` or quotes the permission.
 
 ## Validation
 
-Use one strong proof per material risk. A successful proof remains valid until its relevant inputs change. User acceptance does not invalidate successful checks, and a publication phase must not rerun unchanged evidence.
+Use one strong proof per material risk. A successful proof remains valid until relevant inputs change.
 
-**Feedback gate:** batch current remarks into one pass. A healthy managed preview is the default proof. Add one smallest named check only for hidden behavior it cannot prove. Defer status/diff review, `git diff --check`, build, docs/scope checks, full suites, screenshots, and E2E until acceptance.
+**Feedback gate:** batch remarks, use one healthy managed preview, add only the smallest check for hidden behavior. Defer diff review, build, full checks, screenshots and E2E until acceptance.
 
-**Micro-feedback:** during preview, `без дополнительных проверок` or equivalent for an existing presentation value: make the edit, reuse proof, health-check preview; skip build, checks, screenshots, E2E. Excludes persistence/schema, public IDs, input/collision, dependencies, workflow/security, and new behavior/architecture; otherwise run the one risk check and state why.
+**Micro-feedback:** presentation-only value changes may reuse prior proof and preview health. Hidden contract changes still receive one targeted check.
 
-**Fast publication after `принято`:** immediately acknowledge that the playable result is accepted and no user action is needed. Stop preview, inspect changed files/full diff once, and run only still-unproven targeted checks for code changed since the last valid proof. A final healthy preview already proves browser startup and the visible result, so skip local `npm run check`, full/focused E2E and a standalone production build unless the task specifically changes bundling, dependencies or another risk unavailable to PR CI. Reach the Ready PR with minimal active work; the normal target is a few minutes, while CI wait is separate.
+**Fast publication after `принято`:** acknowledge acceptance, stop preview, inspect files/full diff once, run only still-unproven targeted checks for code changed since the last proof. Skip local full check, full/focused E2E and standalone build unless a specific bundling/dependency/hidden risk requires them.
 
-**Strict publication:** run `npm run check` once plus only missing task-specific proof. Focused local E2E is exceptional: use it only when a changed hidden interaction/state path cannot be proven by preview or a cheaper contract check. The existence of a related E2E spec alone is not a reason to run it. Full E2E belongs to PR CI.
+**Strict publication:** run `npm run check` once plus only missing task-specific proof. Local E2E is exceptional; full E2E belongs to PR CI.
 
-**Micro/docs/process publication:** run the relevant documentation/launcher check and `git diff --check`; workflow changes also require direct workflow inspection. Do not promote a docs-only change to runtime validation.
+Environment:
 
-Environment/evidence:
-
-- Install dependencies only when missing or changed; prefer the existing npm cache.
-- Python checks are invoked through `scripts/run-python-check.mjs`; do not manually hunt for or hard-code a bundled Python path.
-- Managed preview and focused-E2E operational state belongs in the OS temp directory, not writable repository paths.
-- On `EPERM` or access denied, inspect the exact owned path once. Do not blindly repeat an entire command or suite elevated. Recreate an unusable worktree in a user-writable temp location under the same permission level, then rerun only the failed canonical command.
-- Diagnose deterministic failure with its canonical command; compare current `main` once only when base matters.
-- The focused E2E launcher owns Vite, readiness and shutdown.
-- Prefer stable assertions over moving NPCs, live clocks or whole-session equality. Use runtime for feel; maximum two screenshots. For new or changed visible text, verify RU/EN glyphs, wrapping, clipping and overlap at native `320×180` and coarse-pointer mobile.
-- Keep successful logs compact; load full output only on failure.
+- install dependencies only when missing/changed;
+- Python checks use `scripts/run-python-check.mjs`;
+- preview/E2E state belongs in OS temp;
+- do not mix elevated and normal operations;
+- on `EPERM`, inspect the exact path once and rerun only the failed command;
+- keep successful logs compact;
+- visible text verifies RU/EN, glyphs, wrapping and overlap at `320×180` and mobile.
 
 ## Preview acceptance
 
-Required for player-visible gameplay, HUD/UI, input, scenes, localization, animation, audio, and visual assets. Other work keeps the automatic route.
+Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
-1. Codex implements one feedback batch, starts `npm run preview:task`, then status-confirms its exact URL, HTTP, page errors, and live 320×180 canvas.
-2. Handoff: clickable URL plus compact summary. Codex owns server startup; the user receives no shell startup command. Reuse this URL through feedback.
-3. Before explicit `принято`: edit batch → live refresh → status → handoff. Extra checks follow the feedback gate. No full diff, stage, commit, push, PR, auto-merge, or merge.
-4. Test servers use separate free ports and leave preview running. On status failure, inspect recorded PID/log once, repair, and reverify the canonical URL. A stop permission failure follows the environment rule above; state remains until success.
-5. After `принято`: follow the applicable Fast or Strict publication route once, commit, push, create one Ready PR, enable native auto-merge, and let final-head CI gate the merge. A player-visible repair returns to feedback acceptance only when it changes the accepted experience.
-
-If no local/cloud preview URL is available, report the blocker and stop before publication. Automation never replaces the user's runtime/visual verdict.
+1. Start `npm run preview:task`, status-confirm exact URL, HTTP, page errors and 320×180 canvas.
+2. Reuse one URL through feedback.
+3. Before `принято`: no stage, commit, push, PR, auto-merge or merge unless the user explicitly requests the Draft exception.
+4. After `принято`: applicable publication route once, commit, push, one Ready PR, native auto-merge and final-head CI.
+5. Player-visible repair returns to preview only when it changes the accepted experience.
 
 ## GitHub
 
-- Prefer the GitHub connector; use `gh` only for missing operations/Actions logs. A stale `gh` token cannot block connector-covered work.
-- Create one non-draft PR after local validation and, when gated, `принято`. Draft is only user-requested WIP and never a CI gate.
-- Micro PR classification may skip gameplay/Browser E2E while preserving required check names.
-- Wait for final-head CI; repair deterministic failures in the same branch/PR. Interactive runtime/input/HUD/localization/scene/persistence/E2E-hook changes require green final-head Browser E2E.
-- Before pushing a CI repair, wait until every job for the current head SHA is terminal and collect all deterministic failures into one repair pass.
-- Load only failing steps and assertions from remote logs. Poll CI at least 45 seconds apart. Prefer native auto-merge plus one bounded status wait over repeated polling.
-- After required CI passes, merge and fast-forward local `main` unless prohibited.
-- Never request Codex review or create issues, replacement PRs, or extra branches unless asked.
+Prefer the connector. Create one non-draft PR after acceptance/local validation. Wait for final-head CI; repair deterministic failures in the same branch/PR.
 
-## Special and done
+Before repair, wait until every job for current head is terminal and collect failures in one pass. Load only failing steps. Poll at least 45 seconds apart; prefer auto-merge and one bounded wait.
 
-- `AGENTS.override.md` owns existing-PR repair commands.
-- External/user binaries follow `BINARY_IMPORT.md` and `ASSETS.md` preflight/provenance.
-- Create `tasks/*.md` only for explicitly named large, dependent, resumable, or reused contracts.
-- Pixel-grid/third-party spritesheets retain nearest-neighbor geometry and use metadata/contact sheets, not guessed frames.
+After green CI, merge and update local `main` unless prohibited. Never create review requests, issues, replacement PRs or extra branches without request.
 
-Before completion confirm scope, actual checks, final head/merge SHA, Task-first PR link, residual limitations, and current local `main`.
+## Special
+
+- Existing-PR repair: `AGENTS.override.md`.
+- Binary import: `BINARY_IMPORT.md` and `ASSETS.md`.
+- Durable `tasks/*.md` only for named large/resumable work.
+- Before completion report actual checks, final head/merge SHA, Task-first PR link and residual limitations.
