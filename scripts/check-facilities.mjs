@@ -30,6 +30,15 @@ for (const type of ["cutting-table", "gas-stove", "serving-table"]) {
 }
 assert(existsSync(`public/${PLATED_DISH_ASSET.path}`), "plated dish sprite exists");
 
+const diningTablePath = `public/${FACILITY_ASSETS.table.path}`;
+assert.equal(FACILITY_ASSETS.table.key, "facility.dining-table-feast");
+assert.equal(FACILITY_ASSETS.table.width, 48);
+assert.equal(FACILITY_ASSETS.table.height, 16);
+assert(existsSync(diningTablePath));
+assert.equal(statSync(diningTablePath).size, 730);
+assert.equal(createHash("sha256").update(readFileSync(diningTablePath)).digest("hex"), "37fec3c3d5a521d8ac47592622fc79849c7e6b678fd9b4ae9086962365c54018");
+assert.equal(execFileSync("git", ["hash-object", diningTablePath], { encoding: "utf8" }).trim(), "d12b16c0e6f4554d77f48f0e73c4e3963c291fd9");
+
 const bedPath = `public/${BED_ASSET.path}`;
 assert.equal(BED_ASSET.key, "furniture.bed");
 assert.equal(BED_ASSET.width, 16);
