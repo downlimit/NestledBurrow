@@ -30,7 +30,8 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
         bottom: facility.usePosition.y + 2,
       })) return false;
     worldLayout.setWorldObjectCollider(facility.id, boundsFor(facility), `facility:${facility.facilityType}`);
-    const image = scene.add.image(facility.visual.x, facility.visual.y, facility.visual.key)
+    const offset = scene.assetProfiles?.[`facility:${facility.facilityType}`]?.visualOffset ?? { x: 0, y: 0 };
+    const image = scene.add.image(facility.visual.x + offset.x, facility.visual.y + offset.y, facility.visual.key)
       .setOrigin(0, 0)
       .setDepth(500 + facility.visual.y + facility.visual.height);
     visuals.set(facility.id, image);
@@ -158,17 +159,19 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   }
   const servingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
   if (servingTable) {
+    const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
     platedDishVisual = scene.add.image(
-      servingTable.footprint.x + servingTable.footprint.width / 2,
-      servingTable.footprint.y + 5,
+      servingTable.footprint.x + servingTable.footprint.width / 2 + offset.x,
+      servingTable.footprint.y + 5 + offset.y,
       PLATED_DISH_ASSET.key,
     ).setOrigin(0.5, 0.5).setDepth(501 + servingTable.visual.y + servingTable.visual.height).setVisible(false);
   }
 
   function syncKitchenVisuals() {
     const currentServingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
+    const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
     if (currentServingTable) platedDishVisual
-      ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2, currentServingTable.footprint.y + 5)
+      ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2 + offset.x, currentServingTable.footprint.y + 5 + offset.y)
       ?.setDepth?.(501 + currentServingTable.visual.y + currentServingTable.visual.height);
     platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish) && !isServingDishReserved());
   }
@@ -195,6 +198,28 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     },
     getDefinitions() {
       return [...definitions.values()];
+    },
+    getAuthoringInstances() {
+      return [...definitions.values()].flatMap((facility) => {
+        const visual = visuals.get(facility.id);
+        return visual ? [{
+          id: facility.id,
+          profileKey: `facility:${facility.facilityType}`,
+          anchor: { x: facility.visual.x, y: facility.visual.y },
+          bounds: boundsFor(facility),
+          targets: [visual],
+        }] : [];
+      });
+    },
+    applyAuthoringVisualOffset(profileKey, offset) {
+      for (const facility of definitions.values()) {
+        if (`facility:${facility.facilityType}` !== profileKey) continue;
+        visuals.get(facility.id)?.setPosition?.(facility.visual.x + offset.x, facility.visual.y + offset.y);
+        if (facility.facilityType === "serving-table") platedDishVisual?.setPosition?.(
+          facility.footprint.x + facility.footprint.width / 2 + offset.x,
+          facility.footprint.y + 5 + offset.y,
+        );
+      }
     },
     syncKitchenVisuals,
     add,

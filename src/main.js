@@ -53,6 +53,7 @@ import { HUD_DEPTH } from "./hud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
 import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
 import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./colliderDebugOverrides.js";
+import { loadAssetProfiles, saveAssetProfiles } from "./assetProfiles.js";
 import { getColliderResizeEdges, resizeColliderDraft } from "./colliderResize.js";
 import { createBuildModeRuntime } from "./buildModeRuntime.js";
 import {
@@ -152,7 +153,11 @@ class WorldScene extends Phaser.Scene {
   create() {
     this.movementDebugEnabled = true;
     this.worldLayout = createWorldLayout();
-    this.colliderOverrides = migrateColliderOverrideGroups(loadColliderDebugOverrides(window.localStorage));
+      this.colliderOverrides = migrateColliderOverrideGroups(loadColliderDebugOverrides(window.localStorage));
+      this.assetProfiles = loadAssetProfiles(window.localStorage, this.colliderOverrides);
+      for (const [profileKey, profile] of Object.entries(this.assetProfiles)) {
+        this.colliderOverrides[profileKey] = profile.colliderOffsets;
+      }
     saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
     for (const [id, offsets] of Object.entries(this.colliderOverrides)) {
       this.worldLayout.setColliderOverride(id, offsets);
@@ -652,6 +657,7 @@ class WorldScene extends Phaser.Scene {
       },
       onColliderVisibilityChange: (visible) => this.setColliderDebugVisible(visible),
       onColliderEditModeChange: (active) => this.setColliderEditMode(active),
+      onPivotEditModeChange: (active) => this.setPivotEditMode(active),
       onColliderDraftConfirm: () => this.confirmColliderDraft(),
       onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
       getStatusSnapshot: () => {
@@ -672,6 +678,14 @@ class WorldScene extends Phaser.Scene {
     this.input.on("pointerdown", this.onColliderEditPointerDown);
     this.input.on("pointermove", this.onColliderEditPointerMove);
     this.input.on("pointerup", this.onColliderEditPointerUp);
+    this.onPivotEditPointerDown = (pointer) => this.beginPivotEditPointer(pointer);
+    this.onPivotEditPointerMove = (pointer) => this.continuePivotEditPointer(pointer);
+    this.onPivotEditPointerUp = () => { this.pivotDrag = null; };
+    this.onPivotKeyDown = (event) => this.handlePivotKeyDown(event);
+    this.input.on("pointerdown", this.onPivotEditPointerDown);
+    this.input.on("pointermove", this.onPivotEditPointerMove);
+    this.input.on("pointerup", this.onPivotEditPointerUp);
+    this.input.keyboard.on("keydown", this.onPivotKeyDown);
   }
 
   updateMovementDebugStatus() {
@@ -739,6 +753,13 @@ class WorldScene extends Phaser.Scene {
       bottom: selection.draft.bottom - selection.base.bottom,
     };
     this.colliderOverrides[selection.groupKey] = offsets;
+    if (this.assetProfiles?.[selection.groupKey]) {
+      this.assetProfiles = {
+        ...this.assetProfiles,
+        [selection.groupKey]: { ...this.assetProfiles[selection.groupKey], colliderOffsets: { ...offsets } },
+      };
+      saveAssetProfiles(this.assetProfiles, window.localStorage);
+    }
     this.worldLayout.setColliderOverride(selection.groupKey, offsets);
     saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
     this.colliderEditSelection.draft = { ...this.worldLayout.getWorldObjectColliders().find(({ id }) => id === selection.id)?.rect };
@@ -1495,6 +1516,71 @@ class WorldScene extends Phaser.Scene {
     canonical.extraSprites = sprites.slice(1);
   }
 
+  setPivotEditMode(active) {
+    this.pivotEditEnabled = Boolean(active);
+    if (!this.pivotDebugGraphics) this.pivotDebugGraphics = this.add.graphics().setDepth(8975);
+    this.pivotDebugGraphics.setVisible(this.pivotEditEnabled);
+    if (!this.pivotEditEnabled) {
+      this.pivotDrag = null;
+      this.movementDebugPanel?.authoringRuntime?.clearPivotSelection?.();
+      this.movementDebugPanel?.setPivotEditorState?.(null);
+    }
+    this.renderPivotDebug();
+  }
+
+  beginPivotEditPointer(pointer) {
+    if (!this.pivotEditEnabled || this.buildMode?.isActive?.()) return;
+    const point = { x: Math.round(Number(pointer.worldX ?? pointer.x)), y: Math.round(Number(pointer.worldY ?? pointer.y)) };
+    const runtime = this.movementDebugPanel?.authoringRuntime;
+    const selection = runtime?.selectPivotAt?.(point);
+    if (!selection) {
+      this.movementDebugPanel?.setPivotEditorState?.(null);
+      this.renderPivotDebug();
+      return;
+    }
+    this.pivotDrag = { startPoint: point, startOffset: { ...selection.offset } };
+    this.movementDebugPanel?.setPivotEditorState?.(selection);
+    this.renderPivotDebug();
+  }
+
+  continuePivotEditPointer(pointer) {
+    if (!this.pivotEditEnabled || !this.pivotDrag || !pointer.isDown) return;
+    const point = { x: Math.round(Number(pointer.worldX ?? pointer.x)), y: Math.round(Number(pointer.worldY ?? pointer.y)) };
+    const selection = this.movementDebugPanel?.authoringRuntime?.setPivotOffset?.({
+      x: this.pivotDrag.startOffset.x + point.x - this.pivotDrag.startPoint.x,
+      y: this.pivotDrag.startOffset.y + point.y - this.pivotDrag.startPoint.y,
+    });
+    this.movementDebugPanel?.setPivotEditorState?.(selection);
+    this.renderPivotDebug();
+  }
+
+  handlePivotKeyDown(event) {
+    if (!this.pivotEditEnabled) return;
+    const delta = {
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+    }[event?.key];
+    if (!delta) return;
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    const selection = this.movementDebugPanel?.authoringRuntime?.nudgePivot?.(delta.x, delta.y);
+    this.movementDebugPanel?.setPivotEditorState?.(selection);
+    this.renderPivotDebug();
+  }
+
+  renderPivotDebug() {
+    const graphics = this.pivotDebugGraphics;
+    if (!graphics) return;
+    graphics.clear();
+    if (!this.pivotEditEnabled) return;
+    const marker = this.movementDebugPanel?.authoringRuntime?.getPivotSelection?.()?.marker;
+    if (!marker) return;
+    graphics.fillStyle(0xffff3b, 1);
+    graphics.fillRect(Math.round(marker.x), Math.round(marker.y), 1, 1);
+  }
+
   refreshBuildWallEdgesAtVertex(vertex) {
     for (const edge of [
       { x: vertex.x - TILE_SIZE, y: vertex.y, orientation: "horizontal" },
@@ -2188,6 +2274,16 @@ class WorldScene extends Phaser.Scene {
     this.onColliderEditPointerDown = null;
     this.onColliderEditPointerMove = null;
     this.onColliderEditPointerUp = null;
+    if (this.onPivotEditPointerDown) this.input.off("pointerdown", this.onPivotEditPointerDown);
+    if (this.onPivotEditPointerMove) this.input.off("pointermove", this.onPivotEditPointerMove);
+    if (this.onPivotEditPointerUp) this.input.off("pointerup", this.onPivotEditPointerUp);
+    if (this.onPivotKeyDown) this.input.keyboard.off("keydown", this.onPivotKeyDown);
+    this.onPivotEditPointerDown = null;
+    this.onPivotEditPointerMove = null;
+    this.onPivotEditPointerUp = null;
+    this.onPivotKeyDown = null;
+    this.pivotDebugGraphics?.destroy();
+    this.pivotDebugGraphics = null;
     this.colliderDebugGraphics?.destroy();
     this.colliderDebugGraphics = null;
     this.characterSystem?.destroy();
@@ -2456,6 +2552,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   getMovementVector() {
+    if (this.pivotEditEnabled) return { x: 0, y: 0 };
     if (isPlayerMovementSuppressed({
       sleeping: this.sleeping,
       facilityActive: this.facilityRuntime?.isUsing(),

@@ -25,7 +25,7 @@ const FIELDS = Object.freeze([
 export function loadMovementDebugConfig() { return {}; }
 
 export class MovementDebugPanel {
-  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
+  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
     this.enabled = Boolean(enabled);
     this.gameplayTuning = gameplayTuning;
     this.onGameplayTuningChange = onGameplayTuningChange;
@@ -89,6 +89,10 @@ export class MovementDebugPanel {
     colliderEditCheckbox.type = "checkbox";
     colliderEditCheckbox.addEventListener("change", () => {
       const active = Boolean(colliderEditCheckbox.checked);
+      if (active && pivotEditCheckbox?.checked) {
+        pivotEditCheckbox.checked = false;
+        onPivotEditModeChange(false);
+      }
       if (active && !colliderCheckbox.checked) {
         colliderCheckbox.checked = true;
         onColliderVisibilityChange(true);
@@ -100,6 +104,25 @@ export class MovementDebugPanel {
     panel.append(colliderEditLabel);
     this.colliderEditCheckbox = colliderEditCheckbox;
 
+    const pivotEditLabel = documentRef.createElement("label");
+    const pivotEditName = documentRef.createElement("span");
+    pivotEditName.textContent = "Редактировать пивот";
+    const pivotEditCheckbox = documentRef.createElement("input");
+    pivotEditCheckbox.type = "checkbox";
+    pivotEditCheckbox.addEventListener("change", () => {
+      const active = Boolean(pivotEditCheckbox.checked);
+      if (active && colliderEditCheckbox.checked) {
+        colliderEditCheckbox.checked = false;
+        this.colliderEditor.hidden = true;
+        onColliderEditModeChange(false);
+      }
+      this.colliderEditor.hidden = !active;
+      onPivotEditModeChange(active);
+    });
+    pivotEditLabel.append(pivotEditName, pivotEditCheckbox);
+    panel.append(pivotEditLabel);
+    this.pivotEditCheckbox = pivotEditCheckbox;
+
     const colliderEditor = documentRef.createElement("div");
     colliderEditor.className = "collider-debug-editor";
     colliderEditor.hidden = true;
@@ -108,7 +131,7 @@ export class MovementDebugPanel {
     colliderEditor.append(colliderEditorStatus);
     const colliderConfirm = documentRef.createElement("button");
     colliderConfirm.type = "button";
-    colliderConfirm.textContent = "Сохранить коллайдер";
+    colliderConfirm.textContent = "Сохранить коллайдер и пивот";
     colliderConfirm.addEventListener("click", () => void this.applyColliderDraftToProject());
     colliderEditor.append(colliderConfirm);
     panel.append(colliderEditor);
@@ -197,7 +220,7 @@ export class MovementDebugPanel {
 
   async applyColliderDraftToProject() {
     if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = true;
-    this.setAuthoringStatus("Сохранение коллайдера…");
+      this.setAuthoringStatus("Сохранение профиля коллайдера…");
     try {
       if (!this.authoringRuntime?.applyColliderDraftToProject) {
         const localResult = this.onColliderDraftConfirm();
@@ -209,7 +232,7 @@ export class MovementDebugPanel {
         this.setAuthoringStatus("Сначала выберите коллайдер", true);
         return;
       }
-      this.setAuthoringStatus("Коллайдер сохранён в исходники проекта и браузерный черновик очищен");
+      this.setAuthoringStatus("Профиль сохранён в браузере и применён ко всем экземплярам без перезапуска");
     } catch (error) {
       console.warn("Collider project save failed", error);
       if (error?.localSaved) {
@@ -349,6 +372,13 @@ export class MovementDebugPanel {
       : "Кликните по объекту";
   }
 
+  setPivotEditorState(state) {
+    if (!this.colliderEditorStatus) return;
+    this.colliderEditorStatus.textContent = state?.profileKey
+      ? `${state.profileKey}\nпивот ${state.offset.x}, ${state.offset.y} px`
+      : "Кликните по объекту для редактуры пивота";
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -358,6 +388,7 @@ export class MovementDebugPanel {
     this.toggleButton = null; this.panel = null; this.status = null;
     this.colliderCheckbox = null;
     this.colliderEditCheckbox = null; this.colliderEditor = null; this.colliderEditorStatus = null;
+    this.pivotEditCheckbox = null;
     this.colliderConfirmButton = null; this.layoutSaveButton = null; this.authoringStatus = null;
     this.authoringImportInput = null;
     this.authoringRuntime = null; this.scene = null; this.startingLayoutRestoreListener = null;
