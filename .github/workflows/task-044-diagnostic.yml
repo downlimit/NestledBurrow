@@ -6,42 +6,12 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
-  contracts:
-    name: Diagnostic — ${{ matrix.check }}
+  report:
+    name: Diagnostic report
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        check:
-          - check:docs
-          - check:clock-cycle
-          - check:needs
-          - check:cooking
-          - check:guest
-          - check:binary-import
-          - check:input
-          - check:mobile-camera
-          - check:runtime-components
-          - check:build-mode
-          - check:authoring
-          - check:task-044
-          - check:audio
-          - check:facilities
-          - check:fullscreen
-          - check:hud
-          - check:text-resolution
-          - check:movement
-          - check:character
-          - check:patrol
-          - check:interaction
-          - check:dialogue
-          - check:progress
-          - check:i18n
-          - check:visual
-          - check:world
-          - build
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,4 +22,25 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run ${{ matrix.check }}
+      - name: Capture failing contracts
+        shell: bash
+        run: |
+          set +e
+          npm run check:docs > docs.log 2>&1
+          docs_code=$?
+          npm run check:hud > hud.log 2>&1
+          hud_code=$?
+          {
+            echo 'Task #044 diagnostic output:'
+            echo
+            echo '```text'
+            echo "check:docs exit ${docs_code}"
+            tail -n 40 docs.log
+            echo
+            echo "check:hud exit ${hud_code}"
+            tail -n 40 hud.log
+            echo '```'
+          } > comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+        env:
+          GH_TOKEN: ${{ github.token }}
