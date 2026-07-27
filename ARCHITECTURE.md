@@ -1,182 +1,75 @@
 <!-- audience: lead-chat -->
 # Архитектура NestledBurrow
 
-## Назначение
+## Принцип
 
-`ARCHITECTURE.md` хранит долгоживущую оценку runtime-архитектуры, подтверждённые границы и условные точки следующего выделения. Фактическое состояние всегда сверяется с актуальным `main`; продуктовая зрелость принадлежит `GAME.md`.
+Проект развивается небольшими игровыми slices. Универсальная граница появляется после реального повторяющегося use case, но уже подтверждённые owners не обходятся ради скорости.
 
-## Общая оценка
+Системные контракты описаны в `systems/*.md`; этот документ хранит только межсистемные решения и ограничения.
 
-Архитектура соответствует раннему playable-прототипу и не требует полной перестройки. Проект развивается законченными функциональными slices: временный локальный код допустим для проверки ощущения, а новая универсальная граница вводится после повторного реального use case.
+## Устойчивые границы
 
-Устойчивые разделения:
+- character motor, visual и controller разделены;
+- input и mobile joystick возвращают команды, а не владеют gameplay state;
+- needs, resources, cooking и guest flow имеют domain/runtime owners;
+- session save JSON-safe и versioned;
+- developer authoring отделён от gameplay save;
+- HUD, camera, audio и build UI имеют lifecycle owners;
+- interaction selection остаётся детерминированным контрактом.
 
-- `CharacterMotor` владеет runtime-free movement/controller/collision;
-- `CharacterVisual` владеет Phaser sprite, facing, animation и depth;
-- `CharacterSystem` предоставляет stable-ID registry и ordered update;
-- player и patrol controllers возвращают общий `ControllerCommand`;
-- actor/visual profiles декларативны;
-- collision resolver получает environment contract;
-- `GameSessionState` JSON-safe и versioned;
-- interaction targeting является чистой детерминированной функцией;
-- `InteractionRuntime` отделён от `InteractionHud`;
-- `GameHud`, `MobileJoystick`, `MovementDebugPanel`, `CameraFollowRuntime` и `BuildModeRuntime` имеют собственное lifecycle ownership;
-- needs, facilities, resources и audio имеют выделенные domain/config/runtime-модули.
+## `src/main.js` — только composition root
 
-## Главный текущий риск: `WorldScene` / `src/main.js`
+Разрешённые обязанности `WorldScene`:
 
-`WorldScene` остаётся composition root, но сейчас координирует больше, чем простой wiring:
+- preload;
+- создание owners;
+- передача callbacks и dependencies;
+- порядок update/delegation;
+- lifecycle cleanup;
+- сборка E2E bridge из готовых owners.
 
-- preload и world rendering;
-- создание и связывание runtime-систем;
-- keyboard/action sampling;
-- needs/resource/facility/sleep update;
-- build-mode world preview, placement и demolition presentation;
-- camera presentation sync;
-- audio lifecycle;
-- autosave, reset и E2E bridge;
-- browser listeners и cleanup.
+В `src/main.js` нельзя добавлять новую domain logic, самостоятельную state machine, сериализацию, placement algorithm, editor workflow или крупную presentation subsystem.
 
-Это допустимо для работающего прототипа, однако Task #030–#034 подтвердили рост цены изменений в этом файле. Решение — не общий rewrite, а локальное выделение при следующем содержательном use case.
+Текущий файл уже достиг примерно `2898` строк. `scripts/check-architecture-boundaries.mjs` устанавливает жёсткий предел `2900` строк. Это не целевой размер, а предохранитель: следующая содержательная функция обязана сопровождаться локальным выделением, чтобы файл не рос дальше.
 
-## Условные границы для следующих Лидов
+## Следующие подтверждённые выделения
 
-### Build mode
+### Build и authoring
 
-При следующей задаче, которая существенно меняет build mode, Лид обязан проверить фактический `main` и включить в ТЗ локальное выделение build-mode rendering/orchestration, если новая логика иначе снова разрастается в `WorldScene`.
+Следующая задача, добавляющая build/authoring behavior, должна вынести соответствующую world-facing orchestration из `WorldScene` в отдельный coordinator/runtime. Предпочтительный owner связывает:
 
-Предпочтительное направление:
+- world sprites и topology;
+- placement/move/demolition;
+- profile collider и drag anchor;
+- facilities/resources/build objects;
+- authoring callbacks.
 
-- `BuildModeRuntime` владеет UI/input state, gestures, selection, scroll, prediction и undo lifecycle;
-- catalog/placement metadata остаются в `buildAssetCatalog` и связанных definitions;
-- world-facing build renderer/coordinator получает явные callbacks/contracts от scene;
-- `WorldScene` создаёт компонент и передаёт world/facility/resource owners, но не хранит его внутреннюю state machine.
+`BuildModeRuntime` продолжает владеть UI/input state. `WorldScene` только создаёт coordinator и вызывает его update/cleanup.
 
-Это правило не требует отдельного рефакторинга без gameplay-задачи и не разрешает одновременно переписывать всю world architecture.
+### Tavern service
 
-### Facilities и presentation camera
+Следующая задача, существенно расширяющая гостя, очередь, блюда, оплату или несколько service stations, должна проверить выделение service orchestration из `WorldScene`. Domain rules остаются в cooking/guest modules, а scene только связывает owners.
 
-При следующей задаче, которая одновременно меняет facilities, presentation pose, motor position или camera follow, Лид проверяет возможность выделить только coordination boundary:
+### Facilities и presentation
 
-- facility runtime владеет объектом, collider и use lifecycle;
-- presentation pose не мутирует безопасную motor position;
-- `CameraFollowRuntime` получает presentation position через один явный adapter;
-- sleep/wake и interaction candidate остаются самостоятельными контрактами;
-- `WorldScene` только связывает эти результаты.
+Facility runtime владеет объектом, collider и use lifecycle. Presentation pose не мутирует безопасную motor position. Camera получает presentation target через явный adapter. Sleep/wake и interaction candidate остаются отдельными контрактами.
 
-Не создавать универсальную animation/presentation framework до второго отличающегося паттерна.
+## Запрещённые преждевременные решения
 
-## Принятые направления
+Без отдельного доказанного use case не вводятся:
 
-### Controller и движение
-
-Контроллер возвращает нормализованный `ControllerCommand` с `moveDirection`, optional `aimDirection` и действиями. Он получает snapshot вместо mutable `Character`.
-
-`CharacterMotor` хранит position, movement state/config, controller, collision footprint и blocked axes. `CharacterVisual` синхронизирует presentation из motor snapshot. HP, quests, inventory и save logic в motor/visual не добавляются.
-
-Текущий axis-separated substep collision resolver сохраняется, пока dash, knockback или быстрые сущности не докажут необходимость замены.
-
-### Facing и animation
-
-- `moveDirection` — команда;
-- `velocity` — фактическое движение;
-- `facingDirection` — continuous orientation;
-- cardinal/diagonal frame selection принадлежит visual layer;
-- walk cadence: `step A → neutral → step B → neutral`;
-- после остановки sprite явно возвращается в neutral frame текущего facing.
-
-Назначение pixel frames подтверждается по PNG и contact sheet, а не угадывается по имени или порядку.
-
-### World geometry
-
-Активный environment использует Basic Village. Таверна построена на 16 px world cells, стены — на рёбрах между клетками; render и collision используют общую edge-геометрию. Resource placement сохраняет собственный 8 px grid.
-
-`worldConfig` хранит устойчивые размеры и atlas mappings. `worldLayout` собирает production composition и collision environment. Полное разделение `WorldDefinition` / `WorldRuntime` / `WorldRenderer` вводится только когда переходы между пространствами или повторное авторство мира создадут фактическую потребность.
-
-Tiled/LDtk не вводятся без подтверждённой проблемы ручного авторинга.
-
-### Build mode и developer-authoring
-
-`BuildModeRuntime` и `buildAssetCatalog` поддерживают локализованную library, placement/drag prediction, demolition, grouped undo, surfaces, walls, furniture и группу растений. Player runtime-постройки не входят в gameplay save schema.
-
-`EditorAuthoringRuntime` является отдельной developer-only coordination boundary. Он:
-
-- снимает JSON-safe snapshot управляемой стартовой композиции;
-- применяет checked-in `startingLayoutDefault.js` на чистом запуске и `NEW GAME`;
-- передаёт подтверждённые профильные collider offsets в ограниченный dev-only Vite endpoint;
-- не получает произвольный filesystem/command access и отсутствует как writer в production build.
-
-Канонические collider defaults принадлежат `src/colliderDefaults.js`. `localStorage` хранит только рабочий черновик/fallback и после успешной записи проекта не является источником production-истины. Видимая крона дерева расширяет только editor hit-testing; физическая коллизия и debug-отрисовка используют один collider ствола.
-
-Следующее расширение не должно добавлять ещё один параллельный catalog, placement grid, renderer path или второй authoring transport.
-
-### Session и persistence
-
-`GameSessionState` хранит только JSON-safe устойчивое gameplay state. Persistence использует versioned envelope, validation, явные migrations и fresh-state fallback. Presentation preferences — язык, звук и debug tuning — хранятся отдельно и переживают `NEW GAME`.
-
-Состояние посаженного срубаемого дерева хранится как динамический resource node в session state. Стартовая расстановка и collider defaults являются project-authoring данными, а не пользовательским gameplay save.
-
-Новая save schema является Strict-задачей. Runtime-only experimentation допустима без преждевременного persistence, если граница явно названа.
-
-### Needs, resources и facilities
-
-- needs rates/flow и clamps принадлежат pure domain/config;
-- resources используют immutable profiles и общий interaction/action contract;
-- build-planted tree использует профиль `tree-planted`, стандартный resource progress/reward и stable build-object ID;
-- facilities декларативно задают sprite, footprint, collider и optional presentation pose;
-- world runtime хранит stable IDs и teardown;
-- HUD показывает состояние, но не вычисляет gameplay.
-
-Не строить универсальный inventory/tool/facility/plant framework до появления второго содержательно отличающегося цикла.
-
-### Interaction и dialogue
-
-Interaction descriptors immutable и JSON-like. Targeting учитывает radius, facing, priority, distance и stable ID. `InteractionRuntime` выбирает candidate, разрешает dialogue/action и применяет persistent transition; Phaser presentation принадлежит HUD/runtime-компонентам.
-
-User-facing текст не хранится в session state. Session хранит stable IDs и progress.
-
-### Camera
-
-`CameraFollowRuntime` владеет B/F/C и невидимой follow target. Он получает presentation-позицию после visual update; sleep и facility pose не должны перемещать безопасную motor position. Camera bounds и integer zoom остаются у scene.
-
-### HUD и локализация
-
-`GameHud` уже выделен и владеет screen-space controls, needs/resources, options/new-game lifecycle и hit areas. `InteractionHud` владеет prompts/dialogue. Layout измеряет фактический текст и поддерживает native `320×180` и coarse-pointer mobile.
-
-Локализация использует i18next, ICU и JSON namespaces. Runtime font — Pixelify Sans с Latin/Cyrillic subsets из pinned package. Gameplay/config хранит translation keys, а не готовые строки.
-
-### Audio
-
-`audioRuntime` владеет playlist/no-repeat/crossfade и применением master/music volume к активным трекам. Canonical user audio paths и provenance принадлежат `ASSETS.md`. UI плейлиста и отдельная музыкальная система не вводятся без продуктовой необходимости.
-
-### Browser evidence
-
-Node contract checks являются основным доказательством pure logic. Playwright проверяет интегрированные desktop/mobile flows, persistence, input и отсутствие page errors. Visual feel подтверждается preview пользователем; хрупкие pixel-diff baselines не вводятся.
-
-## Реализованные архитектурные шаги
-
-- общий `ControllerCommand`, actor profiles и collision environment;
-- `CharacterMotor` / `CharacterVisual` / `CharacterSystem`;
-- `MobileJoystick`, `MovementDebugPanel`, `CameraFollowRuntime`;
-- JSON-safe session, versioned persistence и `NEW GAME`;
-- `InteractionRuntime`, `InteractionHud`, dialogue/quest slice;
-- i18next RU/EN и Pixelify Sans;
-- `GameHud`, needs/resource/facility/audio runtimes;
-- edge-grid world geometry;
-- `BuildModeRuntime`, asset catalog и `EditorAuthoringRuntime`;
-- checked-in starting layout/collider defaults с dev-only writers;
-- desktop/mobile Browser E2E.
-
-## Не вводить без доказанной необходимости
-
-- полноценный ECS;
+- ECS;
 - глобальный event bus;
-- dependency injection framework;
-- массовую миграцию на TypeScript;
-- Phaser Physics вместо текущего movement/collision core;
-- A* pathfinding;
-- Tiled или LDtk;
-- крупный механический перенос каталогов;
-- самодельный localization framework;
-- cloud TMS/runtime translation service;
-- универсальную quest/inventory/facility/build framework до второго реального паттерна.
+- универсальный editor framework;
+- общий rewrite `WorldScene`;
+- массовое перемещение файлов ради метрики;
+- dependency только для уменьшения локального кода.
+
+## Изменение архитектуры
+
+Когда задача создаёт новый устойчивый owner:
+
+1. код и targeted check появляются в том же PR;
+2. соответствующий `systems/*.md` обновляется;
+3. `LIBRARY.md` меняется только если появился новый адрес;
+4. этот документ меняется только при межсистемном решении.
