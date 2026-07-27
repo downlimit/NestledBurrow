@@ -83,11 +83,6 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     scene.tweens.add({ targets: graphics, alpha: 0, scaleY: 0.55, duration: 160, ease: "Quad.easeOut", onComplete: () => { graphics.destroy(); visuals.delete(resourceId); onComplete(); } });
   }
 
-  function trackBedId(id) {
-    const match = /^editor-bed-(\d+)$/.exec(id);
-    if (match) nextBedId = Math.max(nextBedId, Number(match[1]));
-  }
-
   function createBed(definition) {
     const bounds = bedBounds(definition);
     worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed");
@@ -95,7 +90,6 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     drawBed(graphics);
     bedDefinitions.set(definition.id, definition);
     bedVisuals.set(definition.id, graphics);
-    trackBedId(definition.id);
   }
 
   function getBedDefinitionAt(point) {
