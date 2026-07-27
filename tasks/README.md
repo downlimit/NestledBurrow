@@ -1,13 +1,13 @@
-# Task contracts
+# Контракты задач
 
-`tasks/*.md` are durable contracts only for work that is large, dependent, resumable or repeatedly reused.
+`tasks/*.md` используются только для большой, зависимой, возобновляемой или многократно используемой работы.
 
-Rules:
+Правила:
 
-- routine tasks use the compact Lead prompt and do not create a file here;
-- a task file names its relevant `systems/*.md`;
-- it does not copy `AGENTS.md`, project history or the whole game description;
-- after completion it becomes historical evidence and is not read by later tasks unless explicitly named;
-- balance and implementation details in an old task file are not current defaults.
+- обычная задача получает компактный prompt Лида и не создаёт здесь отдельный файл;
+- task-файл называет релевантные `systems/*.md`;
+- он не копирует `AGENTS.md`, историю проекта или описание всей игры;
+- после завершения файл становится историей и не читается следующими задачами без прямого указания;
+- баланс и детали реализации старого task-файла не являются актуальными defaults.
 
-Use `tasks/TEMPLATE.md` for a new durable contract.
+Для нового долговечного контракта используется `tasks/TEMPLATE.md`.
