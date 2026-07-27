@@ -5,8 +5,10 @@ import {
 } from "./facilityConfig.js";
 import { TILE_SIZE } from "./worldConfig.js";
 import { getKitchenFacilityPrompt } from "./cookingDomain.js";
+import { clearCurrentWorldScene, setCurrentWorldScene } from "./worldSceneRegistry.js";
 
 export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null, isServingDishReserved = () => false }) {
+  setCurrentWorldScene(scene);
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
   const visuals = new Map();
   let activeFacilityId = null;
@@ -244,6 +246,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      clearCurrentWorldScene(scene);
       activeFacilityId = null;
       for (const [id, image] of visuals) {
         image.destroy();
