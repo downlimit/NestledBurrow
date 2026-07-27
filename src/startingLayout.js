@@ -159,13 +159,19 @@ export function saveStartingLayout(scene, storage = globalThis.localStorage) {
   return layout;
 }
 
+function markLocalLayoutSave(error, layout) {
+  const failure = error instanceof Error ? error : new Error(String(error));
+  failure.localSaved = true;
+  failure.savedValue = layout;
+  return failure;
+}
+
 export async function saveStartingLayoutToProject(scene, {
   storage = globalThis.localStorage,
   fetchImpl = globalThis.fetch,
   baseUrl = import.meta.env?.BASE_URL ?? "/",
 } = {}) {
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
-  const previous = storage?.getItem?.(STARTING_LAYOUT_STORAGE_KEY) ?? null;
   const layout = saveStartingLayout(scene, storage);
   try {
     const response = await fetchImpl(`${baseUrl}${STARTING_LAYOUT_SAVE_ENDPOINT}`, {
@@ -177,12 +183,10 @@ export async function saveStartingLayoutToProject(scene, {
       const detail = await response?.text?.().catch?.(() => "") ?? "";
       throw new Error(detail || `Authoring endpoint returned HTTP ${response?.status ?? "unknown"}`);
     }
-    return layout;
   } catch (error) {
-    if (previous === null) storage?.removeItem?.(STARTING_LAYOUT_STORAGE_KEY);
-    else storage?.setItem?.(STARTING_LAYOUT_STORAGE_KEY, previous);
-    throw error;
+    throw markLocalLayoutSave(error, layout);
   }
+  return layout;
 }
 
 export function loadStartingLayout(storage = globalThis.localStorage, projectDefault = null) {

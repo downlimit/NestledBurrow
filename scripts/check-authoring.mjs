@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import {
+  AUTHORING_BACKUP_VERSION,
+  createAuthoringBackup,
+  createAuthoringBackupSource,
+  restoreAuthoringBackup,
+} from "../src/authoringBackup.js";
+import {
   COLLIDER_DEBUG_STORAGE_KEY,
   COLLIDER_DEFAULTS_SAVE_ENDPOINT,
   createColliderDefaultsModuleSource,
   mergeColliderOverrides,
   normalizeColliderOverrides,
+  saveColliderDebugOverrides,
   saveColliderDebugOverridesToProject,
 } from "../src/colliderDebugOverrides.js";
 import {
@@ -14,9 +21,11 @@ import {
   resolveColliderSelectionPointer,
 } from "../src/editorAuthoringRuntime.js";
 import {
+  STARTING_LAYOUT_STORAGE_KEY,
   STARTING_LAYOUT_VERSION,
   captureStartingLayout,
   createStartingLayoutModuleSource,
+  saveStartingLayoutToProject,
 } from "../src/startingLayout.js";
 import { getResourceProfile } from "../src/resourceDomain.js";
 
@@ -67,7 +76,7 @@ const failedStorage = createStorage();
 await assert.rejects(() => saveColliderDebugOverridesToProject(normalized, {
   storage: failedStorage,
   fetchImpl: async () => ({ ok: false, status: 503, text: async () => "unavailable" }),
-}), /unavailable/);
+}), (error) => error.localSaved === true && /unavailable/.test(error.message));
 assert(failedStorage.getItem(COLLIDER_DEBUG_STORAGE_KEY), "failed project write keeps the local collider edit");
 
 const plantObject = {
@@ -160,4 +169,30 @@ assert.equal(captureStartingLayout(captureScene(true)).buildObjects.length, 0, "
 const layoutModule = createStartingLayoutModuleSource(activeLayout);
 assert(layoutModule.includes('"kind": "plant"'));
 
-console.log("authoring contracts passed: collider defaults are canonical and planted trees yield six wood");
+const failedLayoutStorage = createStorage();
+await assert.rejects(() => saveStartingLayoutToProject(captureScene(false), {
+  storage: failedLayoutStorage,
+  fetchImpl: async () => ({ ok: false, status: 404, text: async () => "static host" }),
+}), (error) => error.localSaved === true && /static host/.test(error.message));
+assert.deepEqual(
+  JSON.parse(failedLayoutStorage.getItem(STARTING_LAYOUT_STORAGE_KEY)),
+  activeLayout,
+  "a static-host project write failure must keep the newly authored room topology in browser storage",
+);
+
+const backupStorage = createStorage();
+backupStorage.setItem(STARTING_LAYOUT_STORAGE_KEY, JSON.stringify(activeLayout));
+saveColliderDebugOverrides(normalized, backupStorage);
+const backup = createAuthoringBackup(backupStorage, new Date("2026-07-27T12:00:00.000Z"));
+assert.equal(backup.version, AUTHORING_BACKUP_VERSION);
+assert.equal(backup.savedAt, "2026-07-27T12:00:00.000Z");
+assert.deepEqual(backup.startingLayout, activeLayout);
+assert.deepEqual(backup.colliderOverrides, normalized);
+const backupSource = createAuthoringBackupSource(backup);
+assert(backupSource.endsWith("\n") && backupSource.includes('"colliderOverrides"'));
+const restoredStorage = createStorage();
+restoreAuthoringBackup(JSON.parse(backupSource), restoredStorage);
+assert.deepEqual(JSON.parse(restoredStorage.getItem(STARTING_LAYOUT_STORAGE_KEY)), activeLayout);
+assert.deepEqual(JSON.parse(restoredStorage.getItem(COLLIDER_DEBUG_STORAGE_KEY)), normalized);
+
+console.log("authoring contracts passed: web drafts survive static hosting and backups roundtrip");
