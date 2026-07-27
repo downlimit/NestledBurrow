@@ -47,6 +47,13 @@ export function saveColliderDebugOverrides(overrides, storage = globalThis.local
   }
 }
 
+function markLocalColliderSave(error, normalized) {
+  const failure = error instanceof Error ? error : new Error(String(error));
+  failure.localSaved = true;
+  failure.savedValue = normalized;
+  return failure;
+}
+
 export async function saveColliderDebugOverridesToProject(overrides, {
   storage = globalThis.localStorage,
   fetchImpl = globalThis.fetch,
@@ -55,14 +62,18 @@ export async function saveColliderDebugOverridesToProject(overrides, {
   if (typeof fetchImpl !== "function") throw new Error("Fetch is unavailable");
   const normalized = normalizeColliderOverrides(overrides);
   saveColliderDebugOverrides(normalized, storage);
-  const response = await fetchImpl(`${baseUrl}${COLLIDER_DEFAULTS_SAVE_ENDPOINT}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(normalized),
-  });
-  if (!response?.ok) {
-    const detail = await response?.text?.().catch?.(() => "") ?? "";
-    throw new Error(detail || `Authoring endpoint returned HTTP ${response?.status ?? "unknown"}`);
+  try {
+    const response = await fetchImpl(`${baseUrl}${COLLIDER_DEFAULTS_SAVE_ENDPOINT}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(normalized),
+    });
+    if (!response?.ok) {
+      const detail = await response?.text?.().catch?.(() => "") ?? "";
+      throw new Error(detail || `Authoring endpoint returned HTTP ${response?.status ?? "unknown"}`);
+    }
+  } catch (error) {
+    throw markLocalColliderSave(error, normalized);
   }
   storage?.removeItem?.(COLLIDER_DEBUG_STORAGE_KEY);
   return normalized;
