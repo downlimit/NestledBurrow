@@ -183,7 +183,12 @@ export class MovementDebugPanel {
     if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = true;
     this.setAuthoringStatus("Сохранение коллайдеров в проект…");
     try {
-      const result = await this.authoringRuntime?.applyColliderDraftToProject?.();
+      if (!this.authoringRuntime?.applyColliderDraftToProject) {
+        const localResult = this.onColliderDraftConfirm();
+        this.setAuthoringStatus(localResult?.status === "empty" ? "Сначала выберите коллайдер" : "Коллайдер применён локально", localResult?.status === "empty");
+        return;
+      }
+      const result = await this.authoringRuntime.applyColliderDraftToProject();
       if (!result || result.status === "empty") {
         this.setAuthoringStatus("Сначала выберите коллайдер", true);
         return;
@@ -201,7 +206,8 @@ export class MovementDebugPanel {
     if (this.layoutSaveButton) this.layoutSaveButton.disabled = true;
     this.setAuthoringStatus("Сохранение стартовой расстановки…");
     try {
-      const layout = await this.authoringRuntime?.saveStartingLayout?.();
+      if (!this.authoringRuntime?.saveStartingLayout) throw new Error("Authoring runtime is unavailable");
+      const layout = await this.authoringRuntime.saveStartingLayout();
       const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.beds?.length ?? 0);
       this.setAuthoringStatus(`Стартовая расстановка сохранена в проекте: ${count} объектов`);
     } catch (error) {
