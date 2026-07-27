@@ -2,6 +2,12 @@ import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./resourceConf
 import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { LARGE_RESOURCE_HP_MULTIPLIER } from "./resourceDomain.js";
 import { attachEditorAuthoringRuntime } from "./editorAuthoringRuntime.js";
+import {
+  AUTHORING_BACKUP_FILENAME,
+  createAuthoringBackup,
+  createAuthoringBackupSource,
+  restoreAuthoringBackup,
+} from "./authoringBackup.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
@@ -102,7 +108,7 @@ export class MovementDebugPanel {
     colliderEditor.append(colliderEditorStatus);
     const colliderConfirm = documentRef.createElement("button");
     colliderConfirm.type = "button";
-    colliderConfirm.textContent = "Применить в проект";
+    colliderConfirm.textContent = "Сохранить коллайдер";
     colliderConfirm.addEventListener("click", () => void this.applyColliderDraftToProject());
     colliderEditor.append(colliderConfirm);
     panel.append(colliderEditor);
@@ -114,6 +120,14 @@ export class MovementDebugPanel {
     this.authoringStatus.className = "movement-debug-status";
     panel.append(this.authoringStatus);
 
+    const importInput = documentRef.createElement("input");
+    importInput.type = "file";
+    importInput.accept = ".json,application/json";
+    importInput.hidden = true;
+    importInput.addEventListener("change", () => void this.importAuthoringBackup(importInput.files?.[0]));
+    panel.append(importInput);
+    this.authoringImportInput = importInput;
+
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
     const actionDefinitions = [
@@ -121,7 +135,9 @@ export class MovementDebugPanel {
       ["Восполнить энергию", onRefillEnergy],
       ["Добавить готовое блюдо", onAddCookedDish],
       ["Вернуть значения по умолчанию", () => this.resetDefaults()],
-      ["Сохранить расстановку как стартовую", () => void this.persistStartingLayout()],
+      ["Сохранить топологию и расстановку", () => void this.persistStartingLayout()],
+      ["Скачать резервную копию редактора", () => this.downloadAuthoringBackup()],
+      ["Загрузить резервную копию редактора", () => this.authoringImportInput?.click?.()],
     ];
     for (const [label, handler] of actionDefinitions) {
       const button = documentRef.createElement("button");
@@ -129,7 +145,7 @@ export class MovementDebugPanel {
       button.textContent = label;
       button.addEventListener("click", handler);
       actions.append(button);
-      if (label === "Сохранить расстановку как стартовую") this.layoutSaveButton = button;
+      if (label === "Сохранить топологию и расстановку") this.layoutSaveButton = button;
     }
     panel.append(actions);
     documentRef.body.append(toggle, panel);
@@ -166,7 +182,7 @@ export class MovementDebugPanel {
       this.startingLayoutRestoreListener = () => {
         try {
           const layout = this.authoringRuntime?.restoreStartingLayout?.();
-          this.setAuthoringStatus(layout ? "Стартовая расстановка загружена" : "Стартовая расстановка: базовая");
+          this.setAuthoringStatus(layout ? "Стартовая расстановка загружена из браузера/проекта" : "Стартовая расстановка: базовая");
         } catch (error) {
           console.warn("Starting layout restore failed", error);
           this.setAuthoringStatus("Ошибка загрузки стартовой расстановки", true);
@@ -181,11 +197,11 @@ export class MovementDebugPanel {
 
   async applyColliderDraftToProject() {
     if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = true;
-    this.setAuthoringStatus("Сохранение коллайдеров в проект…");
+    this.setAuthoringStatus("Сохранение коллайдера…");
     try {
       if (!this.authoringRuntime?.applyColliderDraftToProject) {
         const localResult = this.onColliderDraftConfirm();
-        this.setAuthoringStatus(localResult?.status === "empty" ? "Сначала выберите коллайдер" : "Коллайдер применён локально", localResult?.status === "empty");
+        this.setAuthoringStatus(localResult?.status === "empty" ? "Сначала выберите коллайдер" : "Коллайдер сохранён в браузере", localResult?.status === "empty");
         return;
       }
       const result = await this.authoringRuntime.applyColliderDraftToProject();
@@ -193,10 +209,14 @@ export class MovementDebugPanel {
         this.setAuthoringStatus("Сначала выберите коллайдер", true);
         return;
       }
-      this.setAuthoringStatus("Коллайдеры сохранены в проекте");
+      this.setAuthoringStatus("Коллайдер сохранён в исходники проекта и браузерный черновик очищен");
     } catch (error) {
       console.warn("Collider project save failed", error);
-      this.setAuthoringStatus("Коллайдер применён локально, но проект не записан: нужен локальный dev-preview", true);
+      if (error?.localSaved) {
+        this.setAuthoringStatus("Коллайдер сохранён в браузере. Статический веб-билд не может записать репозиторий.");
+      } else {
+        this.setAuthoringStatus("Ошибка сохранения коллайдера", true);
+      }
     } finally {
       if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = false;
     }
@@ -204,17 +224,61 @@ export class MovementDebugPanel {
 
   async persistStartingLayout() {
     if (this.layoutSaveButton) this.layoutSaveButton.disabled = true;
-    this.setAuthoringStatus("Сохранение стартовой расстановки…");
+    this.setAuthoringStatus("Сохранение топологии и расстановки…");
     try {
       if (!this.authoringRuntime?.saveStartingLayout) throw new Error("Authoring runtime is unavailable");
       const layout = await this.authoringRuntime.saveStartingLayout();
       const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.beds?.length ?? 0);
-      this.setAuthoringStatus(`Стартовая расстановка сохранена в проекте: ${count} объектов`);
+      this.setAuthoringStatus(`Топология и расстановка записаны в исходники проекта: ${count} объектов`);
     } catch (error) {
       console.warn("Starting layout save failed", error);
-      this.setAuthoringStatus("Ошибка сохранения расстановки: нужен локальный dev-preview", true);
+      if (error?.localSaved) {
+        const layout = error.savedValue;
+        const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.beds?.length ?? 0);
+        this.setAuthoringStatus(`Топология и расстановка сохранены в браузере: ${count} объектов. Статический веб-билд не может записать репозиторий.`);
+      } else {
+        this.setAuthoringStatus("Ошибка сохранения топологии и расстановки", true);
+      }
     } finally {
       if (this.layoutSaveButton) this.layoutSaveButton.disabled = false;
+    }
+  }
+
+  downloadAuthoringBackup() {
+    try {
+      const backup = createAuthoringBackup(this.storage);
+      const source = createAuthoringBackupSource(backup);
+      if (typeof Blob !== "function" || typeof globalThis.URL?.createObjectURL !== "function") {
+        throw new Error("Browser download is unavailable");
+      }
+      const url = globalThis.URL.createObjectURL(new Blob([source], { type: "application/json" }));
+      const anchor = this.documentRef.createElement("a");
+      anchor.href = url;
+      anchor.download = AUTHORING_BACKUP_FILENAME;
+      this.documentRef.body.append(anchor);
+      anchor.click?.();
+      anchor.remove?.();
+      globalThis.URL.revokeObjectURL?.(url);
+      this.setAuthoringStatus("Резервная копия редактора скачана");
+    } catch (error) {
+      console.warn("Authoring backup download failed", error);
+      this.setAuthoringStatus("Не удалось скачать резервную копию редактора", true);
+    }
+  }
+
+  async importAuthoringBackup(file) {
+    if (!file) return;
+    try {
+      if (typeof file.text !== "function") throw new Error("Backup file is unreadable");
+      restoreAuthoringBackup(JSON.parse(await file.text()), this.storage);
+      this.setAuthoringStatus("Резервная копия загружена; редактор перезапускается");
+      if (this.scene?.scene?.restart) this.scene.scene.restart();
+      else globalThis.location?.reload?.();
+    } catch (error) {
+      console.warn("Authoring backup import failed", error);
+      this.setAuthoringStatus("Файл резервной копии повреждён или несовместим", true);
+    } finally {
+      if (this.authoringImportInput) this.authoringImportInput.value = "";
     }
   }
 
@@ -295,6 +359,7 @@ export class MovementDebugPanel {
     this.colliderCheckbox = null;
     this.colliderEditCheckbox = null; this.colliderEditor = null; this.colliderEditorStatus = null;
     this.colliderConfirmButton = null; this.layoutSaveButton = null; this.authoringStatus = null;
+    this.authoringImportInput = null;
     this.authoringRuntime = null; this.scene = null; this.startingLayoutRestoreListener = null;
   }
 }
