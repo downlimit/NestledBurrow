@@ -44,7 +44,7 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    id: "plants",
+    id: "decorations",
     labelKey: "hud:buildMode.groups.plants",
     items: Object.freeze([
       Object.freeze({
