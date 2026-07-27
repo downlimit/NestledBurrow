@@ -30,7 +30,7 @@ When resuming accepted local work, reread current `origin/main:AGENTS.md`, fetch
 - **Fast:** gameplay, UI, content, config and bounded refactors.
 - **Strict:** persistence/schema, central ownership, broad input/collision, dependencies, workflows/security, external assets or dependent PRs.
 
-Use the smallest clean solution. `src/main.js` is composition only. New domain logic, state machines, persistence, build/editor workflow or service orchestration belongs in a system owner/coordinator. `npm run check:architecture` enforces the current line ceiling; do not bypass it by minifying or compressing code.
+Use the smallest clean solution. In plain terms: src/main.js is composition only. New domain logic, state machines, persistence, build/editor workflow or service orchestration belongs in a system owner/coordinator. `npm run check:architecture` enforces the current line ceiling; do not bypass it by minifying or compressing code.
 
 If an accepted change alters a stable system contract, update the corresponding `systems/*.md` in the same PR. Do not add task history or implementation diaries.
 
