@@ -16,6 +16,7 @@ const profiles = [
   { id: "stone-small", kind: "stone", size: "small", preferredAction: "mine", actionHp: { mine: 7 }, reward: { resource: "stone", amount: 1 }, visual: "stone", footprint: { width: 2, height: 2 }, collisionTopInset: 3, collisionLeftInset: 1, collisionRightInset: 2, prompt: "hud:interaction.mine", sfx: "mine" },
   { id: "stone-large", kind: "stone", size: "large", preferredAction: "mine", actionHp: { mine: { value: 7, multiplier: LARGE_RESOURCE_HP_MULTIPLIER } }, reward: { resource: "stone", amount: 3 }, visual: "stone", footprint: { width: 3, height: 3 }, collisionTopInset: 4.5, prompt: "hud:interaction.mine", sfx: "mine" },
   { id: "ruby-node", kind: "ruby", size: "small", preferredAction: "mine", actionHp: { mine: 5 }, reward: { resource: "rubies", amount: 1 }, visual: "ruby", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.mine", sfx: "mine" },
+  { id: "tree-planted", kind: "plant", size: "large", preferredAction: "chop", actionHp: { chop: "smallLogChopHp" }, reward: { resource: "wood", amount: 6 }, visual: "tree", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.chop", sfx: "chop" },
 ].map(freezeProfile);
 
 export const RESOURCE_PROFILES = Object.freeze(Object.fromEntries(profiles.map((profile) => [profile.id, profile])));
