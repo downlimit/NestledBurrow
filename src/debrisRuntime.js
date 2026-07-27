@@ -43,7 +43,8 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     if (!isPresent(definition) || visuals.has(definition.id)) return;
     setBlocked(definition, true);
     const profile = getResourceProfile(definition.profileId);
-    const graphics = scene.add.graphics().setPosition(definition.cell.x * PLACEMENT_CELL_SIZE, definition.cell.y * PLACEMENT_CELL_SIZE).setDepth(500 + definition.position.y);
+    const offset = scene.assetProfiles?.[`resource:${definition.profileId}`]?.visualOffset ?? { x: 0, y: 0 };
+    const graphics = scene.add.graphics().setPosition(definition.cell.x * PLACEMENT_CELL_SIZE + offset.x, definition.cell.y * PLACEMENT_CELL_SIZE + offset.y).setDepth(500 + definition.position.y);
     drawResource(graphics, profile, stateFor(definition)?.progress ?? 0);
     visuals.set(definition.id, graphics);
   }
@@ -51,7 +52,8 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   function redraw(definition) {
     const graphics = visuals.get(definition.id);
     if (!graphics) return;
-    graphics.setPosition(definition.cell.x * PLACEMENT_CELL_SIZE, definition.cell.y * PLACEMENT_CELL_SIZE);
+    const offset = scene.assetProfiles?.[`resource:${definition.profileId}`]?.visualOffset ?? { x: 0, y: 0 };
+    graphics.setPosition(definition.cell.x * PLACEMENT_CELL_SIZE + offset.x, definition.cell.y * PLACEMENT_CELL_SIZE + offset.y);
     graphics.clear();
     drawResource(graphics, getResourceProfile(definition.profileId), stateFor(definition)?.progress ?? 0);
   }
@@ -91,7 +93,8 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   function createBed(definition) {
     const bounds = bedBounds(definition);
     worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed");
-    const graphics = scene.add.graphics().setPosition(bounds.left, bounds.top).setDepth(500 + definition.position.y);
+    const offset = scene.assetProfiles?.["furniture:bed"]?.visualOffset ?? { x: 0, y: 0 };
+    const graphics = scene.add.graphics().setPosition(bounds.left + offset.x, bounds.top + offset.y).setDepth(500 + definition.position.y);
     drawBed(graphics);
     bedDefinitions.set(definition.id, definition);
     bedVisuals.set(definition.id, graphics);
@@ -189,6 +192,54 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
       return bedDefinitions.values().next().value ?? null;
     },
     getBedDefinitions() { return [...bedDefinitions.values()]; },
+    getAuthoringInstances() {
+      const resources = RESOURCE_OBJECTS.flatMap((definition) => {
+        const visual = visuals.get(definition.id);
+        if (!visual) return [];
+        const profile = getResourceProfile(definition.profileId);
+        const left = definition.cell.x * PLACEMENT_CELL_SIZE;
+        const top = definition.cell.y * PLACEMENT_CELL_SIZE;
+        return [{
+          id: definition.id,
+          profileKey: `resource:${definition.profileId}`,
+          anchor: { x: left, y: top },
+          bounds: {
+            left,
+            top,
+            right: left + profile.footprint.width * PLACEMENT_CELL_SIZE,
+            bottom: top + profile.footprint.height * PLACEMENT_CELL_SIZE,
+          },
+          targets: [visual],
+        }];
+      });
+      const beds = [...bedDefinitions.values()].flatMap((definition) => {
+        const visual = bedVisuals.get(definition.id);
+        const bounds = bedBounds(definition);
+        return visual ? [{
+          id: definition.id,
+          profileKey: "furniture:bed",
+          anchor: { x: bounds.left, y: bounds.top },
+          bounds,
+          targets: [visual],
+        }] : [];
+      });
+      return [...resources, ...beds];
+    },
+    applyAuthoringVisualOffset(profileKey, offset) {
+      for (const definition of RESOURCE_OBJECTS) {
+        if (`resource:${definition.profileId}` !== profileKey) continue;
+        visuals.get(definition.id)?.setPosition?.(
+          definition.cell.x * PLACEMENT_CELL_SIZE + offset.x,
+          definition.cell.y * PLACEMENT_CELL_SIZE + offset.y,
+        );
+      }
+      if (profileKey === "furniture:bed") {
+        for (const definition of bedDefinitions.values()) {
+          const bounds = bedBounds(definition);
+          bedVisuals.get(definition.id)?.setPosition?.(bounds.left + offset.x, bounds.top + offset.y);
+        }
+      }
+    },
     addBed,
     removeBed,
     removeBedAt,

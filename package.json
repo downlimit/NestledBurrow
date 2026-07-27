@@ -31,6 +31,7 @@
     "check:runtime-components": "node scripts/check-runtime-components.mjs",
     "check:build-mode": "node scripts/check-build-mode.mjs",
     "check:authoring": "node scripts/check-authoring.mjs",
+    "check:task-043": "node scripts/check-task-043.mjs",
     "check:audio": "node scripts/check-audio.mjs",
     "check:facilities": "node scripts/check-facilities.mjs",
     "check:interaction": "node scripts/check-interaction.mjs",

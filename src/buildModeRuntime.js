@@ -318,7 +318,7 @@ export class BuildModeRuntime {
       .setScrollFactor(0)
       .setVisible(false);
     if (item.icon === "bed") drawBed(graphics);
-    else if (["shower", "toilet", "table"].includes(item.icon)) {
+    else if (["shower", "toilet", "table", "cutting-table", "gas-stove", "serving-table"].includes(item.icon)) {
       drawFacility(graphics, item.icon);
       graphics.setScale(0.5);
     } else {

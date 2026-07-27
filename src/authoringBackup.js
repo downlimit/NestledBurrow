@@ -8,8 +8,14 @@ import {
   STARTING_LAYOUT_STORAGE_KEY,
   normalizeStartingLayout,
 } from "./startingLayout.js";
+import {
+  ASSET_PROFILES_STORAGE_KEY,
+  loadAssetProfiles,
+  normalizeAssetProfiles,
+  saveAssetProfiles,
+} from "./assetProfiles.js";
 
-export const AUTHORING_BACKUP_VERSION = 1;
+export const AUTHORING_BACKUP_VERSION = 2;
 export const AUTHORING_BACKUP_FILENAME = "nestledburrow-authoring-backup.json";
 
 function assertRecord(value, label) {
@@ -25,6 +31,15 @@ function readStoredLayout(storage) {
 
 export function normalizeAuthoringBackup(value) {
   assertRecord(value, "Authoring backup");
+  if (value.version === 1) {
+    return {
+      version: AUTHORING_BACKUP_VERSION,
+      savedAt: typeof value.savedAt === "string" ? value.savedAt : null,
+      startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
+      colliderOverrides: normalizeColliderOverrides(value.colliderOverrides ?? {}),
+      assetProfiles: loadAssetProfiles(null, value.colliderOverrides ?? {}),
+    };
+  }
   if (value.version !== AUTHORING_BACKUP_VERSION) {
     throw new Error(`Unsupported authoring backup version: ${String(value.version)}`);
   }
@@ -33,6 +48,7 @@ export function normalizeAuthoringBackup(value) {
     savedAt: typeof value.savedAt === "string" ? value.savedAt : null,
     startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
     colliderOverrides: normalizeColliderOverrides(value.colliderOverrides ?? {}),
+    assetProfiles: normalizeAssetProfiles(value.assetProfiles ?? {}),
   };
 }
 
@@ -42,6 +58,7 @@ export function createAuthoringBackup(storage = globalThis.localStorage, now = n
     savedAt: now.toISOString(),
     startingLayout: readStoredLayout(storage),
     colliderOverrides: loadColliderDebugOverrides(storage),
+    assetProfiles: loadAssetProfiles(storage, loadColliderDebugOverrides(storage)),
   });
 }
 
@@ -57,10 +74,12 @@ export function restoreAuthoringBackup(value, storage = globalThis.localStorage)
     storage?.removeItem?.(STARTING_LAYOUT_STORAGE_KEY);
   }
   saveColliderDebugOverrides(backup.colliderOverrides, storage);
+  saveAssetProfiles(backup.assetProfiles, storage);
   return backup;
 }
 
 export function clearAuthoringBackupDraft(storage = globalThis.localStorage) {
   storage?.removeItem?.(STARTING_LAYOUT_STORAGE_KEY);
   storage?.removeItem?.(COLLIDER_DEBUG_STORAGE_KEY);
+  storage?.removeItem?.(ASSET_PROFILES_STORAGE_KEY);
 }
