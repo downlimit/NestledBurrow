@@ -12,9 +12,9 @@ const taskTemplate = read("tasks/TEMPLATE.md");
 const task = "Task #001 — Первая расчистка участка";
 const taskFirstLink = "Task #001 — Первая расчистка участка (PR #81)";
 
-assert(roadmap.includes(task), "ROADMAP.md must keep numbered Task identity");
 assert(roadmap.includes("Следующий свободный номер"), "ROADMAP.md must record the next free Task number");
-assert(roadmap.includes(taskFirstLink), "ROADMAP.md must use Task-first PR links");
+assert(roadmap.includes(task), "ROADMAP.md must show Task identity syntax");
+assert(roadmap.includes(taskFirstLink), "ROADMAP.md must show Task-first PR syntax");
 assert(lead.includes(taskFirstLink), "LEAD.md must use Task-first PR links");
 assert(review.includes(taskFirstLink), "REVIEW.md must use Task-first PR links");
 assert(override.includes("Task #<task> — <name> (PR #<pr>)"), "repair reports must be Task-first");
@@ -22,4 +22,4 @@ assert(prTemplate.includes("Task: `Task #<number> — <human-readable result>`")
 assert(prTemplate.includes("task/<number>-<slug>"), "PR template must keep numbered branch identity");
 assert(taskTemplate.startsWith("# Task #<number> —"), "durable task template must start with Task identity");
 
-console.log("task identity contract passed: Task number and name are primary; PR number is a secondary address");
+console.log("task identity contract passed: task identity is stable without keeping task history in ROADMAP");
