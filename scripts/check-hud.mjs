@@ -109,7 +109,13 @@ const enHud = JSON.parse(readFileSync("public/locales/en/hud.json", "utf8"));
 const debugPanel = readFileSync("src/movementDebugPanel.js", "utf8");
 
 assert(main.includes("onNewGame: () => this.startNewGame()"), "composition root wires New Game callback");
-assert(main.includes("this.interactionHud?.setSuppressed?.(active)") && main.includes("if (!active) this.interactionRuntime?.refresh?.()"), "confirmation suppresses InteractionHud and refreshes its presentation after cancel");
+assert(
+  main.includes("this.gameHudConfirmationActive = Boolean(active);") &&
+    main.includes("this.syncGameplayHudVisibility();") &&
+    main.includes("if (!active) this.interactionRuntime?.refresh?.()") &&
+    main.includes("this.gameHudHidden || buildActive || this.cookingOverlayActive || this.gameHudConfirmationActive"),
+  "confirmation suppresses InteractionHud through the centralized HUD visibility state and refreshes its presentation after cancel",
+);
 assert(main.includes("isExcludedPoint: (x, y) => this.isHudPoint(x, y)"), "all interactive HUD areas exclude MobileJoystick input");
 assert(gameHud.includes('localization.t("hud:options.title")'), "Options label is localized");
 assert.equal(ruHud.options.title, "Опции");
