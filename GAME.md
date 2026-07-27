@@ -89,29 +89,29 @@ Verdict:
 | Расчистка и присвоение пространства | Интегрировано | Не проверено | Малые/крупные брёвна и камни, рубиновые жилы, индивидуальный persistent progress и награды работают. Полный цикл присвоения ещё не проверен. |
 | Сильное любопытство первых 10 минут | Отсутствует | Не проверено | Техническая деревня не является целевым вступлением. |
 | Самостоятельный план на следующий день | Отсутствует | Не проверено | Есть расчистка, потребности, время и строительство, но нет связанного огород→готовка→сервис цикла. |
-| Суперприветливый UX | Играбельно | Принято частично | HUD, потребности, prompts, Options и build library читаемы на desktop; mobile build UX Task #035 принят в локальном preview, но ещё не опубликован в `main`. |
+| Суперприветливый UX | Играбельно | Принято частично | HUD, потребности, prompts, Options и build library читаемы на desktop; mobile build UX Task #035 опубликован в `main`. |
 | Спокойный непрерывный ритм | Интегрировано | Не проверено | 24 игровых часа идут 24 реальные минуты; сон x32 ускоряет мир/NPC, энергия восстанавливается по игровому времени. |
-| Таверна отражает стиль | Фундамент | Не проверено | Runtime build mode позволяет менять поверхности, стены и мебель, но нет сохранения построек, профиля заведения и реакции аудитории. |
+| Таверна отражает стиль | Фундамент | Не проверено | Build mode позволяет менять поверхности, стены, мебель и сажать деревья; developer-authoring фиксирует выбранную стартовую композицию проекта. Gameplay-сохранения построек, профиля заведения и реакции аудитории ещё нет. |
 | Живое поселение | Отсутствует | Не проверено | Есть два технических NPC; нет найденных аллодов, населения и объединения островов. |
 
 ### Игровые области
 
 | Область | Зрелость | Verdict | Что работает и где граница |
 |---|---|---|---|
-| Целевой стартовый аллод и таверна | Фундамент | Не проверено | Единый мир и дом существуют; текущая деревня/планировка остаются prototype, не финальным аллодом. |
-| Перемещение и камера | Играбельно | Принято | Keyboard/mobile используют общий running-state. Sprint-ring `54.45 px`; в опубликованном `main` его центр ещё ограничивается viewport/левой половиной. Камера следует presentation-позиции через B/F/C без мутации motor. |
-| Mobile build UX | Фундамент | Preview принято, не опубликовано | Task #035 локально подтвердила touch-scroll/inertia, edge-touch joystick center и меньшую alpha ring, но GitHub PR/merge отсутствуют. |
+| Целевой стартовый аллод и таверна | Фундамент | Не проверено | Единый мир и дом существуют; текущая деревня/планировка остаются prototype, не финальным аллодом. Стартовую расстановку можно канонически фиксировать developer-action без общего редактора карт. |
+| Перемещение и камера | Играбельно | Принято | Keyboard/mobile используют общий running-state. Sprint-ring `54.45 px`; камера следует presentation-позиции через B/F/C без мутации motor. |
+| Mobile build UX | Играбельно | Принято | Task #035 опубликовала touch-scroll/inertia, edge-touch joystick center и меньшую alpha ring. |
 | NPC, диалоги и мини-квест | Играбельно | Технический фундамент | Два патрулирующих NPC и один устойчивый quest/dialogue flow; это демонстрация систем, не социальный цикл. |
-| Save/reload и `NEW GAME` | Интегрировано | Технический фундамент | Versioned session сохраняет quest, needs, resources, nodes и world time; reset отделён от language/audio/debug preferences. Runtime-постройки пока не сохраняются. |
+| Save/reload и `NEW GAME` | Интегрировано | Технический фундамент | Versioned session сохраняет quest, needs, resources, nodes и world time. Developer-authored стартовая расстановка и collider defaults принадлежат проекту и применяются на чистом запуске/`NEW GAME`; пользовательские runtime-постройки всё ещё не являются gameplay save. |
 | RU/EN, HUD и browser build | Интегрировано | Принято частично | Pixelify Sans, локализованные HUD/prompts/options, build ID и Pages работают; новый видимый текст проверяется на `320×180` и coarse-pointer. |
-| Developer tuning | Играбельно | Принято | Отдельная debug-панель меняет согласованные gameplay/camera параметры и хранится вне gameplay save. |
+| Developer tuning | Интегрировано | Принято | Debug-панель меняет согласованные gameplay/camera параметры; `Применить в проект` записывает профильные collider defaults, а отдельное действие фиксирует стартовую расстановку. Локальные значения остаются черновиком, не gameplay save. |
 | Энергия | Интегрировано | Принято | Ниже 25% target speed нелинейно падает до 25% при 1% энергии; effective multiplier плавно достигает target. Расходы, сон, отказ действия и low-energy feedback интегрированы. |
 | Потребности `N/E/S/T/L/D` | Играбельно | Принято | Persistent values, flow arrows/tooltips и связи с facilities, NPC, бегом и добычей работают. Нулевые последствия, consumables и финальный баланс отсутствуют. |
-| Ресурсы | Интегрировано | Не проверено | Wood/stone/ruby profiles, `chop/mine/mow`, collision, cooldown, rewards и persistence работают; inventory/containers/tools отсутствуют. |
+| Ресурсы | Интегрировано | Не проверено | Wood/stone/ruby profiles, `chop/mine/mow`, collision, cooldown, rewards и persistence работают. Посаженное в build mode дерево является resource node, рубится топором и даёт `6` дерева; inventory/containers/tools отсутствуют. |
 | Время, день/ночь и сон | Интегрировано | Не проверено | 60 игровых секунд за реальную, x32 sleep simulation, безопасное wake и day/night presentation. |
-| Мебель и строительство | Играбельно | Принято | `Tab`/кнопка открывает RU/EN library стен, grass/path/parquet/carpet/tree/bed/bathtub/toilet/table. Есть drag prediction, demolition highlight, type-locked drag и `Ctrl+Z`; WASD остаётся доступен. Rotation и persistence отсутствуют. |
+| Мебель и строительство | Играбельно | Принято | `Tab`/кнопка открывает RU/EN library стен, grass/path/parquet/carpet, группы `Растения`, bed/bathtub/toilet/table. Есть drag prediction, demolition highlight, type-locked drag и `Ctrl+Z`; дерево можно посадить и срубить. Developer-action сохраняет стартовую композицию проекта, но player construction persistence и rotation отсутствуют. |
 | Furniture/audio assets | Интегрировано | Принято | Canonical bed/bathtub/toilet/table PNG используются в мире, library, ghosts и demolition tint. Семь MP3 играют случайно без immediate repeat с fade/overlap. |
-| Огород: вскопать/посадить/полить/собрать | Отсутствует | Не проверено | Нет plant lifecycle. |
+| Огород: вскопать/посадить/полить/собрать | Отсутствует | Не проверено | Нет crop/plant lifecycle; срубаемое посаженное дерево не является системой выращивания. |
 | Колодец и вода | Отсутствует | Не проверено | Нет water source/carry/use. |
 | Рецепты и готовка | Отсутствует | Не проверено | Нет cookbook UX, ингредиентов и cooking. |
 | Производственные станции | Отсутствует | Не проверено | Нет переработки и цепочек. |

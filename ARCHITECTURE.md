@@ -95,15 +95,26 @@
 
 Tiled/LDtk не вводятся без подтверждённой проблемы ручного авторинга.
 
-### Build mode
+### Build mode и developer-authoring
 
-`BuildModeRuntime` и `buildAssetCatalog` уже существуют. Режим поддерживает локализованную library, placement/drag prediction, demolition, grouped undo, surfaces, walls, furniture и дерево. Постройки пока runtime-only и не меняют save schema.
+`BuildModeRuntime` и `buildAssetCatalog` поддерживают локализованную library, placement/drag prediction, demolition, grouped undo, surfaces, walls, furniture и группу растений. Player runtime-постройки не входят в gameplay save schema.
 
-Следующее расширение не должно добавлять ещё один параллельный catalog, placement grid или renderer path.
+`EditorAuthoringRuntime` является отдельной developer-only coordination boundary. Он:
+
+- снимает JSON-safe snapshot управляемой стартовой композиции;
+- применяет checked-in `startingLayoutDefault.js` на чистом запуске и `NEW GAME`;
+- передаёт подтверждённые профильные collider offsets в ограниченный dev-only Vite endpoint;
+- не получает произвольный filesystem/command access и отсутствует как writer в production build.
+
+Канонические collider defaults принадлежат `src/colliderDefaults.js`. `localStorage` хранит только рабочий черновик/fallback и после успешной записи проекта не является источником production-истины. Видимая крона дерева расширяет только editor hit-testing; физическая коллизия и debug-отрисовка используют один collider ствола.
+
+Следующее расширение не должно добавлять ещё один параллельный catalog, placement grid, renderer path или второй authoring transport.
 
 ### Session и persistence
 
 `GameSessionState` хранит только JSON-safe устойчивое gameplay state. Persistence использует versioned envelope, validation, явные migrations и fresh-state fallback. Presentation preferences — язык, звук и debug tuning — хранятся отдельно и переживают `NEW GAME`.
+
+Состояние посаженного срубаемого дерева хранится как динамический resource node в session state. Стартовая расстановка и collider defaults являются project-authoring данными, а не пользовательским gameplay save.
 
 Новая save schema является Strict-задачей. Runtime-only experimentation допустима без преждевременного persistence, если граница явно названа.
 
@@ -111,11 +122,12 @@ Tiled/LDtk не вводятся без подтверждённой пробл�
 
 - needs rates/flow и clamps принадлежат pure domain/config;
 - resources используют immutable profiles и общий interaction/action contract;
+- build-planted tree использует профиль `tree-planted`, стандартный resource progress/reward и stable build-object ID;
 - facilities декларативно задают sprite, footprint, collider и optional presentation pose;
 - world runtime хранит stable IDs и teardown;
 - HUD показывает состояние, но не вычисляет gameplay.
 
-Не строить универсальный inventory/tool/facility framework до появления второго содержательно отличающегося цикла.
+Не строить универсальный inventory/tool/facility/plant framework до появления второго содержательно отличающегося цикла.
 
 ### Interaction и dialogue
 
@@ -151,7 +163,8 @@ Node contract checks являются основным доказательст�
 - i18next RU/EN и Pixelify Sans;
 - `GameHud`, needs/resource/facility/audio runtimes;
 - edge-grid world geometry;
-- `BuildModeRuntime` и asset catalog;
+- `BuildModeRuntime`, asset catalog и `EditorAuthoringRuntime`;
+- checked-in starting layout/collider defaults с dev-only writers;
 - desktop/mobile Browser E2E.
 
 ## Не вводить без доказанной необходимости
