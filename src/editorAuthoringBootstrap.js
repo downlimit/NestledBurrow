@@ -1,7 +1,7 @@
 import { MovementDebugPanel } from "./movementDebugPanel.js";
+import { getCurrentWorldScene } from "./worldSceneRegistry.js";
 
 const retryDelayMs = 50;
-const originalResolveWorldScene = MovementDebugPanel.prototype.resolveWorldScene;
 const originalAttachSceneRuntime = MovementDebugPanel.prototype.attachSceneRuntime;
 const originalPersistStartingLayout = MovementDebugPanel.prototype.persistStartingLayout;
 const originalApplyColliderDraftToProject = MovementDebugPanel.prototype.applyColliderDraftToProject;
@@ -20,22 +20,23 @@ function isAuthoringSceneReady(scene) {
   );
 }
 
-async function waitForAuthoringScene(panel) {
-  const scene = await panel.resolveWorldScene();
-  while (!panel.destroyed && scene && !isAuthoringSceneReady(scene)) {
-    await delay(retryDelayMs);
-  }
-  return panel.destroyed ? null : scene;
-}
-
-MovementDebugPanel.prototype.resolveWorldScene = async function resolveWorldSceneWithRetry() {
+MovementDebugPanel.prototype.resolveWorldScene = async function resolveRegisteredWorldScene() {
   while (!this.destroyed) {
-    const scene = await originalResolveWorldScene.call(this);
-    if (scene) return scene;
+    const scene = getCurrentWorldScene();
+    if (scene && !scene.sys?.isDestroyed?.()) return scene;
     await delay(retryDelayMs);
   }
   return null;
 };
+
+async function waitForAuthoringScene(panel) {
+  while (!panel.destroyed) {
+    const scene = await panel.resolveWorldScene();
+    if (scene && isAuthoringSceneReady(scene)) return scene;
+    await delay(retryDelayMs);
+  }
+  return null;
+}
 
 MovementDebugPanel.prototype.attachSceneRuntime = function attachSceneRuntimeOnce() {
   if (this.destroyed || this.authoringRuntime) return Promise.resolve(this.authoringRuntime);
@@ -45,6 +46,7 @@ MovementDebugPanel.prototype.attachSceneRuntime = function attachSceneRuntimeOnc
     const scene = await waitForAuthoringScene(this);
     if (!scene || this.destroyed) return null;
 
+    this.scene = scene;
     await originalAttachSceneRuntime.call(this);
     if (!this.authoringRuntime || this.destroyed) return this.authoringRuntime;
 
