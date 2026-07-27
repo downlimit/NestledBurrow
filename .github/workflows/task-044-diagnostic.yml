@@ -1,0 +1,55 @@
+name: Task 044 Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Diagnostic — ${{ matrix.check }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - check:docs
+          - check:clock-cycle
+          - check:needs
+          - check:cooking
+          - check:guest
+          - check:binary-import
+          - check:input
+          - check:mobile-camera
+          - check:runtime-components
+          - check:build-mode
+          - check:authoring
+          - check:task-044
+          - check:audio
+          - check:facilities
+          - check:fullscreen
+          - check:hud
+          - check:text-resolution
+          - check:movement
+          - check:character
+          - check:patrol
+          - check:interaction
+          - check:dialogue
+          - check:progress
+          - check:i18n
+          - check:visual
+          - check:world
+          - build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          show-progress: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.check }}
