@@ -5,6 +5,7 @@ import { cellKey } from "./worldLayout.js";
 import { drawResource } from "./resourceVisuals.js";
 import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
 import { TILE_SIZE } from "./worldConfig.js";
+import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
 export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   const visuals = new Map();
@@ -43,8 +44,14 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     if (!isPresent(definition) || visuals.has(definition.id)) return;
     setBlocked(definition, true);
     const profile = getResourceProfile(definition.profileId);
-    const offset = scene.assetProfiles?.[`resource:${definition.profileId}`]?.visualOffset ?? { x: 0, y: 0 };
-    const graphics = scene.add.graphics().setPosition(definition.cell.x * PLACEMENT_CELL_SIZE + offset.x, definition.cell.y * PLACEMENT_CELL_SIZE + offset.y).setDepth(500 + definition.position.y);
+    const profileKey = `resource:${definition.profileId}`;
+    const offset = scene.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? {
+      x: profile.footprint.width * PLACEMENT_CELL_SIZE / 2,
+      y: profile.footprint.height * PLACEMENT_CELL_SIZE / 2,
+    };
+    const placementPosition = { x: definition.cell.x * PLACEMENT_CELL_SIZE, y: definition.cell.y * PLACEMENT_CELL_SIZE };
+    const graphics = scene.add.graphics().setPosition(placementPosition.x + offset.x, placementPosition.y + offset.y).setDepth(assetDepthFromPivot(placementPosition, pivotOffset));
     drawResource(graphics, profile, stateFor(definition)?.progress ?? 0);
     visuals.set(definition.id, graphics);
   }
@@ -94,7 +101,8 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     const bounds = bedBounds(definition);
     worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed");
     const offset = scene.assetProfiles?.["furniture:bed"]?.visualOffset ?? { x: 0, y: 0 };
-    const graphics = scene.add.graphics().setPosition(bounds.left + offset.x, bounds.top + offset.y).setDepth(500 + definition.position.y);
+    const pivotOffset = scene.assetProfiles?.["furniture:bed"]?.snapAnchorOffset ?? { x: TILE_SIZE / 2, y: TILE_SIZE / 2 };
+    const graphics = scene.add.graphics().setPosition(bounds.left + offset.x, bounds.top + offset.y).setDepth(assetDepthFromPivot(bounds, pivotOffset));
     drawBed(graphics);
     bedDefinitions.set(definition.id, definition);
     bedVisuals.set(definition.id, graphics);
@@ -122,7 +130,9 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
   }
 
   function restoreBed(definition) {
-    if (!definition || bedDefinitions.has(definition.id) || worldLayout.isBlockedBox(bedBounds(definition))) return false;
+    const baseCollider = definition ? bedBounds(definition) : null;
+    const effectiveCollider = baseCollider ? worldLayout.getEffectiveCollider(baseCollider, "furniture:bed") : null;
+    if (!definition || bedDefinitions.has(definition.id) || worldLayout.isBlockedBox(effectiveCollider)) return false;
     createBed(definition);
     return true;
   }
@@ -164,7 +174,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
       wakePosition: Object.freeze({ x: point.x + 8, y: point.y + TILE_SIZE + 8 }),
       payload: Object.freeze({ bedId: id }),
     });
-    if (worldLayout.isBlockedBox(bedBounds(definition))) return null;
+    if (worldLayout.isBlockedBox(worldLayout.getEffectiveCollider(bedBounds(definition), "furniture:bed"))) return null;
     createBed(definition);
     return definition;
   }
@@ -192,6 +202,10 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
       return bedDefinitions.values().next().value ?? null;
     },
     getBedDefinitions() { return [...bedDefinitions.values()]; },
+    getBedBounds(id) {
+      const definition = bedDefinitions.get(id);
+      return definition ? bedBounds(definition) : null;
+    },
     getAuthoringInstances() {
       const resources = RESOURCE_OBJECTS.flatMap((definition) => {
         const visual = visuals.get(definition.id);

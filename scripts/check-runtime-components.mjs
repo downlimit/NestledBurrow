@@ -8,7 +8,7 @@ import {
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "../src/movementConfig.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 import { COLLIDER_DEBUG_STORAGE_KEY, loadColliderDebugOverrides, saveColliderDebugOverrides } from "../src/colliderDebugOverrides.js";
-import { getColliderResizeEdges, resizeColliderDraft } from "../src/colliderResize.js";
+import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "../src/colliderResize.js";
 
 class EventTargetStub {
   constructor() {
@@ -314,8 +314,14 @@ let changeCalls = 0;
 let resetCalls = 0;
 let addCookedDishCalls = 0;
 let colliderVisibility = null;
+let buildGridVisibility = null;
 let colliderEditMode = null;
+let pivotEditMode = null;
+let visualOffsetEditMode = null;
 let colliderConfirmCalls = 0;
+let colliderRoundCalls = 0;
+const pivotAlignAxes = [];
+let visualOffsetResetCalls = 0;
 let panel = new MovementDebugPanel({ enabled: false, gameplayTuning, documentRef: documentStub, storage });
 assert.equal(documentStub.body.children.length, 0, "disabled debug controls are absent");
 assert.deepEqual(loadMovementDebugConfig({ enabled: true, storage }), {}, "legacy movement overrides are no longer exposed");
@@ -327,8 +333,20 @@ panel = new MovementDebugPanel({
   onResetBalanceRun: () => resetCalls++,
   onAddCookedDish: () => addCookedDishCalls++,
   onColliderVisibilityChange: (visible) => { colliderVisibility = visible; },
+  onBuildGridVisibilityChange: (visible) => { buildGridVisibility = visible; },
   onColliderEditModeChange: (active) => { colliderEditMode = active; },
+  onPivotEditModeChange: (active) => { pivotEditMode = active; },
+  onVisualOffsetEditModeChange: (active) => { visualOffsetEditMode = active; },
   onColliderDraftConfirm: () => { colliderConfirmCalls += 1; },
+  onColliderRound: () => { colliderRoundCalls += 1; return { status: "rounded" }; },
+  onPivotAlign: (axis) => {
+    pivotAlignAxes.push(axis);
+    return { profileKey: "facility:table", offset: { x: 24, y: 8 } };
+  },
+  onVisualOffsetReset: () => {
+    visualOffsetResetCalls += 1;
+    return { profileKey: "facility:table", offset: { x: 0, y: 0 } };
+  },
   getStatusSnapshot: () => ({ clock: "06:00", energy: 100, smallLogsCleared: 2, wood: 2, stone: 1, rubies: 0 }),
 });
 assert.equal(documentStub.body.children.length, 2, "enabled debug creates a toggle and panel");
@@ -356,17 +374,53 @@ assert.equal(addCookedDishCalls, 1, "debug cooked-dish action is wired");
 panel.colliderCheckbox.checked = true;
 panel.colliderCheckbox.emit("change");
 assert.equal(colliderVisibility, true, "debug collider checkbox enables collider rendering");
+assert.equal(panel.buildGridCheckbox.checked, false, "construction grid checkbox matches its initially hidden state");
+panel.buildGridCheckbox.checked = true;
+panel.buildGridCheckbox.emit("change");
+assert.equal(buildGridVisibility, true, "debug checkbox controls grid visibility directly");
 panel.colliderEditCheckbox.checked = true;
 panel.colliderEditCheckbox.emit("change");
 assert.equal(colliderEditMode, true, "collider edit checkbox enables window-style resizing");
 assert.equal(panel.colliderEditor.hidden, false);
+assert.equal(panel.colliderRoundButton.hidden, false);
+assert.equal(panel.pivotAlignXButton.hidden, true);
 panel.setColliderEditorState({ id: "home-table-01", width: 47, height: 16 });
 assert(panel.colliderEditorStatus.textContent.includes("47 × 16 px"));
 panel.colliderEditor.children.at(-1).emit("click");
 assert.equal(colliderConfirmCalls, 1, "collider confirmation action is wired");
+panel.colliderRoundButton.emit("click");
+assert.equal(colliderRoundCalls, 1, "collider rounding action is wired");
+panel.pivotAlignXButton.emit("click");
+panel.pivotAlignYButton.emit("click");
+assert.deepEqual(pivotAlignAxes, ["x", "y"], "pivot alignment buttons target the two collider axes independently");
+panel.visualOffsetEditCheckbox.checked = true;
+panel.visualOffsetEditCheckbox.emit("change");
+assert.equal(visualOffsetEditMode, true, "visual-offset checkbox enables sprite-only authoring");
+assert.equal(colliderEditMode, false, "visual-offset mode disables collider editing");
+assert.equal(panel.colliderEditCheckbox.checked, false);
+assert.equal(panel.colliderRoundButton.hidden, true);
+assert.equal(panel.pivotAlignXButton.hidden, true, "offset mode hides unrelated geometry commands");
+assert.equal(panel.visualOffsetResetButton.hidden, false);
+panel.visualOffsetResetButton.emit("click");
+assert.equal(visualOffsetResetCalls, 1, "visual-offset reset button restores the profile default");
+panel.pivotEditCheckbox.checked = true;
+panel.pivotEditCheckbox.emit("change");
+assert.equal(pivotEditMode, true);
+assert.equal(visualOffsetEditMode, false, "pivot mode and visual-offset mode stay mutually exclusive");
+assert.equal(panel.visualOffsetEditCheckbox.checked, false);
 
 assert.deepEqual(getColliderResizeEdges({ x: 10, y: 20 }, { left: 10, right: 30, top: 20, bottom: 40 }), { left: true, right: false, top: true, bottom: false }, "collider corner exposes both window resize edges");
 assert.deepEqual(resizeColliderDraft({ left: 10, right: 30, top: 20, bottom: 40 }, { left: false, right: true, top: false, bottom: true }, { x: -3, y: 2 }), { left: 10, right: 27, top: 20, bottom: 42 }, "dragging a corner resizes at one-pixel precision");
+assert.deepEqual(
+  roundColliderDraftToGrid({ left: 9, right: 31, top: 17, bottom: 42 }, 8, 2),
+  { left: 10, right: 30, top: 18, bottom: 46 },
+  "collider rounding covers every touched placement cell and leaves the two-pixel wall clearance",
+);
+assert.deepEqual(
+  getPixelColliderBounds({ left: 10, right: 30, top: 18, bottom: 46 }),
+  { left: 10, right: 29, top: 18, bottom: 45 },
+  "saved and draft collider outlines share the same exclusive right and bottom pixel bounds",
+);
 const colliderStorage = createStorage();
 assert.equal(saveColliderDebugOverrides({ table: { left: -1, right: 2, top: 0, bottom: 1 } }, colliderStorage), true);
 assert(colliderStorage.getItem(COLLIDER_DEBUG_STORAGE_KEY));

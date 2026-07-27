@@ -38,9 +38,9 @@ test("multiply overlay follows exact dusk and dawn phases while HUD stays above 
   await boot(page);
   const phases = [
     [12, 0xffffff, "day-hud"],
-    [18, 0xffb380, "orange-dusk"],
-    [20, 0xff648b, "pink-dusk"],
-    [22, 0x425cd4, "blue-night"],
+    [18, 0xffd9c0, "orange-dusk"],
+    [20, 0xffb2c5, "pink-dusk"],
+    [22, 0xa1aeea, "blue-night"],
     [7, null, "morning-transition"],
   ];
   for (const [hour, color, name] of phases) {

@@ -19,3 +19,22 @@ export function resizeColliderDraft(start, edges, delta, minimumSize = 1) {
   if (edges.bottom) next.bottom = Math.max(start.top + minimumSize, start.bottom + Math.round(delta.y));
   return next;
 }
+
+export function roundColliderDraftToGrid(rect, gridSize, padding = 2) {
+  const size = Math.max(1, Number(gridSize) || 1);
+  const inset = Math.max(0, Math.min(Number(padding) || 0, (size - 1) / 2));
+  return {
+    left: Math.floor(Number(rect.left) / size) * size + inset,
+    right: Math.ceil(Number(rect.right) / size) * size - inset,
+    top: Math.floor(Number(rect.top) / size) * size + inset,
+    bottom: Math.ceil(Number(rect.bottom) / size) * size - inset,
+  };
+}
+
+export function getPixelColliderBounds(rect) {
+  const left = Math.round(Number(rect.left));
+  const right = Math.max(left, Math.round(Number(rect.right)) - 1);
+  const top = Math.round(Number(rect.top));
+  const bottom = Math.max(top, Math.round(Number(rect.bottom)) - 1);
+  return { left, right, top, bottom };
+}

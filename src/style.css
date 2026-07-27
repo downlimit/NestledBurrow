@@ -49,6 +49,8 @@ canvas {
   background: rgb(23 23 36 / 94%);
   border: 1px solid rgb(242 234 220 / 45%);
   font: 12px system-ui, sans-serif;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .movement-debug-panel[hidden] {
@@ -84,12 +86,20 @@ canvas {
   font: inherit;
 }
 
+.movement-debug-panel button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .movement-debug-panel input {
   width: 84px;
 }
 
 .movement-debug-status {
-  white-space: pre;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: ui-monospace, monospace;
   line-height: 1.35;
 }
@@ -98,12 +108,14 @@ canvas {
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;
+  min-width: 0;
 }
 
 .collider-debug-editor {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
+  min-width: 0;
 }
 
 .collider-debug-editor[hidden] {
@@ -111,6 +123,13 @@ canvas {
 }
 
 .collider-debug-editor output,
-.collider-debug-editor button:last-child {
+.collider-debug-editor button:last-child,
+.collider-debug-editor .collider-debug-wide-action {
   grid-column: 1 / -1;
+}
+
+.collider-debug-editor output {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

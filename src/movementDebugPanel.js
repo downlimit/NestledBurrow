@@ -25,13 +25,16 @@ const FIELDS = Object.freeze([
 export function loadMovementDebugConfig() { return {}; }
 
 export class MovementDebugPanel {
-  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
+  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onBuildGridVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onVisualOffsetEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onColliderRound = () => ({ status: "empty" }), onPivotAlign = () => null, onVisualOffsetReset = () => null, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
     this.enabled = Boolean(enabled);
     this.gameplayTuning = gameplayTuning;
     this.onGameplayTuningChange = onGameplayTuningChange;
     this.onRefillEnergy = onRefillEnergy;
     this.onResetBalanceRun = onResetBalanceRun;
     this.onColliderDraftConfirm = onColliderDraftConfirm;
+    this.onColliderRound = onColliderRound;
+    this.onPivotAlign = onPivotAlign;
+    this.onVisualOffsetReset = onVisualOffsetReset;
     this.getStatusSnapshot = getStatusSnapshot;
     this.documentRef = documentRef;
     this.storage = storage;
@@ -82,6 +85,18 @@ export class MovementDebugPanel {
     panel.append(colliderLabel);
     this.colliderCheckbox = colliderCheckbox;
 
+    const buildGridLabel = documentRef.createElement("label");
+    const buildGridName = documentRef.createElement("span");
+    buildGridName.textContent = "Показывать строительную сетку";
+    const buildGridCheckbox = documentRef.createElement("input");
+    buildGridCheckbox.type = "checkbox";
+    buildGridCheckbox.autocomplete = "off";
+    buildGridCheckbox.checked = false;
+    buildGridCheckbox.addEventListener("change", () => onBuildGridVisibilityChange(Boolean(buildGridCheckbox.checked)));
+    buildGridLabel.append(buildGridName, buildGridCheckbox);
+    panel.append(buildGridLabel);
+    this.buildGridCheckbox = buildGridCheckbox;
+
     const colliderEditLabel = documentRef.createElement("label");
     const colliderEditName = documentRef.createElement("span");
     colliderEditName.textContent = "Редактировать коллайдеры";
@@ -93,11 +108,15 @@ export class MovementDebugPanel {
         pivotEditCheckbox.checked = false;
         onPivotEditModeChange(false);
       }
+      if (active && visualOffsetEditCheckbox?.checked) {
+        visualOffsetEditCheckbox.checked = false;
+        onVisualOffsetEditModeChange(false);
+      }
       if (active && !colliderCheckbox.checked) {
         colliderCheckbox.checked = true;
         onColliderVisibilityChange(true);
       }
-      this.colliderEditor.hidden = !active;
+      this.setEditorMode(active ? "collider" : null);
       onColliderEditModeChange(active);
     });
     colliderEditLabel.append(colliderEditName, colliderEditCheckbox);
@@ -113,15 +132,40 @@ export class MovementDebugPanel {
       const active = Boolean(pivotEditCheckbox.checked);
       if (active && colliderEditCheckbox.checked) {
         colliderEditCheckbox.checked = false;
-        this.colliderEditor.hidden = true;
         onColliderEditModeChange(false);
       }
-      this.colliderEditor.hidden = !active;
+      if (active && visualOffsetEditCheckbox?.checked) {
+        visualOffsetEditCheckbox.checked = false;
+        onVisualOffsetEditModeChange(false);
+      }
+      this.setEditorMode(active ? "pivot" : null);
       onPivotEditModeChange(active);
     });
     pivotEditLabel.append(pivotEditName, pivotEditCheckbox);
     panel.append(pivotEditLabel);
     this.pivotEditCheckbox = pivotEditCheckbox;
+
+    const visualOffsetEditLabel = documentRef.createElement("label");
+    const visualOffsetEditName = documentRef.createElement("span");
+    visualOffsetEditName.textContent = "Редактировать оффсет";
+    const visualOffsetEditCheckbox = documentRef.createElement("input");
+    visualOffsetEditCheckbox.type = "checkbox";
+    visualOffsetEditCheckbox.addEventListener("change", () => {
+      const active = Boolean(visualOffsetEditCheckbox.checked);
+      if (active && colliderEditCheckbox.checked) {
+        colliderEditCheckbox.checked = false;
+        onColliderEditModeChange(false);
+      }
+      if (active && pivotEditCheckbox.checked) {
+        pivotEditCheckbox.checked = false;
+        onPivotEditModeChange(false);
+      }
+      this.setEditorMode(active ? "visual-offset" : null);
+      onVisualOffsetEditModeChange(active);
+    });
+    visualOffsetEditLabel.append(visualOffsetEditName, visualOffsetEditCheckbox);
+    panel.append(visualOffsetEditLabel);
+    this.visualOffsetEditCheckbox = visualOffsetEditCheckbox;
 
     const colliderEditor = documentRef.createElement("div");
     colliderEditor.className = "collider-debug-editor";
@@ -129,6 +173,32 @@ export class MovementDebugPanel {
     const colliderEditorStatus = documentRef.createElement("output");
     colliderEditorStatus.textContent = "Кликните по объекту";
     colliderEditor.append(colliderEditorStatus);
+    const colliderRound = documentRef.createElement("button");
+    colliderRound.type = "button";
+    colliderRound.textContent = "Округлить коллайдер";
+    colliderRound.addEventListener("click", () => {
+      const result = this.onColliderRound();
+      if (result?.status === "empty") this.setAuthoringStatus("Сначала выберите коллайдер", true);
+      else if (result?.status === "unsupported") this.setAuthoringStatus("Округление доступно для коллайдеров ассетов", true);
+      else this.setAuthoringStatus("Коллайдер округлён по клеткам с отступом 2 px");
+    });
+    colliderEditor.append(colliderRound);
+    const pivotAlignX = documentRef.createElement("button");
+    pivotAlignX.type = "button";
+    pivotAlignX.textContent = "Пивот по X";
+    pivotAlignX.addEventListener("click", () => this.applyPivotAlignment("x"));
+    colliderEditor.append(pivotAlignX);
+    const pivotAlignY = documentRef.createElement("button");
+    pivotAlignY.type = "button";
+    pivotAlignY.textContent = "Пивот по Y";
+    pivotAlignY.addEventListener("click", () => this.applyPivotAlignment("y"));
+    colliderEditor.append(pivotAlignY);
+    const visualOffsetReset = documentRef.createElement("button");
+    visualOffsetReset.type = "button";
+    visualOffsetReset.className = "collider-debug-wide-action";
+    visualOffsetReset.textContent = "Сбросить оффсет";
+    visualOffsetReset.addEventListener("click", () => this.applyVisualOffsetAction(() => this.onVisualOffsetReset(), "Оффсет возвращён к значению по умолчанию"));
+    colliderEditor.append(visualOffsetReset);
     const colliderConfirm = documentRef.createElement("button");
     colliderConfirm.type = "button";
     colliderConfirm.textContent = "Сохранить коллайдер и пивот";
@@ -137,7 +207,12 @@ export class MovementDebugPanel {
     panel.append(colliderEditor);
     this.colliderEditor = colliderEditor;
     this.colliderEditorStatus = colliderEditorStatus;
+    this.colliderRoundButton = colliderRound;
+    this.pivotAlignXButton = pivotAlignX;
+    this.pivotAlignYButton = pivotAlignY;
+    this.visualOffsetResetButton = visualOffsetReset;
     this.colliderConfirmButton = colliderConfirm;
+    this.setEditorMode(null);
 
     this.authoringStatus = documentRef.createElement("output");
     this.authoringStatus.className = "movement-debug-status";
@@ -311,6 +386,39 @@ export class MovementDebugPanel {
     if (this.authoringStatus.dataset) this.authoringStatus.dataset.status = error ? "error" : "ok";
   }
 
+  setEditorMode(mode) {
+    if (this.colliderEditor) this.colliderEditor.hidden = !mode;
+    if (this.colliderRoundButton) this.colliderRoundButton.hidden = mode !== "collider";
+    if (this.pivotAlignXButton) this.pivotAlignXButton.hidden = mode !== "pivot";
+    if (this.pivotAlignYButton) this.pivotAlignYButton.hidden = mode !== "pivot";
+    if (this.visualOffsetResetButton) this.visualOffsetResetButton.hidden = mode !== "visual-offset";
+    if (this.colliderConfirmButton) this.colliderConfirmButton.textContent = {
+      collider: "Сохранить коллайдер",
+      pivot: "Сохранить пивот",
+      "visual-offset": "Сохранить оффсет",
+    }[mode] ?? "Сохранить профиль ассета";
+  }
+
+  applyPivotAlignment(axis) {
+    const selection = this.onPivotAlign(axis);
+    if (!selection) {
+      this.setAuthoringStatus("Сначала выберите ассет в режиме редактирования пивота", true);
+      return;
+    }
+    this.setPivotEditorState(selection);
+    this.setAuthoringStatus(`Пивот выровнен по ${axis.toUpperCase()} относительно коллайдера`);
+  }
+
+  applyVisualOffsetAction(action, successMessage) {
+    const selection = action();
+    if (!selection) {
+      this.setAuthoringStatus("Сначала выберите ассет в режиме редактирования оффсета", true);
+      return;
+    }
+    this.setVisualOffsetEditorState(selection);
+    this.setAuthoringStatus(successMessage);
+  }
+
   appendInput(panel, field) {
     const label = this.documentRef.createElement("label");
     const name = this.documentRef.createElement("span");
@@ -375,8 +483,15 @@ export class MovementDebugPanel {
   setPivotEditorState(state) {
     if (!this.colliderEditorStatus) return;
     this.colliderEditorStatus.textContent = state?.profileKey
-      ? `${state.profileKey}\nпивот ${state.offset.x}, ${state.offset.y} px`
+      ? `${state.profileKey}\nпивот ${state.offset.x}, ${state.offset.y} px\nстрелки: 1 px`
       : "Кликните по объекту для редактуры пивота";
+  }
+
+  setVisualOffsetEditorState(state) {
+    if (!this.colliderEditorStatus) return;
+    this.colliderEditorStatus.textContent = state?.profileKey
+      ? `${state.profileKey}\nоффсет ${state.offset.x}, ${state.offset.y} px\nстрелки: 1 px`
+      : "Кликните по ассету для редактирования оффсета";
   }
 
   destroy() {
@@ -387,9 +502,13 @@ export class MovementDebugPanel {
     this.toggleButton?.remove(); this.panel?.remove(); this.inputs.clear();
     this.toggleButton = null; this.panel = null; this.status = null;
     this.colliderCheckbox = null;
+    this.buildGridCheckbox = null;
     this.colliderEditCheckbox = null; this.colliderEditor = null; this.colliderEditorStatus = null;
     this.pivotEditCheckbox = null;
+    this.visualOffsetEditCheckbox = null;
     this.colliderConfirmButton = null; this.layoutSaveButton = null; this.authoringStatus = null;
+    this.colliderRoundButton = null; this.pivotAlignXButton = null; this.pivotAlignYButton = null;
+    this.visualOffsetResetButton = null;
     this.authoringImportInput = null;
     this.authoringRuntime = null; this.scene = null; this.startingLayoutRestoreListener = null;
   }

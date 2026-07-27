@@ -6,6 +6,7 @@ import {
 import { TILE_SIZE } from "./worldConfig.js";
 import { getKitchenFacilityPrompt } from "./cookingDomain.js";
 import { clearCurrentWorldScene, setCurrentWorldScene } from "./worldSceneRegistry.js";
+import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
 export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null, isServingDishReserved = () => false }) {
   setCurrentWorldScene(scene);
@@ -22,18 +23,22 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   }
 
   function createVisual(facility, { validateFootprint = true } = {}) {
-    if ((validateFootprint && worldLayout.isBlockedBox(boundsFor(facility)))
+    const profileKey = `facility:${facility.facilityType}`;
+    const baseCollider = boundsFor(facility);
+    const effectiveCollider = worldLayout.getEffectiveCollider(baseCollider, profileKey);
+    if ((validateFootprint && worldLayout.isBlockedBox(effectiveCollider))
       || worldLayout.isBlockedBox({
         left: facility.usePosition.x - 2,
         right: facility.usePosition.x + 2,
         top: facility.usePosition.y - 2,
         bottom: facility.usePosition.y + 2,
       })) return false;
-    worldLayout.setWorldObjectCollider(facility.id, boundsFor(facility), `facility:${facility.facilityType}`);
-    const offset = scene.assetProfiles?.[`facility:${facility.facilityType}`]?.visualOffset ?? { x: 0, y: 0 };
+    worldLayout.setWorldObjectCollider(facility.id, baseCollider, profileKey);
+    const offset = scene.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
     const image = scene.add.image(facility.visual.x + offset.x, facility.visual.y + offset.y, facility.visual.key)
       .setOrigin(0, 0)
-      .setDepth(500 + facility.visual.y + facility.visual.height);
+      .setDepth(assetDepthFromPivot(facility.visual, pivotOffset));
     visuals.set(facility.id, image);
     return true;
   }
@@ -43,13 +48,13 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       x: Math.floor(point.x / TILE_SIZE),
       y: Math.floor(point.y / TILE_SIZE),
     };
-    const definition = createFacilityDefinition({
+    const definition = placeFacilityAt(createFacilityDefinition({
       id: `editor-${facilityType}-${++editorId}`,
       type: facilityType,
       tile,
       useTile: { x: tile.x + 2, y: tile.y + 1 },
       editable: true,
-    });
+    }), point);
     if (!createVisual(definition)) return null;
     definitions.set(definition.id, definition);
     return definition;
@@ -108,19 +113,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   function move(id, point) {
     const previous = definitions.get(id);
     if (!previous) return null;
-    const oldTile = { x: previous.footprint.x / TILE_SIZE, y: previous.footprint.y / TILE_SIZE };
-    const oldUseTile = {
-      x: Math.floor(previous.usePosition.x / TILE_SIZE),
-      y: Math.floor(previous.usePosition.y / TILE_SIZE),
-    };
-    const tile = { x: Math.floor(point.x / TILE_SIZE), y: Math.floor(point.y / TILE_SIZE) };
-    const current = createFacilityDefinition({
-      id: previous.id,
-      type: previous.facilityType,
-      tile,
-      useTile: { x: tile.x + oldUseTile.x - oldTile.x, y: tile.y + oldUseTile.y - oldTile.y },
-      editable: previous.editable,
-    });
+    const current = placeFacilityAt(previous, point);
     return replace(current) ? { previous, current } : null;
   }
 
@@ -160,19 +153,22 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   const servingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
   if (servingTable) {
     const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset ?? { x: servingTable.visual.width / 2, y: servingTable.visual.height };
     platedDishVisual = scene.add.image(
       servingTable.footprint.x + servingTable.footprint.width / 2 + offset.x,
       servingTable.footprint.y + 5 + offset.y,
       PLATED_DISH_ASSET.key,
-    ).setOrigin(0.5, 0.5).setDepth(501 + servingTable.visual.y + servingTable.visual.height).setVisible(false);
+    ).setOrigin(0.5, 0.5).setDepth(assetDepthFromPivot(servingTable.visual, pivotOffset, 501)).setVisible(false);
   }
 
   function syncKitchenVisuals() {
     const currentServingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
     const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
+      ?? (currentServingTable ? { x: currentServingTable.visual.width / 2, y: currentServingTable.visual.height } : { x: 0, y: 0 });
     if (currentServingTable) platedDishVisual
       ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2 + offset.x, currentServingTable.footprint.y + 5 + offset.y)
-      ?.setDepth?.(501 + currentServingTable.visual.y + currentServingTable.visual.height);
+      ?.setDepth?.(assetDepthFromPivot(currentServingTable.visual, pivotOffset, 501));
     platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish) && !isServingDishReserved());
   }
   syncKitchenVisuals();
@@ -261,9 +257,12 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       return activeFacilityId;
     },
     getPresentationPose() {
-      return activeFacilityId
-        ? definitions.get(activeFacilityId)?.presentationPose ?? null
-        : null;
+      if (!activeFacilityId) return null;
+      const facility = definitions.get(activeFacilityId);
+      if (!facility?.presentationPose) return null;
+      const profileKey = `facility:${facility.facilityType}`;
+      const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
+      return { ...facility.presentationPose, depth: assetDepthFromPivot(facility.visual, pivotOffset, 501) };
     },
     isUsing() {
       return activeFacilityId !== null;
@@ -292,6 +291,28 @@ function boundsFor(facility) {
     top: facility.footprint.y,
     bottom: facility.footprint.y + facility.footprint.height,
   };
+}
+
+function placeFacilityAt(facility, point) {
+  const dx = Number(point.x) - facility.footprint.x;
+  const dy = Number(point.y) - facility.footprint.y;
+  if (dx === 0 && dy === 0) return facility;
+  const moved = {
+    ...facility,
+    position: Object.freeze({ x: facility.position.x + dx, y: facility.position.y + dy }),
+    usePosition: Object.freeze({ x: facility.usePosition.x + dx, y: facility.usePosition.y + dy }),
+    footprint: Object.freeze({ ...facility.footprint, x: facility.footprint.x + dx, y: facility.footprint.y + dy }),
+    visual: Object.freeze({ ...facility.visual, x: facility.visual.x + dx, y: facility.visual.y + dy }),
+  };
+  if (facility.presentationPose) {
+    moved.presentationPose = Object.freeze({
+      ...facility.presentationPose,
+      x: facility.presentationPose.x + dx,
+      y: facility.presentationPose.y + dy,
+      depth: facility.presentationPose.depth + dy,
+    });
+  }
+  return Object.freeze(moved);
 }
 
 function contains(bounds, point) {

@@ -14,8 +14,9 @@ import {
   normalizeAssetProfiles,
   saveAssetProfiles,
 } from "./assetProfiles.js";
+import { migrateDirectionalWallOverrides } from "./buildWorldGeometry.js";
 
-export const AUTHORING_BACKUP_VERSION = 2;
+export const AUTHORING_BACKUP_VERSION = 3;
 export const AUTHORING_BACKUP_FILENAME = "nestledburrow-authoring-backup.json";
 
 function assertRecord(value, label) {
@@ -36,8 +37,17 @@ export function normalizeAuthoringBackup(value) {
       version: AUTHORING_BACKUP_VERSION,
       savedAt: typeof value.savedAt === "string" ? value.savedAt : null,
       startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
-      colliderOverrides: normalizeColliderOverrides(value.colliderOverrides ?? {}),
+      colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
       assetProfiles: loadAssetProfiles(null, value.colliderOverrides ?? {}),
+    };
+  }
+  if (value.version === 2) {
+    return {
+      version: AUTHORING_BACKUP_VERSION,
+      savedAt: typeof value.savedAt === "string" ? value.savedAt : null,
+      startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
+      colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
+      assetProfiles: normalizeAssetProfiles(value.assetProfiles ?? {}),
     };
   }
   if (value.version !== AUTHORING_BACKUP_VERSION) {
@@ -47,7 +57,7 @@ export function normalizeAuthoringBackup(value) {
     version: AUTHORING_BACKUP_VERSION,
     savedAt: typeof value.savedAt === "string" ? value.savedAt : null,
     startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
-    colliderOverrides: normalizeColliderOverrides(value.colliderOverrides ?? {}),
+    colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
     assetProfiles: normalizeAssetProfiles(value.assetProfiles ?? {}),
   };
 }

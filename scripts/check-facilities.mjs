@@ -69,7 +69,7 @@ assert(!debrisSource.includes("0x315c8a"));
 
 const colliders = new Map(); const images = [];
 const scene = { add: { image(x, y, key) { const image = { x, y, key, visible: true, setOrigin() { return this; }, setPosition(nextX, nextY) { this.x = nextX; this.y = nextY; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, destroy() { this.destroyed = true; } }; images.push(image); return image; } } };
-const worldLayout = { isBlockedBox() { return false; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
+const worldLayout = { getEffectiveCollider(bounds) { return bounds; }, isBlockedBox() { return false; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
 const kitchen = { rawPotatoes: 5, preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false };
 const runtime = createFacilityRuntime(scene, { worldLayout, getKitchenState: () => kitchen });
 assert.equal(images.length, 7); assert.deepEqual([...colliders.values()].map((bounds) => [(bounds.right - bounds.left) / 16, (bounds.bottom - bounds.top) / 16]), [[2, 2], [1, 1], [3, 1], [2, 1], [1, 2], [2, 1]]);
