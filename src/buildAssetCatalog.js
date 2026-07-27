@@ -45,9 +45,17 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
   }),
   Object.freeze({
     id: "decorations",
-    labelKey: "hud:buildMode.groups.decorations",
+    labelKey: "hud:buildMode.groups.plants",
     items: Object.freeze([
-      Object.freeze({ id: "tree", placement: "tree", labelKey: "hud:buildMode.assets.tree", textureKey: TREES_TEXTURE_KEY, frame: 0 }),
+      Object.freeze({
+        id: "tree",
+        placement: "tree",
+        objectType: "plant",
+        resourceProfileId: "tree-planted",
+        labelKey: "hud:buildMode.assets.tree",
+        textureKey: TREES_TEXTURE_KEY,
+        frame: 0,
+      }),
     ]),
   }),
 ]);

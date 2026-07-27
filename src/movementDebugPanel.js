@@ -1,6 +1,7 @@
 import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "./resourceConfig.js";
 import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { LARGE_RESOURCE_HP_MULTIPLIER } from "./resourceDomain.js";
+import { attachEditorAuthoringRuntime } from "./editorAuthoringRuntime.js";
 
 export const MOVEMENT_STORAGE_KEY = "nestledBurrow.movementDebug";
 
@@ -24,12 +25,16 @@ export class MovementDebugPanel {
     this.onGameplayTuningChange = onGameplayTuningChange;
     this.onRefillEnergy = onRefillEnergy;
     this.onResetBalanceRun = onResetBalanceRun;
+    this.onColliderDraftConfirm = onColliderDraftConfirm;
     this.getStatusSnapshot = getStatusSnapshot;
     this.documentRef = documentRef;
     this.storage = storage;
     this.inputs = new Map();
     this.open = false;
     this.destroyed = false;
+    this.scene = null;
+    this.authoringRuntime = null;
+    this.startingLayoutRestoreListener = null;
     if (!this.enabled) return;
 
     const toggle = documentRef.createElement("button");
@@ -97,21 +102,34 @@ export class MovementDebugPanel {
     colliderEditor.append(colliderEditorStatus);
     const colliderConfirm = documentRef.createElement("button");
     colliderConfirm.type = "button";
-    colliderConfirm.textContent = "Подтвердить";
-    colliderConfirm.addEventListener("click", onColliderDraftConfirm);
+    colliderConfirm.textContent = "Применить в проект";
+    colliderConfirm.addEventListener("click", () => void this.applyColliderDraftToProject());
     colliderEditor.append(colliderConfirm);
     panel.append(colliderEditor);
     this.colliderEditor = colliderEditor;
     this.colliderEditorStatus = colliderEditorStatus;
+    this.colliderConfirmButton = colliderConfirm;
+
+    this.authoringStatus = documentRef.createElement("output");
+    this.authoringStatus.className = "movement-debug-status";
+    panel.append(this.authoringStatus);
 
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
-    for (const [label, handler] of [["Сбросить баланс-забег", onResetBalanceRun], ["Восполнить энергию", onRefillEnergy], ["Добавить готовое блюдо", onAddCookedDish], ["Вернуть значения по умолчанию", () => this.resetDefaults()]]) {
+    const actionDefinitions = [
+      ["Сбросить баланс-забег", onResetBalanceRun],
+      ["Восполнить энергию", onRefillEnergy],
+      ["Добавить готовое блюдо", onAddCookedDish],
+      ["Вернуть значения по умолчанию", () => this.resetDefaults()],
+      ["Сохранить расстановку как стартовую", () => void this.persistStartingLayout()],
+    ];
+    for (const [label, handler] of actionDefinitions) {
       const button = documentRef.createElement("button");
       button.type = "button";
       button.textContent = label;
       button.addEventListener("click", handler);
       actions.append(button);
+      if (label === "Сохранить расстановку как стартовую") this.layoutSaveButton = button;
     }
     panel.append(actions);
     documentRef.body.append(toggle, panel);
@@ -119,6 +137,91 @@ export class MovementDebugPanel {
     this.panel = panel;
     this.syncInputs();
     this.updateStatus();
+
+    if (typeof window !== "undefined" && documentRef === globalThis.document) {
+      void this.attachSceneRuntime();
+    }
+  }
+
+  async resolveWorldScene() {
+    if (this.scene && !this.scene.sys?.isDestroyed?.()) return this.scene;
+    const module = await import("phaser");
+    const Phaser = module.default ?? module;
+    for (const game of Phaser.GAMES ?? []) {
+      const scene = game?.scene?.getScene?.("world") ?? game?.scene?.keys?.world ?? null;
+      if (scene) return scene;
+    }
+    return null;
+  }
+
+  async attachSceneRuntime() {
+    try {
+      const scene = await this.resolveWorldScene();
+      if (!scene || this.destroyed) return;
+      this.scene = scene;
+      this.authoringRuntime = attachEditorAuthoringRuntime(scene, {
+        storage: this.storage,
+        confirmColliderDraft: this.onColliderDraftConfirm,
+      });
+      this.startingLayoutRestoreListener = () => {
+        try {
+          const layout = this.authoringRuntime?.restoreStartingLayout?.();
+          this.setAuthoringStatus(layout ? "Стартовая расстановка загружена" : "Стартовая расстановка: базовая");
+        } catch (error) {
+          console.warn("Starting layout restore failed", error);
+          this.setAuthoringStatus("Ошибка загрузки стартовой расстановки", true);
+        }
+      };
+      scene.events?.once?.("update", this.startingLayoutRestoreListener);
+    } catch (error) {
+      console.warn("Editor authoring runtime unavailable", error);
+      this.setAuthoringStatus("Редактор проекта недоступен", true);
+    }
+  }
+
+  async applyColliderDraftToProject() {
+    if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = true;
+    this.setAuthoringStatus("Сохранение коллайдеров в проект…");
+    try {
+      if (!this.authoringRuntime?.applyColliderDraftToProject) {
+        const localResult = this.onColliderDraftConfirm();
+        this.setAuthoringStatus(localResult?.status === "empty" ? "Сначала выберите коллайдер" : "Коллайдер применён локально", localResult?.status === "empty");
+        return;
+      }
+      const result = await this.authoringRuntime.applyColliderDraftToProject();
+      if (!result || result.status === "empty") {
+        this.setAuthoringStatus("Сначала выберите коллайдер", true);
+        return;
+      }
+      this.setAuthoringStatus("Коллайдеры сохранены в проекте");
+    } catch (error) {
+      console.warn("Collider project save failed", error);
+      this.setAuthoringStatus("Коллайдер применён локально, но проект не записан: нужен локальный dev-preview", true);
+    } finally {
+      if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = false;
+    }
+  }
+
+  async persistStartingLayout() {
+    if (this.layoutSaveButton) this.layoutSaveButton.disabled = true;
+    this.setAuthoringStatus("Сохранение стартовой расстановки…");
+    try {
+      if (!this.authoringRuntime?.saveStartingLayout) throw new Error("Authoring runtime is unavailable");
+      const layout = await this.authoringRuntime.saveStartingLayout();
+      const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.beds?.length ?? 0);
+      this.setAuthoringStatus(`Стартовая расстановка сохранена в проекте: ${count} объектов`);
+    } catch (error) {
+      console.warn("Starting layout save failed", error);
+      this.setAuthoringStatus("Ошибка сохранения расстановки: нужен локальный dev-preview", true);
+    } finally {
+      if (this.layoutSaveButton) this.layoutSaveButton.disabled = false;
+    }
+  }
+
+  setAuthoringStatus(message, error = false) {
+    if (!this.authoringStatus) return;
+    this.authoringStatus.textContent = message;
+    if (this.authoringStatus.dataset) this.authoringStatus.dataset.status = error ? "error" : "ok";
   }
 
   appendInput(panel, field) {
@@ -185,10 +288,14 @@ export class MovementDebugPanel {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.startingLayoutRestoreListener) this.scene?.events?.off?.("update", this.startingLayoutRestoreListener);
+    this.authoringRuntime?.destroy?.();
     this.toggleButton?.remove(); this.panel?.remove(); this.inputs.clear();
     this.toggleButton = null; this.panel = null; this.status = null;
     this.colliderCheckbox = null;
     this.colliderEditCheckbox = null; this.colliderEditor = null; this.colliderEditorStatus = null;
+    this.colliderConfirmButton = null; this.layoutSaveButton = null; this.authoringStatus = null;
+    this.authoringRuntime = null; this.scene = null; this.startingLayoutRestoreListener = null;
   }
 }
 
