@@ -23,7 +23,7 @@ function isAuthoringSceneReady(scene) {
 MovementDebugPanel.prototype.resolveWorldScene = async function resolveRegisteredWorldScene() {
   while (!this.destroyed) {
     const scene = getCurrentWorldScene();
-    if (scene && !scene.sys?.isDestroyed?.()) return scene;
+    if (scene) return scene;
     await delay(retryDelayMs);
   }
   return null;
