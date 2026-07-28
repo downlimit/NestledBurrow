@@ -1,24 +1,17 @@
-import { NEIGHBOR_DIALOGUE_RESOLVER_ID, NEIGHBOR_QUEST_ENTITIES } from "./neighborQuest.js";
+export const SEED_MERCHANT_INTERACTION_KIND = "seed-merchant-shop";
 
-const createTalkInteraction = (id, entityId) => deepFreeze({
-  id,
-  entityId,
-  kind: "dialogue",
+export const INTERACTION_DEFINITIONS = deepFreeze([{
+  id: "open-seed-merchant",
+  entityId: "seed-merchant",
+  kind: SEED_MERCHANT_INTERACTION_KIND,
   radius: 24,
-  priority: 0,
+  priority: 5,
   requiresFacing: true,
   facingDotThreshold: 0,
-  prompt: "hud:interaction.talk",
-  promptKey: "hud:interaction.talk",
-  payload: {
-    dialogueResolverId: NEIGHBOR_DIALOGUE_RESOLVER_ID,
-  },
-});
-
-export const INTERACTION_DEFINITIONS = deepFreeze([
-  createTalkInteraction("talk-home-npc", NEIGHBOR_QUEST_ENTITIES.homeNpc),
-  createTalkInteraction("talk-street-npc", NEIGHBOR_QUEST_ENTITIES.streetNpc),
-]);
+  prompt: "hud:interaction.openSeedShop",
+  promptKey: "hud:interaction.openSeedShop",
+  payload: {},
+}]);
 
 function deepFreeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {

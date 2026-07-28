@@ -6,6 +6,7 @@ const EVIDENCE_DIR = "artifacts/task-018";
 async function boot(page) {
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
+  await bridge(page, "selectInventorySlot", 0);
 }
 
 async function bridge(page, method, argument) {

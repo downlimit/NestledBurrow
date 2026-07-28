@@ -5,6 +5,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { BED_ASSET, BED_OBJECT } from "../src/debrisConfig.js";
 import { FACILITIES, FACILITY_ASSETS, PLATED_DISH_ASSET, preloadFacilityAssets } from "../src/facilityConfig.js";
 import { createFacilityRuntime } from "../src/facilityRuntime.js";
+import { createNewGameInventory } from "../src/inventoryDomain.js";
 
 assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, footprint.width / 16, footprint.height / 16]), [
   ["shower", 2, 2],
@@ -70,8 +71,9 @@ assert(!debrisSource.includes("0x315c8a"));
 const colliders = new Map(); const images = [];
 const scene = { add: { image(x, y, key) { const image = { x, y, key, visible: true, setOrigin() { return this; }, setPosition(nextX, nextY) { this.x = nextX; this.y = nextY; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, destroy() { this.destroyed = true; } }; images.push(image); return image; } } };
 const worldLayout = { getEffectiveCollider(bounds) { return bounds; }, isBlockedBox() { return false; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
-const kitchen = { rawPotatoes: 5, preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false };
-const runtime = createFacilityRuntime(scene, { worldLayout, getKitchenState: () => kitchen });
+const kitchen = { preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false };
+const inventory = createNewGameInventory();
+const runtime = createFacilityRuntime(scene, { worldLayout, getKitchenState: () => kitchen, getInventoryState: () => inventory });
 assert.equal(images.length, 7); assert.deepEqual([...colliders.values()].map((bounds) => [(bounds.right - bounds.left) / 16, (bounds.bottom - bounds.top) / 16]), [[2, 2], [1, 1], [3, 1], [2, 1], [1, 2], [2, 1]]);
 const motor = { position: null, movement: { velocity: { x: 3, y: -2 } } };
 for (const facility of FACILITIES.filter((candidate) => candidate.editable !== false)) {

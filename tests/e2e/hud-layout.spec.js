@@ -61,7 +61,9 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
           { id: "axe", kind: "tool", quantity: 1 },
           { id: "hoe", kind: "tool", quantity: 1 },
           { id: "watering-can", kind: "tool", quantity: 1 },
-          null, null, null, null, null, null, null,
+          { id: "potato-seed", kind: "loot", quantity: 4 },
+          { id: "potato", kind: "loot", quantity: 3 },
+          null, null, null, null, null,
         ],
       },
       energyFillHeight: 54,
@@ -77,6 +79,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
   const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
+  await bridge(page, "selectInventorySlot", 0);
   await expect.poll(async () => {
     await bridge(page, "placePlayerNear", debrisId);
     return (await bridge(page, "getInteractionState"))?.candidate?.entityId;

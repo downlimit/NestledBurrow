@@ -12,7 +12,7 @@ import {
 } from "./actorProfiles.js";
 import { createCharacter } from "./character.js";
 import { createCharacterSystem } from "./characterSystem.js";
-import { createPatrolController, createPlayerController } from "./controllers.js";
+import { createIdleController, createPatrolController, createPlayerController } from "./controllers.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
@@ -38,11 +38,6 @@ import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
 import { createInteractionRuntime } from "./interactionRuntime.js";
 import { createInteractionHud } from "./interactionHud.js";
 import { createGameHud, shouldShakeEnergyAfterInteraction } from "./gameHud.js";
-import {
-  completeNeighborDialogue,
-  NEIGHBOR_DIALOGUE_RESOLVER_ID,
-  resolveNeighborDialogueId,
-} from "./neighborQuest.js";
 import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
@@ -62,6 +57,7 @@ import {
   migrateDirectionalWallOverrides,
   placementMidpointOffset,
   wallColliderGroup,
+  worldDepthFromAnchorY,
 } from "./buildWorldGeometry.js";
 import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./colliderResize.js";
 import { createBuildModeRuntime } from "./buildModeRuntime.js";
@@ -77,11 +73,10 @@ import {
 } from "./buildAssetCatalog.js";
 import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { getResourceProfile } from "./resourceDomain.js";
-import { createDebrisRuntime } from "./debrisRuntime.js";
+import { getResourceProfile, resourceEffectType } from "./resourceDomain.js";
+import { createDebrisRuntime, drawBed } from "./debrisRuntime.js";
 import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, PLATED_DISH_ASSET, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
-import { drawBed } from "./debrisRuntime.js";
 import { drawFacility } from "./facilityPreviewVisuals.js";
 import { applyNeedsUpdate } from "./needsDomain.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
@@ -98,6 +93,12 @@ import {
   getCharacterVisualProfile,
   toPhaserFrame,
 } from "./characterVisualProfiles.js";
+import { FARMING_WELL_TEXTURE_KEY, preloadFarmingAssets, WELL_PROFILE } from "./farmingConfig.js";
+import { createFarmingRuntime } from "./farmingRuntime.js";
+import { createMerchantRuntime } from "./merchantRuntime.js";
+import { createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
+import { installWorldE2EBridge } from "./e2eBridge.js";
+import { UiVisibilityCoordinator } from "./uiVisibilityCoordinator.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
@@ -111,6 +112,7 @@ class WorldScene extends Phaser.Scene {
   preload() {
     preloadMusicPlaylist(this, import.meta.env.BASE_URL);
     preloadFacilityAssets(this, import.meta.env.BASE_URL);
+    preloadFarmingAssets(this, import.meta.env.BASE_URL);
     this.load.spritesheet(TAVERN_SIGN_ASSET.key, `${import.meta.env.BASE_URL}${TAVERN_SIGN_ASSET.path}`, {
       frameWidth: TAVERN_SIGN_ASSET.frameWidth,
       frameHeight: TAVERN_SIGN_ASSET.frameHeight,
@@ -132,7 +134,7 @@ class WorldScene extends Phaser.Scene {
         CHARACTER_VISUAL_PROFILE_IDS.player,
         getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.player),
       ],
-      ...NPCS.map((npc) => [npc.visualProfileId, getCharacterVisualProfile(npc.visualProfileId)]),
+      ...NPCS.map((npc) => [npc.visualProfileId, getCharacterVisualProfile(npc.visualProfileId)]), [GUEST_CONFIG.visualProfileId, getCharacterVisualProfile(GUEST_CONFIG.visualProfileId)],
     ]).values();
   }
 
@@ -187,7 +189,7 @@ class WorldScene extends Phaser.Scene {
     this.sleeping = false;
     this.exhaustedSleeping = false;
     this.isRunning = false;
-    this.simulationScale = 1;
+    this.simulationScale = this.playerTimeScale = 1;
     this.timeScale = 1;
     this.autosaveAccumulatorSeconds = 0;
     this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY;
@@ -195,6 +197,7 @@ class WorldScene extends Phaser.Scene {
     this.createMovementDebugPanel();
     this.createDayNightRuntime();
     this.createHud();
+    this.createFarmingRuntime();
     this.createCookingRuntime();
     this.attachSceneListeners();
     this.createJoystick();
@@ -231,7 +234,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   createCanonicalWallEntry(tile) {
-    const depth = 500 + (tile.worldY ?? tile.y * TILE_SIZE) + TILE_SIZE;
+    const depth = worldDepthFromAnchorY((tile.worldY ?? tile.y * TILE_SIZE) + TILE_SIZE, tile.id);
     const extraSprites = (tile.supplements ?? []).map((supplement) => this.add
       .image(supplement.worldX, supplement.worldY, HOUSE_TEXTURE_KEY, supplement.frame)
       .setOrigin(0, 0)
@@ -280,10 +283,12 @@ class WorldScene extends Phaser.Scene {
       this.characterSystem.add(createCharacter(this, {
         id: npc.id,
         spawn: npc.spawn,
-        controller: createPatrolController({
-          ...npc.patrol,
-          isPaused: () => this.interactionRuntime?.isEntityInActiveDialogue(npc.id) ?? false,
-        }),
+        controller: npc.patrol
+          ? createPatrolController({
+            ...npc.patrol,
+            isPaused: () => this.interactionRuntime?.isEntityInActiveDialogue(npc.id) ?? false,
+          })
+          : createIdleController(),
         movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
         actorProfile,
         visualProfile,
@@ -370,6 +375,16 @@ class WorldScene extends Phaser.Scene {
       isCoarsePointer: () => this.isCoarsePointer(),
       localization: this.localization,
     });
+    this.merchantRuntime = createMerchantRuntime(this, {
+      sessionState: this.sessionState,
+      localization: this.localization,
+      onActiveChange: () => this.syncGameplayHudVisibility(), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onPersistentMutation: () => {
+        this.gameHud?.render?.();
+        this.saveSession();
+      },
+    });
+    this.uiVisibilityCoordinator = new UiVisibilityCoordinator(); this.uiVisibilityCoordinator.register(this.interactionHud, ["gameplay-overlay", "option-sensitive", "merchant-active"]); this.uiVisibilityCoordinator.register(this.merchantRuntime, ["gameplay-overlay", "option-sensitive"]);
     applyGameplayTuning(this.sessionState, this.gameplayTuning);
     this.syncPlayerEnergyTarget();
     this.interactionRuntime = createInteractionRuntime({
@@ -377,18 +392,12 @@ class WorldScene extends Phaser.Scene {
       characterSystem: this.characterSystem,
       interactionDefinitions: INTERACTION_DEFINITIONS,
       getDialogueDefinition,
-      resolveDialogueId: (resolverId, state, entityId) => {
-        if (resolverId !== NEIGHBOR_DIALOGUE_RESOLVER_ID) {
-          throw new Error(`Unknown dialogue resolver ID: ${resolverId}`);
-        }
-        return resolveNeighborDialogueId(state, entityId);
-      },
-      completeDialogue: completeNeighborDialogue,
       onPersistentMutation: () => { this.gameHud?.render?.(); this.saveSession(); },
       getStaticInteractionDefinitions: () => [
         ...(this.debrisRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.facilityRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
+        ...(this.farmingRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.sleeping && !this.exhaustedSleeping ? [this.getSleepingWakeInteraction()] : []),
         ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
       ],
@@ -403,13 +412,13 @@ class WorldScene extends Phaser.Scene {
   }
 
   createDebrisRuntime() {
-    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout });
+    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout, getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null });
   }
 
   createFacilityRuntime() {
     this.facilityRuntime = createFacilityRuntime(this, {
       worldLayout: this.worldLayout,
-      getKitchenState: () => this.sessionState?.gameplay?.kitchen,
+      getKitchenState: () => this.sessionState?.gameplay?.kitchen, getInventoryState: () => this.sessionState?.gameplay?.inventory,
       isServingDishReserved: () => this.guestRuntime?.isDishReserved?.() ?? false,
     });
   }
@@ -458,7 +467,7 @@ class WorldScene extends Phaser.Scene {
       },
       onDishConsumed: ({ position }) => {
         this.facilityRuntime?.syncKitchenVisuals?.();
-        this.coinRuntime?.spawn?.(position);
+        this.audioRuntime?.playEffect?.("coin-toss"); this.coinRuntime?.spawn?.(position);
         this.gameHud?.render?.();
         this.saveSession();
       },
@@ -489,7 +498,7 @@ class WorldScene extends Phaser.Scene {
     let state = "";
     return {
       set: (next) => {
-        state = next;
+        const previousState = state; state = next; if (state !== previousState && state === "open-reaction") this.audioRuntime?.playEffect?.("guest-happy"); else if (state !== previousState && ["closed-reaction", "empty-reaction"].includes(state)) this.audioRuntime?.playEffect?.("guest-angry");
         const reactionText = state === "checking" ? "..."
           : state === "open-reaction" ? ":D"
             : state === "closed-reaction" ? ":("
@@ -530,8 +539,18 @@ class WorldScene extends Phaser.Scene {
   }
 
   runWorldObjectInteraction(candidate) {
+    const merchantResult = this.merchantRuntime?.handleInteraction?.(candidate);
+    if (merchantResult && merchantResult.status !== "ignored") {
+      this.suppressNextInteract = true;
+      return merchantResult;
+    }
+    const farmingResult = this.farmingRuntime?.handleInteraction?.(candidate);
+    if (farmingResult && farmingResult.status !== "ignored") {
+      this.suppressNextInteract = true;
+      return farmingResult;
+    }
     if (candidate.kind === TAVERN_SIGN_KIND) {
-      this.sessionState.gameplay.tavernOpen = !this.sessionState.gameplay.tavernOpen;
+      this.sessionState.gameplay.tavernOpen = !this.sessionState.gameplay.tavernOpen; this.audioRuntime?.playEffect?.(this.sessionState.gameplay.tavernOpen ? "tavern-open" : "tavern-close");
       this.tavernSignRuntime?.sync?.();
       this.interactionRuntime?.refresh?.();
       this.suppressNextInteract = true;
@@ -549,7 +568,7 @@ class WorldScene extends Phaser.Scene {
         return result;
       }
       if (facility?.facilityType === "serving-table") {
-        const result = toggleServingDish(this.sessionState.gameplay.kitchen);
+        const result = toggleServingDish(this.sessionState.gameplay.kitchen); if (result.mutated) this.audioRuntime?.playEffect?.(result.status === "dish-served" ? "dish-serve" : "dish-take");
         if (result.mutated) {
           this.facilityRuntime.syncKitchenVisuals();
           this.gameHud?.render?.();
@@ -579,7 +598,7 @@ class WorldScene extends Phaser.Scene {
     if (nowMs - this.lastSuccessfulHitAtMs < this.gameplayTuning.universalHitCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
     const definition = RESOURCE_OBJECTS.find((item) => item.id === candidate.payload.resourceId);
     if (!definition) return { status: "unknown-resource", mutated: false };
-    const profile = getResourceProfile(definition.profileId);
+    const profile = getResourceProfile(definition.profileId); if (this.gameHud?.getSelectedInventoryItem?.()?.id !== "axe") return { status: "wrong-tool", mutated: false };
     const energyBefore = this.sessionState.gameplay.currentEnergy;
     const result = hitResourceNode(this.sessionState, definition.id, {
       action: profile.preferredAction,
@@ -592,7 +611,7 @@ class WorldScene extends Phaser.Scene {
       this.activeResourceProfileId = profile.id;
       this.interactionHud?.triggerCooldownFeedback?.();
       this.gameHud?.render?.();
-      this.applySuccessfulHitFeedback(profile.sfx, energyBefore);
+      this.applySuccessfulHitFeedback(resourceEffectType(profile, result.status), energyBefore);
       this.debrisRuntime?.hitWithFeedback?.(definition.id, result, () => this.interactionRuntime?.refresh?.());
       this.saveSession();
     }
@@ -893,9 +912,9 @@ class WorldScene extends Phaser.Scene {
       gameContainer: this.gameContainer,
       audioSettings: this.audioSettings,
       isCoarsePointer: () => this.isCoarsePointer(),
-      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, energyFlow: this.getEnergyFlow(), needsFlow: this.needsFlow }),
-      onLanguageChange: () => this.interactionRuntime?.refresh?.(),
-      onOptionsChange: (active) => this.cookingRuntime?.setInputSuppressed?.(active),
+      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, timeScale: this.simulationScale, selectedTimeScale: this.playerTimeScale, energyFlow: this.getEnergyFlow(), needsFlow: this.needsFlow }),
+      onLanguageChange: () => this.interactionRuntime?.refresh?.(), onTimeScaleChange: (scale) => { if (scale > 1) this.audioRuntime?.playEffect?.("time-speed-up"); else if (scale === 1 && this.playerTimeScale !== 1) this.audioRuntime?.playEffect?.("time-speed-normal"); this.playerTimeScale = scale; }, onDroppedItemCollision: (item, collider) => this.farmingRuntime?.handleDroppedItemCollision?.(item, collider), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onOptionsChange: (active) => { this.audioRuntime?.playEffect?.(active ? "menu-open" : "menu-close"); this.optionsOpen = Boolean(active); this.syncGameplayHudVisibility(); this.cookingRuntime?.setInputSuppressed?.(active); },
       onConfirmationChange: (active) => {
         this.gameHudConfirmationActive = Boolean(active);
         this.syncGameplayHudVisibility();
@@ -906,10 +925,22 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
+  createFarmingRuntime() {
+    this.farmingRuntime = createFarmingRuntime(this, {
+      sessionState: this.sessionState,
+      worldLayout: this.worldLayout,
+      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
+      spawnHarvestDrops: (itemId, quantity, origin) => this.gameHud?.spawnWorldItems?.(itemId, quantity, origin),
+      isModalActive: () => Boolean(this.merchantRuntime?.isActive?.()
+        || this.cookingRuntime?.isActive?.() || this.buildMode?.isActive?.() || this.gameHudConfirmationActive),
+      onPersistentMutation: () => { this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); }, playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+    });
+  }
+
   createCookingRuntime() {
     this.cookingRuntime = createCookingRuntime(this, {
       sessionState: this.sessionState,
-      localization: this.localization,
+      localization: this.localization, playEffect: (type) => this.audioRuntime?.playEffect?.(type),
       onActiveChange: (active) => {
         this.cookingOverlayActive = Boolean(active);
         this.gameHud?.setGameplayOverlayActive?.(active);
@@ -963,6 +994,12 @@ class WorldScene extends Phaser.Scene {
     for (const point of canonicalWallPoints) this.refreshBuildWallJunctions(point);
     this.ensureBuildSurfaceTextures();
     this.nextBuildObjectId = 0;
+    this.worldBuildCoordinator = createWorldBuildCoordinator(this, {
+      farmState: this.sessionState.gameplay.farm,
+      worldLayout: this.worldLayout,
+      hasFarmCell: (point) => this.farmingRuntime?.hasFarmCell?.(point) ?? false,
+    });
+    this.farmingRuntime?.attachWorldBuildCoordinator?.(this.worldBuildCoordinator);
     this.buildMode = createBuildModeRuntime(this, {
       localization: this.localization,
       worldBounds: this.worldLayout.bounds,
@@ -984,7 +1021,7 @@ class WorldScene extends Phaser.Scene {
       getPlacementAnchorOffset: (item) => this.getBuildPlacementAnchorOffset(item),
       isActivationAllowed: () => !this.cookingRuntime?.isActive?.(),
       onModeChange: (active) => {
-        this.syncGameplayHudVisibility();
+        this.audioRuntime?.playEffect?.(active ? "menu-open" : "menu-close"); this.syncGameplayHudVisibility();
         this.movementDebugPanel?.setSuppressed?.(active);
         this.mobileJoystick?.reset?.();
         if (!active) this.interactionRuntime?.refresh?.();
@@ -1014,11 +1051,17 @@ class WorldScene extends Phaser.Scene {
   }
 
   applyBuildPlacement(item, point, context) {
-    const result = this.placeBuildAsset(item, point, context);
+    const result = this.placeBuildAsset(item, point, context); if (result?.status === "placed") this.audioRuntime?.playEffect?.("build-place");
     if (result?.undo) {
       this.recordBuildUndo(result.undo);
     } else if (result?.status === "placed" && result.id) {
-      if (item.placement === "facility") {
+      if (item.placement === "well") {
+        this.recordBuildUndo(() => {
+          this.worldBuildCoordinator?.removeAt?.(result.definition);
+          this.interactionRuntime?.refresh?.();
+          this.saveSession();
+        });
+      } else if (item.placement === "facility") {
         this.recordBuildUndo(() => this.facilityRuntime?.remove?.(result.id));
       } else if (item.placement === "bed") {
         this.recordBuildUndo(() => this.debrisRuntime?.removeBed?.(result.id));
@@ -1030,13 +1073,15 @@ class WorldScene extends Phaser.Scene {
   }
 
   applyBuildDemolition(point, onlyType) {
-    const result = this.demolishBuildObject(point, onlyType);
+    const result = this.demolishBuildObject(point, onlyType); if (result?.status === "removed") this.audioRuntime?.playEffect?.("build-remove");
     this.recordBuildUndo(result?.undo);
     return result;
   }
 
   getBuildMoveTarget(point) {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
+    const coordinated = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint);
+    if (coordinated) return coordinated;
     const facility = this.facilityRuntime?.getDefinitionAt?.(hitPoint);
     if (facility) {
       const profileKey = `facility:${facility.facilityType}`;
@@ -1060,6 +1105,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   getBuildPlacementAnchorOffset(item) {
+    if (item?.placement === "well") return { ...WELL_PROFILE.depthAnchorOffset };
     const profileKey = item?.placement === "facility"
       ? `facility:${item.facilityType}`
       : item?.placement === "bed"
@@ -1082,33 +1128,52 @@ class WorldScene extends Phaser.Scene {
 
   syncGameplayHudVisibility() {
     const buildActive = this.buildMode?.isActive?.() ?? false;
+    const gameplayOverlay = this.gameHudHidden || buildActive || this.cookingOverlayActive || this.gameHudConfirmationActive;
     this.gameHud?.setSuppressed?.(this.gameHudHidden || buildActive);
-    this.interactionHud?.setSuppressed?.(
-      this.gameHudHidden || buildActive || this.cookingOverlayActive || this.gameHudConfirmationActive,
-    );
+    this.uiVisibilityCoordinator?.setClassHidden("gameplay-overlay", gameplayOverlay);
+    this.uiVisibilityCoordinator?.setClassHidden("option-sensitive", this.optionsOpen);
+    this.uiVisibilityCoordinator?.setClassHidden("merchant-active", this.merchantRuntime?.isActive?.());
     if (this.gameHudHidden) this.mobileJoystick?.reset?.();
   }
 
   applyBuildMove(target, point) {
     if (!target?.definition) return { status: "ignored" };
-    const result = target.kind === "facility"
+    const result = target.kind === "well"
+      ? this.worldBuildCoordinator?.move?.(target, point)
+      : target.kind === "facility"
       ? this.facilityRuntime?.move?.(target.definition.id, point)
       : target.kind === "bed" ? this.debrisRuntime?.moveBed?.(target.definition.id, point) : null;
     if (!result) return { status: "blocked" };
     this.recordBuildUndo(() => {
-      if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
+      if (target.kind === "well") {
+        this.worldBuildCoordinator?.removeAt?.(result.current);
+        this.worldBuildCoordinator?.restore?.(result.previous);
+        this.saveSession();
+      } else if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
       else this.debrisRuntime?.replaceBed?.(result.previous);
       this.facilityRuntime?.syncKitchenVisuals?.();
       this.interactionRuntime?.refresh?.();
     });
     this.facilityRuntime?.syncKitchenVisuals?.();
     this.interactionRuntime?.refresh?.();
+    if (target.kind === "well") this.saveSession();
     return { status: "moved" };
   }
 
   renderBuildMovePreview(target, point) {
     this.clearBuildPreview();
     if (!target?.definition) return;
+    if (target.kind === "well") {
+      this.addBuildPreviewImage(
+        point.x,
+        point.y,
+        FARMING_WELL_TEXTURE_KEY,
+        0,
+        8988,
+        this.worldBuildCoordinator?.isPlacementBlocked?.({ placement: "well" }, point) ? 0xff5364 : 0x7dff9a,
+      );
+      return;
+    }
     const visualOffset = this.assetProfiles?.[target.profileKey]?.visualOffset ?? { x: 0, y: 0 };
     const graphics = this.add.graphics().setPosition(point.x + visualOffset.x, point.y + visualOffset.y).setDepth(8988).setAlpha(0.58);
     if (target.kind === "bed") drawBed(graphics, 0x7dff9a);
@@ -1119,7 +1184,8 @@ class WorldScene extends Phaser.Scene {
   renderBuildMoveHover(point) {
     this.clearBuildPreview();
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
-    const target = this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
+    const target = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint)
+      ?? this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
       ?? this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
     if (!target) return false;
     const targets = target.targets.map((object) => ({ target: object, alpha: object.alpha ?? 1 }));
@@ -1163,6 +1229,8 @@ class WorldScene extends Phaser.Scene {
   }
 
   isBuildObjectPlacementBlocked(item, point) {
+    const coordinated = this.worldBuildCoordinator?.isPlacementBlocked?.(item, point);
+    if (coordinated !== null && coordinated !== undefined) return coordinated;
     let collider = null;
     let profileKey = null;
     if (item?.placement === "facility") {
@@ -1223,6 +1291,19 @@ class WorldScene extends Phaser.Scene {
         if (item.placement === "bed") drawBed(graphics, tint);
         else drawFacility(graphics, item.facilityType, tint);
         this.buildPreviewObjects.push(graphics);
+      }
+      return;
+    }
+    if (item.placement === "well") {
+      for (const point of uniquePoints) {
+        this.addBuildPreviewImage(
+          point.x,
+          point.y,
+          item.textureKey,
+          item.frame,
+          8988,
+          this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null,
+        );
       }
       return;
     }
@@ -1365,6 +1446,8 @@ class WorldScene extends Phaser.Scene {
       x: Number(point.rawX ?? point.x),
       y: Number(point.rawY ?? point.y),
     };
+    const coordinated = this.worldBuildCoordinator?.getDemolitionTargetAt?.(hitPoint);
+    if (coordinated) return coordinated;
     const facility = this.facilityRuntime?.getDemolitionTargetAt?.(hitPoint);
     if (facility) return facility;
     const bed = this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
@@ -1402,6 +1485,12 @@ class WorldScene extends Phaser.Scene {
   }
 
   placeBuildAsset(item, point, context = {}) {
+    if (this.worldBuildCoordinator?.handles?.(item)) {
+      const result = this.worldBuildCoordinator.place(item, point);
+      this.interactionRuntime?.refresh?.();
+      if (result?.status === "placed") this.saveSession();
+      return result;
+    }
     if (item.placement === "facility") {
       const definition = this.facilityRuntime?.add?.(item.facilityType, point);
       this.interactionRuntime?.refresh?.();
@@ -1426,7 +1515,12 @@ class WorldScene extends Phaser.Scene {
       const profileKey = `resource:${item.resourceProfileId}`;
       const profile = this.assetProfiles?.[profileKey];
       const visualOffset = profile?.visualOffset ?? { x: 0, y: 0 };
-      const depth = assetDepthFromPivot(point, profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 });
+      const depth = assetDepthFromPivot(
+        point,
+        profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
+        500,
+        id,
+      );
       for (let row = 0; row < 4; row += 1) {
         for (let column = 0; column < 3; column += 1) {
           sprites.push(this.add.image(
@@ -1668,7 +1762,10 @@ class WorldScene extends Phaser.Scene {
       frame,
     )
       .setOrigin(0)
-      .setDepth(500 + point.y + (vertical ? TILE_SIZE : 0)));
+      .setDepth(worldDepthFromAnchorY(
+        point.y + (vertical ? TILE_SIZE : 0),
+        `${this.buildWallEdgeKey(point)}:${frame}`,
+      )));
   }
 
   refreshBuildWallEdgeVisual(point) {
@@ -1898,7 +1995,7 @@ class WorldScene extends Phaser.Scene {
     const frames = getBuildWallFrames({ ...incidents, explicit });
     if (!frames.length) return;
     const verticalTerminus = incidents.north !== incidents.south && !incidents.east && !incidents.west;
-    const depth = 500 + vertex.y + getBuildWallColumnDepthOffset({
+    const anchorY = vertex.y + getBuildWallColumnDepthOffset({
       verticalTerminus,
       explicit,
       isBottom: incidents.north,
@@ -1909,7 +2006,7 @@ class WorldScene extends Phaser.Scene {
       spriteY,
       HOUSE_TEXTURE_KEY,
       frame,
-    ).setOrigin(0).setDepth(depth));
+    ).setOrigin(0).setDepth(worldDepthFromAnchorY(anchorY, `${key}:${frame}`)));
     this.buildWallJunctions.set(key, sprites);
   }
 
@@ -2176,6 +2273,8 @@ class WorldScene extends Phaser.Scene {
             restored.point,
             this.assetProfiles?.[`resource:${restored.item.resourceProfileId}`]?.snapAnchorOffset
               ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
+            500,
+            restored.id,
           )));
         }
       }
@@ -2195,6 +2294,22 @@ class WorldScene extends Phaser.Scene {
       x: Number(point.rawX ?? point.x),
       y: Number(point.rawY ?? point.y),
     };
+    const well = (!onlyType || onlyType === "well")
+      ? this.worldBuildCoordinator?.removeAt?.(hitPoint)
+      : null;
+    if (well) {
+      this.interactionRuntime?.refresh?.();
+      this.saveSession();
+      return {
+        status: "removed",
+        type: "well",
+        undo: () => {
+          this.worldBuildCoordinator?.restore?.(well);
+          this.interactionRuntime?.refresh?.();
+          this.saveSession();
+        },
+      };
+    }
     const facility = (!onlyType || onlyType === "facility")
       ? this.facilityRuntime?.getDefinitionAt?.(hitPoint)
       : null;
@@ -2321,6 +2436,7 @@ class WorldScene extends Phaser.Scene {
   isHudPoint(x, y) {
     return Boolean(this.gameHud?.isPointInHud(x, y))
       || Boolean(this.interactionHud?.isPointInHud(x, y))
+      || Boolean(this.merchantRuntime?.isPointInHud?.(x, y))
       || Boolean(this.cookingRuntime?.isPointInHud?.(x, y));
   }
 
@@ -2330,129 +2446,7 @@ class WorldScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  installE2EBridge() {
-    if (!import.meta.env.VITE_E2E) return;
-    const bridge = {
-      getSession: () => JSON.parse(JSON.stringify(this.sessionState)),
-      getLanguage: () => this.localization.getLanguage(),
-      setLanguage: async (language) => {
-        await this.localization.changeLanguage(language);
-        this.gameHud?.render();
-        this.interactionRuntime?.refresh();
-      },
-      placePlayerNear: (entityId) => {
-        const resource = RESOURCE_OBJECTS.find((item) => item.id === entityId);
-        const facility = this.facilityRuntime?.getDefinition?.(entityId);
-        const bed = this.debrisRuntime?.getBedDefinition?.(entityId);
-        const sign = entityId === TAVERN_SIGN.id ? { position: TAVERN_SIGN.interactionPosition } : null;
-        const target = resource ? { position: resource.position } : bed ? { position: bed.position } : facility ? { position: facility.position } : sign ?? this.characterSystem.getSnapshot(entityId);
-        if (!target?.position) throw new Error(`Unknown E2E placement target: ${entityId}`);
-        const player = this.characterSystem.require(this.sessionState.playerId);
-        const directions = [
-          { x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
-          { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
-          { x: -Math.SQRT1_2, y: Math.SQRT1_2 }, { x: Math.SQRT1_2, y: Math.SQRT1_2 },
-        ];
-        let placed = false;
-        for (const distance of [12, 20, 28, 34]) {
-          for (const direction of directions) {
-            player.motor.position = {
-              x: target.position.x + direction.x * distance,
-              y: target.position.y + direction.y * distance,
-            };
-            player.motor.movement = createMovementState({ facing: { x: -direction.x, y: -direction.y } });
-            this.interactionRuntime?.update?.({ actions: { interact: false, primary: false, secondary: false } });
-            if (this.interactionRuntime?.getCurrentCandidate?.()?.entityId === entityId) {
-              placed = true;
-              break;
-            }
-          }
-          if (placed) break;
-        }
-        player.visual.setPresentationPose(null);
-        this.cameraRuntime?.reset(player.motor.position);
-        this.interactionRuntime?.refresh?.();
-      },
-      placePlayerAt: ({ x, y, facing = { x: 0, y: -1 } }) => {
-        const player = this.characterSystem.require(this.sessionState.playerId);
-        player.motor.position = { x: Number(x), y: Number(y) };
-        player.motor.movement = createMovementState({ facing });
-        player.visual.setPresentationPose(null);
-        this.cameraRuntime?.reset(player.motor.position);
-        this.interactionRuntime?.refresh?.();
-      },
-      getInteractionState: () => ({
-        candidate: this.interactionRuntime?.getCurrentCandidate() ?? null,
-        dialogueActive: this.interactionRuntime?.isDialogueActive() ?? false,
-        dialogue: { ...this.sessionState.dialogue },
-      }),
-      getInteractionHudState: () => this.interactionHud?.getPresentationState?.(),
-      getBuildModeState: () => this.buildMode?.getState?.() ?? null,
-      toggleBuildMode: () => this.buildMode?.toggle?.(),
-      getHudState: () => ({ newGameConfirming: this.gameHud?.isConfirming?.() ?? false, resources: this.gameHud?.getResourceState?.(), ...this.gameHud?.getLayoutState?.() }),
-      isHudPoint: ({ x, y }) => this.isHudPoint(x, y),
-      getAudioSettings: () => this.audioSettings?.getSettings(),
-      setAudioChannel: ({ channel, value }) => this.audioSettings?.setChannel?.(channel, value),
-      getAudioEffectState: () => ({ lastEffectType: this.audioRuntime?.lastEffectType ?? null, playCount: this.audioRuntime?.effectPlayCount ?? 0 }),
-      interact: () => { this.frameActions = Object.freeze({ interact: true, primary: false, secondary: false }); this.interactionRuntime?.update({ actions: this.frameActions }); },
-      expireHitCooldown: () => { this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; },
-      getDebrisState: () => ({ present: this.debrisRuntime?.isPresent?.() ?? false, definition: RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID), definitions: RESOURCE_OBJECTS, bed: this.debrisRuntime?.getBedDefinition?.() ?? null, beds: this.debrisRuntime?.getBedDefinitions?.() ?? [], wakeTile: BED_WAKE_TILE }),
-      getFacilityState: () => ({ definitions: this.facilityRuntime?.getDefinitions?.() ?? FACILITIES, activeId: this.facilityRuntime?.getActiveId?.() ?? null }),
-      getCookingState: () => this.cookingRuntime?.getState?.() ?? null,
-      getTavernState: () => ({ open: this.sessionState.gameplay.tavernOpen, sign: this.tavernSignRuntime?.getState?.(), guest: this.guestRuntime?.getState?.() }),
-      getCoinState: () => this.coinRuntime?.getState?.() ?? [],
-      forceGuestSpawn: () => this.guestRuntime?.forceSpawn?.(),
-      setServingDish: (present) => { this.sessionState.gameplay.kitchen.servingTableHasDish = Boolean(present); this.facilityRuntime?.syncKitchenVisuals?.(); },
-      attemptCooking: () => this.cookingRuntime?.attempt?.(),
-      completeCooking: () => this.cookingRuntime?.completeForTest?.(),
-      alignCookingMarker: () => this.cookingRuntime?.alignMarkerForTest?.(),
-      newGame: () => this.startNewGame(),
-      getNeedsState: () => ({ values: JSON.parse(JSON.stringify(this.sessionState.gameplay.needs)), flow: JSON.parse(JSON.stringify(this.needsFlow ?? {})), activity: this.getNeedsActivityContext() }),
-      setNeeds: (values) => {
-        for (const [id, value] of Object.entries(values ?? {})) {
-          if (!(id in this.sessionState.gameplay.needs)) continue;
-          this.sessionState.gameplay.needs[id] = Math.min(100, Math.max(0, Number(value) || 0));
-        }
-        this.gameHud?.render?.();
-      },
-      setEnergy: (value) => { this.sessionState.gameplay.currentEnergy = Math.max(0, Math.min(this.sessionState.gameplay.maximumEnergy, Number(value) || 0)); this.syncPlayerEnergyTarget(); this.gameHud?.render(); },
-      setEnergyState: ({ current, maximum }) => { this.sessionState.gameplay.maximumEnergy = Math.max(1, Number(maximum) || 1); this.sessionState.gameplay.currentEnergy = Math.max(0, Math.min(this.sessionState.gameplay.maximumEnergy, Number(current) || 0)); this.syncPlayerEnergyTarget(); this.gameHud?.render(); },
-      setPlayerMotion: ({ moving = false, running = false } = {}) => {
-        const player = this.characterSystem.require(this.sessionState.playerId);
-        player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
-        player.motor.movement.velocity.x = moving ? player.motor.movementConfig.movingSpeedThreshold : 0;
-        this.e2eEnergyMotion = { moving: Boolean(moving), running: Boolean(running) };
-        this.isRunning = Boolean(running);
-      },
-      advanceGameplayTime: (milliseconds) => this.updateGameplayTime(Math.max(0, Number(milliseconds) || 0)),
-      getRuntimeState: () => ({ sleeping: this.sleeping, exhaustedSleeping: this.exhaustedSleeping, cookingActive: this.cookingRuntime?.isActive?.() ?? false, timeScale: this.simulationScale }),
-      setWorldTimeSeconds: (value) => { this.sessionState.gameplay.worldTimeSeconds = Math.max(0, Number(value) || 0); this.updateDayNightLighting(); this.gameHud?.render(); },
-      getClockText: () => formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()),
-      getDayNightState: () => ({ color: dayNightMultiplyColor(this.sessionState.gameplay.worldTimeSeconds), worldTimeSeconds: this.sessionState.gameplay.worldTimeSeconds }),
-      getResourceState: () => JSON.parse(JSON.stringify(this.sessionState.gameplay)),
-      getResourceNodeState: (id) => JSON.parse(JSON.stringify(this.sessionState.gameplay.resourceNodes[id])),
-      getResourceVisualState: (id) => this.debrisRuntime?.getVisualState?.(id) ?? null,
-      getResourceCollider: (id) => this.worldLayout?.getResourceCollider?.(id) ?? null,
-      getCharacterSnapshot: (id) => this.characterSystem.has(id) ? this.characterSystem.getSnapshot(id) : null,
-      getPlayerMovementState: () => ({ targetMultiplier: this.playerCharacter?.motor?.targetSpeedMultiplier, effectiveMultiplier: this.playerCharacter?.motor?.effectiveSpeedMultiplier, runSpeedMultiplier: this.playerCharacter?.motor?.runSpeedMultiplier }),
-      getPlayerVisualState: () => {
-        const sprite = this.playerCharacter?.sprite;
-        return sprite ? { x: sprite.x, y: sprite.y, angle: sprite.angle, textureKey: sprite.texture?.key } : null;
-      },
-      getCameraState: () => this.cameraRuntime?.getState?.() ?? null,
-      getLowEnergyMarkerState: () => {
-        const visual = this.playerCharacter?.visual;
-        const marker = visual?.lowEnergyMarker;
-        return marker ? { x: marker.x, y: marker.y, playerX: visual.sprite.x, playerY: visual.sprite.y } : null;
-      },
-      setWakeRandomValue: (value) => { this.e2eWakeRandom = () => Number(value); },
-      wakeUp: () => this.wakeUp(),
-      tryWakeFromExhaustion: () => this.tryWakeFromExhaustion(() => 0),
-    };
-    this.e2eBridge = bridge;
-    window.__NESTLED_BURROW_E2E__ = bridge;
-  }
-
+  installE2EBridge() { installWorldE2EBridge(this); }
   isCoarsePointer() {
     return window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
   }
@@ -2490,6 +2484,8 @@ class WorldScene extends Phaser.Scene {
     this.mobileJoystick = null;
     this.buildMode?.destroy();
     this.buildMode = null;
+    this.worldBuildCoordinator?.destroy?.();
+    this.worldBuildCoordinator = null;
     for (const object of this.buildPlacedObjects?.values?.() ?? []) {
       for (const sprite of object.sprites) sprite.destroy();
       if (object.collider) this.worldLayout?.clearWorldObjectCollider?.(object.id);
@@ -2513,6 +2509,11 @@ class WorldScene extends Phaser.Scene {
     this.tavernSignRuntime = null;
     this.cookingRuntime?.destroy();
     this.cookingRuntime = null;
+    this.farmingRuntime?.destroy();
+    this.farmingRuntime = null;
+    this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
+    this.merchantRuntime?.destroy();
+    this.merchantRuntime = null;
     this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
     this.interactionHud?.destroy();
@@ -2587,7 +2588,7 @@ class WorldScene extends Phaser.Scene {
     const wasExhausted = this.exhaustedSleeping;
     this.sleeping = false;
     this.exhaustedSleeping = false;
-    this.simulationScale = 1;
+    this.simulationScale = this.playerTimeScale = 1;
     this.timeScale = 1;
     const player = this.characterSystem.require(this.sessionState.playerId);
     player.visual.setPresentationPose(null);
@@ -2604,9 +2605,10 @@ class WorldScene extends Phaser.Scene {
 
   updateGameplayTime(deltaMs) {
     const realSeconds = Math.max(0, deltaMs) / 1000;
-    this.simulationScale = this.sleeping ? this.getSleepTimeScale() : 1;
+    this.simulationScale = this.sleeping ? this.getSleepTimeScale() : this.playerTimeScale;
     this.timeScale = this.simulationScale;
     advanceGameTime(this.sessionState, realSeconds, this.simulationScale);
+    this.farmingRuntime?.advanceTo?.(this.sessionState.gameplay.worldTimeSeconds);
     const activity = this.getNeedsActivityContext();
     this.needsFlow = applyNeedsUpdate(this.sessionState.gameplay.needs, realSeconds, activity, this.gameplayTuning.needs);
     const activeFacility = this.facilityRuntime?.getActiveType?.();
@@ -2663,6 +2665,9 @@ class WorldScene extends Phaser.Scene {
       deltaMs: realDeltaMs,
     });
     this.interactionRuntime?.update({ actions: this.frameActions });
+    const currentCandidate = this.interactionRuntime?.getCurrentCandidate?.() ?? null;
+    this.merchantRuntime?.updateCandidate?.(currentCandidate);
+    this.debrisRuntime?.updateCandidate?.(currentCandidate); this.farmingRuntime?.updateCandidate?.(currentCandidate);
     this.interactionHud?.setCooldownProgress?.(this.getInteractionCooldownProgress());
     this.updateMovementDebugStatus();
     this.renderColliderDebug();
@@ -2674,7 +2679,7 @@ class WorldScene extends Phaser.Scene {
       this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
       return;
     }
-    this.isRunning = Boolean(this.runKey?.isDown || this.mobileJoystick?.isSprinting?.()) && !this.sleeping;
+    const nextRunning = Boolean(this.runKey?.isDown || this.mobileJoystick?.isSprinting?.()) && !this.sleeping; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
     this.syncPlayerEnergyTarget();
     this.syncLowEnergyMarker();
     const keyboardPressed =
@@ -2819,7 +2824,7 @@ class WorldScene extends Phaser.Scene {
     if (isPlayerMovementSuppressed({
       sleeping: this.sleeping,
       facilityActive: this.facilityRuntime?.isUsing(),
-      dialogueActive: this.interactionRuntime?.isDialogueActive(),
+      dialogueActive: this.interactionRuntime?.isDialogueActive() || this.merchantRuntime?.isActive?.(),
       cookingActive: this.cookingRuntime?.isActive?.(),
     })) return { x: 0, y: 0 };
     const left = this.cursors.left.isDown || this.wasd.A.isDown;

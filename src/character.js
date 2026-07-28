@@ -35,6 +35,7 @@ export class Character {
       footDepth,
     });
     this.visual = createCharacterVisual(scene, {
+      id,
       spawn,
       visualProfile,
       animationPrefix,

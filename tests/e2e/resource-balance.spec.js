@@ -11,6 +11,7 @@ async function boot(page) {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./?movementDebug=1");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
+  await bridge(page, "selectInventorySlot", 0);
 }
 
 async function placeNear(page, id) {
@@ -49,6 +50,7 @@ test("balance panel is compact, scrollable and applies live resource tuning", as
   await page.locator('input[data-field="axeDamage"]').dispatchEvent("input");
   await interact(page, "fallen-log-01");
   await expect.poll(async () => (await bridge(page, "getResourceNodeState", "fallen-log-01")).cleared).toBe(true);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("wood-break");
   await expect.poll(async () => inventoryQuantity((await bridge(page, "getSession")).gameplay, "wood")).toBe(1);
   await page.screenshot({ path: `${EVIDENCE_DIR}/balance-panel.png`, fullPage: false });
   await testInfo.attach("balance-panel", { path: `${EVIDENCE_DIR}/balance-panel.png`, contentType: "image/png" });
@@ -122,6 +124,7 @@ test("resource hit feedback returns to its placement-grid anchor", async ({ page
   const definition = (await bridge(page, "getDebrisState")).definitions.find((item) => item.id === id);
   const expected = { x: definition.cell.x * 8, y: definition.cell.y * 8 };
   await interact(page, id);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("wood-hit");
   await page.waitForTimeout(160);
   expect(await bridge(page, "getResourceVisualState", id)).toMatchObject(expected);
   await interact(page, id);
@@ -140,8 +143,10 @@ test("running, exhaustion sleep and wake-up share the energy-flow contract", asy
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 2 } } });
   await page.keyboard.down("Shift");
   await expect.poll(() => bridge(page, "getPlayerMovementState")).toMatchObject({ runSpeedMultiplier: 1.66 });
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("sprint-on");
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 3 } } });
   await page.keyboard.up("Shift");
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("sprint-off");
   await page.keyboard.up("ArrowRight");
 
   await bridge(page, "setEnergy", 0);

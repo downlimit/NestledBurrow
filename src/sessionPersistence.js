@@ -1,7 +1,13 @@
 import { createFreshGameSessionState, normalizeGameSessionState, SESSION_STATE_VERSION } from "./gameSessionState.js";
-import { createInventoryFromLegacyCounters } from "./inventoryDomain.js";
+import {
+  addInventoryItem,
+  createInventoryFromLegacyCounters,
+  createWorldItemId,
+  inventoryStackLimit,
+} from "./inventoryDomain.js";
+import { DOOR_LEFT, DOOR_Y, TILE_SIZE } from "./worldConfig.js";
 
-export const SAVE_SCHEMA_VERSION = 7;
+export const SAVE_SCHEMA_VERSION = 9;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -42,6 +48,8 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 4) envelope = migrateV4Envelope(envelope);
   if (envelope.schemaVersion === 5) envelope = migrateV5Envelope(envelope);
   if (envelope.schemaVersion === 6) envelope = migrateV6Envelope(envelope);
+  if (envelope.schemaVersion === 7) envelope = migrateV7Envelope(envelope);
+  if (envelope.schemaVersion === 8) envelope = migrateV8Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -61,6 +69,8 @@ const migrationRegistry = new Map([
   [4, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [5, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [6, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [7, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [8, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -133,6 +143,67 @@ function migrateV6Envelope(envelope) {
   delete gameplay.wood;
   delete gameplay.stone;
   delete gameplay.rubies;
+  state.gameplay = gameplay;
+  state.version = 7;
+  return { schemaVersion: 7, state };
+}
+
+function migrateV7Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  gameplay.farm = {
+    soilCells: [],
+    wateringCan: { capacity: 40, currentWater: 40 },
+    wells: [],
+    lastProcessedWorldTimeSeconds: Number(gameplay.worldTimeSeconds) || 0,
+  };
+  state.gameplay = gameplay;
+  state.flags ??= {};
+  for (const key of Object.keys(state.flags)) {
+    if (key.startsWith("neighborQuest.")) delete state.flags[key];
+  }
+  state.entities ??= {};
+  delete state.entities["home-npc"];
+  delete state.entities["street-npc"];
+  state.entities["seed-merchant"] = { id: "seed-merchant", flags: {} };
+  delete state.dialogue;
+  state.version = 8;
+  return { schemaVersion: 8, state };
+}
+
+function migrateV8Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const kitchen = gameplay.kitchen ?? {};
+  let remaining = Number.isSafeInteger(kitchen.rawPotatoes) && kitchen.rawPotatoes > 0
+    ? kitchen.rawPotatoes
+    : 0;
+  delete kitchen.rawPotatoes;
+  gameplay.kitchen = kitchen;
+  gameplay.worldItems ??= [];
+  if (remaining > 0 && gameplay.inventory?.slots) {
+    const stackLimit = inventoryStackLimit("potato");
+    const capacity = gameplay.inventory.slots.reduce((total, slot) => {
+      if (slot === null) return total + stackLimit;
+      if (slot?.id === "potato") return total + Math.max(0, stackLimit - slot.quantity);
+      return total;
+    }, 0);
+    const inventoryQuantity = Math.min(remaining, capacity);
+    if (inventoryQuantity > 0) {
+      addInventoryItem(gameplay.inventory, { id: "potato", kind: "loot", quantity: inventoryQuantity });
+      remaining -= inventoryQuantity;
+    }
+  }
+  while (remaining > 0) {
+    const quantity = Math.min(remaining, inventoryStackLimit("potato"));
+    gameplay.worldItems.push({
+      id: createWorldItemId(gameplay.worldItems),
+      item: { id: "potato", kind: "loot", quantity },
+      x: (DOOR_LEFT + 1.5) * TILE_SIZE,
+      y: (DOOR_Y - 3) * TILE_SIZE,
+    });
+    remaining -= quantity;
+  }
   state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };

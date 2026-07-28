@@ -4,6 +4,8 @@ export const WALL_COLLIDER_GROUPS = Object.freeze({
   node: "build:wall-node",
   legacy: "build:wall",
 });
+export const WORLD_DEPTH_BASE = 500;
+const WORLD_DEPTH_TIE_SCALE = 0.000001;
 
 const ZERO_OFFSETS = Object.freeze({ left: 0, right: 0, top: 0, bottom: 0 });
 
@@ -101,8 +103,23 @@ export function assetPivotWorldPosition(placementPosition, pivotOffset = { x: 0,
   });
 }
 
-export function assetDepthFromPivot(placementPosition, pivotOffset = { x: 0, y: 0 }, baseDepth = 500) {
-  return Number(baseDepth) + Math.round(assetPivotWorldPosition(placementPosition, pivotOffset).y);
+export function stableWorldDepthTieBreak(stableId = "") {
+  let hash = 2166136261;
+  for (const character of String(stableId)) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 997;
+}
+
+export function worldDepthFromAnchorY(anchorY, stableId = "", baseDepth = WORLD_DEPTH_BASE) {
+  const normalizedY = Number(anchorY);
+  if (!Number.isFinite(normalizedY)) throw new Error("World depth anchor Y must be finite");
+  return Number(baseDepth) + normalizedY + stableWorldDepthTieBreak(stableId) * WORLD_DEPTH_TIE_SCALE;
+}
+
+export function assetDepthFromPivot(placementPosition, pivotOffset = { x: 0, y: 0 }, baseDepth = WORLD_DEPTH_BASE, stableId = "") {
+  return worldDepthFromAnchorY(assetPivotWorldPosition(placementPosition, pivotOffset).y, stableId, baseDepth);
 }
 
 export function placementMidpointOffset({ placementPosition, pivotOffset, effectiveCollider }) {

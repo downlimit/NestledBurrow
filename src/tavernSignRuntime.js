@@ -1,9 +1,10 @@
 import { TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_KIND } from "./guestConfig.js";
+import { worldDepthFromAnchorY } from "./buildWorldGeometry.js";
 
 export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
   const sprite = scene.add.sprite(TAVERN_SIGN.position.x, TAVERN_SIGN.position.y, TAVERN_SIGN_ASSET.key, 1)
     .setOrigin(0.5, 1)
-    .setDepth(500 + TAVERN_SIGN.position.y);
+    .setDepth(worldDepthFromAnchorY(TAVERN_SIGN.position.y, TAVERN_SIGN.id));
   const collider = {
     left: TAVERN_SIGN.position.x - 5,
     right: TAVERN_SIGN.position.x + 5,

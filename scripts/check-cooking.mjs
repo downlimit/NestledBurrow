@@ -12,14 +12,16 @@ import {
   toggleServingDish,
 } from "../src/cookingDomain.js";
 import { createFreshGameSessionState, normalizeGameSessionState, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
+import { createFreshInventory, createInventoryItem, addInventoryItem, getInventoryQuantity } from "../src/inventoryDomain.js";
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/sessionPersistence.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const fresh = createFreshGameSessionState();
 assert.deepEqual(fresh.gameplay.kitchen, DEFAULT_KITCHEN_STATE, "fresh game starts with the canonical kitchen stock");
+assert.equal(getInventoryQuantity(fresh.gameplay.inventory, "potato"), 3, "new-game potatoes live in the shared inventory");
 assert.equal(fresh.version, SESSION_STATE_VERSION);
-assert.equal(SAVE_SCHEMA_VERSION, 7);
+assert.equal(SAVE_SCHEMA_VERSION, 9);
 
 const legacyState = clone(fresh);
 legacyState.version = 3;
@@ -27,8 +29,9 @@ delete legacyState.gameplay.kitchen;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 3, state: legacyState }));
 assert.equal(migrated.status, "loaded");
 assert.deepEqual(migrated.state.gameplay.kitchen, DEFAULT_KITCHEN_STATE, "v3 saves receive fresh kitchen defaults");
+assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "potato"), 5, "legacy raw potatoes migrate into inventory");
 assert.throws(
-  () => normalizeGameSessionState({ ...clone(fresh), gameplay: { ...clone(fresh.gameplay), kitchen: { ...DEFAULT_KITCHEN_STATE, rawPotatoes: -1 } } }),
+  () => normalizeGameSessionState({ ...clone(fresh), gameplay: { ...clone(fresh.gameplay), kitchen: { ...DEFAULT_KITCHEN_STATE, preparedPotatoes: -1 } } }),
   /non-negative integer/,
   "negative kitchen quantities are rejected",
 );
@@ -76,26 +79,30 @@ assert.equal(clamped.status, "completed");
 assert.equal(clamped.activeStep.remainingSeconds, 0, "remaining time clamps to zero");
 
 const kitchen = normalizeKitchenState();
-const preparationStart = startCookingStep(kitchen, COOKING_STEP_TYPES.preparation, () => 0);
+const inventory = createFreshInventory();
+addInventoryItem(inventory, createInventoryItem("potato", 2));
+const preparationStart = startCookingStep(kitchen, COOKING_STEP_TYPES.preparation, inventory, () => 0);
 assert.equal(preparationStart.status, "started");
 assert.deepEqual(kitchen, DEFAULT_KITCHEN_STATE, "starting a step does not spend its input");
-assert.equal(completeCookingStep(kitchen, COOKING_STEP_TYPES.preparation).status, "completed");
-assert.deepEqual(kitchen, { rawPotatoes: 4, preparedPotatoes: 1, cookedDishes: 0, servingTableHasDish: false });
-assert.equal(completeCookingStep(kitchen, COOKING_STEP_TYPES.frying).status, "completed");
-assert.deepEqual(kitchen, { rawPotatoes: 4, preparedPotatoes: 0, cookedDishes: 1, servingTableHasDish: false });
+assert.equal(completeCookingStep(kitchen, COOKING_STEP_TYPES.preparation, inventory).status, "completed");
+assert.equal(getInventoryQuantity(inventory, "potato"), 1, "preparation consumes the same potato inventory item harvested from crops");
+assert.deepEqual(kitchen, { preparedPotatoes: 1, cookedDishes: 0, servingTableHasDish: false });
+assert.equal(completeCookingStep(kitchen, COOKING_STEP_TYPES.frying, inventory).status, "completed");
+assert.deepEqual(kitchen, { preparedPotatoes: 0, cookedDishes: 1, servingTableHasDish: false });
 
 assert.equal(toggleServingDish(kitchen).status, "dish-served");
-assert.deepEqual(kitchen, { rawPotatoes: 4, preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: true });
+assert.deepEqual(kitchen, { preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: true });
 assert.equal(toggleServingDish(kitchen).status, "dish-removed");
-assert.deepEqual(kitchen, { rawPotatoes: 4, preparedPotatoes: 0, cookedDishes: 1, servingTableHasDish: false });
+assert.deepEqual(kitchen, { preparedPotatoes: 0, cookedDishes: 1, servingTableHasDish: false });
 assert.equal(toggleServingDish(kitchen).status, "dish-served");
 assert.equal(toggleServingDish(kitchen).status, "dish-removed");
 assert.equal(kitchen.cookedDishes, 1, "repeated serving round-trips never duplicate or lose the dish");
 
-const emptyKitchen = normalizeKitchenState({ rawPotatoes: 0, preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false });
-assert.equal(startCookingStep(emptyKitchen, COOKING_STEP_TYPES.preparation).status, "no-raw-potatoes");
-assert.equal(startCookingStep(emptyKitchen, COOKING_STEP_TYPES.frying).status, "no-prepared-potatoes");
+const emptyKitchen = normalizeKitchenState({ preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false });
+const emptyInventory = createFreshInventory();
+assert.equal(startCookingStep(emptyKitchen, COOKING_STEP_TYPES.preparation, emptyInventory).status, "no-raw-potatoes");
+assert.equal(startCookingStep(emptyKitchen, COOKING_STEP_TYPES.frying, emptyInventory).status, "no-prepared-potatoes");
 assert.equal(toggleServingDish(emptyKitchen).status, "no-cooked-dish");
-assert.deepEqual(emptyKitchen, { rawPotatoes: 0, preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false });
+assert.deepEqual(emptyKitchen, { preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false });
 
 console.log("cooking checks passed");

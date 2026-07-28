@@ -32,6 +32,7 @@
       "shower": "Душ",
       "toilet": "Туалет",
       "table": "Стол",
+      "well": "Колодец",
       "tree": "Дерево"
     }
   },
@@ -63,7 +64,21 @@
     "noCookedDish": "Нет готового блюда",
     "servingTableOccupied": "Сервировочный стол занят",
     "openTavern": "Открыть таверну",
-    "closeTavern": "Закрыть таверну"
+    "closeTavern": "Закрыть таверну",
+    "openSeedShop": "Магазин семян",
+    "tillSoil": "Вскопать землю",
+    "plantPotato": "Посадить картофель",
+    "waterSoil": "Полить землю",
+    "harvestPotato": "Собрать урожай",
+    "clearRottenCrop": "Убрать сгнившее растение",
+    "destroyCrop": "Срубить растение",
+    "destroySoil": "Убрать грядку",
+    "refillWateringCan": "Наполнить лейку",
+    "wateringCanEmpty": "Лейка пуста",
+    "wateringCanFull": "Лейка уже полна",
+    "wateringCanRefilled": "Лейка наполнена",
+    "noPotatoSeed": "Нет семян картофеля",
+    "invalidSoil": "Здесь нельзя вскопать землю"
   },
   "progress": {
     "newGame": "Новая игра",
@@ -80,11 +95,19 @@
   "resources": {
     "energy": "ЭН {current}/{max}"
   },
+  "merchant": {
+    "title": "ТОРГОВЕЦ СЕМЕНАМИ",
+    "offer": "Семя картофеля - 1 монета",
+    "balance_one": "Монеты: {count}",
+    "balance_few": "Монеты: {count}",
+    "balance_many": "Монеты: {count}",
+    "balance_other": "Монеты: {count}",
+    "buy": "КУПИТЬ 1",
+    "exit": "ПРОБЕЛ - ЗАКРЫТЬ",
+    "not-enough-coins": "Не хватает монет",
+    "inventory-full": "Инвентарь заполнен"
+  },
   "kitchen": {
-    "raw": "СЫР",
-    "prepared": "ПОДГ",
-    "dishes": "БЛЮД",
-    "coins": "МОН",
     "facilities": {
       "cuttingTable": "Разделочный стол",
       "gasStove": "Газовая плита",

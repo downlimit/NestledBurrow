@@ -27,6 +27,13 @@ export function getResourceProfile(profileId) {
   return profile;
 }
 
+export function resourceEffectType(profile, status) {
+  const kind = profile?.kind === "ruby" ? "ruby"
+    : profile?.kind === "stone" ? "stone"
+      : "wood";
+  return `${kind}-${status === "cleared" ? "break" : "hit"}`;
+}
+
 export function resolveActionHp(profile, action, tuning = {}) {
   const source = profile.actionHp[action];
   if (source == null) return null;

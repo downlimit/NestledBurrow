@@ -88,10 +88,11 @@ assert.equal(new Set([playerVisual.animationPrefix, homeVisual.animationPrefix, 
 assert.notEqual(homeVisual.resources[0].textureKey, streetVisual.resources[0].textureKey, "home and street texture keys differ");
 assert.notEqual(homeVisual.resources[0].path, streetVisual.resources[0].path, "home and street asset paths differ");
 assert.throws(() => getCharacterVisualProfile("missing"), /Unknown character visual profile ID: missing/);
-assert.equal(NPCS.find((npc) => npc.id === "home-npc").profileId, ACTOR_PROFILE_IDS.villager, "home NPC keeps villager movement profile");
-assert.equal(NPCS.find((npc) => npc.id === "street-npc").profileId, ACTOR_PROFILE_IDS.villager, "street NPC keeps villager movement profile");
-assert.equal(NPCS.find((npc) => npc.id === "home-npc").visualProfileId, CHARACTER_VISUAL_PROFILE_IDS.homeNpc, "home NPC config chooses home visual profile");
-assert.equal(NPCS.find((npc) => npc.id === "street-npc").visualProfileId, CHARACTER_VISUAL_PROFILE_IDS.streetNpc, "street NPC config chooses street visual profile");
+assert.equal(NPCS.length, 1, "only the stationary seed merchant remains");
+assert.equal(NPCS[0].id, "seed-merchant");
+assert.equal(NPCS[0].profileId, ACTOR_PROFILE_IDS.villager, "seed merchant keeps villager movement profile");
+assert.equal(NPCS[0].visualProfileId, CHARACTER_VISUAL_PROFILE_IDS.homeNpc, "seed merchant uses the authored indoor villager visual");
+assert.equal(NPCS[0].patrol, undefined, "seed merchant has no patrol route");
 assert(!/entityId\s*===\s*["']home-npc|entityId\s*===\s*["']street-npc/.test(characterVisualSource), "CharacterVisual has no hardcoded NPC entity branching");
 assert(/import\.meta\.env\.BASE_URL/.test(mainSource), "character asset paths use Vite BASE_URL");
 assert(/load\.spritesheet/.test(mainSource), "character spritesheets are loaded declaratively");

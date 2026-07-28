@@ -32,6 +32,7 @@
       "shower": "Shower",
       "toilet": "Toilet",
       "table": "Table",
+      "well": "Well",
       "tree": "Tree"
     }
   },
@@ -63,7 +64,21 @@
     "noCookedDish": "No cooked dish",
     "servingTableOccupied": "Serving table occupied",
     "openTavern": "Open tavern",
-    "closeTavern": "Close tavern"
+    "closeTavern": "Close tavern",
+    "openSeedShop": "Seed shop",
+    "tillSoil": "Till soil",
+    "plantPotato": "Plant potato",
+    "waterSoil": "Water soil",
+    "harvestPotato": "Harvest",
+    "clearRottenCrop": "Clear rotten crop",
+    "destroyCrop": "Cut down crop",
+    "destroySoil": "Remove garden bed",
+    "refillWateringCan": "Fill watering can",
+    "wateringCanEmpty": "Watering can is empty",
+    "wateringCanFull": "Watering can is already full",
+    "wateringCanRefilled": "Watering can filled",
+    "noPotatoSeed": "No potato seeds",
+    "invalidSoil": "This ground cannot be tilled"
   },
   "progress": {
     "newGame": "New game",
@@ -80,11 +95,19 @@
   "resources": {
     "energy": "EN {current}/{max}"
   },
+  "merchant": {
+    "title": "SEED MERCHANT",
+    "offer": "Potato seed - 1 coin",
+    "balance_one": "Coins: {count}",
+    "balance_few": "Coins: {count}",
+    "balance_many": "Coins: {count}",
+    "balance_other": "Coins: {count}",
+    "buy": "BUY 1",
+    "exit": "SPACE - CLOSE",
+    "not-enough-coins": "Not enough coins",
+    "inventory-full": "Inventory is full"
+  },
   "kitchen": {
-    "raw": "RAW",
-    "prepared": "PREP",
-    "dishes": "DISH",
-    "coins": "COIN",
     "facilities": {
       "cuttingTable": "Cutting table",
       "gasStove": "Gas stove",

@@ -5,6 +5,7 @@ import {
   addInventoryItem,
   createFreshInventory,
   createInventoryItem,
+  createNewGameInventory,
   getInventoryQuantity,
   normalizeInventory,
   normalizeWorldItems,
@@ -17,6 +18,8 @@ import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
 import {
   INVENTORY_HUD_AREA,
   INVENTORY_SLOT_AREAS,
+  inventoryCycleDirectionFromKeyboardEvent,
+  inventoryCycleIndex,
   inventoryIndexFromKeyboardEvent,
   inventorySlotIndexAt,
 } from "../src/inventoryRuntime.js";
@@ -26,6 +29,9 @@ assert.equal(INVENTORY_SLOT_COUNT, 10);
 assert.equal(inventory.slots.length, 10);
 assert.deepEqual(inventory.slots.slice(0, 3).map((item) => item.id), ["axe", "hoe", "watering-can"]);
 assert(inventory.slots.slice(3).every((item) => item === null));
+const newGameInventory = createNewGameInventory();
+assert.equal(getInventoryQuantity(newGameInventory, "potato-seed"), 4);
+assert.equal(getInventoryQuantity(newGameInventory, "potato"), 3);
 
 assert.equal(addInventoryItem(inventory, createInventoryItem("wood", 3)).status, "inserted");
 assert.equal(addInventoryItem(inventory, createInventoryItem("wood", 2)).status, "stacked");
@@ -51,6 +57,17 @@ assert.equal(inventoryIndexFromKeyboardEvent({ code: "Digit0" }), 9);
 assert.equal(inventoryIndexFromKeyboardEvent({ code: "Numpad0" }), 9);
 assert.equal(inventoryIndexFromKeyboardEvent({ code: "Digit4", repeat: true }), null);
 assert.equal(inventoryIndexFromKeyboardEvent({ code: "Digit4", target: { tagName: "INPUT" } }), null);
+assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE" }), 1);
+assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyQ" }), -1);
+assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE", repeat: true }), 0);
+assert.equal(inventoryCycleIndex(newGameInventory.slots, null, 1), 0);
+assert.equal(inventoryCycleIndex(newGameInventory.slots, 2, 1), 3);
+assert.equal(inventoryCycleIndex(newGameInventory.slots, 0, -1), 4);
+
+const droppedToolInventory = createFreshInventory();
+const droppedAxe = takeInventorySlot(droppedToolInventory, 0).item;
+assert.equal(addInventoryItem(droppedToolInventory, droppedAxe).mutated, true);
+assert.equal(droppedToolInventory.slots[0].id, "axe", "picked-up tools execute their planned insertion");
 
 const legacyState = JSON.parse(JSON.stringify(createFreshGameSessionState()));
 legacyState.version = 6;
@@ -65,6 +82,8 @@ assert.equal(migrated.state.version, SESSION_STATE_VERSION);
 assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "wood"), 7);
 assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "stone"), 2);
 assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "ruby"), 1);
+assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "potato-seed"), 0);
+assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "potato"), 0);
 assert.deepEqual(migrated.state.gameplay.worldItems, []);
 const serialized = JSON.parse(serializeSessionEnvelope(migrated.state));
 assert.equal(serialized.schemaVersion, SAVE_SCHEMA_VERSION);

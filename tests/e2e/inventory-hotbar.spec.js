@@ -35,7 +35,7 @@ function inventoryState(hud) {
   return hud.resources.inventory;
 }
 
-test("ten-slot hotbar selects with 1-9/0, swaps, drops and picks up inside the game", async ({ page }, testInfo) => {
+test("ten-slot hotbar selects with digits and Q/E, swaps, drops and picks up tools", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop pointer and keyboard route captures game integration once");
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   const pageErrors = [];
@@ -48,7 +48,22 @@ test("ten-slot hotbar selects with 1-9/0, swaps, drops and picks up inside the g
 
   await page.keyboard.press("Digit1");
   await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBe(0);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("inventory-activate");
   await page.keyboard.press("Digit1");
+  await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBeNull();
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("inventory-deactivate");
+  await page.keyboard.press("KeyE");
+  await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBe(1);
+  await page.keyboard.press("KeyE");
+  await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBe(2);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("inventory-change");
+  await page.keyboard.press("KeyQ");
+  await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBe(1);
+  await page.keyboard.press("Digit2");
+  await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBeNull();
+  await page.keyboard.press("KeyE");
+  await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBe(2);
+  await page.keyboard.press("Digit3");
   await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBeNull();
 
   await dragLogical(page, SLOT_CENTERS[0], SLOT_CENTERS[9]);
@@ -63,6 +78,7 @@ test("ten-slot hotbar selects with 1-9/0, swaps, drops and picks up inside the g
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots[3]?.id).toBe("axe");
   await dragLogical(page, SLOT_CENTERS[3], { x: 160, y: 120 });
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(1);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("drop");
   expect((await bridge(page, "getSession")).gameplay.inventory.slots[3]).toBeNull();
   await page.waitForTimeout(500);
 
@@ -73,6 +89,19 @@ test("ten-slot hotbar selects with 1-9/0, swaps, drops and picks up inside the g
 
   await bridge(page, "placePlayerAt", { x: dropped.x, y: dropped.y, facing: { x: 0, y: 1 } });
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(0);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("pickup");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots[0]?.id).toBe("axe");
+
+  for (const toolId of ["hoe", "watering-can"]) {
+    const session = await bridge(page, "getSession");
+    const slotIndex = session.gameplay.inventory.slots.findIndex((item) => item?.id === toolId);
+    await dragLogical(page, SLOT_CENTERS[slotIndex], { x: 160, y: 120 });
+    await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(1);
+    await page.waitForTimeout(500);
+    const toolDrop = (await bridge(page, "getSession")).gameplay.worldItems[0];
+    await bridge(page, "placePlayerAt", { x: toolDrop.x, y: toolDrop.y, facing: { x: 0, y: 1 } });
+    await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(0);
+    await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots.some((item) => item?.id === toolId)).toBe(true);
+  }
   expect(pageErrors).toEqual([]);
 });

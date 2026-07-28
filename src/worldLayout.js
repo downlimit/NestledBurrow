@@ -128,24 +128,6 @@ function overlaps(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-function addTree(tiles, blocked, x, y, variant) {
-  const base = variant * 3;
-  const depth = 500 + (y + 4) * TILE_SIZE;
-
-  for (let row = 0; row < 4; row += 1) {
-    for (let column = 0; column < 3; column += 1) {
-      tiles.push({
-        x: x + column,
-        y: y + row,
-        frame: base + row * 9 + column,
-        depth,
-      });
-    }
-  }
-
-  blockTile(blocked, x + 1, y + 3);
-}
-
 function getGrassFrame(x, y) {
   const hash = (Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663)) >>> 0;
   const detailFrames = OUTDOOR_FRAMES.grassDetails;
@@ -206,11 +188,6 @@ export function createWorldLayout() {
 
   houseWallTiles.push(...createWallRenderDescriptors(houseGeometry));
 
-  addTree(decorationTiles, blocked, 7, 6, 0);
-  addTree(decorationTiles, blocked, 52, 7, 1);
-  addTree(decorationTiles, blocked, 8, 33, 2);
-  addTree(decorationTiles, blocked, 51, 34, 0);
-
   const environment = createGridCollisionEnvironment({
     bounds: { left: 0, top: 0, right: WORLD_WIDTH, bottom: WORLD_HEIGHT },
     cellSize: PLACEMENT_CELL_SIZE,
@@ -256,6 +233,21 @@ export function createWorldLayout() {
       ].filter((entry) => overlaps(box, entry.rect));
     },
     doorway: houseGeometry.doorway,
+    getSurfaceAt(point) {
+      const tileX = Math.floor(Number(point.x) / TILE_SIZE);
+      const tileY = Math.floor(Number(point.y) / TILE_SIZE);
+      if (tileX >= HOUSE.x && tileX < HOUSE.x + HOUSE.columns
+        && tileY >= HOUSE.y && tileY < HOUSE.y + HOUSE.rows) return "house-floor";
+      if (tileY >= DOOR_Y && tileX >= pathLeft && tileX < pathLeft + 3) return "path";
+      return "grass";
+    },
+    isFarmableTile(point) {
+      const x = Number(point.x);
+      const y = Number(point.y);
+      return Number.isFinite(x) && Number.isFinite(y)
+        && x >= 0 && y >= 0 && x + TILE_SIZE <= WORLD_WIDTH && y + TILE_SIZE <= WORLD_HEIGHT
+        && this.getSurfaceAt(point) === "grass";
+    },
     getEffectiveCollider(rect, groupKey = null) {
       return applyColliderOffsets(rect, colliderOverrides.get(groupKey));
     },
