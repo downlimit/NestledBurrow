@@ -49,7 +49,9 @@ test("multiply overlay follows exact dusk and dawn phases while HUD stays above 
     await captureEvidence(page, testInfo, name);
   }
   const hud = await bridge(page, "getHudState");
-  expect(hud.resources.icons).toEqual({ wood: true, stone: true, ruby: true });
+  expect(hud.resources.inventory.slots).toHaveLength(10);
+  expect(hud.resources.inventory.slots.slice(0, 3).map((item) => item.id)).toEqual(["axe", "hoe", "watering-can"]);
+  expect(hud.resources.icons).toEqual({ wood: false, stone: false, ruby: false });
   expect(hud.resources.energyRatio).toBeGreaterThan(0.98);
   expect(hud.resources.energyFillHeight).toBeGreaterThanOrEqual(53);
   expect(hud.resources.clockText).toBe("07:00");
