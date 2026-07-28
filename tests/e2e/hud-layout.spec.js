@@ -73,7 +73,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
   expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 280, y: 167 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 30, y: 167 })).toBe(false);
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
   const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
