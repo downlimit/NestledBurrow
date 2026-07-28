@@ -45,7 +45,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       options: { x: 8, y: 4, width: 74, height: 30 },
       clock: { x: 120, y: 4, width: 80, height: 24 },
       fullscreen: { x: 286, y: 4, width: 30, height: 30 },
-      resources: { x: 210, y: 38, width: 40, height: 68 },
+      resources: { x: 41, y: 156, width: 238, height: 22 },
+      inventory: { x: 41, y: 156, width: 238, height: 22 },
       energy: { x: 252, y: 38, width: 60, height: 68 },
       needs: { x: 252, y: 38, width: 60, height: 68 },
     },
@@ -53,7 +54,16 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
       woodText: "0",
       stoneText: "0",
       rubyText: "0",
-      icons: { wood: true, stone: true, ruby: true },
+      icons: { wood: false, stone: false, ruby: false },
+      inventory: {
+        selectedIndex: null,
+        slots: [
+          { id: "axe", kind: "tool", quantity: 1 },
+          { id: "hoe", kind: "tool", quantity: 1 },
+          { id: "watering-can", kind: "tool", quantity: 1 },
+          null, null, null, null, null, null, null,
+        ],
+      },
       energyFillHeight: 54,
     },
   });
@@ -62,6 +72,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
   expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 280, y: 167 })).toBe(false);
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
   const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
@@ -73,7 +85,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true, buildLabelVisible: true });
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 20, y: 108 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 280, y: 158 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: false, promptVisible: true });
   await captureNativeCanvas(page, testInfo, "options-with-prompt");
 
@@ -91,7 +103,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(false);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 280, y: 158 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: true, promptVisible: false, dialogueVisible: false });
   await activateLogical(page, 228, 95);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: false, newGameConfirming: false });
@@ -113,6 +125,7 @@ test("coarse pointer activates only visible Options hit areas", async ({ page },
   await activateLogical(page, 45, 19, true);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true });
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
   await activateLogical(page, 189, 54, true);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
 });
