@@ -1,6 +1,7 @@
 import { createFreshGameSessionState, normalizeGameSessionState, SESSION_STATE_VERSION } from "./gameSessionState.js";
+import { createInventoryFromLegacyCounters } from "./inventoryDomain.js";
 
-export const SAVE_SCHEMA_VERSION = 6;
+export const SAVE_SCHEMA_VERSION = 7;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -40,6 +41,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 3) envelope = migrateV3Envelope(envelope);
   if (envelope.schemaVersion === 4) envelope = migrateV4Envelope(envelope);
   if (envelope.schemaVersion === 5) envelope = migrateV5Envelope(envelope);
+  if (envelope.schemaVersion === 6) envelope = migrateV6Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -58,6 +60,7 @@ const migrationRegistry = new Map([
   [3, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [4, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [5, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [6, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -94,12 +97,7 @@ function migrateV2Envelope(envelope) {
 function migrateV3Envelope(envelope) {
   const state = cloneJsonSafe(envelope.state ?? {});
   const gameplay = state.gameplay ?? {};
-  gameplay.kitchen = {
-    rawPotatoes: 5,
-    preparedPotatoes: 0,
-    cookedDishes: 0,
-    servingTableHasDish: false,
-  };
+  gameplay.kitchen = { rawPotatoes: 5, preparedPotatoes: 0, cookedDishes: 0, servingTableHasDish: false };
   state.gameplay = gameplay;
   state.version = 4;
   return { schemaVersion: 4, state };
@@ -119,6 +117,23 @@ function migrateV5Envelope(envelope) {
   const gameplay = state.gameplay ?? {};
   gameplay.coins = 0;
   state.gameplay = gameplay;
+  state.version = 6;
+  return { schemaVersion: 6, state };
+}
+
+function migrateV6Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  gameplay.inventory = createInventoryFromLegacyCounters({
+    wood: gameplay.wood ?? 0,
+    stone: gameplay.stone ?? 0,
+    rubies: gameplay.rubies ?? 0,
+  });
+  gameplay.worldItems = [];
+  delete gameplay.wood;
+  delete gameplay.stone;
+  delete gameplay.rubies;
+  state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };
 }
@@ -134,7 +149,6 @@ export function migrateSessionEnvelope(envelope, options = {}) {
 
 export function createSessionPersistence({ storage, storageKey = DEFAULT_STORAGE_KEY, createFreshState = createFreshGameSessionState } = {}) {
   if (!storage) throw new Error("Session persistence requires a Storage-compatible adapter");
-
   return {
     load() {
       let rawValue;
@@ -146,7 +160,6 @@ export function createSessionPersistence({ storage, storageKey = DEFAULT_STORAGE
       if (rawValue === null) return { status: "empty", state: createFreshState() };
       return deserializeSessionEnvelope(rawValue, { createFreshState });
     },
-
     save(sessionState) {
       let serialized;
       try {
@@ -161,7 +174,6 @@ export function createSessionPersistence({ storage, storageKey = DEFAULT_STORAGE
         return { status: "error", diagnostic: createDiagnostic("storage-write", error) };
       }
     },
-
     clear() {
       try {
         storage.removeItem(storageKey);
