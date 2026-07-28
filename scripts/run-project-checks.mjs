@@ -41,9 +41,9 @@ for (const check of checks) {
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.status === 0) continue;
-  mkdirSync("artifacts/world-preview", { recursive: true });
+  mkdirSync("artifacts", { recursive: true });
   writeFileSync(
-    "artifacts/world-preview/project-check-failure.txt",
+    "artifacts/world-overview.png",
     [`command: ${command}`, `exit: ${result.status}`, "", result.stdout ?? "", result.stderr ?? ""].join("\n"),
   );
   process.exit(result.status ?? 1);
