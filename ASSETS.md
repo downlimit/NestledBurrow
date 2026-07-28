@@ -182,3 +182,23 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
 - **Byte length:** `2,981`.
 - **SHA-256:** `47b15a21480a0096e4541900425dd0d870d9f50d1401d12832a6828abeaef154`.
 - **Integrity check:** `scripts/check-guest.mjs` verifies the committed dimensions and exact bytes.
+
+## Task #047 Lead-authored farming sprites
+
+- **Provenance:** original project pixels authored by the Lead through deterministic editing on the native `16×16` RGBA grid. No generative image model, third-party source pixels, resampling or interpolation were used.
+- **Style contract:** compact earthy palette selected to remain compatible with the canonical Basic Village environment; transparent sprite backgrounds and nearest-neighbor runtime filtering.
+- **Canonical manifest:** `public/assets/project/farming/NestledBurrow_Farming.manifest.json`.
+- **Farming sheet:** `public/assets/project/farming/NestledBurrow_Farming.png`
+  - geometry: `144×16`, nine horizontal `16×16` frames;
+  - frame order: `potato-seeds`, `potato`, `soil-dry`, `soil-wet`, `crop-planted`, `crop-sprout`, `crop-young`, `crop-mature`, `crop-rotten`;
+  - byte length: `1,040`;
+  - SHA-256: `3f241cfa1c05aa23d71b021a62fa4a25d7b552193b05268c0f762aa7f57ab2db`;
+  - Git blob SHA: `a4927511908b3c7150c5e5d279cfa8230f68ee78`.
+- **Well:** `public/assets/project/farming/NestledBurrow_Well.png`
+  - geometry: one `16×16` frame;
+  - depth anchor offset: `{x: 8, y: 14}`;
+  - collision rectangle: `{left: 2, top: 8, right: 14, bottom: 14}`;
+  - byte length: `365`;
+  - SHA-256: `38663d4ce106c0e7b4ec6dfeaacaeaf7542a60827475a61ae4704afc621e5226`;
+  - Git blob SHA: `9c70c437dafefaa7c027fc7fb11a30486bc68822`.
+- **Delivery:** these binaries are Lead-owned immutable inputs. Codex may integrate and display them but must not generate, redraw, modify, replace or add any tracked binary in Task #047.
