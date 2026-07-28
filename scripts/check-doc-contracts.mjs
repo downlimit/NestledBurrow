@@ -53,6 +53,9 @@ requireText(lead, [
   "Codex никогда не генерирует",
   "Lead asset-preparation route",
   "задача заблокирована",
+  "визуальная «пиксельность» не является доказательством native asset",
+  "запрещено уменьшать, нарезать или выдавать за runtime spritesheet",
+  "nearest-neighbor contact sheet",
 ], "LEAD.md");
 
 requireText(agents, [
@@ -162,4 +165,4 @@ for (const [label, text, limit] of [
   assert(text.length <= limit, `${label} exceeds context budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: role routing, focused system context, active-only roadmap, composition-root guard and Lead-owned binary delivery are enforced");
+console.log("documentation contracts passed: role routing, focused system context, active-only roadmap, composition-root guard, Lead-owned binary delivery and native pixel-art preflight are enforced");
