@@ -45,10 +45,11 @@ test("open guest reserves, eats and consumes the served dish", async ({ page }) 
   await expect.poll(async () => (await bridge(page, "getTavernState")).guest.state, { timeout: 25_000 }).toBe("eating");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen.servingTableHasDish, { timeout: 10_000 }).toBe(false);
   await expect.poll(async () => (await bridge(page, "getCoinState"))[0]?.landed, { timeout: 10_000 }).toBe(true);
+  const coinsBeforeCollection = (await bridge(page, "getSession")).gameplay.coins;
   const [coin] = await bridge(page, "getCoinState");
   await bridge(page, "placePlayerAt", { x: coin.x, y: coin.y });
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.coins).toBe(1);
-  await expect.poll(async () => (await bridge(page, "getHudState")).resources.kitchenTexts[3]).toMatch(/1$/);
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.coins).toBe(coinsBeforeCollection + 1);
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.coinCount).toBe(coinsBeforeCollection + 1);
   await expect.poll(async () => (await bridge(page, "getTavernState")).guest.active, { timeout: 25_000 }).toBe(false);
   expect(await bridge(page, "getCharacterSnapshot", "tavern-guest-01")).toBeNull();
   expect(await page.locator("canvas").count()).toBe(1);

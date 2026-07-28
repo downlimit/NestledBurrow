@@ -144,11 +144,14 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(true);
   await page.locator("canvas").screenshot({ path: "artifacts/task-047/resource-target-outline.png" });
   await bridge(page, "selectInventorySlot", 1);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ kind: "farm-till" });
   await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(false);
   await bridge(page, "interact");
   expect((await bridge(page, "getSession")).gameplay.resourceNodes["fallen-log-01"].progress).toBe(0);
   await bridge(page, "selectInventorySlot", 0);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ kind: "farm-axe-cell" });
+  await bridge(page, "interact");
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(0);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("fallen-log-01");
   for (let hitCount = 1; hitCount <= 7; hitCount += 1) {
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
