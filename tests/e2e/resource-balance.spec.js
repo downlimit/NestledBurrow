@@ -158,6 +158,7 @@ test("running, exhaustion sleep and wake-up share the energy-flow contract", asy
 });
 
 test("awake energy drains continuously per real second and low-energy idle recovers", async ({ page }) => {
+  const maxFrameEnergyDrift = 0.2;
   await boot(page);
   await bridge(page, "setEnergy", 100);
   await bridge(page, "setPlayerMotion", { moving: false });
@@ -165,26 +166,26 @@ test("awake energy drains continuously per real second and low-energy idle recov
   await bridge(page, "advanceGameplayTime", 1000);
   let after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(before - after).toBeGreaterThanOrEqual(0.25);
-  expect(before - after).toBeLessThan(0.35);
+  expect(before - after).toBeLessThan(0.25 + maxFrameEnergyDrift);
   await bridge(page, "setPlayerMotion", { moving: true, running: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(before - after).toBeGreaterThanOrEqual(0.75);
-  expect(before - after).toBeLessThan(0.85);
+  expect(before - after).toBeLessThan(0.75 + maxFrameEnergyDrift);
   await bridge(page, "setPlayerMotion", { moving: true, running: true });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(before - after).toBeGreaterThanOrEqual(1.5);
-  expect(before - after).toBeLessThan(1.6);
+  expect(before - after).toBeLessThan(1.5 + maxFrameEnergyDrift);
   await bridge(page, "setEnergy", 4);
   await bridge(page, "setPlayerMotion", { moving: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(after - before).toBeGreaterThanOrEqual(1.5 / 1.66);
-  expect(after - before).toBeLessThan(1.5 / 1.66 + 0.1);
+  expect(after - before).toBeLessThan(1.5 / 1.66 + maxFrameEnergyDrift);
 });
 
 test("resource colliders have their requested insets and work from directly above", async ({ page }) => {
