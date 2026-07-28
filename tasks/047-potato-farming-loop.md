@@ -2,7 +2,7 @@
 
 ## Status
 
-Blocked until the Lead-owned farming binaries listed below exist in the confirmed Base SHA. Codex must not begin implementation before that read-back.
+Lead-owned farming binaries were visually accepted and are immutable. Codex may begin only from a confirmed Base SHA that contains the exact files and hashes below.
 
 ## Goal
 
@@ -27,20 +27,23 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
 ### New Lead-owned files
 
 1. `public/assets/project/farming/NestledBurrow_Farming.png`
-   - RGBA PNG, `144×16`
+   - RGBA PNG, `192×16`
    - native grid `16×16`
-   - 9 horizontal frames:
+   - 12 horizontal frames:
      0. `potato-seeds`
      1. `potato`
      2. `soil-dry`
-     3. `soil-wet`
-     4. `crop-planted`
-     5. `crop-sprout`
-     6. `crop-young`
-     7. `crop-mature`
-     8. `crop-rotten`
-   - byte length `1040`
-   - SHA-256 `3f241cfa1c05aa23d71b021a62fa4a25d7b552193b05268c0f762aa7f57ab2db`
+     3. `soil-wet-100`
+     4. `soil-wet-66`
+     5. `soil-wet-33`
+     6. `crop-planted`
+     7. `crop-planted-rotten`
+     8. `crop-sprout`
+     9. `crop-young`
+     10. `crop-mature`
+     11. `crop-rotten`
+   - byte length `1319`
+   - SHA-256 `2ec6df4ed336b68bc436557cc0cce5b0ce4135f6b698dcba78d18fbaa0fc2755`
 
 2. `public/assets/project/farming/NestledBurrow_Well.png`
    - RGBA PNG, `16×16`
@@ -51,7 +54,8 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
    - SHA-256 `38663d4ce106c0e7b4ec6dfeaacaeaf7542a60827475a61ae4704afc621e5226`
 
 3. `public/assets/project/farming/NestledBurrow_Farming.manifest.json`
-   - canonical frame order, dimensions, hashes, depth anchor, collision metadata and provenance.
+   - manifest version `2`;
+   - canonical frame order, dimensions, hashes, moisture percentages, depth anchor, collision metadata and provenance.
 
 ### Existing immutable files reused
 
@@ -63,7 +67,8 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
 ## Asset contract
 
 - Project-authored by the Lead through deterministic pixel-grid drawing.
-- No generative image model was used.
+- The final contact sheet was accepted by the user on 2026-07-28.
+- No generative image model was used for the runtime binaries.
 - No resampling or interpolation.
 - Runtime uses nearest-neighbor filtering.
 - Codex must not modify, regenerate, redraw, reinterpret, recolor, resize, recompress or replace these files.
@@ -77,10 +82,11 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
 - seed and potato inventory stacks: maximum 99, multiple stacks allowed, atomic capacity planning;
 - watering can capacity: 40, starts full;
 - soil moisture decay counts only solar overlap 04:00–20:00;
+- soil presentation selects `soil-wet-100`, `soil-wet-66`, `soil-wet-33` or `soil-dry` from the authoritative moisture state without introducing a second moisture model;
 - potato requires 8 effective solar growth hours, maximum 4 credited per calendar day;
 - moisture multiplier: 0–4 dry solar hours = 1; 4–8 = 2/3; 8–12 = 1/3; after 12 = 0;
-- never-watered seed rots 72 absolute world hours after planting;
-- after hydration, crop rots after 24 absolute world hours without new hydration;
+- never-watered seed rots 72 absolute world hours after planting and uses `crop-planted-rotten`;
+- after hydration, crop rots after 24 absolute world hours without new hydration and uses `crop-rotten`;
 - rain counts as hydration; dynamic weather generation and weather UI are out of scope;
 - harvest creates 4, 5 or 6 separate potato world items with uniform discrete probability;
 - crops have no collision;
@@ -100,10 +106,10 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
 
 ## Validation
 
-Before implementation, run `node scripts/check-task-047-assets.mjs`. Any failure is a blocker and must not be repaired by changing the expected hashes or binaries.
+Before implementation, run `npm run check:task-047-assets`. Any failure is a blocker and must not be repaired by changing the expected hashes or binaries.
 
 ## Acceptance
 
-A managed 320×180 preview proves the complete farming loop, persistence/reload, RU/EN merchant UI, compact interaction prompt, absence of old HUD/canonical trees, and correct two-way tree depth crossing without leaving its visual bounds.
+A managed 320×180 preview proves the complete farming loop, all four soil moisture visuals, both rotten states, persistence/reload, RU/EN merchant UI, compact interaction prompt, absence of old HUD/canonical trees, and correct two-way tree depth crossing without leaving its visual bounds.
 
-Do not stage, commit, push or open a PR before explicit user acceptance. After `принято`, publish one Ready PR with final-head CI.
+Do not stage, commit, push or open a gameplay PR before explicit user acceptance of the integrated preview. After `принято`, publish one Ready gameplay PR with final-head CI.

@@ -5,10 +5,10 @@ import { readFileSync } from "node:fs";
 const ASSETS = Object.freeze([
   Object.freeze({
     path: "public/assets/project/farming/NestledBurrow_Farming.png",
-    width: 144,
+    width: 192,
     height: 16,
-    byteLength: 1040,
-    sha256: "3f241cfa1c05aa23d71b021a62fa4a25d7b552193b05268c0f762aa7f57ab2db",
+    byteLength: 1319,
+    sha256: "2ec6df4ed336b68bc436557cc0cce5b0ce4135f6b698dcba78d18fbaa0fc2755",
   }),
   Object.freeze({
     path: "public/assets/project/farming/NestledBurrow_Well.png",
@@ -33,15 +33,36 @@ for (const expected of ASSETS) {
 }
 
 const manifest = JSON.parse(readFileSync("public/assets/project/farming/NestledBurrow_Farming.manifest.json", "utf8"));
-assert.equal(manifest.version, 1);
+assert.equal(manifest.version, 2);
 assert.equal(manifest.nativePixelGrid, 16);
 assert.equal(manifest.filtering, "nearest-neighbor");
 assert.equal(manifest.provenance.generativeImageModel, false);
 assert.deepEqual(
   manifest.assets[0].frames.map((frame) => frame.id),
-  ["potato-seeds", "potato", "soil-dry", "soil-wet", "crop-planted", "crop-sprout", "crop-young", "crop-mature", "crop-rotten"],
+  [
+    "potato-seeds",
+    "potato",
+    "soil-dry",
+    "soil-wet-100",
+    "soil-wet-66",
+    "soil-wet-33",
+    "crop-planted",
+    "crop-planted-rotten",
+    "crop-sprout",
+    "crop-young",
+    "crop-mature",
+    "crop-rotten",
+  ],
 );
+assert.deepEqual(
+  manifest.assets[0].frames.slice(2, 6).map((frame) => frame.moisturePercent),
+  [0, 100, 66, 33],
+);
+assert.equal(manifest.assets[0].sha256, ASSETS[0].sha256);
+assert.equal(manifest.assets[0].byteLength, ASSETS[0].byteLength);
 assert.deepEqual(manifest.assets[1].depthAnchorOffset, { x: 8, y: 14 });
 assert.deepEqual(manifest.assets[1].collisionRect, { left: 2, top: 8, right: 14, bottom: 14 });
+assert.equal(manifest.assets[1].sha256, ASSETS[1].sha256);
+assert.equal(manifest.assets[1].byteLength, ASSETS[1].byteLength);
 
-console.log("Task #047 Lead-owned farming binaries passed PNG geometry, manifest and SHA-256 integrity checks");
+console.log("Task #047 Lead-owned farming binaries passed PNG geometry, manifest v2, moisture-frame and SHA-256 integrity checks");
