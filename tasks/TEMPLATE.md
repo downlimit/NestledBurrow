@@ -14,6 +14,13 @@
 
 - <only constraints whose absence could produce the wrong result>
 
+## Asset preflight (when applicable)
+
+- Every required tracked binary already exists in the supplied Base SHA.
+- Record canonical path, native dimensions, frame order, byte length, SHA-256 and provenance.
+- Codex integrates immutable binaries only; a missing asset blocks implementation.
+- The implementation diff contains no new or modified tracked binary files.
+
 ## Acceptance
 
 - <observable or automated proof>

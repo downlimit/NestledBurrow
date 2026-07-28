@@ -40,9 +40,13 @@ For a changed identifier, rate, save field, localization key, action, selector, 
 
 ## Visual assets
 
-Do not generate polished game art unless the prompt contains exactly `Codex image generation explicitly allowed`.
+Codex never generates, redraws, regenerates, reinterprets, replaces, recompresses, recolors, resizes or otherwise authors game images.
 
-Otherwise use only exact supplied/committed binaries. Do not redraw, regenerate, reinterpret, recompress, recolor or resize unless explicitly requested. Missing required binary is a blocker. Final report states `Image generation was not invoked.` or quotes the permission.
+Use only exact binaries already supplied and committed by the Lead in the stated Base SHA. Treat their canonical paths, dimensions, frame order, byte length and SHA-256 as immutable integration inputs.
+
+A missing, mismatched or undecodable required binary is a blocker. Stop before implementation and report the exact missing contract. Do not use placeholders, procedural substitutes, external downloads, package copies or prompt wording as permission to manufacture an image.
+
+The final report states `Image generation was not invoked.` and confirms that the changed-file list contains no new or modified tracked binary files.
 
 ## Validation
 

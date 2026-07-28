@@ -106,7 +106,21 @@ Draft PR до приёмки разрешён только прямой кома
 
 ## Visual assets
 
-Без точной строки `Codex image generation explicitly allowed` Codex не генерирует polished game-art. Лид заранее доставляет проверенный binary в canonical path, указывает identity и следует `BINARY_IMPORT.md`.
+Codex никогда не генерирует, не дорисовывает, не интерпретирует, не заменяет и не подготавливает игровые изображения.
+
+Любая просьба о новой графике автоматически проходит через Lead asset-preparation route:
+
+1. Лид определяет полный список обязательных бинарников;
+2. проверяет Basic Village и уже принятые project assets;
+3. самостоятельно подготавливает отсутствующие изображения;
+4. проверяет native pixel grid, frame order, transparency, palette, nearest-neighbor contract, provenance и лицензию;
+5. доставляет immutable binaries в canonical paths;
+6. фиксирует размеры, byte length, SHA-256 и manifest;
+7. только после read-back готовых файлов выдаёт Codex code-only integration task по `BINARY_IMPORT.md`.
+
+Явная просьба пользователя создать графику не является разрешением передать её генерацию Codex. Изменить это разделение ответственности можно только отдельным прямым решением пользователя о смене самого процесса.
+
+Если обязательного бинарника ещё нет в подтверждённом Base SHA, задача заблокирована. Codex не получает placeholder, ожидаемый путь к отсутствующему файлу или разрешение изготовить замену.
 
 Постоянная загрузка:
 [Загрузить файлы в `asset-inbox/incoming`](https://github.com/downlimit/NestledBurrow/upload/asset-inbox/incoming)

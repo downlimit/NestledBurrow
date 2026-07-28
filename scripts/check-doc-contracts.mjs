@@ -50,6 +50,9 @@ requireText(lead, [
   "20–50",
   "Draft PR до приёмки",
   "src/main.js",
+  "Codex никогда не генерирует",
+  "Lead asset-preparation route",
+  "задача заблокирована",
 ], "LEAD.md");
 
 requireText(agents, [
@@ -61,7 +64,15 @@ requireText(agents, [
   "check:architecture",
   "Fast publication after `принято`",
   "one Ready PR",
+  "Codex never generates",
+  "missing, mismatched or undecodable required binary is a blocker",
+  "Image generation was not invoked.",
 ], "AGENTS.md");
+
+const forbiddenImagePermission = "Codex image generation explicitly allowed";
+assert(!lead.includes(forbiddenImagePermission), "LEAD.md must not contain a prompt-level Codex image-generation bypass");
+assert(!agents.includes(forbiddenImagePermission), "AGENTS.md must not contain a prompt-level Codex image-generation bypass");
+assert(!taskTemplate.includes(forbiddenImagePermission), "tasks/TEMPLATE.md must not contain a prompt-level Codex image-generation bypass");
 
 requireText(review, [
   "<!-- audience: integrator-chat -->",
@@ -121,7 +132,13 @@ requireText(fastLoop, [
 ], "FAST_LOOP.md");
 
 requireText(taskReadme, ["историей", "не читается"], "tasks/README.md");
-requireText(taskTemplate, ["## Relevant systems", "One Ready PR"], "tasks/TEMPLATE.md");
+requireText(taskTemplate, [
+  "## Relevant systems",
+  "## Asset preflight",
+  "Every required tracked binary already exists",
+  "Codex integrates immutable binaries only",
+  "One Ready PR",
+], "tasks/TEMPLATE.md");
 requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
 requireText(prTemplate, ["# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
 
@@ -145,4 +162,4 @@ for (const [label, text, limit] of [
   assert(text.length <= limit, `${label} exceeds context budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: role routing, focused system context, active-only roadmap and composition-root guard are enforced");
+console.log("documentation contracts passed: role routing, focused system context, active-only roadmap, composition-root guard and Lead-owned binary delivery are enforced");
