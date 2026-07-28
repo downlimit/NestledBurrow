@@ -84,11 +84,12 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
 - soil moisture decay counts only solar overlap 04:00–20:00;
 - soil presentation selects `soil-wet-100`, `soil-wet-66`, `soil-wet-33` or `soil-dry` from the authoritative moisture state without introducing a second moisture model;
 - potato requires 8 effective solar growth hours, maximum 4 credited per calendar day;
-- moisture multiplier: 0–4 dry solar hours = 1; 4–8 = 2/3; 8–12 = 1/3; after 12 = 0;
+- moisture multiplier: 0–10 dry solar hours = 1; 10–17 = 2/3; 17–21 = 1/3; after 21 = 0;
 - never-watered seed rots 72 absolute world hours after planting and uses `crop-planted-rotten`;
 - after hydration, crop rots after 24 absolute world hours without new hydration and uses `crop-rotten`;
 - rain counts as hydration; dynamic weather generation and weather UI are out of scope;
 - harvest creates 4, 5 or 6 separate potato world items with uniform discrete probability;
+- harvested potatoes and cooking potatoes are the same stackable `potato` inventory item;
 - crops have no collision;
 - well is a persistent 1×1 build object with a normal collider;
 - only the well receives new build persistence in this slice; general build persistence remains out of scope.
@@ -98,8 +99,10 @@ The same slice removes the obsolete neighbor quest and street NPC, turns the for
 - remove `street-npc` and the neighbor quest completely;
 - retain the former `home-npc` visual as stationary semantic entity `seed-merchant`;
 - remove the permanent kitchen/raw/prepared/dishes/coins HUD panel;
-- coin balance is visible in merchant UI;
+- coin balance is visible beside the fullscreen control as a number with the canonical pixel coin, and remains visible in merchant UI;
+- requested gameplay feedback uses code-native procedural Web Audio effects for resources, farming, inventory, cooking, tavern guests, time controls, build actions and shared menu open/close events;
 - compact world interaction prompt sits above and never overlaps the inventory HUD;
+- clock controls provide pause, 1×, 4× and 16× simulation speeds, show the active speed and hide while options or sleep are active;
 - remove all canonical pre-planted map trees but keep manual tree construction;
 - one canonical depth function orders player, merchant, manually placed trees, resources, walls/caps/junctions, facilities, bed, well, crops and dropped items by world depth pivot;
 - the player changes order immediately when its foot point crosses an asset pivot, even while still inside the asset visual bounds.

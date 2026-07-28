@@ -1,10 +1,12 @@
 import { GAME_HEIGHT, GAME_WIDTH } from "./worldConfig.js";
 import { HUD_COLORS, HUD_DEPTH, isPointInRect } from "./hud.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
+import { INVENTORY_HUD_AREA } from "./inventoryRuntime.js";
 
-const PROMPT_RIGHT_MARGIN = 10;
-const PROMPT_MIN_WIDTH = 76;
-const PROMPT_HEIGHT = 24;
+const PROMPT_HORIZONTAL_PADDING = 5;
+const PROMPT_COARSE_MIN_WIDTH = 28;
+const PROMPT_HEIGHT = 18;
+const PROMPT_INVENTORY_GAP = 3;
 const DIALOGUE_RECT = Object.freeze({ x: 8, y: GAME_HEIGHT - 64, width: GAME_WIDTH - 16, height: 56 });
 const DIALOGUE_ACTION_RECT = Object.freeze({ x: GAME_WIDTH - 86, y: GAME_HEIGHT - 36, width: 78, height: 28 });
 
@@ -12,7 +14,7 @@ export function createInteractionHud(scene, options = {}) {
   const isCoarsePointer = options.isCoarsePointer ?? (() => false);
   const localization = options.localization;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 10).setScrollFactor(0);
-  const promptHit = scene.add.zone(0, 0, PROMPT_MIN_WIDTH, PROMPT_HEIGHT)
+  const promptHit = scene.add.zone(0, 0, PROMPT_COARSE_MIN_WIDTH, PROMPT_HEIGHT)
     .setOrigin(0, 0).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setInteractive({ useHandCursor: true });
   const dialogueHit = scene.add.zone(DIALOGUE_ACTION_RECT.x, DIALOGUE_ACTION_RECT.y, DIALOGUE_ACTION_RECT.width, DIALOGUE_ACTION_RECT.height)
     .setOrigin(0, 0).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setInteractive({ useHandCursor: true });
@@ -129,13 +131,13 @@ export function createInteractionHud(scene, options = {}) {
       const label = actionLabel(promptState.promptKey);
       setManagedTextStyle(promptText, scene, promptStyle()).setText(label).setVisible(true);
       transitionPromptAlpha(cooldownProgress > 0 ? 0.5 : 1);
-      const width = Math.max(isCoarsePointer() ? 36 : PROMPT_MIN_WIDTH, Math.ceil(promptText.width) + 16);
-      promptRect = { x: GAME_WIDTH - PROMPT_RIGHT_MARGIN - width, y: GAME_HEIGHT - 34, width, height: PROMPT_HEIGHT };
+      const width = compactPromptWidth(promptText.width, isCoarsePointer());
+      promptRect = compactPromptRect(width);
       graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(promptRect.x, promptRect.y, promptRect.width, promptRect.height);
       const cooldownWidth = Math.round(promptRect.width * cooldownProgress);
       if (cooldownWidth > 0) graphics.fillStyle(HUD_COLORS.light, 0.2).fillRect(promptRect.x + promptRect.width - cooldownWidth, promptRect.y + 1, cooldownWidth, promptRect.height - 2);
       graphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(promptRect.x + 0.5, promptRect.y + 0.5, promptRect.width - 1, promptRect.height - 1);
-      promptText.setPosition(Math.round(promptRect.x + 8), Math.round(promptRect.y + 7));
+      promptText.setPosition(Math.round(promptRect.x + PROMPT_HORIZONTAL_PADDING), Math.round(promptRect.y + (PROMPT_HEIGHT - promptText.height) / 2));
       promptHit.setPosition(promptRect.x, promptRect.y).setSize(promptRect.width, promptRect.height).setInteractive({ useHandCursor: true });
     } else {
       promptRect = null;
@@ -184,6 +186,7 @@ export function createInteractionHud(scene, options = {}) {
       return {
         suppressed,
         promptVisible: Boolean(!suppressed && promptState && promptRect),
+        promptRect: promptRect ? { ...promptRect } : null,
         messageKey: promptState?.message ? promptState.promptKey : null,
         cooldownProgress,
         promptAlpha: promptText.alpha,
@@ -212,4 +215,21 @@ export function createInteractionHud(scene, options = {}) {
       speakerText.destroy(); bodyText.destroy(); actionText.destroy(); promptText.destroy();
     },
   };
+}
+
+export function compactPromptRect(width) {
+  const normalizedWidth = Math.max(1, Math.ceil(Number(width) || 0));
+  return {
+    x: INVENTORY_HUD_AREA.x + INVENTORY_HUD_AREA.width - normalizedWidth,
+    y: INVENTORY_HUD_AREA.y - PROMPT_INVENTORY_GAP - PROMPT_HEIGHT,
+    width: normalizedWidth,
+    height: PROMPT_HEIGHT,
+  };
+}
+
+export function compactPromptWidth(textWidth, coarsePointer = false) {
+  return Math.max(
+    coarsePointer ? PROMPT_COARSE_MIN_WIDTH : 0,
+    Math.ceil(Number(textWidth) || 0) + PROMPT_HORIZONTAL_PADDING * 2,
+  );
 }

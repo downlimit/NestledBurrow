@@ -6,6 +6,7 @@ const EVIDENCE_DIR = "artifacts/task-018";
 async function boot(page) {
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
+  await bridge(page, "selectInventorySlot", 0);
 }
 
 async function bridge(page, method, argument) {
@@ -86,7 +87,7 @@ test("successful low-energy hits shake the whole energy bar and dispatch distinc
   await hit(page, "fallen-log-01");
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.energyShakeCount).toBe(beforeLowHit.resources.energyShakeCount + 1);
   expect((await bridge(page, "getHudState")).resources.energyCritical).toBe(true);
-  await expect.poll(() => bridge(page, "getAudioEffectState")).toMatchObject({ lastEffectType: "chop" });
+  await expect.poll(() => bridge(page, "getAudioEffectState")).toMatchObject({ lastEffectType: "wood-hit" });
   await captureEvidence(page, testInfo, "low-energy-resources");
 
   await bridge(page, "setEnergy", 15.25);
@@ -99,7 +100,7 @@ test("successful low-energy hits shake the whole energy bar and dispatch distinc
 
   await bridge(page, "setEnergy", 100);
   await hit(page, "yard-ruby-01");
-  await expect.poll(() => bridge(page, "getAudioEffectState")).toMatchObject({ lastEffectType: "mine" });
+  await expect.poll(() => bridge(page, "getAudioEffectState")).toMatchObject({ lastEffectType: "ruby-hit" });
   await bridge(page, "setAudioChannel", { channel: "effects", value: 0 });
   const mutedAudio = await bridge(page, "getAudioEffectState");
   await hit(page, "yard-log-04");

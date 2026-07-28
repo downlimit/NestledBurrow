@@ -55,7 +55,7 @@ test.describe("Task #030 player needs", () => {
     await page.evaluate(() => {
       const api = window.__NESTLED_BURROW_E2E__;
       api.setNeeds({ dialogue: 50 });
-      api.placePlayerNear("home-npc");
+      api.placePlayerNear("seed-merchant");
       api.advanceGameplayTime(1000);
     });
     state = await snapshot(page);
@@ -66,6 +66,7 @@ test.describe("Task #030 player needs", () => {
     await page.evaluate(() => {
       const api = window.__NESTLED_BURROW_E2E__;
       api.setNeeds({ novelty: 50 });
+      api.selectInventorySlot(0);
       api.setPlayerMotion({ moving: true, running: true });
       api.advanceGameplayTime(100);
     });

@@ -7,10 +7,12 @@ import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
 import { TILE_SIZE } from "./worldConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
-export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
+export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelectedItem = () => null }) {
   const visuals = new Map();
   const bedDefinitions = new Map();
   const bedVisuals = new Map();
+  let targetOutline = [];
+  let targetOutlineId = null;
   let nextBedId = 0;
   let sleepingBedId = null;
   let sleeping = false;
@@ -51,7 +53,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
       y: profile.footprint.height * PLACEMENT_CELL_SIZE / 2,
     };
     const placementPosition = { x: definition.cell.x * PLACEMENT_CELL_SIZE, y: definition.cell.y * PLACEMENT_CELL_SIZE };
-    const graphics = scene.add.graphics().setPosition(placementPosition.x + offset.x, placementPosition.y + offset.y).setDepth(assetDepthFromPivot(placementPosition, pivotOffset));
+    const graphics = scene.add.graphics().setPosition(placementPosition.x + offset.x, placementPosition.y + offset.y).setDepth(assetDepthFromPivot(placementPosition, pivotOffset, 500, definition.id));
     drawResource(graphics, profile, stateFor(definition)?.progress ?? 0);
     visuals.set(definition.id, graphics);
   }
@@ -63,6 +65,38 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     graphics.setPosition(definition.cell.x * PLACEMENT_CELL_SIZE + offset.x, definition.cell.y * PLACEMENT_CELL_SIZE + offset.y);
     graphics.clear();
     drawResource(graphics, getResourceProfile(definition.profileId), stateFor(definition)?.progress ?? 0);
+  }
+
+  function clearTargetOutline() {
+    for (const graphics of targetOutline) graphics.destroy();
+    targetOutline = [];
+    targetOutlineId = null;
+  }
+
+  function updateCandidate(candidate) {
+    const definition = candidate?.kind === "work-resource" && getSelectedItem()?.id === "axe"
+      ? RESOURCE_OBJECTS.find((item) => item.id === candidate.entityId && isPresent(item))
+      : null;
+    if (definition?.id === targetOutlineId) return;
+    clearTargetOutline();
+    if (!definition) return;
+    const profile = getResourceProfile(definition.profileId);
+    const profileKey = `resource:${definition.profileId}`;
+    const visualOffset = scene.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? {
+      x: profile.footprint.width * PLACEMENT_CELL_SIZE / 2,
+      y: profile.footprint.height * PLACEMENT_CELL_SIZE / 2,
+    };
+    const placement = { x: definition.cell.x * PLACEMENT_CELL_SIZE, y: definition.cell.y * PLACEMENT_CELL_SIZE };
+    targetOutline = [[0, -1], [-1, 0], [1, 0], [0, 1]].map(([x, y]) => {
+      const graphics = scene.add.graphics()
+        .setPosition(placement.x + visualOffset.x + x, placement.y + visualOffset.y + y)
+        .setDepth(assetDepthFromPivot(placement, pivotOffset, 500, definition.id) - 0.1)
+        .setAlpha(0.22);
+      drawResource(graphics, profile, stateFor(definition)?.progress ?? 0, { colorOverride: 0x8ed6ff });
+      return graphics;
+    });
+    targetOutlineId = definition.id;
   }
 
   function hitWithFeedback(resourceId, result, onComplete = () => {}) {
@@ -102,7 +136,8 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed");
     const offset = scene.assetProfiles?.["furniture:bed"]?.visualOffset ?? { x: 0, y: 0 };
     const pivotOffset = scene.assetProfiles?.["furniture:bed"]?.snapAnchorOffset ?? { x: TILE_SIZE / 2, y: TILE_SIZE / 2 };
-    const graphics = scene.add.graphics().setPosition(bounds.left + offset.x, bounds.top + offset.y).setDepth(assetDepthFromPivot(bounds, pivotOffset));
+    const placementPosition = { x: bounds.left, y: bounds.top };
+    const graphics = scene.add.graphics().setPosition(bounds.left + offset.x, bounds.top + offset.y).setDepth(assetDepthFromPivot(placementPosition, pivotOffset, 500, definition.id));
     drawBed(graphics);
     bedDefinitions.set(definition.id, definition);
     bedVisuals.set(definition.id, graphics);
@@ -195,8 +230,10 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
           ? { ...definition, prompt: "hud:interaction.wake" }
           : definition
       ));
-      return [...RESOURCE_OBJECTS.filter(isPresent), ...beds];
+      const resources = getSelectedItem()?.id === "axe" ? RESOURCE_OBJECTS.filter(isPresent) : [];
+      return [...resources, ...beds];
     },
+    updateCandidate,
     getBedDefinition(id = null) {
       if (id) return bedDefinitions.get(id) ?? null;
       return bedDefinitions.values().next().value ?? null;
@@ -265,12 +302,13 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout }) {
     isPresent(id) { const definition = RESOURCE_OBJECTS.find((item) => item.id === (id ?? RESOURCE_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },
     getVisualState(id) {
       const graphics = visuals.get(id);
-      return graphics ? { x: graphics.x, y: graphics.y } : null;
+      return graphics ? { x: graphics.x, y: graphics.y, highlighted: targetOutlineId === id } : null;
     },
     hitWithFeedback, clearWithFeedback, setSleeping,
     rebuild() { for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); RESOURCE_OBJECTS.forEach(createVisual); },
     destroy() {
       destroyed = true;
+      clearTargetOutline();
       for (const graphics of visuals.values()) graphics.destroy();
       visuals.clear();
       for (const graphics of bedVisuals.values()) graphics.destroy();

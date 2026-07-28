@@ -1,3 +1,5 @@
+import { drawCoinSprite } from "./coinVisual.js";
+
 export function createCoinRuntime(scene, { getPlayerPosition, onCollect = () => {} }) {
   const coins = new Map();
   let nextId = 0;
@@ -7,9 +9,7 @@ export function createCoinRuntime(scene, { getPlayerPosition, onCollect = () => 
     if (destroyed) return null;
     const id = `guest-coin-${++nextId}`;
     const visual = scene.add.graphics().setDepth(800 + Math.round(origin.y));
-    visual.fillStyle(0x6b3d17, 1).fillRect(-2, -2, 5, 5);
-    visual.fillStyle(0xf3c969, 1).fillRect(-1, -2, 3, 5).fillRect(-2, -1, 5, 3);
-    visual.fillStyle(0xffe59a, 1).fillRect(-1, -1, 2, 1);
+    drawCoinSprite(visual);
     const coin = {
       id,
       visual,

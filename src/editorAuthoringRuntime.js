@@ -118,7 +118,12 @@ function createTreeSprites(scene, object) {
   const sprites = [];
   const profileKey = `resource:${object.item.resourceProfileId ?? PLANTED_TREE_PROFILE_ID}`;
   const profile = scene.assetProfiles?.[profileKey];
-  const depth = assetDepthFromPivot(object.point, profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 });
+  const depth = assetDepthFromPivot(
+    object.point,
+    profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
+    500,
+    object.id,
+  );
   for (let row = 0; row < 4; row += 1) {
     for (let column = 0; column < 3; column += 1) {
       const offset = profile?.visualOffset ?? { x: 0, y: 0 };
@@ -281,7 +286,7 @@ export function attachEditorAuthoringRuntime(scene, {
     });
     for (const instance of getAuthoringInstances()) {
       if (instance.profileKey !== profileKey) continue;
-      const depth = assetDepthFromPivot(instance.anchor, offset);
+      const depth = assetDepthFromPivot(instance.anchor, offset, 500, instance.id);
       for (const target of instance.targets) target.setDepth?.(depth);
     }
     scene.facilityRuntime?.syncKitchenVisuals?.();

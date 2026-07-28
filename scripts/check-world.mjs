@@ -85,7 +85,7 @@ assert(wallCaps.every((tile) => (
   tile.supplements.length === 1
   && tile.supplements[0].cropWidth === TILE_SIZE / 2
 )), "each shifted wall cap fills its remaining half-edge with a cropped middle segment");
-assert.equal(layout.decorationTiles.length, 48, "four 3x4 trees are present");
+assert.equal(layout.decorationTiles.length, 0, "obsolete canonical map trees are removed");
 
 assert.equal(layout.doorway.left, DOOR_LEFT * TILE_SIZE);
 assert.equal(layout.doorway.right, (DOOR_LEFT + HOUSE.doorWidth) * TILE_SIZE);
@@ -96,15 +96,14 @@ const firstPathTile = layout.groundTiles[WORLD_COLUMNS * WORLD_ROWS];
 const pathCenterX = (firstPathTile.x + 1.5) * TILE_SIZE;
 assert.equal(pathCenterX - layout.doorway.centerX, 0, "doorway and path centerlines are identical");
 
-const expectedBlockedCells = [
+const formerTreeCells = [
   [7 + 1, 6 + 3],
   [52 + 1, 7 + 3],
   [8 + 1, 33 + 3],
   [51 + 1, 34 + 3],
 ];
-for (const [x, y] of expectedBlockedCells) {
-  assert.equal(layout.blocked.has(cellKey(x * 2, y * 2)), true, `diagnostic blocked set contains tile ${x},${y}`);
-  assert.equal(layout.isBlockedCell(x * 2, y * 2), true, `environment query blocks tile ${x},${y}`);
+for (const [x, y] of formerTreeCells) {
+  assert.equal(layout.blocked.has(cellKey(x * 2, y * 2)), false, `former tree tile ${x},${y} is released`);
 }
 
 const resourceCells = new Set();
@@ -125,7 +124,7 @@ for (const resource of RESOURCE_OBJECTS) {
     resourceCells.add(key);
   }
 }
-for (const [label, point] of [["spawn", layout.spawn], ["outdoor target", layout.outdoorTarget], ...NPCS.flatMap((npc) => [[`${npc.id} spawn`, npc.spawn], ...npc.patrol.waypoints.map((waypoint, index) => [`${npc.id} waypoint ${index}`, waypoint])])]) {
+for (const [label, point] of [["spawn", layout.spawn], ["outdoor target", layout.outdoorTarget], ...NPCS.flatMap((npc) => [[`${npc.id} spawn`, npc.spawn], ...(npc.patrol?.waypoints ?? []).map((waypoint, index) => [`${npc.id} waypoint ${index}`, waypoint])])]) {
   const cell = cellKey(Math.floor(point.x / PLACEMENT_CELL_SIZE), Math.floor(point.y / PLACEMENT_CELL_SIZE));
   assert(!resourceCells.has(cell), `${label} remains outside resource footprints`);
 }
@@ -135,7 +134,7 @@ for (const point of [layout.spawn, layout.outdoorTarget]) {
 }
 for (const npc of NPCS) {
   assert.equal(collides(npc.spawn, layout, footWidth, footDepth), false, `${npc.id} spawn is walkable`);
-  for (const waypoint of npc.patrol.waypoints) {
+  for (const waypoint of npc.patrol?.waypoints ?? []) {
     assert.equal(collides(waypoint, layout, footWidth, footDepth), false, `${npc.id} waypoint is walkable`);
   }
 }

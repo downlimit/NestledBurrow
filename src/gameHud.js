@@ -12,10 +12,20 @@ import {
 import { GAME_WIDTH } from "./worldConfig.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
 import { createInventoryRuntime, INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "./inventoryRuntime.js";
+import { drawCoinSprite } from "./coinVisual.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
+export const COIN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 82, y: 4, width: 46, height: 30 });
 export const CLOCK_HUD_AREA = Object.freeze({ x: 120, y: 4, width: 80, height: 24 });
+export const TIME_CONTROL_SPEEDS = Object.freeze([0, 1, 4, 16]);
+export const TIME_CONTROL_HUD_AREA = Object.freeze({ x: 120, y: 29, width: 80, height: 13 });
+export const TIME_CONTROL_AREAS = Object.freeze(TIME_CONTROL_SPEEDS.map((_speed, index) => Object.freeze({
+  x: TIME_CONTROL_HUD_AREA.x + index * 20,
+  y: TIME_CONTROL_HUD_AREA.y,
+  width: 19,
+  height: TIME_CONTROL_HUD_AREA.height,
+})));
 export const OPTIONS_PANEL_AREA = Object.freeze({ x: 8, y: 34, width: 228, height: 80 });
 export const LANGUAGE_HIT_AREA = Object.freeze({ x: 154, y: 40, width: 70, height: 28 });
 export const NEW_GAME_HIT_AREA = Object.freeze({ x: 146, y: 72, width: 78, height: 30 });
@@ -27,7 +37,6 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
 export const OPTIONS_BUILD_LABEL = Object.freeze({ x: 14, y: 102 });
 export const RESOURCE_HUD_AREA = INVENTORY_HUD_AREA;
 export const NEEDS_HUD_AREA = Object.freeze({ x: 252, y: 38, width: 60, height: 68 });
-export const KITCHEN_HUD_AREA = Object.freeze({ x: 210, y: 108, width: 102, height: 30 });
 export const ENERGY_HUD_AREA = NEEDS_HUD_AREA;
 export const NEED_ROW_IDS = Object.freeze(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
 export const NEED_ROW_SYMBOLS = Object.freeze(["N", "E", "S", "T", "L", "D"]);
@@ -80,6 +89,9 @@ export function createGameHud(scene, options) {
     onNewGame = () => {},
     onConfirmationChange = () => {},
     onOptionsChange = () => {},
+    onTimeScaleChange = () => {},
+    onDroppedItemCollision = () => {},
+    playEffect = () => {},
     audioSettings,
     getGameplayState = () => null,
     isCoarsePointer = () => false,
@@ -123,6 +135,8 @@ export function createGameHud(scene, options) {
       scene.interactionRuntime?.refresh?.();
       scene.saveSession?.();
     },
+    onWorldItemCollision: onDroppedItemCollision,
+    playEffect,
   });
 
   const optionsHit = createZone(scene, OPTIONS_HIT_AREA);
@@ -141,6 +155,15 @@ export function createGameHud(scene, options) {
       if (!isCoarsePointer()) return;
       const needId = NEED_ROW_IDS[index];
       pinnedNeedId = pinnedNeedId === needId ? null : needId;
+      render();
+    });
+    return zone;
+  });
+  const timeControlHits = TIME_CONTROL_AREAS.map((rect, index) => {
+    const zone = createZone(scene, rect).disableInteractive();
+    zone.on("pointerdown", (pointer, _x, _y, event) => {
+      stop(pointer, event);
+      onTimeScaleChange(TIME_CONTROL_SPEEDS[index]);
       render();
     });
     return zone;
@@ -167,12 +190,7 @@ export function createGameHud(scene, options) {
     effects: createText(scene),
   };
   const clockText = createText(scene, { fontSize: "8px" });
-  const kitchenTexts = [
-    createText(scene, { fontSize: "7px" }),
-    createText(scene, { fontSize: "7px" }),
-    createText(scene, { fontSize: "7px" }),
-    createText(scene, { fontSize: "7px" }),
-  ];
+  const coinText = createText(scene, { fontSize: "8px" });
   const needTooltipText = createText(scene, { fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } });
 
   function stop(pointer, event) {
@@ -258,7 +276,7 @@ export function createGameHud(scene, options) {
   }
 
   function hideManagedObjects() {
-    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) text.setVisible(false);
+    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, coinText, needTooltipText, ...Object.values(soundTexts)]) text.setVisible(false);
   }
 
   function render() {
@@ -287,7 +305,8 @@ export function createGameHud(scene, options) {
       renderClock(gameplay);
       if (!optionsOpen && !gameplayOverlayActive) {
         renderNeeds(gameplay);
-        renderKitchen(gameplay);
+        if (!gameplay.sleeping) renderTimeControls(gameplay);
+        renderCoinBalance(gameplay);
       }
     }
     if (optionsOpen) renderOptionsPanel();
@@ -300,17 +319,25 @@ export function createGameHud(scene, options) {
     clockText.setPosition(Math.round((GAME_WIDTH - clockText.width) / 2), Math.round(CLOCK_HUD_AREA.y + (CLOCK_HUD_AREA.height - clockText.height) / 2));
   }
 
-  function renderKitchen(gameplay) {
-    const kitchen = gameplay.kitchen ?? {};
-    graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(KITCHEN_HUD_AREA.x, KITCHEN_HUD_AREA.y, KITCHEN_HUD_AREA.width, KITCHEN_HUD_AREA.height);
-    graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(KITCHEN_HUD_AREA.x + 0.5, KITCHEN_HUD_AREA.y + 0.5, KITCHEN_HUD_AREA.width - 1, KITCHEN_HUD_AREA.height - 1);
-    const rows = [["raw", kitchen.rawPotatoes], ["prepared", kitchen.preparedPotatoes], ["dishes", kitchen.cookedDishes], ["coins", gameplay.coins]];
-    rows.forEach(([key, value], index) => {
-      setManagedTextStyle(kitchenTexts[index], scene, textStyle({ fontSize: "6px" }))
-        .setText(`${localization.t(`hud:kitchen.${key}`)} ${Number(value) || 0}`)
-        .setVisible(true)
-        .setPosition(KITCHEN_HUD_AREA.x + 5, KITCHEN_HUD_AREA.y + 1 + index * 7);
-    });
+  function renderCoinBalance(gameplay) {
+    graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(COIN_HUD_AREA.x, COIN_HUD_AREA.y, COIN_HUD_AREA.width, COIN_HUD_AREA.height);
+    graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(COIN_HUD_AREA.x + 0.5, COIN_HUD_AREA.y + 0.5, COIN_HUD_AREA.width - 1, COIN_HUD_AREA.height - 1);
+    drawCoinSprite(graphics, COIN_HUD_AREA.x + COIN_HUD_AREA.width - 10, COIN_HUD_AREA.y + 14);
+    setManagedTextStyle(coinText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.coins ?? 0)).setVisible(true);
+    coinText.setPosition(COIN_HUD_AREA.x + COIN_HUD_AREA.width - 18 - coinText.width, Math.round(COIN_HUD_AREA.y + (COIN_HUD_AREA.height - coinText.height) / 2));
+  }
+
+  function renderTimeControls(gameplay) {
+    const selectedScale = Number(gameplay.selectedTimeScale ?? gameplay.timeScale ?? 1);
+    for (let index = 0; index < TIME_CONTROL_AREAS.length; index += 1) {
+      const rect = TIME_CONTROL_AREAS[index];
+      const active = TIME_CONTROL_SPEEDS[index] === selectedScale;
+      graphics.fillStyle(active ? HUD_COLORS.mid : HUD_COLORS.panel, active ? 0.96 : 0.78)
+        .fillRect(rect.x, rect.y, rect.width, rect.height);
+      graphics.lineStyle(1, active ? HUD_COLORS.light : HUD_COLORS.border, active ? 1 : 0.8)
+        .strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+      drawTimeControlIcon(graphics, rect, index, active ? HUD_COLORS.panel : HUD_COLORS.light);
+    }
   }
 
   function renderNeeds(gameplay) {
@@ -390,6 +417,7 @@ export function createGameHud(scene, options) {
       optionsHit.disableInteractive();
       setOptionsPanelInteractive(false);
       setNeedsInteractive(false);
+      setTimeControlsInteractive(false);
       confirmHit.disableInteractive();
       cancelHit.disableInteractive();
       fullscreenHud?.hit?.disableInteractive?.();
@@ -400,6 +428,7 @@ export function createGameHud(scene, options) {
       optionsHit.disableInteractive();
       setOptionsPanelInteractive(false);
       setNeedsInteractive(false);
+      setTimeControlsInteractive(false);
       confirmHit.setInteractive({ useHandCursor: true });
       cancelHit.setInteractive({ useHandCursor: true });
       return;
@@ -407,6 +436,7 @@ export function createGameHud(scene, options) {
     optionsHit.setInteractive({ useHandCursor: true });
     setOptionsPanelInteractive(optionsOpen);
     setNeedsInteractive(!optionsOpen && !gameplayOverlayActive);
+    setTimeControlsInteractive(!optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping);
     confirmHit.disableInteractive();
     cancelHit.disableInteractive();
   }
@@ -414,6 +444,10 @@ export function createGameHud(scene, options) {
   function setNeedsInteractive(active) {
     for (const zone of needHits) active ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive();
     if (!active) { hoveredNeedId = null; pinnedNeedId = null; }
+  }
+
+  function setTimeControlsInteractive(active) {
+    for (const zone of timeControlHits) active ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive();
   }
 
   function setOptionsPanelInteractive(active) {
@@ -478,11 +512,13 @@ export function createGameHud(scene, options) {
       const gameplay = getGameplayState?.();
       return {
         clockText: clockText.text,
+        coinText: coinText.text,
+        coinCount: Number(gameplay?.coins ?? 0),
         woodText: String(gameplay?.wood ?? 0),
         stoneText: String(gameplay?.stone ?? 0),
         rubyText: String(gameplay?.rubies ?? 0),
         inventory: inventoryHud.getState(),
-        kitchenTexts: kitchenTexts.map((text) => text.text),
+        kitchenTexts: [],
         icons: { wood: false, stone: false, ruby: false },
         energyRatio,
         energyFillHeight,
@@ -494,6 +530,8 @@ export function createGameHud(scene, options) {
         energyShakeCount,
         energyShakeActive,
         needsRows: needsRowsState,
+        timeScale: Number(gameplay?.timeScale ?? 1),
+        selectedTimeScale: Number(gameplay?.selectedTimeScale ?? gameplay?.timeScale ?? 1),
         hoveredNeedId,
         pinnedNeedId,
         tooltipVisible: needTooltipText.visible,
@@ -508,10 +546,11 @@ export function createGameHud(scene, options) {
         areas: {
           options: OPTIONS_HIT_AREA,
           clock: CLOCK_HUD_AREA,
+          coins: COIN_HUD_AREA,
+          timeControls: TIME_CONTROL_AREAS,
           resources: INVENTORY_HUD_AREA,
           inventory: INVENTORY_HUD_AREA,
           inventorySlots: INVENTORY_SLOT_AREAS,
-          kitchen: KITCHEN_HUD_AREA,
           energy: ENERGY_HUD_AREA,
           needs: NEEDS_HUD_AREA,
           needRows: NEED_ROW_AREAS,
@@ -522,6 +561,7 @@ export function createGameHud(scene, options) {
           optionsPanel: OPTIONS_PANEL_AREA,
           confirmation: NEW_GAME_CONFIRM_PANEL,
         },
+        timeControlsVisible: !suppressed && !optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping,
       };
     },
     isPointInHud(x, y) {
@@ -529,6 +569,9 @@ export function createGameHud(scene, options) {
       if (confirmingNewGame) return isPointInRect(x, y, NEW_GAME_CONFIRM_PANEL) || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));
       return inventoryHud.isPointInHud(x, y)
         || isPointInRect(x, y, OPTIONS_HIT_AREA)
+        || Boolean(!optionsOpen && !gameplayOverlayActive && isPointInRect(x, y, COIN_HUD_AREA))
+        || Boolean(!optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping
+          && TIME_CONTROL_AREAS.some((rect) => isPointInRect(x, y, rect)))
         || Boolean(optionsOpen && isPointInRect(x, y, OPTIONS_PANEL_AREA))
         || Boolean(!optionsOpen && isPointInRect(x, y, NEEDS_HUD_AREA))
         || Boolean((hoveredNeedId || pinnedNeedId) && isPointInRect(x, y, NEED_TOOLTIP_AREA))
@@ -541,10 +584,10 @@ export function createGameHud(scene, options) {
       unsubscribe?.();
       scene.input.off("pointerdown", onScenePointerDown);
       inventoryHud.destroy();
-      for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits]) zone.destroy();
+      for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits, ...timeControlHits]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
       scene.tweens.killTweensOf(energyArrowGraphics);
-      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
+      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, coinText, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
       energyBarGraphics.destroy();
       energyArrowGraphics.destroy();
       graphics.destroy();
@@ -554,6 +597,10 @@ export function createGameHud(scene, options) {
         fullscreenHud.graphics.destroy();
       }
     },
+    getSelectedInventoryItem: () => inventoryHud.getSelectedItem(),
+    selectInventorySlot: (index) => inventoryHud.selectSlot(index),
+    dropInventorySlot: (index) => inventoryHud.dropSlot(index),
+    spawnWorldItems: (itemId, quantity, origin) => inventoryHud.spawnWorldItems(itemId, quantity, origin),
   };
 }
 
@@ -569,6 +616,26 @@ function drawNeedFlow(graphics, x, y, flow, nowMs, seed) {
   const alpha = needFlowPulseAlpha(arrows, nowMs, seed);
   if (alpha <= 0) return;
   for (let index = 0; index < arrows; index += 1) drawEnergyArrow(graphics, x + index * 5, y, flow.direction, alpha);
+}
+
+function drawTimeControlIcon(graphics, rect, index, color) {
+  graphics.fillStyle(color, 0.96);
+  const centerY = rect.y + 3;
+  if (index === 0) {
+    graphics.fillRect(rect.x + 7, centerY, 2, 7);
+    graphics.fillRect(rect.x + 11, centerY, 2, 7);
+    return;
+  }
+  const count = index;
+  const totalWidth = count * 4 + (count - 1);
+  const startX = Math.round(rect.x + (rect.width - totalWidth) / 2);
+  for (let icon = 0; icon < count; icon += 1) {
+    const x = startX + icon * 5;
+    graphics.fillRect(x, centerY, 1, 7);
+    graphics.fillRect(x + 1, centerY + 1, 1, 5);
+    graphics.fillRect(x + 2, centerY + 2, 1, 3);
+    graphics.fillRect(x + 3, centerY + 3, 1, 1);
+  }
 }
 
 function createZone(scene, rect) {

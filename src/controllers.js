@@ -20,6 +20,15 @@ export function createPlayerController({ getInputDirection, getAimDirection, get
   };
 }
 
+export function createIdleController() {
+  return {
+    kind: "idle",
+    getCommand() {
+      return createControllerCommand({ moveDirection: IDLE_DIRECTION });
+    },
+  };
+}
+
 export function createPatrolController({ waypoints, mode, tolerance = WAYPOINT_TOLERANCE, isPaused } = {}) {
   if (!Array.isArray(waypoints) || waypoints.length < 2) {
     throw new Error("Patrol routes need at least two waypoints");

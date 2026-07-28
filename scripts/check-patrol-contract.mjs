@@ -1,64 +1,37 @@
 import assert from "node:assert/strict";
 import {
-  PATROL_MODE_LOOP,
   PATROL_MODE_PING_PONG,
+  createIdleController,
   createPatrolController,
 } from "../src/controllers.js";
 import { NPCS } from "../src/npcConfig.js";
 
-const homeNpc = NPCS.find((npc) => npc.id === "home-npc");
-const streetNpc = NPCS.find((npc) => npc.id === "street-npc");
-
-assert(homeNpc, "home NPC exists");
-assert(streetNpc, "street NPC exists");
-assert.equal(homeNpc.patrol.mode, PATROL_MODE_LOOP, "home NPC keeps a closed loop patrol");
-assert.equal(
-  streetNpc.patrol.mode,
-  PATROL_MODE_PING_PONG,
-  "street NPC traverses its multi-point route forward and then backward",
-);
-
-function routeStats(npc) {
-  const points = npc.patrol.waypoints;
-  return {
-    points,
-    waiting: points.filter((point) => point.waitMs >= 2000 && point.waitMs <= 3000),
-    passThrough: points.filter((point) => (point.waitMs ?? 0) === 0),
-    uniqueX: new Set(points.map((point) => point.x)).size,
-    uniqueY: new Set(points.map((point) => point.y)).size,
-  };
-}
-
-const streetRoute = routeStats(streetNpc);
-assert(streetRoute.points.length >= 6, "street ping-pong route has multiple meaningful points");
-assert(streetRoute.uniqueX > 1, "street ping-pong route changes X");
-assert(streetRoute.uniqueY > 1, "street ping-pong route changes Y");
-assert(streetRoute.passThrough.length >= 2, "street route includes pass-through points without rests");
-assert(streetRoute.waiting.length >= 3, "street route includes several rest points");
-assert.notDeepEqual(
-  streetRoute.points[0],
-  streetRoute.points.at(-1),
-  "ping-pong route does not fake a loop by repeating its starting point",
-);
-
-const controller = createPatrolController({
-  mode: streetNpc.patrol.mode,
-  waypoints: streetNpc.patrol.waypoints,
-});
-const visitedIndexes = [0, controller.currentWaypointIndex];
-while (visitedIndexes.length < streetRoute.points.length * 2 - 1) {
-  controller.advanceForTest();
-  visitedIndexes.push(controller.currentWaypointIndex);
-}
-
-const forward = streetRoute.points.map((_, index) => index);
-const backwardWithoutEndpointDuplicate = streetRoute.points
-  .slice(0, -1)
-  .map((_, index) => streetRoute.points.length - 2 - index);
+assert.equal(NPCS.length, 1, "obsolete street and neighbor patrol actors are removed");
+assert.equal(NPCS[0].id, "seed-merchant");
+assert.equal(NPCS[0].patrol, undefined, "seed merchant has no patrol route");
+const idle = createIdleController();
 assert.deepEqual(
-  visitedIndexes,
-  [...forward, ...backwardWithoutEndpointDuplicate],
-  "street NPC follows A→B→C→…→C→B→A rather than a two-point shuttle",
+  idle.getCommand(),
+  {
+    moveDirection: { x: 0, y: 0 },
+    aimDirection: null,
+    actions: { interact: false, primary: false, secondary: false },
+  },
+  "stationary NPC controller emits a stable idle command",
 );
 
-console.log("Patrol contract checks passed");
+const patrol = createPatrolController({
+  mode: PATROL_MODE_PING_PONG,
+  waypoints: [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+  ],
+});
+const visited = [patrol.currentWaypointIndex];
+for (let index = 0; index < 4; index += 1) {
+  patrol.advanceForTest();
+  visited.push(patrol.currentWaypointIndex);
+}
+assert.deepEqual(visited, [1, 2, 1, 0, 1], "generic ping-pong controller remains available");
+console.log("Patrol contract checks passed: seed merchant is stationary and generic patrol remains stable");

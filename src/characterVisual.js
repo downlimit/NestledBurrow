@@ -1,12 +1,14 @@
 import { isMoving } from "./characterMovement.js";
 import { quantizeCharacterFacing } from "./characterFacing.js";
 import { applyFrameReference } from "./characterVisualProfiles.js";
+import { worldDepthFromAnchorY } from "./buildWorldGeometry.js";
 
 export class CharacterVisual {
   constructor(
     scene,
     {
       spawn,
+      id = "character",
       visualProfile,
       animationPrefix = visualProfile.animationPrefix,
       frames = visualProfile.frames,
@@ -15,6 +17,7 @@ export class CharacterVisual {
     },
   ) {
     this.scene = scene;
+    this.id = id;
     this.visualProfile = visualProfile;
     this.animationPrefix = animationPrefix;
     this.frames = frames;
@@ -51,7 +54,7 @@ export class CharacterVisual {
   }
 
   updateDepth() {
-    this.sprite.setDepth(500 + Math.round(this.sprite.y));
+    this.sprite.setDepth(worldDepthFromAnchorY(this.sprite.y, this.id));
   }
 
   updateFacing(direction) {
@@ -111,7 +114,7 @@ export class CharacterVisual {
     this.sprite.setOrigin?.(0.5, 0.5);
     this.sprite.setAngle?.(this.presentationPose.angle);
     this.sprite.setPosition(this.presentationPose.x, this.presentationPose.y);
-    this.sprite.setDepth(this.presentationPose.depth ?? 501 + Math.round(this.presentationPose.y));
+    this.sprite.setDepth(this.presentationPose.depth ?? worldDepthFromAnchorY(this.presentationPose.y, this.id, 501));
     if (this.presentationPose.showSleepMarker) this.updateSleepMarker();
     else this.destroySleepMarker();
   }

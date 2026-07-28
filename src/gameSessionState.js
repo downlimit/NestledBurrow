@@ -3,22 +3,23 @@ import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
 import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
 import { DEFAULT_NEEDS, normalizeNeeds } from "./needsDomain.js";
 import { normalizeKitchenState } from "./cookingDomain.js";
+import { createFreshFarmState, normalizeFarmState } from "./farmingDomain.js";
 import {
   addInventoryItem,
   canAddInventoryItem,
-  createFreshInventory,
   createInventoryFromLegacyCounters,
   createInventoryItem,
+  createNewGameInventory,
   getInventoryQuantity,
   normalizeInventory,
   normalizeWorldItems,
   resetInventory,
 } from "./inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 7;
+export const SESSION_STATE_VERSION = 9;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
-export const DEFAULT_ENTITY_IDS = Object.freeze(["home-npc", "street-npc"]);
+export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
 export const DEFAULT_DEBRIS_ID = "fallen-log-01";
 export const DEFAULT_MAXIMUM_ENERGY = 100;
 export const DEFAULT_STARTING_ENERGY = 100;
@@ -157,10 +158,11 @@ function normalizeGameplayState(value = {}) {
     worldItems: normalizeWorldItems(value.worldItems ?? []),
     resourceNodes,
     worldTimeSeconds,
+    farm: normalizeFarmState(value.farm ?? createFreshFarmState(worldTimeSeconds), worldTimeSeconds),
     needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
     kitchen: normalizeKitchenState(value.kitchen ?? {}),
     tavernOpen: normalizeBoolean(value.tavernOpen, false, "Tavern open"),
-    coins: normalizeNonNegativeInteger(value.coins, 0, "Coins"),
+    coins: normalizeNonNegativeInteger(value.coins, 3, "Coins"),
   });
 }
 
@@ -186,7 +188,7 @@ export function createFreshGameSessionState(options = {}) {
     entities: createDictionary(),
     flags: createDictionary(),
     dialogue: createDialogueState(),
-    gameplay: normalizeGameplayState({ inventory: createFreshInventory(), worldItems: [] }),
+    gameplay: normalizeGameplayState({ inventory: createNewGameInventory(), worldItems: [] }),
   };
   ensureSessionEntity(state, playerId);
   for (const entityId of options.initialEntityIds ?? options.entityIds ?? DEFAULT_ENTITY_IDS) ensureSessionEntity(state, entityId);
@@ -332,6 +334,7 @@ export function resetBalanceRun(state) {
   state.gameplay.worldTimeSeconds = DEFAULT_START_TIME_SECONDS;
   resetInventory(state.gameplay.inventory);
   state.gameplay.worldItems.splice(0, state.gameplay.worldItems.length);
+  state.gameplay.farm = createFreshFarmState(DEFAULT_START_TIME_SECONDS);
   state.gameplay.needs = normalizeNeeds();
   for (const node of Object.values(state.gameplay.resourceNodes)) {
     node.cleared = false;

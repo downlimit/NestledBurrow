@@ -1,10 +1,11 @@
+import { getInventoryQuantity, takeInventoryItem } from "./inventoryDomain.js";
+
 export const COOKING_STEP_TYPES = Object.freeze({
   preparation: "preparation",
   frying: "frying",
 });
 
 export const DEFAULT_KITCHEN_STATE = Object.freeze({
-  rawPotatoes: 5,
   preparedPotatoes: 0,
   cookedDishes: 0,
   servingTableHasDish: false,
@@ -52,7 +53,6 @@ function clampUnit(value) {
 export function normalizeKitchenState(value = {}) {
   assertPlainRecord(value, "Kitchen state");
   return {
-    rawPotatoes: normalizeNonNegativeInteger(value.rawPotatoes, DEFAULT_KITCHEN_STATE.rawPotatoes, "Raw potatoes"),
     preparedPotatoes: normalizeNonNegativeInteger(value.preparedPotatoes, DEFAULT_KITCHEN_STATE.preparedPotatoes, "Prepared potatoes"),
     cookedDishes: normalizeNonNegativeInteger(value.cookedDishes, DEFAULT_KITCHEN_STATE.cookedDishes, "Cooked dishes"),
     servingTableHasDish: normalizeBoolean(value.servingTableHasDish, DEFAULT_KITCHEN_STATE.servingTableHasDish, "Serving table dish"),
@@ -80,9 +80,9 @@ export function createCookingStep(stepType, randomSource = Math.random, config =
   };
 }
 
-export function canStartCookingStep(kitchen, stepType) {
+export function canStartCookingStep(kitchen, stepType, inventory) {
   if (stepType === COOKING_STEP_TYPES.preparation) {
-    return kitchen.rawPotatoes >= 1
+    return getInventoryQuantity(inventory, "potato") >= 1
       ? { status: "available" }
       : { status: "no-raw-potatoes", messageKey: "hud:interaction.noRawPotatoes" };
   }
@@ -94,8 +94,8 @@ export function canStartCookingStep(kitchen, stepType) {
   return { status: "unknown-step" };
 }
 
-export function startCookingStep(kitchen, stepType, randomSource = Math.random, config = COOKING_MINIGAME_CONFIG) {
-  const availability = canStartCookingStep(kitchen, stepType);
+export function startCookingStep(kitchen, stepType, inventory, randomSource = Math.random, config = COOKING_MINIGAME_CONFIG) {
+  const availability = canStartCookingStep(kitchen, stepType, inventory);
   if (availability.status !== "available") return { ...availability, activeStep: null };
   return { status: "started", activeStep: createCookingStep(stepType, randomSource, config) };
 }
@@ -156,11 +156,11 @@ export function attemptCookingStep(activeStep, randomSource = Math.random, confi
   };
 }
 
-export function completeCookingStep(kitchen, stepType) {
-  const availability = canStartCookingStep(kitchen, stepType);
+export function completeCookingStep(kitchen, stepType, inventory) {
+  const availability = canStartCookingStep(kitchen, stepType, inventory);
   if (availability.status !== "available") return { ...availability, mutated: false };
   if (stepType === COOKING_STEP_TYPES.preparation) {
-    kitchen.rawPotatoes -= 1;
+    takeInventoryItem(inventory, "potato", 1);
     kitchen.preparedPotatoes += 1;
   } else {
     kitchen.preparedPotatoes -= 1;
@@ -183,9 +183,9 @@ export function toggleServingDish(kitchen) {
   return { status: "dish-served", mutated: true };
 }
 
-export function getKitchenFacilityPrompt(facilityType, kitchen) {
+export function getKitchenFacilityPrompt(facilityType, kitchen, inventory) {
   if (facilityType === "cutting-table") {
-    return kitchen.rawPotatoes >= 1
+    return getInventoryQuantity(inventory, "potato") >= 1
       ? "hud:interaction.startPreparation"
       : "hud:interaction.noRawPotatoes";
   }

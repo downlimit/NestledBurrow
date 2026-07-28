@@ -23,6 +23,7 @@ import {
   getActorProfile,
 } from "../src/actorProfiles.js";
 import { moveWithCollision } from "../src/movement.js";
+import { worldDepthFromAnchorY } from "../src/buildWorldGeometry.js";
 import { NPCS } from "../src/npcConfig.js";
 import {
   FACING_HYSTERESIS,
@@ -263,7 +264,7 @@ assert.equal(visual.sprite.texture.key, "custom-down", "CharacterVisual creates 
 assert.deepEqual(visual.sprite.origin, { x: 0.5, y: 1 }, "CharacterVisual preserves sprite origin");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 0.7, y: 0.6 } }, { velocity: { x: 0, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.deepEqual({ x: visual.sprite.x, y: visual.sprite.y }, { x: 7, y: 9 }, "CharacterVisual synchronizes sprite position");
-assert.equal(visual.sprite.depth, 509, "CharacterVisual keeps depth sorting as 500 plus rounded y");
+assert.equal(visual.sprite.depth, worldDepthFromAnchorY(9, "character"), "CharacterVisual uses systemic pivot depth with a stable tie break");
 assert.equal(visual.lastFacing, "down-right", "CharacterVisual uses diagonal facing for diagonal input");
 visual.update({ position: { x: 7, y: 9 }, facingDirection: { x: 1, y: 0 } }, { velocity: { x: 20, y: 0 } }, DEFAULT_MOVEMENT_CONFIG);
 assert.equal(visual.lastFacing, "right", "CharacterVisual updates cardinal facing outside hysteresis");
@@ -513,43 +514,9 @@ assert(snapshotCharacter.movement.aimDirection.x > 0.9, "Character passes explic
 assert.equal(snapshotCharacter.movement.desiredDirection.x, 0, "movement can differ from explicit aim");
 
 
-const homeNpc = NPCS.find((npc) => npc.id === "home-npc");
-const streetNpc = NPCS.find((npc) => npc.id === "street-npc");
-assert(homeNpc, "home NPC exists");
-assert(streetNpc, "street NPC exists");
-
-function routeStats(npc) {
-  const points = npc.patrol.waypoints;
-  return {
-    points,
-    waiting: points.filter((waypoint) => waypoint.waitMs >= 2000 && waypoint.waitMs <= 3000),
-    passThrough: points.filter((waypoint) => (waypoint.waitMs ?? 0) === 0),
-    uniqueX: new Set(points.map((waypoint) => waypoint.x)).size,
-    uniqueY: new Set(points.map((waypoint) => waypoint.y)).size,
-  };
-}
-
-function isSimpleRectangle(points) {
-  const uniqueX = new Set(points.map((waypoint) => waypoint.x));
-  const uniqueY = new Set(points.map((waypoint) => waypoint.y));
-  if (uniqueX.size !== 2 || uniqueY.size !== 2 || points.length !== 4) return false;
-  return points.every((waypoint) => uniqueX.has(waypoint.x) && uniqueY.has(waypoint.y));
-}
-
-const homeRoute = routeStats(homeNpc);
-assert(homeRoute.points.length >= 5, "home NPC route has at least five points");
-assert(homeRoute.passThrough.length >= 2, "home NPC route includes pass-through waypoints");
-assert(homeRoute.waiting.length >= 2 && homeRoute.waiting.length <= 4, "home NPC route includes meaningful waits");
-assert(homeRoute.uniqueX > 2 && homeRoute.uniqueY > 2, "home NPC route moves among different house areas");
-assert(!isSimpleRectangle(homeRoute.points), "home NPC route is not the previous simple rectangle");
-
-const streetRoute = routeStats(streetNpc);
-assert(streetRoute.points.length >= 6, "street NPC route has at least six points");
-assert(streetRoute.passThrough.length >= 2, "street NPC route includes pass-through waypoints");
-assert(streetRoute.waiting.length >= 2 && streetRoute.waiting.length <= 4, "street NPC route includes meaningful waits");
-assert(streetRoute.uniqueX > 1 && streetRoute.uniqueY > 1, "street NPC route changes both X and Y");
-assert(!(streetRoute.uniqueX === 1 && streetNpc.patrol.mode === PATROL_MODE_PING_PONG), "street NPC route is not the previous vertical ping-pong line");
-assert(!isSimpleRectangle(streetRoute.points), "street NPC route is not a simple rectangle");
+const seedMerchant = NPCS.find((npc) => npc.id === "seed-merchant");
+assert(seedMerchant, "seed merchant exists");
+assert.equal(seedMerchant.patrol, undefined, "seed merchant is stationary");
 
 for (const npc of NPCS) {
   assert.equal(
@@ -562,7 +529,7 @@ for (const npc of NPCS) {
     false,
     `${npc.id} spawn uses world collision footprint`,
   );
-  for (const waypoint of npc.patrol.waypoints) {
+  for (const waypoint of npc.patrol?.waypoints ?? []) {
     assert.equal(
       moveWithCollision(waypoint, { x: 0, y: 0 }, layout, PLAYER_FOOT_WIDTH, PLAYER_FOOT_DEPTH).blockedAxes.x,
       false,

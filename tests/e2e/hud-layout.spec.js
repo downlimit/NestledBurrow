@@ -61,7 +61,9 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
           { id: "axe", kind: "tool", quantity: 1 },
           { id: "hoe", kind: "tool", quantity: 1 },
           { id: "watering-can", kind: "tool", quantity: 1 },
-          null, null, null, null, null, null, null,
+          { id: "potato-seed", kind: "loot", quantity: 4 },
+          { id: "potato", kind: "loot", quantity: 3 },
+          null, null, null, null, null,
         ],
       },
       energyFillHeight: 54,
@@ -77,6 +79,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
   const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
+  await bridge(page, "selectInventorySlot", 0);
   await expect.poll(async () => {
     await bridge(page, "placePlayerNear", debrisId);
     return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
@@ -86,8 +89,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 20, y: 108 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
-  expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: false, promptVisible: true });
-  await captureNativeCanvas(page, testInfo, "options-with-prompt");
+  expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: true, promptVisible: false });
+  await captureNativeCanvas(page, testInfo, "options-without-prompt");
 
   await activateLogical(page, 189, 54);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
@@ -111,6 +114,8 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   const sessionAfterCancel = await bridge(page, "getSession");
   const { worldTimeSeconds: _beforeTime, currentEnergy: _beforeEnergy, needs: _beforeNeeds, ...gameplayBeforeConfirmation } = sessionBeforeConfirmation.gameplay;
   const { worldTimeSeconds: _afterTime, currentEnergy: _afterEnergy, needs: _afterNeeds, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
+  delete gameplayBeforeConfirmation.farm.lastProcessedWorldTimeSeconds;
+  delete gameplayAfterCancel.farm.lastProcessedWorldTimeSeconds;
   expect({ ...sessionAfterCancel, gameplay: gameplayAfterCancel }).toEqual({ ...sessionBeforeConfirmation, gameplay: gameplayBeforeConfirmation });
 });
 

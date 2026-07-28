@@ -8,7 +8,7 @@ import { getKitchenFacilityPrompt } from "./cookingDomain.js";
 import { clearCurrentWorldScene, setCurrentWorldScene } from "./worldSceneRegistry.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
-export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null, isServingDishReserved = () => false }) {
+export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null, getInventoryState = () => null, isServingDishReserved = () => false }) {
   setCurrentWorldScene(scene);
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
   const visuals = new Map();
@@ -38,7 +38,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
     const image = scene.add.image(facility.visual.x + offset.x, facility.visual.y + offset.y, facility.visual.key)
       .setOrigin(0, 0)
-      .setDepth(assetDepthFromPivot(facility.visual, pivotOffset));
+      .setDepth(assetDepthFromPivot(facility.visual, pivotOffset, 500, facility.id));
     visuals.set(facility.id, image);
     return true;
   }
@@ -158,7 +158,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       servingTable.footprint.x + servingTable.footprint.width / 2 + offset.x,
       servingTable.footprint.y + 5 + offset.y,
       PLATED_DISH_ASSET.key,
-    ).setOrigin(0.5, 0.5).setDepth(assetDepthFromPivot(servingTable.visual, pivotOffset, 501)).setVisible(false);
+    ).setOrigin(0.5, 0.5).setDepth(assetDepthFromPivot(servingTable.visual, pivotOffset, 501, `${servingTable.id}:dish`)).setVisible(false);
   }
 
   function syncKitchenVisuals() {
@@ -168,7 +168,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       ?? (currentServingTable ? { x: currentServingTable.visual.width / 2, y: currentServingTable.visual.height } : { x: 0, y: 0 });
     if (currentServingTable) platedDishVisual
       ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2 + offset.x, currentServingTable.footprint.y + 5 + offset.y)
-      ?.setDepth?.(assetDepthFromPivot(currentServingTable.visual, pivotOffset, 501));
+      ?.setDepth?.(assetDepthFromPivot(currentServingTable.visual, pivotOffset, 501, `${currentServingTable.id}:dish`));
     platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish) && !isServingDishReserved());
   }
   syncKitchenVisuals();
@@ -179,7 +179,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       if (!activeFacilityId) {
         const kitchen = getKitchenState();
         return [...definitions.values()].map((facility) => {
-          const prompt = kitchen ? getKitchenFacilityPrompt(facility.facilityType, kitchen) : null;
+          const prompt = kitchen ? getKitchenFacilityPrompt(facility.facilityType, kitchen, getInventoryState()) : null;
           return prompt ? { ...facility, prompt } : facility;
         });
       }
@@ -262,7 +262,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       if (!facility?.presentationPose) return null;
       const profileKey = `facility:${facility.facilityType}`;
       const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
-      return { ...facility.presentationPose, depth: assetDepthFromPivot(facility.visual, pivotOffset, 501) };
+      return { ...facility.presentationPose, depth: assetDepthFromPivot(facility.visual, pivotOffset, 501, `${facility.id}:pose`) };
     },
     isUsing() {
       return activeFacilityId !== null;

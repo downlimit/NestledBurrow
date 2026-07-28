@@ -18,6 +18,7 @@ export function createCookingRuntime(scene, {
   randomSource = Math.random,
   onActiveChange = () => {},
   onPersistentMutation = () => {},
+  playEffect = () => {},
 } = {}) {
   let activeStep = null;
   let destroyed = false;
@@ -56,7 +57,7 @@ export function createCookingRuntime(scene, {
 
   function start(stepType) {
     if (destroyed || activeStep) return { status: "busy", mutated: false };
-    const result = startCookingStep(sessionState.gameplay.kitchen, stepType, randomSource);
+    const result = startCookingStep(sessionState.gameplay.kitchen, stepType, sessionState.gameplay.inventory, randomSource);
     if (!result.activeStep) return { ...result, mutated: false };
     activeStep = result.activeStep;
     onActiveChange(true);
@@ -77,6 +78,7 @@ export function createCookingRuntime(scene, {
   function attempt() {
     if (!activeStep || destroyed || inputSuppressed) return { status: "inactive", mutated: false };
     const result = attemptCookingStep(activeStep, randomSource);
+    playEffect(result.status === "miss" ? "cooking-miss" : "cooking-success");
     activeStep = result.activeStep;
     if (result.status === "completed") {
       finish();
@@ -89,7 +91,7 @@ export function createCookingRuntime(scene, {
   function finish() {
     if (!activeStep) return { status: "inactive", mutated: false };
     const completedStep = activeStep;
-    const result = completeCookingStep(sessionState.gameplay.kitchen, completedStep.stepType);
+    const result = completeCookingStep(sessionState.gameplay.kitchen, completedStep.stepType, sessionState.gameplay.inventory);
     activeStep = null;
     onActiveChange(false);
     render();
@@ -108,6 +110,16 @@ export function createCookingRuntime(scene, {
     activeStep = {
       ...activeStep,
       markerPosition: activeStep.targetPosition + activeStep.targetWidth / 2,
+    };
+    render();
+    return { ...activeStep };
+  }
+
+  function missMarkerForTest() {
+    if (!activeStep) return null;
+    activeStep = {
+      ...activeStep,
+      markerPosition: activeStep.targetPosition > 0.5 ? 0 : 1,
     };
     render();
     return { ...activeStep };
@@ -183,6 +195,7 @@ export function createCookingRuntime(scene, {
     attempt,
     completeForTest,
     alignMarkerForTest,
+    missMarkerForTest,
     isActive() { return Boolean(activeStep) && !destroyed; },
     getState() { return activeStep ? { ...activeStep } : null; },
     setInputSuppressed(value) {

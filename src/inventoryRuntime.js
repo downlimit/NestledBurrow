@@ -9,6 +9,8 @@ import {
 } from "./inventoryDomain.js";
 import { drawInventoryItem } from "./inventoryVisuals.js";
 import { HUD_COLORS, HUD_DEPTH, drawBitmapTextInto, isPointInRect, measureBitmapText } from "./hud.js";
+import { FARMING_FRAMES, FARMING_TEXTURE_KEY } from "./farmingConfig.js";
+import { worldDepthFromAnchorY } from "./buildWorldGeometry.js";
 
 export const INVENTORY_SLOT_SIZE = 22;
 export const INVENTORY_SLOT_GAP = 2;
@@ -33,6 +35,7 @@ const DROP_THROW_DURATION_MS = 320;
 const DROP_SLIDE_SPEED = 36;
 const DROP_PICKUP_RADIUS = 12;
 const DROP_SEARCH_LIMIT = 96;
+const TINT_MODE_FILL = 1;
 
 export function inventoryIndexFromKeyboardEvent(event) {
   if (!event || event.repeat || isEditableTarget(event.target)) return null;
@@ -41,6 +44,23 @@ export function inventoryIndexFromKeyboardEvent(event) {
   if (!match) return null;
   const digit = Number(match[1]);
   return digit === 0 ? 9 : digit - 1;
+}
+
+export function inventoryCycleDirectionFromKeyboardEvent(event) {
+  if (!event || event.repeat || isEditableTarget(event.target)) return 0;
+  if (event.code === "KeyE") return 1;
+  if (event.code === "KeyQ") return -1;
+  return 0;
+}
+
+export function inventoryCycleIndex(slots, baseIndex, direction) {
+  const step = direction < 0 ? -1 : 1;
+  const base = Number.isInteger(baseIndex) ? baseIndex : step > 0 ? -1 : 0;
+  for (let offset = 1; offset <= INVENTORY_SLOT_COUNT; offset += 1) {
+    const index = (base + step * offset + INVENTORY_SLOT_COUNT) % INVENTORY_SLOT_COUNT;
+    if (slots?.[index]) return index;
+  }
+  return null;
 }
 
 export function inventorySlotIndexAt(x, y) {
@@ -52,19 +72,27 @@ export function createInventoryRuntime(scene, options = {}) {
     getGameplayState = () => null,
     getPlayerCharacter = () => scene.playerCharacter ?? null,
     isSuppressed = () => false,
+    onWorldItemCollision = () => {},
     onPersistentMutation = () => {},
+    playEffect = () => {},
   } = options;
 
   const hudGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 4).setScrollFactor(0);
   const slotItemGraphics = INVENTORY_SLOT_AREAS.map(() => scene.add.graphics().setDepth(HUD_DEPTH + 5).setScrollFactor(0));
+  const slotItemImages = INVENTORY_SLOT_AREAS.map(() => scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0)
+    .setOrigin(0).setDepth(HUD_DEPTH + 5).setScrollFactor(0).setVisible(false));
   const dragGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 7).setScrollFactor(0).setVisible(false);
+  const dragImage = scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0).setOrigin(0).setDepth(HUD_DEPTH + 7).setScrollFactor(0).setVisible(false);
   const heldGraphics = scene.add.graphics().setDepth(900).setVisible(false);
+  const heldImage = scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0).setOrigin(0).setDepth(900).setVisible(false);
+  const waterBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 6).setScrollFactor(0).setVisible(false);
   const slotZones = INVENTORY_SLOT_AREAS.map((rect, index) => createSlotZone(scene, rect, index));
   const worldVisuals = new Map();
   const motions = new Map();
 
   let destroyed = false;
   let selectedIndex = null;
+  let lastSelectedIndex = null;
   let selectedAtMs = 0;
   let dragCandidate = null;
   let dragging = false;
@@ -101,7 +129,7 @@ export function createInventoryRuntime(scene, options = {}) {
       if (!active()) return;
       const current = inventory()?.slots?.[index] ?? null;
       if (!current) {
-        selectedIndex = null;
+        setSelection(null);
         selectedAtMs = scene.time.now;
         render();
         return;
@@ -129,6 +157,7 @@ export function createInventoryRuntime(scene, options = {}) {
     dragCandidate = null;
     dragging = false;
     dragGraphics.clear().setVisible(false);
+    dragImage.setVisible(false);
     if (!active()) return;
     if (!wasDragging) {
       toggleSelection(fromIndex);
@@ -140,6 +169,7 @@ export function createInventoryRuntime(scene, options = {}) {
       if (result.mutated) {
         if (selectedIndex === fromIndex) selectedIndex = targetIndex;
         else if (selectedIndex === targetIndex) selectedIndex = fromIndex;
+        if (selectedIndex !== null) lastSelectedIndex = selectedIndex;
         onPersistentMutation(result);
       }
       render();
@@ -152,21 +182,42 @@ export function createInventoryRuntime(scene, options = {}) {
     dragCandidate = null;
     dragging = false;
     dragGraphics.clear().setVisible(false);
+    dragImage.setVisible(false);
   }
 
   function handleKeyDown(event) {
     const index = inventoryIndexFromKeyboardEvent(event);
-    if (index === null || !active()) return;
+    const direction = inventoryCycleDirectionFromKeyboardEvent(event);
+    if ((index === null && direction === 0) || !active()) return;
     event.preventDefault?.();
     event.stopPropagation?.();
-    toggleSelection(index);
+    if (index !== null) {
+      toggleSelection(index);
+      return;
+    }
+    const next = inventoryCycleIndex(inventory()?.slots, selectedIndex ?? lastSelectedIndex, direction);
+    if (next === null) return;
+    setSelection(next);
+    lastSelectedIndex = next;
+    selectedAtMs = scene.time.now;
+    render();
   }
 
   function toggleSelection(index) {
     const item = inventory()?.slots?.[index] ?? null;
-    selectedIndex = item && selectedIndex !== index ? index : null;
+    if (item) lastSelectedIndex = index;
+    setSelection(item && selectedIndex !== index ? index : null);
     selectedAtMs = scene.time.now;
     render();
+  }
+
+  function setSelection(nextIndex) {
+    const previous = selectedIndex;
+    selectedIndex = nextIndex;
+    if (previous === selectedIndex) return;
+    if (previous === null) playEffect("inventory-activate");
+    else if (selectedIndex === null) playEffect("inventory-deactivate");
+    else playEffect("inventory-change");
   }
 
   function dropSlot(slotIndex) {
@@ -198,7 +249,8 @@ export function createInventoryRuntime(scene, options = {}) {
       arcHeight: 0,
       bounces: 0,
     });
-    if (selectedIndex === slotIndex) selectedIndex = null;
+    if (selectedIndex === slotIndex) setSelection(null);
+    playEffect("drop");
     render();
     syncWorldVisuals();
     onPersistentMutation({ status: "dropped", mutated: true, slotIndex, worldItem });
@@ -211,9 +263,13 @@ export function createInventoryRuntime(scene, options = {}) {
     hudGraphics.clear().setVisible(visible);
     slotZones.forEach((zone) => visible ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive());
     slotItemGraphics.forEach((graphics) => graphics.clear().setVisible(visible));
+    slotItemImages.forEach((image) => image.setVisible(false));
+    waterBarGraphics.clear().setVisible(false);
     if (!visible) {
       dragGraphics.clear().setVisible(false);
+      dragImage.setVisible(false);
       heldGraphics.clear().setVisible(false);
+      heldImage.setVisible(false);
       return;
     }
     const slots = inventory()?.slots ?? [];
@@ -229,21 +285,28 @@ export function createInventoryRuntime(scene, options = {}) {
       const item = slots[index];
       if (!item) return;
       const graphics = slotItemGraphics[index];
-      drawInventoryItem(graphics, item.id);
-      graphics.setPosition(rect.x + 3, rect.y + 3).setScale(1).setAlpha(dragCandidate?.index === index && dragging ? 0.25 : 1);
+      const image = slotItemImages[index];
+      renderItem(graphics, image, item.id, rect.x + 3, rect.y + 3);
+      const alpha = dragCandidate?.index === index && dragging ? 0.25 : 1;
+      graphics.setScale(1).setAlpha(alpha);
+      image.setAlpha(alpha);
       if (item.kind === "loot" && item.quantity > 1) {
         const text = String(item.quantity);
         drawBitmapTextInto(hudGraphics, rect.x + rect.width - measureBitmapText(text) - 2, rect.y + 13, text, { shadow: 0 });
       }
     });
+    const selected = selectedIndex === null ? null : slots[selectedIndex];
+    if (selected?.id === "watering-can") renderWaterBar();
   }
 
   function renderDrag(x, y) {
     const item = inventory()?.slots?.[dragCandidate?.index] ?? null;
     dragGraphics.clear();
+    dragImage.setVisible(false);
     if (!item) return dragGraphics.setVisible(false);
-    drawInventoryItem(dragGraphics, item.id);
-    dragGraphics.setPosition(Math.round(x - 8), Math.round(y - 8)).setVisible(true).setAlpha(0.9);
+    renderItem(dragGraphics, dragImage, item.id, Math.round(x - 8), Math.round(y - 8));
+    dragGraphics.setAlpha(0.9);
+    dragImage.setAlpha(0.9);
   }
 
   function update(time, deltaMs) {
@@ -256,6 +319,7 @@ export function createInventoryRuntime(scene, options = {}) {
 
   function updateHeldItem(nowMs) {
     heldGraphics.clear().setVisible(false);
+    heldImage.setVisible(false);
     if (!active() || selectedIndex === null) return;
     const item = inventory()?.slots?.[selectedIndex] ?? null;
     const character = getPlayerCharacter?.();
@@ -267,34 +331,33 @@ export function createInventoryRuntime(scene, options = {}) {
       if (elapsed >= TOOL_VISIBLE_MS + TOOL_FADE_MS) return;
       if (elapsed > TOOL_VISIBLE_MS) alpha = 1 - (elapsed - TOOL_VISIBLE_MS) / TOOL_FADE_MS;
     }
-    drawInventoryItem(heldGraphics, item.id);
-    heldGraphics
-      .setPosition(Math.round(sprite.x - 8), Math.round(sprite.y - 35))
-      .setDepth(700 + Math.round(sprite.y))
-      .setAlpha(alpha)
-      .setVisible(true);
+    const x = Math.round(sprite.x - 8);
+    const y = Math.round(sprite.y - 35);
+    renderItem(heldGraphics, heldImage, item.id, x, y);
+    const depth = worldDepthFromAnchorY(sprite.y, `held-${item.id}`, 700);
+    heldGraphics.setDepth(depth).setAlpha(alpha);
+    heldImage.setDepth(depth).setAlpha(alpha);
   }
 
   function syncWorldVisuals() {
     const existing = new Set();
     for (const worldItem of worldItems()) {
       existing.add(worldItem.id);
-      let graphics = worldVisuals.get(worldItem.id);
-      if (!graphics) {
-        graphics = scene.add.graphics();
-        drawInventoryItem(graphics, worldItem.item.id);
-        worldVisuals.set(worldItem.id, graphics);
+      let visual = worldVisuals.get(worldItem.id);
+      if (!visual) {
+        visual = createDroppedItemVisual(scene, worldItem.item.id);
+        worldVisuals.set(worldItem.id, visual);
       }
       const motion = motions.get(worldItem.id);
       const arcHeight = motion?.arcHeight ?? 0;
-      graphics
+      visual
         .setPosition(Math.round(worldItem.x - 8), Math.round(worldItem.y - 8 - arcHeight))
-        .setDepth(500 + Math.round(worldItem.y))
+        .setDepth(worldDepthFromAnchorY(worldItem.y, worldItem.id))
         .setVisible(true);
     }
-    for (const [id, graphics] of worldVisuals) {
+    for (const [id, visual] of worldVisuals) {
       if (existing.has(id)) continue;
-      graphics.destroy();
+      visual.destroy();
       worldVisuals.delete(id);
       motions.delete(id);
     }
@@ -312,6 +375,7 @@ export function createInventoryRuntime(scene, options = {}) {
         const t = Math.min(1, motion.elapsedMs / DROP_THROW_DURATION_MS);
         worldItem.x = lerp(motion.startX, motion.targetX, t);
         worldItem.y = lerp(motion.startY, motion.targetY, t);
+        notifyWorldItemCollision(worldItem);
         motion.arcHeight = Math.sin(Math.PI * t) * 12;
         if (t < 1) continue;
         motion.arcHeight = 0;
@@ -337,6 +401,7 @@ export function createInventoryRuntime(scene, options = {}) {
       if (motion.directionX === 0 && motion.directionY === 0) motion.directionX = 1;
       worldItem.x = nextX;
       worldItem.y = nextY;
+      notifyWorldItemCollision(worldItem);
       if (isDropPointFree(worldItem, nextX, nextY)) {
         finishMotion(worldItem, motion);
         continue;
@@ -373,9 +438,63 @@ export function createInventoryRuntime(scene, options = {}) {
       if (index >= 0) worldItems().splice(index, 1);
       worldVisuals.get(worldItem.id)?.destroy();
       worldVisuals.delete(worldItem.id);
+      playEffect("pickup");
       render();
       onPersistentMutation({ status: "picked-up", mutated: true, worldItem, inventory: result });
     }
+  }
+
+  function notifyWorldItemCollision(worldItem) {
+    if (worldItem.item?.id === "wood" || worldItem.item?.id === "stone") {
+      onWorldItemCollision(worldItem, dropBox(worldItem.x, worldItem.y));
+    }
+  }
+
+  function spawnWorldItems(itemId, quantity, origin) {
+    const count = Math.max(0, Math.floor(Number(quantity) || 0));
+    if (!count) return { status: "empty", mutated: false, worldItems: [] };
+    const spawned = [];
+    for (let index = 0; index < count; index += 1) {
+      const angle = -Math.PI / 2 + index * (Math.PI * 2 / count);
+      const id = createWorldItemId(worldItems());
+      const worldItem = {
+        id,
+        item: { id: itemId, kind: "loot", quantity: 1 },
+        x: Number(origin.x),
+        y: Number(origin.y),
+      };
+      worldItems().push(worldItem);
+      motions.set(id, {
+        phase: "arc",
+        elapsedMs: 0,
+        settleElapsedMs: 0,
+        startX: worldItem.x,
+        startY: worldItem.y,
+        targetX: worldItem.x + Math.cos(angle) * DROP_THROW_DISTANCE,
+        targetY: worldItem.y + Math.sin(angle) * DROP_THROW_DISTANCE,
+        directionX: Math.cos(angle),
+        directionY: Math.sin(angle),
+        arcHeight: 0,
+        bounces: 0,
+      });
+      spawned.push(worldItem);
+    }
+    syncWorldVisuals();
+    onPersistentMutation({ status: "world-items-spawned", mutated: true, worldItems: spawned });
+    return { status: "spawned", mutated: true, worldItems: spawned };
+  }
+
+  function renderWaterBar() {
+    const can = gameplay()?.farm?.wateringCan;
+    if (!can) return;
+    const width = 42;
+    const x = Math.round(INVENTORY_HUD_AREA.x + (INVENTORY_HUD_AREA.width - width) / 2);
+    const y = INVENTORY_HUD_AREA.y - 7;
+    const ratio = Math.min(1, Math.max(0, Number(can.currentWater) / Number(can.capacity) || 0));
+    waterBarGraphics.setVisible(true)
+      .fillStyle(HUD_COLORS.panel, 0.92).fillRect(x, y, width, 5)
+      .lineStyle(1, HUD_COLORS.border, 1).strokeRect(x + 0.5, y + 0.5, width - 1, 4)
+      .fillStyle(0x55b6d3, 1).fillRect(x + 1, y + 1, Math.round((width - 2) * ratio), 3);
   }
 
   function isDropPointFree(worldItem, x, y) {
@@ -417,9 +536,21 @@ export function createInventoryRuntime(scene, options = {}) {
     render,
     update,
     dropSlot,
+    selectSlot(index) {
+      const next = Number(index);
+      if (!Number.isInteger(next) || next < 0 || next >= INVENTORY_SLOT_COUNT) return false;
+      setSelection(inventory()?.slots?.[next] ? next : null);
+      if (selectedIndex !== null) lastSelectedIndex = selectedIndex;
+      selectedAtMs = scene.time.now;
+      render();
+      return selectedIndex === next;
+    },
     getSelectedIndex: () => selectedIndex,
+    getSelectedItem: () => cloneInventoryItem(selectedIndex === null ? null : inventory()?.slots?.[selectedIndex]),
+    spawnWorldItems,
     getState: () => ({
       selectedIndex,
+      lastSelectedIndex,
       dragging,
       slots: (inventory()?.slots ?? []).map((item) => cloneInventoryItem(item)),
       worldItems: worldItems().map((item) => ({ ...item, item: cloneInventoryItem(item.item) })),
@@ -437,14 +568,51 @@ export function createInventoryRuntime(scene, options = {}) {
       scene.events.off("update", update);
       slotZones.forEach((zone) => zone.destroy());
       slotItemGraphics.forEach((graphics) => graphics.destroy());
-      for (const graphics of worldVisuals.values()) graphics.destroy();
+      slotItemImages.forEach((image) => image.destroy());
+      for (const visual of worldVisuals.values()) visual.destroy();
       worldVisuals.clear();
       motions.clear();
       hudGraphics.destroy();
       dragGraphics.destroy();
+      dragImage.destroy();
       heldGraphics.destroy();
+      heldImage.destroy();
+      waterBarGraphics.destroy();
     },
   };
+}
+
+function farmingItemFrame(itemId) {
+  if (itemId === "potato-seed") return FARMING_FRAMES.potatoSeeds;
+  if (itemId === "potato") return FARMING_FRAMES.potato;
+  return null;
+}
+
+function createDroppedItemVisual(scene, itemId) {
+  const frame = farmingItemFrame(itemId);
+  const outline = [
+    [0, -1], [-1, 0], [1, 0], [0, 1],
+  ].map(([x, y]) => {
+    const visual = frame === null
+      ? scene.add.graphics()
+      : scene.add.image(x, y, FARMING_TEXTURE_KEY, frame).setOrigin(0);
+    if (frame === null) drawInventoryItem(visual, itemId, { colorOverride: 0xffffff });
+    else visual.setTint(0xffffff).setTintMode(TINT_MODE_FILL);
+    return visual.setPosition(x, y).setAlpha(0.28);
+  });
+  const item = frame === null
+    ? scene.add.graphics()
+    : scene.add.image(0, 0, FARMING_TEXTURE_KEY, frame).setOrigin(0);
+  if (frame === null) drawInventoryItem(item, itemId);
+  return scene.add.container(0, 0, [...outline, item]);
+}
+
+function renderItem(graphics, image, itemId, x, y) {
+  const frame = farmingItemFrame(itemId);
+  graphics.clear().setPosition(x, y).setVisible(frame === null);
+  image.setPosition(x, y).setVisible(frame !== null);
+  if (frame !== null) image.setFrame(frame);
+  else drawInventoryItem(graphics, itemId);
 }
 
 function facingVector(facing) {

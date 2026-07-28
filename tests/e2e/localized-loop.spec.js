@@ -27,13 +27,6 @@ async function placeNear(page, entityId) {
   }).toBe(entityId);
 }
 
-async function completeDialogue(page, entityId) {
-  await placeNear(page, entityId);
-  await pressInteract(page);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.dialogueActive ?? false).toBe(true);
-  while ((await bridge(page, "getInteractionState"))?.dialogueActive) await pressInteract(page);
-}
-
 async function clickLogical(page, x, y) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
@@ -61,26 +54,28 @@ test("default Russian locale and saved preference survive reload", async ({ page
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
 });
 
-test("localized quest progress persists and New Game keeps language", async ({ page }) => {
+test("localized seed purchase persists and New Game keeps language", async ({ page }) => {
   await boot(page);
-  await completeDialogue(page, "home-npc");
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: { "neighborQuest.started": true } });
-  await completeDialogue(page, "street-npc");
-  await completeDialogue(page, "home-npc");
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: {
-    "neighborQuest.started": true,
-    "neighborQuest.streetAnswered": true,
-    "neighborQuest.completed": true,
-  } });
+  await placeNear(page, "seed-merchant");
+  await pressInteract(page);
+  await expect.poll(() => bridge(page, "getMerchantState")).toMatchObject({ active: true });
+  await clickLogical(page, 45, 19);
+  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true });
+  await expect.poll(() => bridge(page, "getMerchantState")).toMatchObject({ active: true, visible: false });
+  await clickLogical(page, 45, 19);
+  await expect.poll(() => bridge(page, "getMerchantState")).toMatchObject({ active: true, visible: true });
+  const buyButton = (await bridge(page, "getMerchantState")).buyButton;
+  await clickLogical(page, buyButton.x + buyButton.width / 2, buyButton.y + buyButton.height / 2);
+  await expect.poll(async () => inventoryQuantity((await bridge(page, "getSession")).gameplay, "potato-seed")).toBe(5);
   await page.reload();
   await boot(page);
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: { "neighborQuest.completed": true } });
+  await expect.poll(async () => inventoryQuantity((await bridge(page, "getSession")).gameplay, "potato-seed")).toBe(5);
   await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
   await bridge(page, "setLanguage", "ru");
   await openNewGameConfirmation(page);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ newGameConfirming: true });
   await clickLogical(page, 92, 95);
-  await expect.poll(() => bridge(page, "getSession")).toMatchObject({ flags: {} });
+  await expect.poll(async () => inventoryQuantity((await bridge(page, "getSession")).gameplay, "potato-seed")).toBe(4);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
 });
@@ -118,18 +113,23 @@ test("desktop keyboard selects and preserves diagonal runtime facing", async ({ 
   expect(pageErrors).toEqual([]);
 });
 
-test("mobile touch starts a Russian dialogue without joystick capture", async ({ page }, testInfo) => {
+test("mobile touch opens the Russian seed shop without joystick capture", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile"), "mobile project only");
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await boot(page);
   await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
   await bridge(page, "setLanguage", "ru");
-  await placeNear(page, "home-npc");
+  await placeNear(page, "seed-merchant");
+  const prompt = await bridge(page, "getInteractionHudState");
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
-  await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.dialogueActive ?? false).toBe(true);
+  await page.touchscreen.tap(
+    box.x + (prompt.promptRect.x + prompt.promptRect.width / 2) * box.width / 320,
+    box.y + (prompt.promptRect.y + prompt.promptRect.height / 2) * box.height / 180,
+  );
+  await expect.poll(() => bridge(page, "getMerchantState")).toMatchObject({ active: true, visible: true });
+  await expect.poll(async () => (await bridge(page, "getMerchantState")).labels.title).toMatch(/[А-ЯЁ]/);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
   expect(pageErrors).toEqual([]);
 });
@@ -139,7 +139,20 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await boot(page);
   await bridge(page, "setLanguage", "en");
   await page.evaluate(() => localStorage.setItem("nestledburrow.audio.v1", JSON.stringify({ schemaVersion: 1, settings: { master: 0.2, music: 0.3, effects: 0.4 } })));
+  await bridge(page, "selectInventorySlot", 0);
   await placeNear(page, "fallen-log-01");
+  await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(true);
+  await page.locator("canvas").screenshot({ path: "artifacts/task-047/resource-target-outline.png" });
+  await bridge(page, "selectInventorySlot", 1);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ kind: "farm-till" });
+  await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(false);
+  await bridge(page, "interact");
+  expect((await bridge(page, "getSession")).gameplay.resourceNodes["fallen-log-01"].progress).toBe(0);
+  await bridge(page, "selectInventorySlot", 0);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ kind: "farm-axe-cell" });
+  await bridge(page, "interact");
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(0);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("fallen-log-01");
   for (let hitCount = 1; hitCount <= 7; hitCount += 1) {
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
     await pressInteract(page);
@@ -185,12 +198,17 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
 test("mobile touch clears a resource through prompt hit area", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile"), "mobile debris touch flow only");
   await boot(page);
+  await bridge(page, "selectInventorySlot", 0);
   await placeNear(page, "fallen-log-01");
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
   for (let hitCount = 1; hitCount <= 7; hitCount += 1) {
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
-    await page.touchscreen.tap(box.x + 280 * box.width / 320, box.y + 158 * box.height / 180);
+    const prompt = await bridge(page, "getInteractionHudState");
+    await page.touchscreen.tap(
+      box.x + (prompt.promptRect.x + prompt.promptRect.width / 2) * box.width / 320,
+      box.y + (prompt.promptRect.y + prompt.promptRect.height / 2) * box.height / 180,
+    );
     await expect.poll(async () => (await bridge(page, "getSession"))?.gameplay?.resourceNodes?.["fallen-log-01"]?.progress).toBeCloseTo(hitCount / 7, 6);
     await bridge(page, "expireHitCooldown");
   }

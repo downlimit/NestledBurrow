@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { AUDIO_STORAGE_KEY, DEFAULT_AUDIO_SETTINGS, clampVolume, createAudioSettingsStore, deserializeAudioSettings, getEffectiveEffectsVolume, getEffectiveMusicVolume } from "../src/audioSettings.js";
 import { MUSIC_CROSSFADE_SECONDS, MUSIC_FADE_OUT_SECONDS, MUSIC_PLAYLIST, PROCEDURAL_SFX, PhaserAudioRuntime, choosePlaylistTrack, getFadeEnvelope, getMusicUrl } from "../src/audioRuntime.js";
+import { getResourceProfile, resourceEffectType } from "../src/resourceDomain.js";
 
 function memory() { const data = new Map(); return { data, getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) }; }
 function hash(path) { return createHash("sha256").update(readFileSync(path)).digest("hex"); }
@@ -14,6 +15,20 @@ assert.equal(clampVolume(-1), 0); assert.equal(clampVolume(2), 1);
 assert.equal(getEffectiveMusicVolume({ master: 0.4, music: 0.25, effects: 1 }), 0.1);
 assert.equal(getEffectiveEffectsVolume({ master: 0.4, music: 0.25, effects: 0.5 }), 0.2);
 assert.notDeepEqual(PROCEDURAL_SFX.chop, PROCEDURAL_SFX.mine);
+const task047Effects = [
+  "wood-hit", "stone-hit", "ruby-hit", "wood-break", "stone-break", "ruby-break",
+  "plant-destroy", "pickup", "drop", "crop-stage", "inventory-activate",
+  "inventory-change", "inventory-deactivate", "time-speed-up", "time-speed-normal",
+  "harvest", "water", "well-refill", "build-place", "build-remove", "menu-open",
+  "menu-close", "cooking-success", "cooking-miss", "dish-serve", "dish-take",
+  "sprint-on", "sprint-off", "tavern-open", "tavern-close", "guest-happy",
+  "guest-angry", "coin-toss", "purchase",
+];
+assert(task047Effects.every((id) => PROCEDURAL_SFX[id]?.voices?.length > 0), "every requested gameplay event has a procedural effect");
+assert(PROCEDURAL_SFX["crop-stage"].voices.every((voice) => voice.gain <= 0.016), "crop growth stays deliberately quiet");
+assert.equal(resourceEffectType(getResourceProfile("log-small"), "hit"), "wood-hit");
+assert.equal(resourceEffectType(getResourceProfile("stone-small"), "cleared"), "stone-break");
+assert.equal(resourceEffectType(getResourceProfile("ruby-node"), "hit"), "ruby-hit");
 
 const expectedAssets = [
   ["public/assets/audio/music/NestledBurrow_SunlitSavePoint.mp3", "76767a4fc6e5a7386118b044b5a99e02f24b0a07", 3977087, "502dfd51bcfa7908becd39f604a6c73d868d9742fd3d1207c985cb9482627a91"],
@@ -59,7 +74,40 @@ const outgoing = runtime.activeMusic.find((instance) => instance !== incoming); 
 assert.equal(runtime.activeMusic.length, 1); assert.equal(outgoing.sound.destroyed, true);
 assert.equal(runtime.playEffect("chop"), false, "procedural SFX safely no-ops without a Web Audio context");
 runtime.destroy(); runtime.destroy(); assert.equal(updateHandlers.size, 0); assert.equal(runtime.activeMusic.length, 0);
+
+const scheduled = [];
+const audioParam = () => ({ setValueAtTime(value, time) { scheduled.push(["set", value, time]); }, linearRampToValueAtTime(value, time) { scheduled.push(["ramp", value, time]); } });
+const audioNode = () => ({ connect() {}, start(time) { scheduled.push(["start", time]); }, stop(time) { scheduled.push(["stop", time]); } });
+const effectContext = {
+  state: "running",
+  currentTime: 2,
+  sampleRate: 8000,
+  destination: {},
+  createGain() { return { ...audioNode(), gain: audioParam() }; },
+  createOscillator() { return { ...audioNode(), frequency: audioParam(), type: null }; },
+  createBuffer(_channels, length) { const data = new Float32Array(length); return { getChannelData: () => data }; },
+  createBufferSource() { return { ...audioNode(), buffer: null }; },
+  createBiquadFilter() { return { ...audioNode(), frequency: audioParam(), type: null }; },
+};
+const effectScene = {
+  input: { once() {}, off() {}, keyboard: { once() {}, off() {} } },
+  events: { on() {}, off() {} },
+  sound: { context: effectContext },
+};
+const effectRuntime = new PhaserAudioRuntime(effectScene, createAudioSettingsStore({ storage: memory() }));
+assert.equal(effectRuntime.playEffect("well-refill"), true, "well refill schedules oscillator and water-noise voices");
+assert.equal(effectRuntime.lastEffectType, "well-refill");
+assert.equal(effectRuntime.effectPlayCount, 1);
+assert(scheduled.filter(([event]) => event === "start").length >= 3, "layered effects schedule all requested voices");
+effectRuntime.destroy();
 const audioRuntimeSource = readFileSync("src/audioRuntime.js", "utf8");
 assert(!audioRuntimeSource.includes("visibilitychange")); assert(!audioRuntimeSource.includes("blur"));
+const eventWiringSource = [
+  "src/main.js", "src/inventoryRuntime.js", "src/farmingRuntime.js",
+  "src/cookingRuntime.js", "src/merchantRuntime.js",
+].map((path) => readFileSync(path, "utf8")).join("\n");
+for (const effectId of task047Effects.filter((id) => !id.startsWith("wood-") && !id.startsWith("stone-") && !id.startsWith("ruby-"))) {
+  assert(eventWiringSource.includes(`"${effectId}"`), `${effectId} is wired to a gameplay event`);
+}
 assert(readFileSync("src/main.js", "utf8").includes("disableVisibilityChange: true"));
 console.log("audio checks passed: playlist, asset integrity, crossfade and lifecycle");
