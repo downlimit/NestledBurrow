@@ -19,7 +19,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const fresh = createFreshGameSessionState();
 assert.deepEqual(fresh.gameplay.kitchen, DEFAULT_KITCHEN_STATE, "fresh game starts with the canonical kitchen stock");
 assert.equal(fresh.version, SESSION_STATE_VERSION);
-assert.equal(SAVE_SCHEMA_VERSION, 6);
+assert.equal(SAVE_SCHEMA_VERSION, 7);
 
 const legacyState = clone(fresh);
 legacyState.version = 3;
