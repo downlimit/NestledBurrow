@@ -418,7 +418,12 @@ export function createInventoryRuntime(scene, options = {}) {
     update,
     dropSlot,
     getSelectedIndex: () => selectedIndex,
-    getState: () => ({ selectedIndex, dragging, worldItems: worldItems().map((item) => ({ ...item, item: cloneInventoryItem(item.item) })) }),
+    getState: () => ({
+      selectedIndex,
+      dragging,
+      slots: (inventory()?.slots ?? []).map((item) => cloneInventoryItem(item)),
+      worldItems: worldItems().map((item) => ({ ...item, item: cloneInventoryItem(item.item) })),
+    }),
     isPointInHud(x, y) {
       return active() && isPointInRect(x, y, INVENTORY_HUD_AREA);
     },
