@@ -475,8 +475,12 @@ export function createGameHud(scene, options) {
     setGameplayOverlayActive(value) { gameplayOverlayActive = Boolean(value); render(); },
     triggerEnergyShake,
     getResourceState() {
+      const gameplay = getGameplayState?.();
       return {
         clockText: clockText.text,
+        woodText: String(gameplay?.wood ?? 0),
+        stoneText: String(gameplay?.stone ?? 0),
+        rubyText: String(gameplay?.rubies ?? 0),
         inventory: inventoryHud.getState(),
         kitchenTexts: kitchenTexts.map((text) => text.text),
         icons: { wood: false, stone: false, ruby: false },
