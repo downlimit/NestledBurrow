@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "nativePixelGrid": 16,
+  "filtering": "nearest-neighbor",
+  "provenance": {
+    "type": "project-authored",
+    "authoringRoute": "Lead deterministic pixel-grid drawing",
+    "date": "2026-07-28",
+    "generativeImageModel": false,
+    "derivation": "Original project pixels authored directly on a 16x16 RGBA grid; no resampling, recoloring, or third-party source pixels."
+  },
+  "assets": [
+    {
+      "id": "farming",
+      "path": "public/assets/project/farming/NestledBurrow_Farming.png",
+      "width": 144,
+      "height": 16,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 9,
+      "rows": 1,
+      "frames": [
+        { "index": 0, "id": "potato-seeds", "role": "inventory-and-world-item" },
+        { "index": 1, "id": "potato", "role": "inventory-and-world-item" },
+        { "index": 2, "id": "soil-dry", "role": "soil-base" },
+        { "index": 3, "id": "soil-wet", "role": "soil-base" },
+        { "index": 4, "id": "crop-planted", "role": "crop-overlay" },
+        { "index": 5, "id": "crop-sprout", "role": "crop-overlay" },
+        { "index": 6, "id": "crop-young", "role": "crop-overlay" },
+        { "index": 7, "id": "crop-mature", "role": "crop-overlay" },
+        { "index": 8, "id": "crop-rotten", "role": "crop-overlay" }
+      ],
+      "sha256": "3f241cfa1c05aa23d71b021a62fa4a25d7b552193b05268c0f762aa7f57ab2db",
+      "byteLength": 1040
+    },
+    {
+      "id": "well",
+      "path": "public/assets/project/farming/NestledBurrow_Well.png",
+      "width": 16,
+      "height": 16,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 1,
+      "rows": 1,
+      "frames": [{ "index": 0, "id": "well", "role": "buildable-world-asset" }],
+      "depthAnchorOffset": { "x": 8, "y": 14 },
+      "collisionRect": { "left": 2, "top": 8, "right": 14, "bottom": 14 },
+      "sha256": "38663d4ce106c0e7b4ec6dfeaacaeaf7542a60827475a61ae4704afc621e5226",
+      "byteLength": 365
+    }
+  ]
+}
