@@ -11,7 +11,7 @@ import {
 } from "./hud.js";
 import { GAME_WIDTH } from "./worldConfig.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
-import { drawLog, drawRuby, drawStone } from "./resourceVisuals.js";
+import { createInventoryRuntime, INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "./inventoryRuntime.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -25,7 +25,7 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
   effects: Object.freeze({ x: 68, y: 78, width: 66, height: 14 }),
 });
 export const OPTIONS_BUILD_LABEL = Object.freeze({ x: 14, y: 102 });
-export const RESOURCE_HUD_AREA = Object.freeze({ x: 210, y: 38, width: 40, height: 68 });
+export const RESOURCE_HUD_AREA = INVENTORY_HUD_AREA;
 export const NEEDS_HUD_AREA = Object.freeze({ x: 252, y: 38, width: 60, height: 68 });
 export const KITCHEN_HUD_AREA = Object.freeze({ x: 210, y: 108, width: 102, height: 30 });
 export const ENERGY_HUD_AREA = NEEDS_HUD_AREA;
@@ -38,14 +38,6 @@ export const NEED_ROW_AREAS = Object.freeze(NEED_ROW_IDS.map((_id, index) => Obj
   height: 10,
 })));
 export const NEED_TOOLTIP_AREA = Object.freeze({ x: 32, y: 42, width: 174, height: 54 });
-export const RESOURCE_HUD_LAYOUT = Object.freeze({
-  woodIcon: Object.freeze({ x: 216, y: 52 }),
-  woodValue: Object.freeze({ x: 229, y: 55 }),
-  stoneIcon: Object.freeze({ x: 216, y: 70 }),
-  stoneValue: Object.freeze({ x: 229, y: 73 }),
-  rubyIcon: Object.freeze({ x: 216, y: 88 }),
-  rubyValue: Object.freeze({ x: 229, y: 91 }),
-});
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 36, width: GAME_WIDTH - 48, height: 78 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 82, width: 96, height: 26 });
 export const NEW_GAME_CANCEL_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 140, y: 82, width: 96, height: 26 });
@@ -117,6 +109,22 @@ export function createGameHud(scene, options) {
   let pinnedNeedId = null;
   let needsRowsState = [];
 
+  const inventoryHud = createInventoryRuntime(scene, {
+    getGameplayState,
+    getPlayerCharacter: () => scene.playerCharacter ?? null,
+    isSuppressed: () => suppressed
+      || confirmingNewGame
+      || optionsOpen
+      || gameplayOverlayActive
+      || Boolean(scene.interactionRuntime?.isDialogueActive?.())
+      || Boolean(scene.buildMode?.isActive?.()),
+    onPersistentMutation: () => {
+      inventoryHud.render();
+      scene.interactionRuntime?.refresh?.();
+      scene.saveSession?.();
+    },
+  });
+
   const optionsHit = createZone(scene, OPTIONS_HIT_AREA);
   const optionsPanelHit = createZone(scene, OPTIONS_PANEL_AREA).disableInteractive();
   const languageHit = createZone(scene, LANGUAGE_HIT_AREA).disableInteractive();
@@ -159,9 +167,6 @@ export function createGameHud(scene, options) {
     effects: createText(scene),
   };
   const clockText = createText(scene, { fontSize: "8px" });
-  const woodValueText = createText(scene, { fontSize: "8px" });
-  const stoneValueText = createText(scene, { fontSize: "8px" });
-  const rubyValueText = createText(scene, { fontSize: "8px" });
   const kitchenTexts = [
     createText(scene, { fontSize: "7px" }),
     createText(scene, { fontSize: "7px" }),
@@ -169,12 +174,6 @@ export function createGameHud(scene, options) {
     createText(scene, { fontSize: "7px" }),
   ];
   const needTooltipText = createText(scene, { fontSize: "8px", wordWrap: { width: NEED_TOOLTIP_AREA.width - 12 } });
-  const woodIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
-  const stoneIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
-  const rubyIcon = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0).setScale(0.5).setVisible(false);
-  drawLog(woodIcon, 0);
-  drawStone(stoneIcon, 0);
-  drawRuby(rubyIcon, 0);
 
   function stop(pointer, event) {
     event?.stopPropagation?.();
@@ -213,10 +212,7 @@ export function createGameHud(scene, options) {
     zone.on("pointerout", () => { draggingChannel = null; });
   }
 
-  languageHit.on("pointerdown", (pointer, _x, _y, event) => {
-    stop(pointer, event);
-    void toggleLanguage();
-  });
+  languageHit.on("pointerdown", (pointer, _x, _y, event) => { stop(pointer, event); void toggleLanguage(); });
   languageHit.on("pointerup", () => { languageLatched = false; });
   languageHit.on("pointerout", () => { languageLatched = false; });
   languageHit.on("pointercancel", () => { languageLatched = false; });
@@ -258,19 +254,11 @@ export function createGameHud(scene, options) {
     graphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6);
     graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(rect.x + 3.5, rect.y + 3.5, rect.width - 7, rect.height - 7);
     setManagedTextStyle(textObject, scene, textStyle()).setText(labelText).setVisible(true);
-    textObject.setPosition(
-      Math.round(rect.x + (rect.width - textObject.width) / 2),
-      Math.round(rect.y + (rect.height - textObject.height) / 2),
-    );
+    textObject.setPosition(Math.round(rect.x + (rect.width - textObject.width) / 2), Math.round(rect.y + (rect.height - textObject.height) / 2));
   }
 
   function hideManagedObjects() {
-    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) {
-      text.setVisible(false);
-    }
-    woodIcon.setVisible(false);
-    stoneIcon.setVisible(false);
-    rubyIcon.setVisible(false);
+    for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) text.setVisible(false);
   }
 
   function render() {
@@ -281,14 +269,14 @@ export function createGameHud(scene, options) {
     hideManagedObjects();
     if (suppressed) {
       fullscreenHud?.graphics?.clear?.();
+      inventoryHud.render();
       updateInteractivity();
       return;
     }
-
     if (confirmingNewGame) renderConfirmation();
     else renderNormalHud();
+    inventoryHud.render();
     updateInteractivity();
-
     if (fullscreenHud) renderFullscreenIcon(fullscreenHud.graphics, isFullscreenActive(document, gameContainer));
   }
 
@@ -298,7 +286,6 @@ export function createGameHud(scene, options) {
     if (gameplay) {
       renderClock(gameplay);
       if (!optionsOpen && !gameplayOverlayActive) {
-        renderResources(gameplay);
         renderNeeds(gameplay);
         renderKitchen(gameplay);
       }
@@ -310,33 +297,14 @@ export function createGameHud(scene, options) {
     graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(CLOCK_HUD_AREA.x, CLOCK_HUD_AREA.y, CLOCK_HUD_AREA.width, CLOCK_HUD_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(CLOCK_HUD_AREA.x + 0.5, CLOCK_HUD_AREA.y + 0.5, CLOCK_HUD_AREA.width - 1, CLOCK_HUD_AREA.height - 1);
     setManagedTextStyle(clockText, scene, textStyle({ fontSize: "8px" })).setText(gameplay.clock ?? "").setVisible(true);
-    clockText.setPosition(
-      Math.round((GAME_WIDTH - clockText.width) / 2),
-      Math.round(CLOCK_HUD_AREA.y + (CLOCK_HUD_AREA.height - clockText.height) / 2),
-    );
-  }
-
-  function renderResources(gameplay) {
-    graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(RESOURCE_HUD_AREA.x, RESOURCE_HUD_AREA.y, RESOURCE_HUD_AREA.width, RESOURCE_HUD_AREA.height);
-    graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(RESOURCE_HUD_AREA.x + 0.5, RESOURCE_HUD_AREA.y + 0.5, RESOURCE_HUD_AREA.width - 1, RESOURCE_HUD_AREA.height - 1);
-    setManagedTextStyle(woodValueText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.wood)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodValue.x, RESOURCE_HUD_LAYOUT.woodValue.y);
-    setManagedTextStyle(stoneValueText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.stone ?? 0)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.stoneValue.x, RESOURCE_HUD_LAYOUT.stoneValue.y);
-    setManagedTextStyle(rubyValueText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.rubies ?? 0)).setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyValue.x, RESOURCE_HUD_LAYOUT.rubyValue.y);
-    woodIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.woodIcon.x, RESOURCE_HUD_LAYOUT.woodIcon.y);
-    stoneIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.stoneIcon.x, RESOURCE_HUD_LAYOUT.stoneIcon.y);
-    rubyIcon.setVisible(true).setPosition(RESOURCE_HUD_LAYOUT.rubyIcon.x, RESOURCE_HUD_LAYOUT.rubyIcon.y);
+    clockText.setPosition(Math.round((GAME_WIDTH - clockText.width) / 2), Math.round(CLOCK_HUD_AREA.y + (CLOCK_HUD_AREA.height - clockText.height) / 2));
   }
 
   function renderKitchen(gameplay) {
     const kitchen = gameplay.kitchen ?? {};
     graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(KITCHEN_HUD_AREA.x, KITCHEN_HUD_AREA.y, KITCHEN_HUD_AREA.width, KITCHEN_HUD_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(KITCHEN_HUD_AREA.x + 0.5, KITCHEN_HUD_AREA.y + 0.5, KITCHEN_HUD_AREA.width - 1, KITCHEN_HUD_AREA.height - 1);
-    const rows = [
-      ["raw", kitchen.rawPotatoes],
-      ["prepared", kitchen.preparedPotatoes],
-      ["dishes", kitchen.cookedDishes],
-      ["coins", gameplay.coins],
-    ];
+    const rows = [["raw", kitchen.rawPotatoes], ["prepared", kitchen.preparedPotatoes], ["dishes", kitchen.cookedDishes], ["coins", gameplay.coins]];
     rows.forEach(([key, value], index) => {
       setManagedTextStyle(kitchenTexts[index], scene, textStyle({ fontSize: "6px" }))
         .setText(`${localization.t(`hud:kitchen.${key}`)} ${Number(value) || 0}`)
@@ -438,20 +406,14 @@ export function createGameHud(scene, options) {
     }
     optionsHit.setInteractive({ useHandCursor: true });
     setOptionsPanelInteractive(optionsOpen);
-    setNeedsInteractive(!optionsOpen);
+    setNeedsInteractive(!optionsOpen && !gameplayOverlayActive);
     confirmHit.disableInteractive();
     cancelHit.disableInteractive();
   }
 
   function setNeedsInteractive(active) {
-    for (const zone of needHits) {
-      if (active) zone.setInteractive({ useHandCursor: true });
-      else zone.disableInteractive();
-    }
-    if (!active) {
-      hoveredNeedId = null;
-      pinnedNeedId = null;
-    }
+    for (const zone of needHits) active ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive();
+    if (!active) { hoveredNeedId = null; pinnedNeedId = null; }
   }
 
   function setOptionsPanelInteractive(active) {
@@ -492,12 +454,7 @@ export function createGameHud(scene, options) {
   }
 
   function textStyle(overrides = {}) {
-    return {
-      fontFamily: localization.getLocale().fontKey,
-      fontSize: "9px",
-      color: "#f2eadc",
-      ...overrides,
-    };
+    return { fontFamily: localization.getLocale().fontKey, fontSize: "9px", color: "#f2eadc", ...overrides };
   }
 
   render();
@@ -515,19 +472,18 @@ export function createGameHud(scene, options) {
       }
       render();
     },
-    setGameplayOverlayActive(value) {
-      gameplayOverlayActive = Boolean(value);
-      render();
-    },
+    setGameplayOverlayActive(value) { gameplayOverlayActive = Boolean(value); render(); },
     triggerEnergyShake,
     getResourceState() {
+      const gameplay = getGameplayState?.();
       return {
         clockText: clockText.text,
-        woodText: woodValueText.text,
-        stoneText: stoneValueText.text,
-        rubyText: rubyValueText.text,
+        woodText: String(gameplay?.wood ?? 0),
+        stoneText: String(gameplay?.stone ?? 0),
+        rubyText: String(gameplay?.rubies ?? 0),
+        inventory: inventoryHud.getState(),
         kitchenTexts: kitchenTexts.map((text) => text.text),
-        icons: { wood: woodIcon.visible, stone: stoneIcon.visible, ruby: rubyIcon.visible },
+        icons: { wood: false, stone: false, ruby: false },
         energyRatio,
         energyFillHeight,
         energyCritical,
@@ -552,7 +508,9 @@ export function createGameHud(scene, options) {
         areas: {
           options: OPTIONS_HIT_AREA,
           clock: CLOCK_HUD_AREA,
-          resources: RESOURCE_HUD_AREA,
+          resources: INVENTORY_HUD_AREA,
+          inventory: INVENTORY_HUD_AREA,
+          inventorySlots: INVENTORY_SLOT_AREAS,
           kitchen: KITCHEN_HUD_AREA,
           energy: ENERGY_HUD_AREA,
           needs: NEEDS_HUD_AREA,
@@ -568,11 +526,9 @@ export function createGameHud(scene, options) {
     },
     isPointInHud(x, y) {
       if (suppressed) return false;
-      if (confirmingNewGame) {
-        return isPointInRect(x, y, NEW_GAME_CONFIRM_PANEL)
-          || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));
-      }
-      return isPointInRect(x, y, OPTIONS_HIT_AREA)
+      if (confirmingNewGame) return isPointInRect(x, y, NEW_GAME_CONFIRM_PANEL) || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));
+      return inventoryHud.isPointInHud(x, y)
+        || isPointInRect(x, y, OPTIONS_HIT_AREA)
         || Boolean(optionsOpen && isPointInRect(x, y, OPTIONS_PANEL_AREA))
         || Boolean(!optionsOpen && isPointInRect(x, y, NEEDS_HUD_AREA))
         || Boolean((hoveredNeedId || pinnedNeedId) && isPointInRect(x, y, NEED_TOOLTIP_AREA))
@@ -584,13 +540,11 @@ export function createGameHud(scene, options) {
       if (confirmingNewGame) onConfirmationChange(false);
       unsubscribe?.();
       scene.input.off("pointerdown", onScenePointerDown);
+      inventoryHud.destroy();
       for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
       scene.tweens.killTweensOf(energyArrowGraphics);
-      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, woodValueText, stoneValueText, rubyValueText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
-      woodIcon.destroy();
-      stoneIcon.destroy();
-      rubyIcon.destroy();
+      for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, ...kitchenTexts, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
       energyBarGraphics.destroy();
       energyArrowGraphics.destroy();
       graphics.destroy();
@@ -604,9 +558,7 @@ export function createGameHud(scene, options) {
 }
 
 function drawEnergyArrow(graphics, x, y, direction, alpha = 0.9) {
-  const rows = direction === "up"
-    ? [[2], [1, 2, 3], [0, 1, 2, 3, 4], [2], [2]]
-    : [[2], [2], [0, 1, 2, 3, 4], [1, 2, 3], [2]];
+  const rows = direction === "up" ? [[2], [1, 2, 3], [0, 1, 2, 3, 4], [2], [2]] : [[2], [2], [0, 1, 2, 3, 4], [1, 2, 3], [2]];
   graphics.fillStyle(direction === "up" ? 0x9fd38a : 0xf2eadc, alpha);
   rows.forEach((columns, row) => columns.forEach((column) => graphics.fillRect(x + column, y + row, 1, 1)));
 }
@@ -616,14 +568,11 @@ function drawNeedFlow(graphics, x, y, flow, nowMs, seed) {
   const arrows = Math.min(3, Math.max(1, Math.round(flow.arrows) || 1));
   const alpha = needFlowPulseAlpha(arrows, nowMs, seed);
   if (alpha <= 0) return;
-  for (let index = 0; index < arrows; index += 1) {
-    drawEnergyArrow(graphics, x + index * 5, y, flow.direction, alpha);
-  }
+  for (let index = 0; index < arrows; index += 1) drawEnergyArrow(graphics, x + index * 5, y, flow.direction, alpha);
 }
 
 function createZone(scene, rect) {
-  return scene.add
-    .zone(rect.x, rect.y, rect.width, rect.height)
+  return scene.add.zone(rect.x, rect.y, rect.width, rect.height)
     .setOrigin(0, 0)
     .setDepth(HUD_DEPTH + 2)
     .setScrollFactor(0)

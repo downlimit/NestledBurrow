@@ -26,6 +26,12 @@ async function interact(page, id, expire = true) {
   await bridge(page, "interact");
 }
 
+function inventoryQuantity(gameplay, itemId) {
+  return (gameplay?.inventory?.slots ?? [])
+    .filter((item) => item?.id === itemId)
+    .reduce((total, item) => total + item.quantity, 0);
+}
+
 test("balance panel is compact, scrollable and applies live resource tuning", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the focused balance panel evidence once");
   mkdirSync(EVIDENCE_DIR, { recursive: true });
@@ -43,7 +49,7 @@ test("balance panel is compact, scrollable and applies live resource tuning", as
   await page.locator('input[data-field="axeDamage"]').dispatchEvent("input");
   await interact(page, "fallen-log-01");
   await expect.poll(async () => (await bridge(page, "getResourceNodeState", "fallen-log-01")).cleared).toBe(true);
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.wood).toBe(1);
+  await expect.poll(async () => inventoryQuantity((await bridge(page, "getSession")).gameplay, "wood")).toBe(1);
   await page.screenshot({ path: `${EVIDENCE_DIR}/balance-panel.png`, fullPage: false });
   await testInfo.attach("balance-panel", { path: `${EVIDENCE_DIR}/balance-panel.png`, contentType: "image/png" });
   await toggle.click({ force: true });
@@ -65,7 +71,10 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   await interact(page, "yard-log-04");
   await interact(page, "yard-stone-01");
   await interact(page, "yard-stone-02");
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay).toMatchObject({ wood: 3, stone: 4 });
+  await expect.poll(async () => {
+    const gameplay = (await bridge(page, "getSession")).gameplay;
+    return { wood: inventoryQuantity(gameplay, "wood"), stone: inventoryQuantity(gameplay, "stone") };
+  }).toEqual({ wood: 3, stone: 4 });
 
   await bridge(page, "expireHitCooldown");
   await placeNear(page, "yard-ruby-01");
