@@ -27,12 +27,13 @@ This system owns screen-space feedback and sensory presentation without becoming
 - options/debug preferences remain separate from gameplay save where appropriate;
 - audio respects master/music/effects ownership;
 - procedural action effects fire only after their owning gameplay mutation succeeds;
+- collected guest coins use the pickup cue, while completed preparation and frying add a short celebratory cue;
 - day/night presentation does not cover HUD or alter gameplay state;
 - player-visible changes require managed preview acceptance.
 
 ## Current baseline
 
-Localized HUD, ten-slot inventory, selected-item marker, dropped-item presentation, needs arrows/tooltips, options, fullscreen, audio playlist, distinct procedural gameplay effects, mobile joystick, presentation camera and day/night multiply are integrated.
+Localized HUD, ten-slot inventory, selected-item marker, dropped-item presentation, needs arrows/tooltips, options, fullscreen, audio playlist, distinct procedural gameplay effects including farming, coin pickup and cooking completion feedback, mobile joystick, presentation camera and day/night multiply are integrated.
 
 ## Not yet
 
