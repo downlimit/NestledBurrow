@@ -5,6 +5,8 @@ import { BED_SLEEP_DEPTH_OFFSET, sleepingCharacterDepth } from "../src/debrisRun
 
 const farmingSource = readFileSync(new URL("../src/farmingRuntime.js", import.meta.url), "utf8");
 const debrisSource = readFileSync(new URL("../src/debrisRuntime.js", import.meta.url), "utf8");
+const coinSource = readFileSync(new URL("../src/coinRuntime.js", import.meta.url), "utf8");
+const cookingSource = readFileSync(new URL("../src/cookingRuntime.js", import.meta.url), "utf8");
 
 for (const effectId of ["hoe-use", "plant-seed", "crop-impact"]) {
   assert(PROCEDURAL_SFX[effectId]?.voices?.length > 0, `${effectId} has a procedural oscillator voice`);
@@ -23,5 +25,7 @@ assert(/FARMING_INTERACTION_KINDS\.till[\s\S]*playEffect\("hoe-use"\)/.test(farm
 assert(/FARMING_INTERACTION_KINDS\.plant\) playEffect\("plant-seed"\)/.test(farmingSource), "successful planting is wired");
 assert(/handleDroppedItemCollision[\s\S]*playEffect\("crop-impact"\)/.test(farmingSource), "crop impact is wired only through dropped-resource collision");
 assert(!/handleDroppedItemCollision[\s\S]*playEffect\("plant-destroy"\)/.test(farmingSource), "thrown-resource impact no longer reuses manual plant destruction");
+assert(/function collect\(id\)[\s\S]*playEffect\("pickup"\)[\s\S]*onCollect/.test(coinSource), "collected guest coins play the pickup cue before persistence");
+assert(/if \(result\.mutated\) \{[\s\S]*playEffect\("guest-happy"\)[\s\S]*onPersistentMutation/.test(cookingSource), "completed preparation and frying play a short celebratory cue only after mutation");
 
-console.log("task 048 checks passed: bed occupant depth and farming procedural effects");
+console.log("task 048 checks passed: bed depth, farming, coin pickup and cooking completion audio");
