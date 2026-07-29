@@ -46,6 +46,18 @@ export const PROCEDURAL_SFX = Object.freeze({
     { oscillator: "sine", startFrequency: 740, endFrequency: 1080, durationSeconds: 0.08, gain: 0.025, delaySeconds: 0.055 },
   ]),
   drop: effect([{ oscillator: "triangle", startFrequency: 310, endFrequency: 120, durationSeconds: 0.13, gain: 0.055 }], { durationSeconds: 0.065, gain: 0.02, filterFrequency: 1100, seed: 41 }),
+  "hoe-use": effect([
+    { oscillator: "triangle", startFrequency: 205, endFrequency: 92, durationSeconds: 0.12, gain: 0.045 },
+    { oscillator: "square", startFrequency: 96, endFrequency: 58, durationSeconds: 0.085, gain: 0.022, delaySeconds: 0.018 },
+  ], { durationSeconds: 0.095, gain: 0.028, filterFrequency: 820, seed: 67 }),
+  "plant-seed": effect([
+    { oscillator: "sine", startFrequency: 350, endFrequency: 510, durationSeconds: 0.11, gain: 0.026 },
+    { oscillator: "triangle", startFrequency: 165, endFrequency: 105, durationSeconds: 0.12, gain: 0.023, delaySeconds: 0.025 },
+  ], { durationSeconds: 0.07, gain: 0.014, filterFrequency: 690, seed: 71 }),
+  "crop-impact": effect([
+    { oscillator: "triangle", startFrequency: 158, endFrequency: 54, durationSeconds: 0.2, gain: 0.064 },
+    { oscillator: "square", startFrequency: 92, endFrequency: 42, durationSeconds: 0.16, gain: 0.03, delaySeconds: 0.02 },
+  ], { durationSeconds: 0.18, gain: 0.044, filterFrequency: 930, seed: 73 }),
   "crop-stage": effect([{ oscillator: "sine", startFrequency: 620, endFrequency: 790, durationSeconds: 0.18, gain: 0.016 }]),
   "inventory-activate": effect([{ oscillator: "square", startFrequency: 360, endFrequency: 520, durationSeconds: 0.065, gain: 0.025 }]),
   "inventory-change": effect([{ oscillator: "square", startFrequency: 440, endFrequency: 570, durationSeconds: 0.055, gain: 0.022 }]),

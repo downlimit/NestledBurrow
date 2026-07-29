@@ -95,7 +95,10 @@ export function createCookingRuntime(scene, {
     activeStep = null;
     onActiveChange(false);
     render();
-    if (result.mutated) onPersistentMutation(result);
+    if (result.mutated) {
+      playEffect("guest-happy");
+      onPersistentMutation(result);
+    }
     return result;
   }
 

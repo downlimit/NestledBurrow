@@ -183,6 +183,9 @@ export function createFarmingRuntime(scene, {
       return { status: "ignored", mutated: false };
     }
     if (result.mutated) {
+      if (candidate.kind === FARMING_INTERACTION_KINDS.till
+        || candidate.kind === FARMING_INTERACTION_KINDS.clearRotten) playEffect("hoe-use");
+      if (candidate.kind === FARMING_INTERACTION_KINDS.plant) playEffect("plant-seed");
       if (candidate.kind === FARMING_INTERACTION_KINDS.water) playEffect("water");
       if (candidate.kind === FARMING_INTERACTION_KINDS.refill) playEffect("well-refill");
       if (candidate.kind === FARMING_INTERACTION_KINDS.harvest) playEffect("harvest");
@@ -254,7 +257,7 @@ export function createFarmingRuntime(scene, {
     handleDroppedItemCollision(worldItem, collider) {
       if (!["wood", "stone"].includes(worldItem?.item?.id)) return { status: "ignored", mutated: false };
       const result = destroyCropsByCollider(farm, collider);
-      if (result.mutated) { playEffect("plant-destroy"); render(); onPersistentMutation(result); }
+      if (result.mutated) { playEffect("crop-impact"); render(); onPersistentMutation(result); }
       return result;
     },
     advanceTo,

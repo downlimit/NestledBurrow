@@ -10,6 +10,7 @@ This system owns how the player moves, presents, spends time and receives contin
 - motor position is authoritative and presentation poses do not corrupt it;
 - camera follows an explicit presentation target;
 - world time is continuous; sleep accelerates simulation;
+- a sleeping character is explicitly layered above the selected bed visual;
 - energy and `N/E/S/T/L/D` change for understandable reasons and are visible in HUD.
 
 ## Owners
@@ -19,6 +20,7 @@ This system owns how the player moves, presents, spends time and receives contin
 - camera: `cameraFollowRuntime.js`;
 - time: `gameClock.js`, time fields in `gameSessionState.js`;
 - needs: `needsDomain.js`;
+- sleep furniture presentation: `debrisRuntime.js`;
 - presentation/HUD details: `systems/presentation.md`.
 
 ## Invariants
@@ -26,6 +28,7 @@ This system owns how the player moves, presents, spends time and receives contin
 - domain values remain framework-free and JSON-safe;
 - camera/presentation never rewrites safe motor position;
 - interaction/cooking/sleep suppression is explicit;
+- bed collider and authoring offsets do not decide the sleeping occupant layer;
 - tuning/debug storage is separate from gameplay save;
 - new need consequences belong to domain/runtime owners, not HUD.
 
@@ -39,4 +42,4 @@ Final balance, zero-value consequences, consumables and long-term progression ar
 
 ## Evidence
 
-`check:input`, `check:mobile-camera`, `check:movement`, `check:character`, `check:needs`, `check:clock-cycle`; browser E2E for integrated input/sleep paths.
+`check:input`, `check:mobile-camera`, `check:movement`, `check:character`, `check:needs`, `check:clock-cycle`, `check:task-048`; browser E2E for integrated input/sleep paths.
