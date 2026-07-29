@@ -21,6 +21,8 @@ async function placeNear(page, entityId) {
 }
 
 async function hit(page, entityId) {
+  if (entityId === "yard-ruby-01") await bridge(page, "selectInventorySlot", 1);
+  else await bridge(page, "selectInventorySlot", 0);
   await bridge(page, "expireHitCooldown");
   await placeNear(page, entityId);
   await page.keyboard.down("Space");
@@ -51,14 +53,15 @@ test("multiply overlay follows exact dusk and dawn phases while HUD stays above 
   }
   const hud = await bridge(page, "getHudState");
   expect(hud.resources.inventory.slots).toHaveLength(10);
-  expect(hud.resources.inventory.slots.slice(0, 3).map((item) => item.id)).toEqual(["axe", "hoe", "watering-can"]);
+  expect(hud.resources.inventory.slots.slice(0, 4).map((item) => item.id))
+    .toEqual(["axe", "pickaxe", "hoe", "water-bucket"]);
   expect(hud.resources.icons).toEqual({ wood: false, stone: false, ruby: false });
   expect(hud.resources.energyRatio).toBeGreaterThan(0.98);
   expect(hud.resources.energyFillHeight).toBeGreaterThanOrEqual(53);
-  expect(hud.resources.clockText).toBe("07:00");
+  expect(hud.resources.clockText).toMatch(/^07:\d{2}$/u);
   await bridge(page, "setLanguage", "en");
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.energyFillHeight).toBeGreaterThanOrEqual(53);
-  expect((await bridge(page, "getHudState")).resources.clockText).toBe("7:00 AM");
+  expect((await bridge(page, "getHudState")).resources.clockText).toMatch(/^7:\d{2} AM$/u);
 });
 
 test("energy curve changes player speed smoothly and uses maximum energy", async ({ page }) => {

@@ -92,14 +92,14 @@ export function createFacilityRuntime(scene, {
     return definition ? remove(definition.id) : false;
   }
 
-  function restore(definition) {
-    if (!definition || definitions.has(definition.id) || !createVisual(definition)) return false;
+  function restore(definition, { validateFootprint = true } = {}) {
+    if (!definition || definitions.has(definition.id) || !createVisual(definition, { validateFootprint })) return false;
     definitions.set(definition.id, definition);
     trackEditorId(definition.id);
     return true;
   }
 
-  function replace(definition) {
+  function replace(definition, options = {}) {
     if (!definition) return false;
     const previous = definitions.get(definition.id);
     if (previous) {
@@ -109,12 +109,12 @@ export function createFacilityRuntime(scene, {
       definitions.delete(previous.id);
       worldLayout.clearWorldObjectCollider(previous.id);
     }
-    if (restore(definition)) {
+    if (restore(definition, options)) {
       syncKitchenVisuals();
       return true;
     }
     if (previous) {
-      restore(previous);
+      restore(previous, { validateFootprint: false });
       syncKitchenVisuals();
     }
     return false;

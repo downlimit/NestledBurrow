@@ -35,10 +35,14 @@ test("potatoes move through preparation, frying and the persistent serving table
       requestAnimationFrame(check);
     });
   });
+  expect(await bridge(page, "addInventoryItem", { itemId: "potato", quantity: 3 })).toMatchObject({ mutated: true });
+  expect(await bridge(page, "addInventoryItem", { itemId: "wood", quantity: 10 })).toMatchObject({ mutated: true });
+  expect(await bridge(page, "addInventoryItem", { itemId: "stone", quantity: 8 })).toMatchObject({ mutated: true });
+  await bridge(page, "setCoins", 10);
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toEqual({
-    preparedPotatoes: 0,
-    cookedDishes: 0,
-    servingTableHasDish: false,
+    starterLemons: 6,
+    stoveRepaired: false,
+    servingTable: { itemId: null, quantity: 0, reservations: [] },
   });
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots.find((item) => item?.id === "potato")?.quantity).toBe(3);
 
@@ -54,39 +58,42 @@ test("potatoes move through preparation, frying and the persistent serving table
   await expect.poll(() => bridge(page, "getCookingState")).toMatchObject({ combo: 1, feedback: "success" });
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("cooking-success");
   await bridge(page, "completeCooking");
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
-    preparedPotatoes: 1,
-  });
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots
+    .find((item) => item?.id === "sliced-potato")?.quantity).toBe(1);
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots.find((item) => item?.id === "potato")?.quantity).toBe(2);
 
   await interact(page, "home-gas-stove-01");
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen.stoveRepaired).toBe(true);
+  await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ cookingActive: false });
+  await interact(page, "home-gas-stove-01");
   await expect.poll(() => bridge(page, "getCookingState")).toMatchObject({ stepType: "frying" });
   await bridge(page, "completeCooking");
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
-    preparedPotatoes: 0,
-    cookedDishes: 1,
-  });
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots
+    .find((item) => item?.id === "fried-potato-dish")?.quantity).toBe(1);
 
+  const dishSlot = (await bridge(page, "getSession")).gameplay.inventory.slots
+    .findIndex((item) => item?.id === "fried-potato-dish");
+  await bridge(page, "selectInventorySlot", dishSlot);
   await interact(page, "home-serving-table-01");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
-    cookedDishes: 0,
-    servingTableHasDish: true,
+    servingTable: { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
   });
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("dish-serve");
 
   await page.reload();
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toEqual({
-    preparedPotatoes: 0,
-    cookedDishes: 0,
-    servingTableHasDish: true,
+    starterLemons: 6,
+    stoveRepaired: true,
+    servingTable: { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
   });
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots.find((item) => item?.id === "potato")?.quantity).toBe(2);
 
   await interact(page, "home-serving-table-01");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
-    cookedDishes: 1,
-    servingTableHasDish: false,
+    servingTable: { itemId: null, quantity: 0, reservations: [] },
   });
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots
+    .find((item) => item?.id === "fried-potato-dish")?.quantity).toBe(1);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("dish-take");
 });

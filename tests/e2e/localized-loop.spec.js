@@ -143,7 +143,7 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await placeNear(page, "fallen-log-01");
   await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(true);
   await page.locator("canvas").screenshot({ path: "artifacts/task-047/resource-target-outline.png" });
-  await bridge(page, "selectInventorySlot", 1);
+  await bridge(page, "selectInventorySlot", 2);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ kind: "farm-till" });
   await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(false);
   await bridge(page, "interact");
@@ -185,11 +185,17 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
     return {
       wood: inventoryQuantity(session.gameplay, "wood"),
       stone: inventoryQuantity(session.gameplay, "stone"),
-      tools: session.gameplay.inventory.slots.slice(0, 3).map((item) => item.id),
+      tools: session.gameplay.inventory.slots.slice(0, 4).map((item) => item.id),
       node: session.gameplay.resourceNodes["fallen-log-01"],
       worldItems: session.gameplay.worldItems,
     };
-  }).toEqual({ wood: 0, stone: 0, tools: ["axe", "hoe", "watering-can"], node: { cleared: false, progress: 0 }, worldItems: [] });
+  }).toEqual({
+    wood: 0,
+    stone: 0,
+    tools: ["axe", "pickaxe", "hoe", "water-bucket"],
+    node: { cleared: false, progress: 0 },
+    worldItems: [],
+  });
   expect((await bridge(page, "getSession")).gameplay.currentEnergy).toBeGreaterThan(95);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
   await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });

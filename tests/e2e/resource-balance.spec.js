@@ -15,6 +15,11 @@ async function boot(page) {
 }
 
 async function placeNear(page, id) {
+  const resource = (await bridge(page, "getDebrisState")).definitions.find((item) => item.id === id);
+  if (resource) {
+    const slotIndex = ["stone-small", "stone-large", "ruby-node"].includes(resource.profileId) ? 1 : 0;
+    await bridge(page, "selectInventorySlot", slotIndex);
+  }
   await expect.poll(async () => {
     await bridge(page, "placePlayerNear", id);
     return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
@@ -201,6 +206,7 @@ test("resource colliders have their requested insets and work from directly abov
   expect(largeLog.bottom - largeLog.top).toBe(19.5);
   expect(largeStone.bottom - largeStone.top).toBe(19.5);
   const stoneDefinition = (await bridge(page, "getDebrisState")).definitions.find((item) => item.id === "yard-stone-02");
+  await bridge(page, "selectInventorySlot", 1);
   await bridge(page, "placePlayerAt", { x: stoneDefinition.position.x, y: stoneDefinition.position.y - 20, facing: { x: 0, y: -1 } });
   await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { entityId: "yard-stone-02" } });
 });
@@ -210,6 +216,8 @@ test("logs and stones always show a work target from every approach angle", asyn
   const definitions = (await bridge(page, "getDebrisState")).definitions;
   for (const id of ["fallen-log-01", "yard-log-04", "yard-stone-02", "yard-stone-01"]) {
     const resource = definitions.find((item) => item.id === id);
+    const slotIndex = ["stone-small", "stone-large", "ruby-node"].includes(resource.profileId) ? 1 : 0;
+    await bridge(page, "selectInventorySlot", slotIndex);
     for (const [x, y] of [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]) {
       const length = Math.hypot(x, y);
       const reach = resource.radius - 1;

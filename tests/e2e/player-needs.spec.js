@@ -75,21 +75,22 @@ test.describe("Task #030 player needs", () => {
     await page.evaluate(() => window.__NESTLED_BURROW_E2E__.setPlayerMotion({ moving: false, running: false }));
 
     const cases = [
-      ["fallen-log-01", -1.5],
-      ["yard-stone-02", -1.5],
-      ["yard-ruby-01", 8],
+      ["fallen-log-01", 0, -1.5],
+      ["yard-stone-02", 1, -1.5],
+      ["yard-ruby-01", 1, 8],
     ];
-    for (const [resourceId, expectedRate] of cases) {
-      await page.evaluate(({ resourceId }) => {
+    for (const [resourceId, slotIndex, expectedRate] of cases) {
+      state = await page.evaluate(({ resourceId, slotIndex }) => {
         const api = window.__NESTLED_BURROW_E2E__;
         api.setNeeds({ novelty: 50, satiety: 50 });
+        api.selectInventorySlot(slotIndex);
         api.placePlayerNear(resourceId);
         api.expireHitCooldown();
         api.interact();
         api.advanceGameplayTime(1000);
-      }, { resourceId });
+        return api.getNeedsState();
+      }, { resourceId, slotIndex });
       await expect.poll(async () => (await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getInteractionHudState())).promptAlpha).toBe(0.5);
-      state = await snapshot(page);
       expect(state.activity.activeResourceKind).toBeTruthy();
       expect(state.flow.novelty.rate).toBe(expectedRate);
       expect(state.flow.satiety.rate).toBeCloseTo(-0.495, 5);

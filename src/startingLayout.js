@@ -229,9 +229,12 @@ function restoreFacilities(scene, definitions) {
     }
   }
   for (const definition of definitions) {
+    // Starting layouts are captured only after editor placement validation.
+    // Restore them without re-validating against the temporary staging order.
+    const options = { validateFootprint: false };
     const restored = runtime.getDefinition(definition.id)
-      ? runtime.replace(definition)
-      : runtime.restore(definition);
+      ? runtime.replace(definition, options)
+      : runtime.restore(definition, options);
     if (!restored) throw new Error(`Failed to restore facility ${definition.id}`);
   }
   runtime.syncKitchenVisuals?.();
