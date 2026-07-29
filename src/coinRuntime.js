@@ -1,6 +1,10 @@
 import { drawCoinSprite } from "./coinVisual.js";
 
-export function createCoinRuntime(scene, { getPlayerPosition, onCollect = () => {} }) {
+export function createCoinRuntime(scene, {
+  getPlayerPosition,
+  onCollect = () => {},
+  playEffect = (type) => scene.audioRuntime?.playEffect?.(type),
+}) {
   const coins = new Map();
   let nextId = 0;
   let destroyed = false;
@@ -51,6 +55,7 @@ export function createCoinRuntime(scene, { getPlayerPosition, onCollect = () => 
     if (!coin) return false;
     coins.delete(id);
     coin.visual.destroy();
+    playEffect("pickup");
     onCollect({ id, position: { x: coin.x, y: coin.y } });
     return true;
   }
