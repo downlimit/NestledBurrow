@@ -68,17 +68,49 @@
     "openSeedShop": "Магазин семян",
     "tillSoil": "Вскопать землю",
     "plantPotato": "Посадить картофель",
+    "plantLemon": "Посадить лимон",
     "waterSoil": "Полить землю",
     "harvestPotato": "Собрать урожай",
+    "harvestLemon": "Собрать лимоны",
     "clearRottenCrop": "Убрать сгнившее растение",
     "destroyCrop": "Срубить растение",
     "destroySoil": "Убрать грядку",
-    "refillWateringCan": "Наполнить лейку",
-    "wateringCanEmpty": "Лейка пуста",
-    "wateringCanFull": "Лейка уже полна",
-    "wateringCanRefilled": "Лейка наполнена",
+    "refillWaterBucket": "Наполнить ведро",
+    "waterBucketRequired": "Нужно выбрать ведро",
+    "waterBucketEmpty": "Ведро пусто",
+    "waterBucketFull": "Ведро уже полно",
+    "waterBucketRefilled": "Ведро наполнено: 8",
     "noPotatoSeed": "Нет семян картофеля",
-    "invalidSoil": "Здесь нельзя вскопать землю"
+    "noLemonSeed": "Нет семян лимона",
+    "invalidSoil": "Здесь нельзя вскопать землю",
+    "makeLemonade": "Сделать лимонад",
+    "noLemon": "Нужен лимон",
+    "noWater": "Нужна вода в ведре",
+    "inventoryFull": "В инвентаре нет места",
+    "takeLemons": "Взять лимоны",
+    "lemonSackEmpty": "Мешок лимонов пуст",
+    "serveItem": "Выставить товар",
+    "takeItem": "Забрать товар",
+    "servingTableDifferentItem": "На столе другой товар",
+    "servingTableFull": "На столе уже 4 порции",
+    "servingTableEmpty": "Сервировочный стол пуст",
+    "repairStove": "Починить: 10 дерева, 8 камня, 10 монет",
+    "repairMissing": "Не хватает: {categories}",
+    "repairCategory": {
+      "wood": "дерево",
+      "stone": "камень",
+      "coins": "монеты"
+    },
+    "servingStock": {
+      "lemonade1": "Лимонад 1/4 — забрать",
+      "lemonade2": "Лимонад 2/4 — забрать",
+      "lemonade3": "Лимонад 3/4 — забрать",
+      "lemonade4": "Лимонад 4/4 — забрать",
+      "friedPotatoDish1": "Картофель 1/4 — забрать",
+      "friedPotatoDish2": "Картофель 2/4 — забрать",
+      "friedPotatoDish3": "Картофель 3/4 — забрать",
+      "friedPotatoDish4": "Картофель 4/4 — забрать"
+    }
   },
   "progress": {
     "newGame": "Новая игра",
@@ -98,11 +130,19 @@
   "merchant": {
     "title": "ТОРГОВЕЦ СЕМЕНАМИ",
     "offer": "Семя картофеля - 1 монета",
+    "potato-seed": "КАРТОФЕЛЬ",
+    "lemon-seed": "ЛИМОН",
+    "balance": "Монеты: {count}",
     "balance_one": "Монеты: {count}",
     "balance_few": "Монеты: {count}",
     "balance_many": "Монеты: {count}",
     "balance_other": "Монеты: {count}",
     "buy": "КУПИТЬ 1",
+    "buyPrice": "КУПИТЬ · {count}",
+    "buyPrice_one": "КУПИТЬ · {count}",
+    "buyPrice_few": "КУПИТЬ · {count}",
+    "buyPrice_many": "КУПИТЬ · {count}",
+    "buyPrice_other": "КУПИТЬ · {count}",
     "exit": "ПРОБЕЛ - ЗАКРЫТЬ",
     "not-enough-coins": "Не хватает монет",
     "inventory-full": "Инвентарь заполнен"
@@ -111,8 +151,13 @@
     "facilities": {
       "cuttingTable": "Разделочный стол",
       "gasStove": "Газовая плита",
-      "servingTable": "Сервировочный стол"
+      "servingTable": "Сервировочный стол",
+      "juicer": "Соковыжималка",
+      "lemonSack": "Мешок лимонов"
     }
+  },
+  "migration": {
+    "task049": "Для чистой игры лучше начать новую игру."
   },
   "cooking": {
     "attempt": "Постараться",

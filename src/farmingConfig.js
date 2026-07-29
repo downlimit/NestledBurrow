@@ -20,11 +20,13 @@ export const FARMING_FRAMES = Object.freeze({
   cropRotten: 11,
 });
 
-export const WATERING_CAN_CAPACITY = 40;
+export const WATER_BUCKET_CAPACITY = 8;
 export const SOLAR_DAY_START_SECONDS = 4 * 60 * 60;
 export const SOLAR_DAY_END_SECONDS = 20 * 60 * 60;
 export const POTATO_REQUIRED_GROWTH_SECONDS = 8 * 60 * 60;
 export const POTATO_DAILY_GROWTH_CAP_SECONDS = 4 * 60 * 60;
+export const LEMON_REQUIRED_GROWTH_SECONDS = 4 * 60 * 60;
+export const LEMON_DAILY_GROWTH_CAP_SECONDS = 4 * 60 * 60;
 export const NEVER_WATERED_ROT_SECONDS = 72 * 60 * 60;
 export const HYDRATED_ROT_SECONDS = 24 * 60 * 60;
 
@@ -39,6 +41,17 @@ export const POTATO_CROP_PROFILE = Object.freeze({
   }),
   collision: false,
 });
+export const LEMON_CROP_PROFILE = Object.freeze({
+  id: "lemon",
+  requiredEffectiveGrowthSeconds: LEMON_REQUIRED_GROWTH_SECONDS,
+  maximumEffectiveGrowthPerDay: LEMON_DAILY_GROWTH_CAP_SECONDS,
+  weatherGrowthMultipliers: POTATO_CROP_PROFILE.weatherGrowthMultipliers,
+  collision: false,
+});
+export const CROP_PROFILES = Object.freeze({
+  potato: POTATO_CROP_PROFILE,
+  lemon: LEMON_CROP_PROFILE,
+});
 
 export const FARMING_INTERACTION_KINDS = Object.freeze({
   till: "farm-till",
@@ -47,7 +60,7 @@ export const FARMING_INTERACTION_KINDS = Object.freeze({
   harvest: "farm-harvest",
   clearRotten: "farm-clear-rotten",
   axeCell: "farm-axe-cell",
-  refill: "farm-refill-watering-can",
+  refill: "farm-refill-water-bucket",
 });
 
 export const WELL_PROFILE = Object.freeze({
@@ -56,6 +69,13 @@ export const WELL_PROFILE = Object.freeze({
   height: TILE_SIZE,
   depthAnchorOffset: Object.freeze({ x: 8, y: 14 }),
   collisionRect: Object.freeze({ left: 2, top: 8, right: 14, bottom: 14 }),
+});
+
+export const STARTER_WELL = Object.freeze({
+  id: "farm-well-1",
+  x: 544,
+  y: 496,
+  fixed: true,
 });
 
 export function preloadFarmingAssets(scene, baseUrl = import.meta.env.BASE_URL) {

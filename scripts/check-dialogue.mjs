@@ -56,11 +56,17 @@ const wakeRuntime = createInteractionRuntime({
     position: { x: 0, y: 0 }, radius: 24, priority: 100, requiresFacing: false,
     facingDotThreshold: -1, prompt: "hud:interaction.wake", payload: {},
   }],
-  runWorldObjectInteraction: () => ({ status: "wake-failed", mutated: false }),
+  runWorldObjectInteraction: () => ({
+    status: "wake-failed",
+    messageKey: "hud:interaction.wakeFailed",
+    transientMessageShown: true,
+    mutated: false,
+  }),
   presenter,
 });
 wakeRuntime.update({ actions: { interact: true } });
-assert.deepEqual(presenter.messages, [{ messageKey: "hud:interaction.wakeFailed" }]);
+assert.deepEqual(presenter.messages, [], "wake failure does not replace the action label with duplicate status text");
+assert.equal(presenter.prompts.at(-1).promptKey, "hud:interaction.wake", "wake action remains available after a failed attempt");
 runtime.destroy();
 wakeRuntime.destroy();
 console.log("interaction checks passed: obsolete neighbor quest removed and seed merchant route is active");

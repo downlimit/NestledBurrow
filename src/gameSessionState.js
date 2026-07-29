@@ -4,6 +4,7 @@ import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, adv
 import { DEFAULT_NEEDS, normalizeNeeds } from "./needsDomain.js";
 import { normalizeKitchenState } from "./cookingDomain.js";
 import { createFreshFarmState, normalizeFarmState } from "./farmingDomain.js";
+import { normalizeTavernServiceState } from "./tavernServiceDomain.js";
 import {
   addInventoryItem,
   canAddInventoryItem,
@@ -16,7 +17,7 @@ import {
   resetInventory,
 } from "./inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 9;
+export const SESSION_STATE_VERSION = 10;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -151,6 +152,13 @@ function normalizeGameplayState(value = {}) {
   const inventory = value.inventory
     ? normalizeInventory(value.inventory)
     : createInventoryFromLegacyCounters({ wood: value.wood ?? 0, stone: value.stone ?? 0, rubies: value.rubies ?? 0 });
+  const kitchen = normalizeKitchenState(value.kitchen ?? {});
+  const tavernService = normalizeTavernServiceState(value.tavernService ?? {});
+  const resumableReservations = new Set(tavernService.guests
+    .filter((guest) => guest.reservationActive)
+    .map((guest) => guest.id));
+  kitchen.servingTable.reservations = kitchen.servingTable.reservations
+    .filter((reservation) => resumableReservations.has(reservation.guestId));
   return attachLegacyResourceGetters({
     currentEnergy,
     maximumEnergy,
@@ -160,7 +168,8 @@ function normalizeGameplayState(value = {}) {
     worldTimeSeconds,
     farm: normalizeFarmState(value.farm ?? createFreshFarmState(worldTimeSeconds), worldTimeSeconds),
     needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
-    kitchen: normalizeKitchenState(value.kitchen ?? {}),
+    kitchen,
+    tavernService,
     tavernOpen: normalizeBoolean(value.tavernOpen, false, "Tavern open"),
     coins: normalizeNonNegativeInteger(value.coins, 3, "Coins"),
   });

@@ -2,16 +2,17 @@
 
 ## Purpose
 
-This system owns world geometry, collision queries, resource definitions, gatherable world objects and inventory item ownership.
+This system owns world geometry, collision queries, resource definitions, gatherable world objects, farm lifecycle and inventory item ownership.
 
 ## Player-visible contract
 
 - world geometry renders and collides from the same semantic source;
-- resources have readable action, progress, cooldown and reward;
-- removing a node removes its collision and presentation consistently;
-- resource rewards enter the inventory instead of separate HUD counters;
-- dropped inventory items remain non-blocking for the player, use a `2×2` occupancy footprint, settle in a free point and can be picked up again;
-- future garden/water mechanics extend resource and inventory lifecycle instead of becoming unrelated UI counters.
+- axe, pickaxe, hoe and water bucket expose separate strict actions;
+- a mismatched tool cannot mutate a resource or farm cell;
+- resource rewards enter the inventory and removing a node removes its collision and presentation consistently;
+- inventory and wallet drag share one player-to-cursor throw direction; inventory throws a whole stack, while wallet drag throws one coin; dropped items remain non-blocking, use a `2×2` occupancy footprint, settle at a free point and can be picked up again;
+- the fixed canonical well refills the eight-use water bucket;
+- potato and lemon crops share persisted soil/moisture rules and retain crop-specific growth and yield.
 
 ## Owners
 
@@ -19,6 +20,7 @@ This system owns world geometry, collision queries, resource definitions, gather
 - profiles/actions/rewards: `resourceDomain.js`, `resourceConfig.js`;
 - inventory state and item operations: `inventoryDomain.js`;
 - inventory/world-item runtime: `inventoryRuntime.js`;
+- farm rules/runtime and crop profiles: `farmingDomain.js`, `farmingRuntime.js`, `farmingConfig.js`;
 - world instances: `debrisRuntime.js`;
 - interaction targeting: `interaction.js`, `interactionRuntime.js`;
 - build placement of plants: `systems/build-and-authoring.md`;
@@ -26,24 +28,22 @@ This system owns world geometry, collision queries, resource definitions, gather
 
 ## Invariants
 
-- stable IDs survive save/load;
-- profile data is immutable;
-- inventory has exactly ten slots;
-- tools and loot share the same movable slot contract;
-- loot stacks by canonical item ID;
-- a final resource hit is atomic when no inventory slot or compatible stack can accept the reward;
-- dropped items do not enter player collision, cannot share the same `2×2` occupancy point and use deterministic fallback placement;
-- collision footprint and visible object remain coordinated;
-- placed tree is currently a gatherable resource node, not a crop lifecycle.
+- stable IDs survive save/load and profile data is immutable;
+- inventory has exactly ten slots; tools and loot share the movable-slot contract;
+- a fresh game owns exactly one axe, pickaxe, hoe and water bucket; migration adds missing tools without duplicates;
+- loot stacks by canonical item ID and the final resource hit is atomic when inventory is full;
+- potato crops require eight effective daylight hours, lemon crops require four, and each crop applies its own daily cap and yield;
+- the canonical well is fixed infrastructure and is excluded from build placement, move and demolition;
+- planted trees are gatherable resource nodes, yield exactly five wood and use the axe.
 
 ## Current baseline
 
-Small/large logs and stones, ruby nodes and planted trees support interactions, progress, inventory rewards, collision and persistence. The player can reorder ten hotbar slots, drop whole stacks into the world and pick them up again. Planted trees can be placed through build mode and chopped.
+Logs, stones, ruby nodes and six starting planted trees support strict tool interactions, progress, inventory rewards, collision and persistence. The player can reorder ten hotbar slots, throw whole stacks toward the cursor and pick them up. Potato and lemon crops share persisted soil/moisture rules; the fixed well refills the water bucket.
 
 ## Not yet
 
-Soil, seeds, crop stages, watering gameplay, water source, inventory containers, stack splitting, tool progression, durability and seasonal rules.
+Inventory containers, stack splitting, tool progression, durability and seasonal rules.
 
 ## Evidence
 
-`check:inventory`, `check:world`, `check:interaction`, `check:progress`, resource-related Browser E2E.
+`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, resource/farming Browser E2E.

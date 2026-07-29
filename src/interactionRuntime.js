@@ -79,12 +79,16 @@ export function createInteractionRuntime({
         return;
       }
       currentCandidate = null;
-      if (result?.messageKey) {
+      if (result?.transientMessageShown) {
+        currentCandidate = candidate;
+        presenter?.showPrompt?.({ promptKey: candidate.prompt });
+      } else if (result?.messageKey) {
         presenter?.showMessage?.({ messageKey: result.messageKey });
       } else if (result?.status === "insufficient-energy") {
         presenter?.showMessage?.({ messageKey: "hud:interaction.notEnoughEnergy" });
       } else if (result?.status === "wake-failed") {
-        presenter?.showMessage?.({ messageKey: "hud:interaction.wakeFailed" });
+        currentCandidate = candidate;
+        presenter?.showPrompt?.({ promptKey: candidate.prompt });
       } else {
         presenter?.hidePrompt?.();
       }

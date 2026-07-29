@@ -11,12 +11,12 @@ function freezeProfile(profile) {
 }
 
 const profiles = [
-  { id: "log-small", kind: "log", size: "small", preferredAction: "chop", actionHp: { chop: "smallLogChopHp" }, reward: { resource: "wood", amount: 1 }, visual: "log", footprint: { width: 2, height: 2 }, collisionTopInset: 3, prompt: "hud:interaction.chop", sfx: "chop" },
-  { id: "log-large", kind: "log", size: "large", preferredAction: "chop", actionHp: { chop: { tuning: "smallLogChopHp", multiplier: LARGE_RESOURCE_HP_MULTIPLIER } }, reward: { resource: "wood", amount: 3 }, visual: "log", footprint: { width: 3, height: 3 }, collisionTopInset: 4.5, prompt: "hud:interaction.chop", sfx: "chop" },
-  { id: "stone-small", kind: "stone", size: "small", preferredAction: "mine", actionHp: { mine: 7 }, reward: { resource: "stone", amount: 1 }, visual: "stone", footprint: { width: 2, height: 2 }, collisionTopInset: 3, collisionLeftInset: 1, collisionRightInset: 2, prompt: "hud:interaction.mine", sfx: "mine" },
-  { id: "stone-large", kind: "stone", size: "large", preferredAction: "mine", actionHp: { mine: { value: 7, multiplier: LARGE_RESOURCE_HP_MULTIPLIER } }, reward: { resource: "stone", amount: 3 }, visual: "stone", footprint: { width: 3, height: 3 }, collisionTopInset: 4.5, prompt: "hud:interaction.mine", sfx: "mine" },
-  { id: "ruby-node", kind: "ruby", size: "small", preferredAction: "mine", actionHp: { mine: 5 }, reward: { resource: "rubies", amount: 1 }, visual: "ruby", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.mine", sfx: "mine" },
-  { id: "tree-planted", kind: "plant", size: "large", preferredAction: "chop", actionHp: { chop: "smallLogChopHp" }, reward: { resource: "wood", amount: 6 }, visual: "tree", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.chop", sfx: "chop" },
+  { id: "log-small", kind: "log", size: "small", requiredTool: "axe", preferredAction: "chop", actionHp: { chop: "smallLogChopHp" }, reward: { resource: "wood", amount: 1 }, visual: "log", footprint: { width: 2, height: 2 }, collisionTopInset: 3, prompt: "hud:interaction.chop", sfx: "chop" },
+  { id: "log-large", kind: "log", size: "large", requiredTool: "axe", preferredAction: "chop", actionHp: { chop: { tuning: "smallLogChopHp", multiplier: LARGE_RESOURCE_HP_MULTIPLIER } }, reward: { resource: "wood", amount: 3 }, visual: "log", footprint: { width: 3, height: 3 }, collisionTopInset: 4.5, prompt: "hud:interaction.chop", sfx: "chop" },
+  { id: "stone-small", kind: "stone", size: "small", requiredTool: "pickaxe", preferredAction: "mine", actionHp: { mine: 7 }, reward: { resource: "stone", amount: 1 }, visual: "stone", footprint: { width: 2, height: 2 }, collisionTopInset: 3, collisionLeftInset: 1, collisionRightInset: 2, prompt: "hud:interaction.mine", sfx: "mine" },
+  { id: "stone-large", kind: "stone", size: "large", requiredTool: "pickaxe", preferredAction: "mine", actionHp: { mine: { value: 7, multiplier: LARGE_RESOURCE_HP_MULTIPLIER } }, reward: { resource: "stone", amount: 3 }, visual: "stone", footprint: { width: 3, height: 3 }, collisionTopInset: 4.5, prompt: "hud:interaction.mine", sfx: "mine" },
+  { id: "ruby-node", kind: "ruby", size: "small", requiredTool: "pickaxe", preferredAction: "mine", actionHp: { mine: 5 }, reward: { resource: "rubies", amount: 1 }, visual: "ruby", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.mine", sfx: "mine" },
+  { id: "tree-planted", kind: "plant", size: "large", requiredTool: "axe", preferredAction: "chop", actionHp: { chop: "smallLogChopHp" }, reward: { resource: "wood", amount: 5 }, visual: "tree", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.chop", sfx: "chop" },
 ].map(freezeProfile);
 
 export const RESOURCE_PROFILES = Object.freeze(Object.fromEntries(profiles.map((profile) => [profile.id, profile])));
@@ -25,6 +25,10 @@ export function getResourceProfile(profileId) {
   const profile = RESOURCE_PROFILES[profileId];
   if (!profile) throw new Error(`Unknown resource profile: ${String(profileId)}`);
   return profile;
+}
+
+export function resourceActionForTool(profile, toolId) {
+  return profile?.requiredTool === toolId ? profile.preferredAction : null;
 }
 
 export function resourceEffectType(profile, status) {

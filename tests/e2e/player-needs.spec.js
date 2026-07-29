@@ -122,8 +122,12 @@ test.describe("Task #030 player needs", () => {
     await expect.poll(async () => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).toMatchObject({ sleeping: true, exhaustedSleeping: true });
     await page.evaluate(() => window.__NESTLED_BURROW_E2E__.interact());
     await expect.poll(async () => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getInteractionHudState())).toMatchObject({
-      messageKey: "hud:interaction.wakeFailed",
+      messageKey: null,
       promptVisible: true,
+    });
+    await expect.poll(async () => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getTransientMessageState())).toMatchObject({
+      messageKey: "hud:interaction.wakeFailed",
+      visible: true,
     });
   });
 });

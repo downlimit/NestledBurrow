@@ -1,15 +1,18 @@
 import {
   FARMING_FRAMES,
+  CROP_PROFILES,
   HYDRATED_ROT_SECONDS,
   NEVER_WATERED_ROT_SECONDS,
-  POTATO_CROP_PROFILE,
   SOLAR_DAY_END_SECONDS,
   SOLAR_DAY_START_SECONDS,
-  WATERING_CAN_CAPACITY,
+  STARTER_WELL,
+  WATER_BUCKET_CAPACITY,
 } from "./farmingConfig.js";
 import { SECONDS_PER_DAY } from "./gameClock.js";
 import { takeInventoryItem } from "./inventoryDomain.js";
 import { TILE_SIZE } from "./worldConfig.js";
+import { LEMONADE_TEXTURE_KEY, lemonCropFrame } from "./lemonadeConfig.js";
+import { FARMING_TEXTURE_KEY } from "./farmingConfig.js";
 
 const MOISTURE_TIER_SECONDS = Object.freeze([10 * 3600, 17 * 3600, 21 * 3600]);
 const EPSILON = 1e-7;
@@ -45,26 +48,27 @@ export function farmCellKey(point) {
 export function createFreshFarmState(worldTimeSeconds = 0) {
   return {
     soilCells: [],
-    wateringCan: { capacity: WATERING_CAN_CAPACITY, currentWater: WATERING_CAN_CAPACITY },
-    wells: [],
+    waterBucket: { capacity: WATER_BUCKET_CAPACITY, currentWater: 0 },
+    wells: [{ ...STARTER_WELL }],
     lastProcessedWorldTimeSeconds: finiteNonNegative(worldTimeSeconds, 0, "Farm clock"),
   };
 }
 
 function normalizeCrop(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  if (value.type !== "potato") throw new Error(`${label}.type must be potato`);
+  if (!CROP_PROFILES[value.type]) throw new Error(`${label}.type is unsupported`);
+  const profile = CROP_PROFILES[value.type];
   const effectiveGrowthSeconds = finiteNonNegative(value.effectiveGrowthSeconds, 0, `${label}.effectiveGrowthSeconds`);
   const rotten = Boolean(value.rotten);
   return {
-    type: "potato",
+    type: value.type,
     plantedAt: finiteNonNegative(value.plantedAt, 0, `${label}.plantedAt`),
     firstHydratedAt: nullableTime(value.firstHydratedAt, `${label}.firstHydratedAt`),
     lastHydratedAt: nullableTime(value.lastHydratedAt, `${label}.lastHydratedAt`),
     effectiveGrowthSeconds,
     growthDayIndex: integer(value.growthDayIndex, Math.floor(Number(value.plantedAt) / SECONDS_PER_DAY), `${label}.growthDayIndex`),
     growthTodaySeconds: finiteNonNegative(value.growthTodaySeconds, 0, `${label}.growthTodaySeconds`),
-    mature: !rotten && (Boolean(value.mature) || effectiveGrowthSeconds >= POTATO_CROP_PROFILE.requiredEffectiveGrowthSeconds),
+    mature: !rotten && (Boolean(value.mature) || effectiveGrowthSeconds >= profile.requiredEffectiveGrowthSeconds),
     rotten,
   };
 }
@@ -86,7 +90,8 @@ function normalizeWell(value, index) {
   const point = normalizePoint(value, `Farm well ${index}`);
   const id = String(value.id ?? "");
   if (!/^farm-well-\d+$/.test(id)) throw new Error(`Farm well ${index}.id is invalid`);
-  return { id, x: point.x, y: point.y };
+  if (id === STARTER_WELL.id) return { ...STARTER_WELL };
+  return { id, x: point.x, y: point.y, fixed: Boolean(value.fixed) };
 }
 
 export function normalizeFarmState(value = {}, worldTimeSeconds = 0) {
@@ -100,14 +105,14 @@ export function normalizeFarmState(value = {}, worldTimeSeconds = 0) {
   }
   const wells = (value.wells ?? []).map(normalizeWell);
   if (new Set(wells.map((well) => well.id)).size !== wells.length) throw new Error("Duplicate farm well ID");
-  const capacity = integer(value.wateringCan?.capacity, WATERING_CAN_CAPACITY, "Watering can capacity");
-  const currentWater = integer(value.wateringCan?.currentWater, capacity, "Watering can water");
-  if (capacity !== WATERING_CAN_CAPACITY || currentWater < 0 || currentWater > capacity) {
-    throw new Error(`Watering can must be within 0..${WATERING_CAN_CAPACITY}`);
+  const capacity = integer(value.waterBucket?.capacity, WATER_BUCKET_CAPACITY, "Water bucket capacity");
+  const currentWater = integer(value.waterBucket?.currentWater, 0, "Water bucket water");
+  if (capacity !== WATER_BUCKET_CAPACITY || currentWater < 0 || currentWater > capacity) {
+    throw new Error(`Water bucket must be within 0..${WATER_BUCKET_CAPACITY}`);
   }
   return {
     soilCells,
-    wateringCan: { capacity, currentWater },
+    waterBucket: { capacity, currentWater },
     wells,
     lastProcessedWorldTimeSeconds: finiteNonNegative(
       value.lastProcessedWorldTimeSeconds,
@@ -135,15 +140,18 @@ export function tillSoil(farm, point, { valid = true } = {}) {
   return { status: "tilled", mutated: true, cell };
 }
 
-export function plantPotato(farm, point, inventory, worldTimeSeconds) {
+export function plantCrop(farm, point, inventory, worldTimeSeconds, cropType) {
+  const profile = CROP_PROFILES[cropType];
+  if (!profile) return { status: "unknown-crop", mutated: false };
   const cell = findSoilCell(farm, point);
   if (!cell || cell.crop) return { status: "invalid-planting-cell", mutated: false };
-  const taken = takeInventoryItem(inventory, "potato-seed", 1);
-  if (!taken.mutated) return { status: "no-potato-seed", mutated: false };
+  const seedId = `${cropType}-seed`;
+  const taken = takeInventoryItem(inventory, seedId, 1);
+  if (!taken.mutated) return { status: `no-${seedId}`, mutated: false };
   const hydrated = moistureMultiplier(cell.moistureSolarAgeSeconds) > 0;
   const now = finiteNonNegative(worldTimeSeconds, 0, "Planting time");
   cell.crop = {
-    type: "potato",
+    type: cropType,
     plantedAt: now,
     firstHydratedAt: hydrated ? now : null,
     lastHydratedAt: hydrated ? now : null,
@@ -156,30 +164,39 @@ export function plantPotato(farm, point, inventory, worldTimeSeconds) {
   return { status: "planted", mutated: true, cell, inventory: taken };
 }
 
+export function plantPotato(farm, point, inventory, worldTimeSeconds) {
+  return plantCrop(farm, point, inventory, worldTimeSeconds, "potato");
+}
+
 export function waterSoil(farm, point, worldTimeSeconds) {
   const cell = findSoilCell(farm, point);
   if (!cell) return { status: "not-tilled", mutated: false };
-  if (farm.wateringCan.currentWater <= 0) return { status: "watering-can-empty", mutated: false };
-  farm.wateringCan.currentWater -= 1;
+  if (farm.waterBucket.currentWater <= 0) return { status: "water-bucket-empty", mutated: false };
+  farm.waterBucket.currentWater -= 1;
   hydrateCell(cell, finiteNonNegative(worldTimeSeconds, 0, "Watering time"));
-  return { status: "watered", mutated: true, cell, currentWater: farm.wateringCan.currentWater };
+  return { status: "watered", mutated: true, cell, currentWater: farm.waterBucket.currentWater };
 }
 
-export function refillWateringCan(farm) {
-  if (farm.wateringCan.currentWater >= farm.wateringCan.capacity) {
-    return { status: "watering-can-full", mutated: false, currentWater: farm.wateringCan.currentWater };
+export function refillWaterBucket(farm) {
+  if (farm.waterBucket.currentWater >= farm.waterBucket.capacity) {
+    return { status: "water-bucket-full", mutated: false, currentWater: farm.waterBucket.currentWater };
   }
-  farm.wateringCan.currentWater = farm.wateringCan.capacity;
-  return { status: "watering-can-refilled", mutated: true, currentWater: farm.wateringCan.currentWater };
+  farm.waterBucket.currentWater = farm.waterBucket.capacity;
+  return { status: "water-bucket-refilled", mutated: true, currentWater: farm.waterBucket.currentWater };
 }
 
-export function harvestPotato(farm, point, rng = Math.random) {
+export function harvestCrop(farm, point, rng = Math.random) {
   const cell = findSoilCell(farm, point);
   if (!cell?.crop?.mature || cell.crop.rotten) return { status: "not-mature", mutated: false };
   const random = Math.min(0.999999999, Math.max(0, Number(rng()) || 0));
-  const quantity = 4 + Math.floor(random * 3);
+  const itemId = cell.crop.type;
+  const quantity = itemId === "lemon" ? 2 + Math.floor(random * 2) : 4 + Math.floor(random * 3);
   cell.crop = null;
-  return { status: "harvested", mutated: true, quantity, cell };
+  return { status: "harvested", mutated: true, itemId, quantity, cell };
+}
+
+export function harvestPotato(farm, point, rng = Math.random) {
+  return harvestCrop(farm, point, rng);
 }
 
 export function axeFarmCell(farm, point) {
@@ -226,6 +243,7 @@ export function soilFrame(cell) {
 
 export function cropFrame(crop) {
   if (!crop) return null;
+  if (crop.type === "lemon") return lemonCropFrame(crop);
   if (crop.rotten) return crop.firstHydratedAt === null
     ? FARMING_FRAMES.cropPlantedRotten
     : FARMING_FRAMES.cropRotten;
@@ -233,6 +251,15 @@ export function cropFrame(crop) {
   if (crop.firstHydratedAt === null) return FARMING_FRAMES.cropPlanted;
   if (crop.effectiveGrowthSeconds < 2 * 3600) return FARMING_FRAMES.cropSprout;
   return FARMING_FRAMES.cropYoung;
+}
+
+export function cropVisualAsset(crop) {
+  const frame = cropFrame(crop);
+  if (frame === null) return null;
+  return {
+    textureKey: crop.type === "lemon" ? LEMONADE_TEXTURE_KEY : FARMING_TEXTURE_KEY,
+    frame,
+  };
 }
 
 export function advanceFarmTime(farm, targetWorldTimeSeconds, environment = {}) {
@@ -277,16 +304,17 @@ function integrateCell(cell, start, end, duration, solar, weather) {
     }
     if (!crop.rotten && solar) {
       const moisture = weather.precipitation ? 1 : moistureMultiplier(cell.moistureSolarAgeSeconds);
-      const weatherMultiplier = POTATO_CROP_PROFILE.weatherGrowthMultipliers[weather.id] ?? 1;
-      const dailyRoom = Math.max(0, POTATO_CROP_PROFILE.maximumEffectiveGrowthPerDay - crop.growthTodaySeconds);
+      const profile = CROP_PROFILES[crop.type];
+      const weatherMultiplier = profile.weatherGrowthMultipliers[weather.id] ?? 1;
+      const dailyRoom = Math.max(0, profile.maximumEffectiveGrowthPerDay - crop.growthTodaySeconds);
       const growth = Math.min(dailyRoom, duration * moisture * weatherMultiplier);
       if (growth > 0) {
         crop.effectiveGrowthSeconds += growth;
         crop.growthTodaySeconds += growth;
         mutated = true;
       }
-      if (crop.effectiveGrowthSeconds >= POTATO_CROP_PROFILE.requiredEffectiveGrowthSeconds) {
-        crop.effectiveGrowthSeconds = POTATO_CROP_PROFILE.requiredEffectiveGrowthSeconds;
+      if (crop.effectiveGrowthSeconds >= profile.requiredEffectiveGrowthSeconds) {
+        crop.effectiveGrowthSeconds = profile.requiredEffectiveGrowthSeconds;
         crop.mature = true;
       }
     }
@@ -380,12 +408,13 @@ function nextBoundary(farm, cursor, target, weather, segments) {
     }
     if (!isSolarTime(cursor)) continue;
     const moisture = weather.precipitation ? 1 : moistureMultiplier(cell.moistureSolarAgeSeconds);
-    const weatherMultiplier = POTATO_CROP_PROFILE.weatherGrowthMultipliers[weather.id] ?? 1;
+    const profile = CROP_PROFILES[crop.type];
+    const weatherMultiplier = profile.weatherGrowthMultipliers[weather.id] ?? 1;
     const rate = moisture * weatherMultiplier;
     if (rate <= 0) continue;
     ensureGrowthDay(crop, Math.floor(cursor / SECONDS_PER_DAY));
-    const capRoom = POTATO_CROP_PROFILE.maximumEffectiveGrowthPerDay - crop.growthTodaySeconds;
-    const matureRoom = POTATO_CROP_PROFILE.requiredEffectiveGrowthSeconds - crop.effectiveGrowthSeconds;
+    const capRoom = profile.maximumEffectiveGrowthPerDay - crop.growthTodaySeconds;
+    const matureRoom = profile.requiredEffectiveGrowthSeconds - crop.effectiveGrowthSeconds;
     for (const room of [capRoom, matureRoom]) {
       if (room > EPSILON) next = Math.min(next, cursor + room / rate);
     }

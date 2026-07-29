@@ -104,7 +104,8 @@ const audioRuntimeSource = readFileSync("src/audioRuntime.js", "utf8");
 assert(!audioRuntimeSource.includes("visibilitychange")); assert(!audioRuntimeSource.includes("blur"));
 const eventWiringSource = [
   "src/main.js", "src/inventoryRuntime.js", "src/farmingRuntime.js",
-  "src/cookingRuntime.js", "src/merchantRuntime.js",
+  "src/cookingRuntime.js", "src/merchantRuntime.js", "src/kitchenInteractionRuntime.js",
+  "src/guestFeedback.js", "src/tavernServiceRuntime.js",
 ].map((path) => readFileSync(path, "utf8")).join("\n");
 for (const effectId of task047Effects.filter((id) => !id.startsWith("wood-") && !id.startsWith("stone-") && !id.startsWith("ruby-"))) {
   assert(eventWiringSource.includes(`"${effectId}"`), `${effectId} is wired to a gameplay event`);

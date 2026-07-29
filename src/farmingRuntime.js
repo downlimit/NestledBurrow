@@ -6,13 +6,13 @@ import {
 import {
   advanceFarmTime,
   axeFarmCell,
-  cropFrame,
+  cropVisualAsset,
   destroyCropsByCollider,
   farmCellKey,
   findSoilCell,
-  harvestPotato,
-  plantPotato,
-  refillWateringCan,
+  harvestCrop,
+  plantCrop,
+  refillWaterBucket,
   soilFrame,
   tillSoil,
   waterSoil,
@@ -48,7 +48,7 @@ export function createFarmingRuntime(scene, {
     if (!character) return null;
     const desired = character.motor?.movement?.desiredDirection;
     const selectedId = getSelectedItem()?.id;
-    const usingStableFarmAim = selectedId === "hoe" || selectedId === "axe" || selectedId === "watering-can";
+    const usingStableFarmAim = selectedId === "hoe" || selectedId === "axe" || selectedId === "water-bucket";
     if (usingStableFarmAim) {
       hoeAimDirection = stableHoeAimDirection(hoeAimDirection, desired, facingVector(character.lastFacing));
       farmAimAnchorCell = stableGridAnchor(
@@ -84,7 +84,7 @@ export function createFarmingRuntime(scene, {
     const cell = findSoilCell(farm, point);
     const selected = getSelectedItem();
     if (cell?.crop?.mature && !cell.crop.rotten && selected?.id !== "axe" && !isModalActive()) {
-      return definition("harvest", FARMING_INTERACTION_KINDS.harvest, point, "hud:interaction.harvestPotato", 32);
+      return definition("harvest", FARMING_INTERACTION_KINDS.harvest, point, cell.crop.type === "lemon" ? "hud:interaction.harvestLemon" : "hud:interaction.harvestPotato", 32);
     }
     if (selected?.id === "axe" && cell) {
       return definition("axe", FARMING_INTERACTION_KINDS.axeCell, point, cell.crop ? "hud:interaction.destroyCrop" : "hud:interaction.destroySoil", 33);
@@ -95,10 +95,10 @@ export function createFarmingRuntime(scene, {
         return definition("till", FARMING_INTERACTION_KINDS.till, point, "hud:interaction.tillSoil", 26);
       }
     }
-    if (selected?.id === "potato-seed" && cell && !cell.crop) {
-      return definition("plant", FARMING_INTERACTION_KINDS.plant, point, "hud:interaction.plantPotato", 27);
+    if (["potato-seed", "lemon-seed"].includes(selected?.id) && cell && !cell.crop) {
+      return definition("plant", FARMING_INTERACTION_KINDS.plant, point, selected.id === "lemon-seed" ? "hud:interaction.plantLemon" : "hud:interaction.plantPotato", 27);
     }
-    if (selected?.id === "watering-can" && cell) {
+    if (selected?.id === "water-bucket" && cell) {
       return definition("water", FARMING_INTERACTION_KINDS.water, point, "hud:interaction.waterSoil", 28);
     }
     return null;
@@ -131,18 +131,18 @@ export function createFarmingRuntime(scene, {
         soilVisuals.set(key, soil);
       }
       soil.setFrame(soilFrame(cell)).setPosition(cell.x, cell.y).setVisible(true);
-      const frame = cropFrame(cell.crop);
+      const asset = cropVisualAsset(cell.crop);
       let crop = cropVisuals.get(key);
-      if (frame === null) {
+      if (asset === null) {
         crop?.destroy();
         cropVisuals.delete(key);
         continue;
       }
       if (!crop) {
-        crop = scene.add.image(cell.x, cell.y, FARMING_TEXTURE_KEY, frame).setOrigin(0);
+        crop = scene.add.image(cell.x, cell.y, asset.textureKey, asset.frame).setOrigin(0);
         cropVisuals.set(key, crop);
       }
-      crop.setFrame(frame)
+      crop.setTexture(asset.textureKey, asset.frame)
         .setPosition(cell.x, cell.y)
         .setDepth(assetDepthFromPivot(cell, CROP_DEPTH_ANCHOR, 500, `crop-${key}`))
         .setVisible(true);
@@ -166,19 +166,22 @@ export function createFarmingRuntime(scene, {
     if (candidate.kind === FARMING_INTERACTION_KINDS.till || candidate.kind === FARMING_INTERACTION_KINDS.clearRotten) {
       result = tillSoil(farm, point, { valid: isTillingValid(point) });
     } else if (candidate.kind === FARMING_INTERACTION_KINDS.plant) {
-      result = plantPotato(farm, point, sessionState.gameplay.inventory, sessionState.gameplay.worldTimeSeconds);
+      const cropType = getSelectedItem()?.id === "lemon-seed" ? "lemon" : "potato";
+      result = plantCrop(farm, point, sessionState.gameplay.inventory, sessionState.gameplay.worldTimeSeconds, cropType);
     } else if (candidate.kind === FARMING_INTERACTION_KINDS.water) {
       result = waterSoil(farm, point, sessionState.gameplay.worldTimeSeconds);
     } else if (candidate.kind === FARMING_INTERACTION_KINDS.harvest) {
-      result = harvestPotato(farm, point, rng);
+      result = harvestCrop(farm, point, rng);
       if (result.mutated) {
         const origin = scene.playerCharacter?.motor?.position ?? { x: point.x + 8, y: point.y + 8 };
-        spawnHarvestDrops("potato", result.quantity, origin);
+        spawnHarvestDrops(result.itemId, result.quantity, origin);
       }
     } else if (candidate.kind === FARMING_INTERACTION_KINDS.axeCell) {
       result = axeFarmCell(farm, point);
     } else if (candidate.kind === FARMING_INTERACTION_KINDS.refill) {
-      result = refillWateringCan(farm);
+      result = getSelectedItem()?.id === "water-bucket"
+        ? refillWaterBucket(farm)
+        : { status: "water-bucket-required", mutated: false };
     } else {
       return { status: "ignored", mutated: false };
     }
@@ -203,12 +206,12 @@ export function createFarmingRuntime(scene, {
   function advanceTo(worldTimeSeconds) {
     const beforeFrames = new Map(farm.soilCells
       .filter((cell) => cell.crop)
-      .map((cell) => [farmCellKey(cell), cropFrame(cell.crop)]));
+      .map((cell) => [farmCellKey(cell), JSON.stringify(cropVisualAsset(cell.crop))]));
     const result = advanceFarmTime(farm, worldTimeSeconds, { weatherSegments });
     if (result.mutated) {
       const stageChanged = farm.soilCells.some((cell) => cell.crop
         && beforeFrames.has(farmCellKey(cell))
-        && beforeFrames.get(farmCellKey(cell)) !== cropFrame(cell.crop));
+        && beforeFrames.get(farmCellKey(cell)) !== JSON.stringify(cropVisualAsset(cell.crop)));
       if (stageChanged) playEffect("crop-stage");
       render();
     }
@@ -224,14 +227,14 @@ export function createFarmingRuntime(scene, {
     const cell = findSoilCell(farm, point);
     const selectedId = getSelectedItem()?.id;
     const harvesting = candidate?.kind === FARMING_INTERACTION_KINDS.harvest;
-    if (!harvesting && !["axe", "hoe", "watering-can", "potato-seed"].includes(selectedId)) return;
+    if (!harvesting && !["axe", "hoe", "water-bucket", "potato-seed", "lemon-seed"].includes(selectedId)) return;
     if (selectedId === "axe" && !cell) return;
     const valid = harvesting
       || selectedId === "hoe" && (cell?.crop?.rotten || !cell?.crop && (cell || isTillingValid(point)))
-      || selectedId === "watering-can" && Boolean(cell)
-      || selectedId === "potato-seed" && Boolean(cell && !cell.crop)
+      || selectedId === "water-bucket" && Boolean(cell)
+      || ["potato-seed", "lemon-seed"].includes(selectedId) && Boolean(cell && !cell.crop)
       || selectedId === "axe" && Boolean(cell);
-    const color = valid ? selectedId === "watering-can" ? 0x62c7e5 : selectedId === "potato-seed" ? 0x93d36e : selectedId === "axe" ? 0xe58b62 : 0xf6d766 : 0xd87867;
+    const color = valid ? selectedId === "water-bucket" ? 0x62c7e5 : ["potato-seed", "lemon-seed"].includes(selectedId) ? 0x93d36e : selectedId === "axe" ? 0xe58b62 : 0xf6d766 : 0xd87867;
     const { x, y } = point;
     highlight.fillStyle(color, 0.12).fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
     highlight.lineStyle(1, color, 0.9)
@@ -351,10 +354,12 @@ function cardinalVector(vector) {
 
 function messageKeyForStatus(status) {
   const keys = {
-    "watering-can-empty": "hud:interaction.wateringCanEmpty",
-    "watering-can-full": "hud:interaction.wateringCanFull",
-    "watering-can-refilled": "hud:interaction.wateringCanRefilled",
+    "water-bucket-empty": "hud:interaction.waterBucketEmpty",
+    "water-bucket-full": "hud:interaction.waterBucketFull",
+    "water-bucket-refilled": "hud:interaction.waterBucketRefilled",
+    "water-bucket-required": "hud:interaction.waterBucketRequired",
     "no-potato-seed": "hud:interaction.noPotatoSeed",
+    "no-lemon-seed": "hud:interaction.noLemonSeed",
     "invalid-soil": "hud:interaction.invalidSoil",
   };
   return keys[status] ?? null;

@@ -1,19 +1,34 @@
 export const INVENTORY_SLOT_COUNT = 10;
-export const INVENTORY_TOOL_IDS = Object.freeze(["axe", "hoe", "watering-can"]);
-export const INVENTORY_ITEM_IDS = Object.freeze([...INVENTORY_TOOL_IDS, "wood", "stone", "ruby", "potato-seed", "potato"]);
+export const INVENTORY_TOOL_IDS = Object.freeze(["axe", "pickaxe", "hoe", "water-bucket"]);
+export const INVENTORY_ITEM_IDS = Object.freeze([
+  ...INVENTORY_TOOL_IDS,
+  "wood", "stone", "ruby", "potato-seed", "potato", "lemon-seed", "lemon",
+  "sliced-potato", "lemonade", "fried-potato-dish",
+]);
 export const INVENTORY_ITEM_KINDS = Object.freeze({
   axe: "tool",
+  pickaxe: "tool",
   hoe: "tool",
-  "watering-can": "tool",
+  "water-bucket": "tool",
   wood: "loot",
   stone: "loot",
   ruby: "loot",
   "potato-seed": "loot",
   potato: "loot",
+  "lemon-seed": "loot",
+  lemon: "loot",
+  "sliced-potato": "loot",
+  lemonade: "loot",
+  "fried-potato-dish": "loot",
 });
 export const INVENTORY_STACK_LIMITS = Object.freeze({
   "potato-seed": 99,
   potato: 99,
+  "lemon-seed": 99,
+  lemon: 99,
+  "sliced-potato": 99,
+  lemonade: 99,
+  "fried-potato-dish": 99,
 });
 
 const RESERVED_IDS = new Set(["__proto__", "constructor", "prototype"]);
@@ -70,17 +85,17 @@ export function createFreshInventory() {
   return {
     slots: [
       createInventoryItem("axe"),
+      createInventoryItem("pickaxe"),
       createInventoryItem("hoe"),
-      createInventoryItem("watering-can"),
-      ...Array.from({ length: INVENTORY_SLOT_COUNT - 3 }, () => null),
+      createInventoryItem("water-bucket"),
+      ...Array.from({ length: INVENTORY_SLOT_COUNT - 4 }, () => null),
     ],
   };
 }
 
 export function createNewGameInventory() {
   const inventory = createFreshInventory();
-  inventory.slots[3] = createInventoryItem("potato-seed", 4);
-  inventory.slots[4] = createInventoryItem("potato", 3);
+  inventory.slots[4] = createInventoryItem("potato-seed", 4);
   return inventory;
 }
 
@@ -200,7 +215,11 @@ export function addInventoryItem(inventory, item) {
   const normalized = normalizeInventoryBatch(item);
   const availability = canAddInventoryItem(inventory, normalized);
   if (!availability.canAdd) return { ...availability, mutated: false, item: normalized };
-  for (const operation of availability.plan ?? []) {
+  const plan = (availability.plan ?? []).map((operation) => ({
+    ...operation,
+    wasEmpty: inventory.slots[operation.slotIndex] === null,
+  }));
+  for (const operation of plan) {
     const existing = inventory.slots[operation.slotIndex];
     inventory.slots[operation.slotIndex] = existing
       ? { ...existing, quantity: operation.quantity }
@@ -210,9 +229,33 @@ export function addInventoryItem(inventory, item) {
     status: availability.status === "stack" ? "stacked" : "inserted",
     mutated: true,
     slotIndex: availability.slotIndex,
-    slots: availability.plan.map(({ slotIndex }) => slotIndex),
+    slots: plan.map(({ slotIndex }) => slotIndex),
+    plan,
     item: { ...normalized },
   };
+}
+
+export function inventoryCapacityFor(inventory, itemId) {
+  const id = normalizeItemId(itemId);
+  if (itemKind(id) === "tool") {
+    return inventory.slots.some((slot) => slot?.id === id) ? 0 : Number(findFirstEmptyInventorySlot(inventory) >= 0);
+  }
+  const limit = inventoryStackLimit(id);
+  return inventory.slots.reduce((total, slot) => {
+    if (slot === null) return total + limit;
+    if (slot.id === id && slot.kind === "loot") return total + Math.max(0, limit - slot.quantity);
+    return total;
+  }, 0);
+}
+
+export function addInventoryItemUpTo(inventory, item) {
+  const normalized = normalizeInventoryBatch(item);
+  const accepted = Math.min(normalized.quantity, inventoryCapacityFor(inventory, normalized.id));
+  if (accepted <= 0) {
+    return { status: "inventory-full", mutated: false, accepted: 0, remaining: normalized.quantity, item: normalized, plan: [] };
+  }
+  const result = addInventoryItem(inventory, { ...normalized, quantity: accepted });
+  return { ...result, accepted, remaining: normalized.quantity - accepted };
 }
 
 function normalizeInventoryBatch(item) {

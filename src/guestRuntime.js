@@ -1,11 +1,16 @@
 import { createActorNavigation, findGridPath } from "./gridPathfinder.js";
+import {
+  GUEST_ACTIVE_CAP,
+  allowedGuestWaveSize,
+  sampleGuestSpawnDelay,
+  sampleGuestWaveSize,
+} from "./tavernServiceDomain.js";
 
 export const GUEST_STATES = Object.freeze({
   approachingSign: "approaching-sign",
   checkingSign: "checking-sign",
   entering: "entering",
   approachingService: "approaching-service",
-  waitingForDish: "waiting-for-dish",
   carryingToSeat: "carrying-to-seat",
   eating: "eating",
   leaving: "leaving",
@@ -14,47 +19,70 @@ export const GUEST_STATES = Object.freeze({
 
 export function createGuestRuntime({
   config,
+  serviceState,
   worldLayout,
   createGuest,
   removeGuest,
   getTavernOpen,
-  getKitchenState,
   getServicePoint,
   getSeatPoint,
+  getAvailablePortions = () => 0,
+  reserveItem = () => null,
+  releaseReservation = () => false,
+  consumeReservation = () => null,
   onReservationChange = () => {},
-  onDishConsumed = () => {},
+  onPurchaseComplete = () => {},
   randomSource = Math.random,
-  createFeedback = () => ({ set: () => {}, destroy: () => {} }),
+  createFeedback = () => ({ set: () => {}, update: () => {}, destroy: () => {} }),
 }) {
   if (typeof getServicePoint !== "function" || typeof getSeatPoint !== "function") {
     throw new Error("Guest runtime requires live service and seat point resolvers");
   }
-  let visit = null;
-  let spawnRemainingMs = config.initialSpawnDelayMs;
+  const visits = new Map();
   let destroyed = false;
-  let reservation = false;
+
+  for (const snapshot of serviceState.guests) restoreVisit(snapshot);
+  syncPersistedState();
 
   function update(deltaMs) {
     if (destroyed) return;
     const delta = Math.max(0, Number(deltaMs) || 0);
-    if (!visit) {
-      spawnRemainingMs -= delta;
-      if (spawnRemainingMs <= 0) spawn();
-      return;
+    updateScheduler(delta);
+    for (const visit of [...visits.values()]) {
+      visit.feedback.update?.();
+      visit.stateElapsedMs += delta;
+      syncMovingFacilityTarget(visit);
+      if (visit.path) updateMovement(visit, delta);
+      else updateStationary(visit);
     }
-    visit.feedback.update?.();
-    visit.stateElapsedMs += delta;
-    syncMovingFacilityTarget();
-    if (visit.path) updateMovement(delta);
-    else updateStationary();
+    syncPersistedState();
   }
 
-  function spawn() {
-    if (visit || destroyed) return false;
+  function updateScheduler(deltaMs) {
+    if (!getTavernOpen()) return;
+    serviceState.spawnRemainingMs = Math.max(0, serviceState.spawnRemainingMs - deltaMs);
+    if (serviceState.spawnRemainingMs > 0) return;
+    const requested = sampleGuestWaveSize(randomSource);
+    const allowed = allowedGuestWaveSize({
+      requested,
+      activeGuests: visits.size,
+      unreservedPortions: getAvailablePortions(),
+      cap: GUEST_ACTIVE_CAP,
+    });
+    for (let index = 0; index < allowed; index += 1) spawn({ requireReservation: true });
+    serviceState.spawnRemainingMs = sampleGuestSpawnDelay(randomSource);
+  }
+
+  function spawn({ requireReservation = false } = {}) {
+    if (destroyed || visits.size >= GUEST_ACTIVE_CAP) return false;
+    const id = `tavern-guest-${++serviceState.nextGuestId}`;
+    const reservation = reserveItem(id);
+    if (requireReservation && !reservation) return false;
     const controller = config.createController();
-    const character = createGuest(controller);
+    const character = createGuest(controller, id, config.points.spawn);
     const feedback = createFeedback(character);
-    visit = {
+    const visit = {
+      id,
       character,
       controller,
       feedback,
@@ -67,14 +95,51 @@ export function createGuestRuntime({
       replans: 0,
       target: config.points.sign,
       signDecision: null,
-      emptyTableReacting: false,
+      itemId: reservation?.itemId ?? null,
+      reservationActive: Boolean(reservation),
       mealCompleted: false,
+      paid: false,
     };
+    visits.set(id, visit);
+    if (reservation) onReservationChange({ guestId: id, active: true, itemId: reservation.itemId });
     feedback.set("arriving");
-    return planTo(config.points.sign);
+    if (!planTo(visit, config.points.sign)) {
+      cancelVisit(visit);
+      return false;
+    }
+    syncPersistedState();
+    return id;
   }
 
-  function updateMovement(deltaMs) {
+  function restoreVisit(snapshot) {
+    const controller = config.createController();
+    const character = createGuest(controller, snapshot.id, snapshot.position);
+    const visit = {
+      id: snapshot.id,
+      character,
+      controller,
+      feedback: createFeedback(character),
+      state: snapshot.state,
+      stateElapsedMs: snapshot.stateElapsedMs,
+      path: null,
+      waypointIndex: 0,
+      blockedMs: 0,
+      lastWaypointDistance: Number.POSITIVE_INFINITY,
+      replans: 0,
+      target: null,
+      signDecision: snapshot.state === GUEST_STATES.checkingSign ? null : true,
+      itemId: snapshot.itemId,
+      reservationActive: snapshot.reservationActive,
+      mealCompleted: snapshot.mealCompleted,
+      paid: snapshot.paid,
+    };
+    visits.set(visit.id, visit);
+    visit.feedback.set(feedbackForState(visit));
+    const target = targetForState(visit);
+    if (target) planTo(visit, target);
+  }
+
+  function updateMovement(visit, deltaMs) {
     const waypoint = visit.path[visit.waypointIndex];
     const position = visit.character.motor.position;
     const dx = waypoint.x - position.x;
@@ -83,7 +148,7 @@ export function createGuestRuntime({
     if (distance <= config.arrivalRadius) {
       visit.waypointIndex += 1;
       visit.blockedMs = 0;
-      if (visit.waypointIndex >= visit.path.length) arrive();
+      if (visit.waypointIndex >= visit.path.length) arrive(visit);
       return;
     }
     visit.controller.setMovement({ x: dx, y: dy });
@@ -97,10 +162,10 @@ export function createGuestRuntime({
     if (visit.blockedMs < config.blockedReplanMs) return;
     visit.blockedMs = 0;
     visit.replans += 1;
-    if (visit.replans > config.maxReplans || !planTo(visit.target, { keepReplans: true })) cancelVisit();
+    if (visit.replans > config.maxReplans || !planTo(visit, visit.target, { keepReplans: true })) cancelVisit(visit);
   }
 
-  function updateStationary() {
+  function updateStationary(visit) {
     if (visit.state === GUEST_STATES.checkingSign) {
       if (visit.signDecision === null && visit.stateElapsedMs >= config.signCheckMs) {
         visit.signDecision = getTavernOpen();
@@ -109,45 +174,42 @@ export function createGuestRuntime({
         return;
       }
       if (visit.signDecision === null || visit.stateElapsedMs < (config.signReactionMs ?? 0)) return;
-      if (visit.signDecision) transition(GUEST_STATES.entering, config.points.outsideDoor);
-      else transition(GUEST_STATES.leaving, config.points.exit);
-      return;
-    }
-    if (visit.state === GUEST_STATES.waitingForDish) {
-      const servicePoint = getServicePoint();
-      if (!isNearPoint(visit.character.motor.position, servicePoint, config.arrivalRadius)) {
-        transition(GUEST_STATES.approachingService, servicePoint);
+      if (!visit.signDecision) {
+        releaseVisitReservation(visit);
+        transition(visit, GUEST_STATES.leaving, config.points.exit);
         return;
       }
-      if (tryReserveDish()) transition(GUEST_STATES.carryingToSeat, getSeatPoint());
-      else if (visit.emptyTableReacting) {
-        if (visit.stateElapsedMs >= (config.emptyTableReactionMs ?? 0)) {
-          visit.emptyTableReacting = false;
-          visit.stateElapsedMs = 0;
-          visit.feedback.set("waiting");
+      if (!visit.reservationActive) {
+        const reservation = reserveItem(visit.id);
+        if (!reservation) {
+          transition(visit, GUEST_STATES.leaving, config.points.exit);
+          return;
         }
+        visit.reservationActive = true;
+        visit.itemId = reservation.itemId;
+        onReservationChange({ guestId: visit.id, active: true, itemId: reservation.itemId });
       }
-      else if (visit.stateElapsedMs >= config.dishWaitMs) transition(GUEST_STATES.leaving, config.points.exit);
+      transition(visit, GUEST_STATES.entering, config.points.outsideDoor);
       return;
     }
     if (visit.state === GUEST_STATES.eating) {
       const seatPoint = getSeatPoint();
       if (!visit.mealCompleted && !isNearPoint(visit.character.motor.position, seatPoint, config.arrivalRadius)) {
-        transition(GUEST_STATES.carryingToSeat, seatPoint);
+        transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
         return;
       }
       if (!visit.mealCompleted && visit.stateElapsedMs >= config.eatingMs) {
-        consumeReservedDish();
         visit.mealCompleted = true;
         visit.stateElapsedMs = 0;
         visit.feedback.set("meal-complete");
+        completePurchase(visit, 4);
       } else if (visit.mealCompleted && visit.stateElapsedMs >= (config.mealCompleteReactionMs ?? 0)) {
-        transition(GUEST_STATES.leaving, config.points.exit);
+        transition(visit, GUEST_STATES.leaving, config.points.exit);
       }
     }
   }
 
-  function arrive() {
+  function arrive(visit) {
     visit.path = null;
     visit.controller.stop();
     visit.stateElapsedMs = 0;
@@ -156,34 +218,57 @@ export function createGuestRuntime({
       visit.controller.face(config.signFacing ?? { x: 1, y: 0 });
       visit.feedback.set("checking");
     } else if (visit.state === GUEST_STATES.entering) {
-      transition(GUEST_STATES.approachingService, config.points.insideDoor);
+      transition(visit, GUEST_STATES.approachingService, config.points.insideDoor);
     } else if (visit.state === GUEST_STATES.approachingService && samePoint(visit.target, config.points.insideDoor)) {
-      transition(GUEST_STATES.approachingService, getServicePoint());
+      transition(visit, GUEST_STATES.approachingService, getServicePoint());
     } else if (visit.state === GUEST_STATES.approachingService) {
-      if (tryReserveDish()) transition(GUEST_STATES.carryingToSeat, getSeatPoint());
-      else {
-        visit.state = GUEST_STATES.waitingForDish;
-        visit.emptyTableReacting = true;
-        visit.feedback.set("empty-reaction");
+      const consumed = visit.reservationActive ? consumeReservation(visit.id) : null;
+      if (!consumed) {
+        releaseVisitReservation(visit);
+        transition(visit, GUEST_STATES.leaving, config.points.exit);
+        return;
+      }
+      visit.reservationActive = false;
+      visit.itemId = consumed.itemId;
+      onReservationChange({ guestId: visit.id, active: false, itemId: consumed.itemId, consumed: true });
+      if (visit.itemId === "lemonade") {
+        visit.feedback.set("carrying-lemonade");
+        completePurchase(visit, 2);
+        transition(visit, GUEST_STATES.leaving, config.points.exit, { preserveFeedback: true });
+      } else {
+        transition(visit, GUEST_STATES.carryingToSeat, getSeatPoint());
       }
     } else if (visit.state === GUEST_STATES.carryingToSeat) {
       visit.state = GUEST_STATES.eating;
       visit.controller.face({ x: 1, y: 0 });
       visit.feedback.set("eating");
-    } else if (visit.state === GUEST_STATES.leaving) finishVisit();
+    } else if (visit.state === GUEST_STATES.leaving) {
+      finishVisit(visit);
+    }
   }
 
-  function transition(state, target) {
+  function completePurchase(visit, value) {
+    if (visit.paid) return;
+    visit.paid = true;
+    onPurchaseComplete({
+      guestId: visit.id,
+      itemId: visit.itemId,
+      value,
+      position: { ...visit.character.motor.position },
+    });
+  }
+
+  function transition(visit, state, target, { preserveFeedback = false } = {}) {
     visit.state = state;
     visit.stateElapsedMs = 0;
-    visit.feedback.set(state === GUEST_STATES.leaving
+    if (!preserveFeedback) visit.feedback.set(state === GUEST_STATES.leaving
       ? "leaving"
-      : state === GUEST_STATES.carryingToSeat ? "carrying" : "moving");
-    if (!planTo(target)) cancelVisit();
+      : state === GUEST_STATES.carryingToSeat ? "carrying-dish" : "moving");
+    if (!planTo(visit, target)) cancelVisit(visit);
   }
 
-  function planTo(target, { keepReplans = false } = {}) {
-    if (!visit) return false;
+  function planTo(visit, target, { keepReplans = false } = {}) {
+    if (!visits.has(visit.id)) return false;
     const character = visit.character;
     const navigation = createActorNavigation(worldLayout, {
       cellSize: 16,
@@ -198,7 +283,7 @@ export function createGuestRuntime({
       ...navigation,
     });
     if (!path) return false;
-    visit.target = target;
+    visit.target = { ...target };
     visit.path = path.length > 0 ? path : [{ ...target }];
     visit.waypointIndex = 0;
     visit.lastWaypointDistance = Number.POSITIVE_INFINITY;
@@ -206,87 +291,109 @@ export function createGuestRuntime({
     return true;
   }
 
-  function syncMovingFacilityTarget() {
-    if (!visit?.path) return;
+  function syncMovingFacilityTarget(visit) {
+    if (!visit.path) return;
     let facilityPoint = null;
     if (visit.state === GUEST_STATES.approachingService
       && !samePoint(visit.target, config.points.insideDoor)) facilityPoint = getServicePoint();
     else if (visit.state === GUEST_STATES.carryingToSeat) facilityPoint = getSeatPoint();
-    if (facilityPoint && !samePoint(facilityPoint, visit.target)) planTo(facilityPoint);
+    if (facilityPoint && !samePoint(facilityPoint, visit.target)) planTo(visit, facilityPoint);
   }
 
-  function tryReserveDish() {
-    if (reservation || !getKitchenState()?.servingTableHasDish) return false;
-    reservation = true;
-    onReservationChange(true);
-    return true;
+  function releaseVisitReservation(visit) {
+    if (!visit.reservationActive) return false;
+    const released = releaseReservation(visit.id);
+    visit.reservationActive = false;
+    if (released) onReservationChange({ guestId: visit.id, active: false, itemId: visit.itemId });
+    return released;
   }
 
-  function consumeReservedDish() {
-    if (!reservation) return false;
-    const kitchen = getKitchenState();
-    if (!kitchen?.servingTableHasDish) return releaseReservation();
-    kitchen.servingTableHasDish = false;
-    reservation = false;
-    onReservationChange(false);
-    onDishConsumed({ position: { ...visit.character.motor.position } });
-    return true;
+  function cancelVisit(visit) {
+    releaseVisitReservation(visit);
+    finishVisit(visit);
   }
 
-  function releaseReservation() {
-    if (!reservation) return false;
-    reservation = false;
-    onReservationChange(false);
-    return true;
-  }
-
-  function cancelVisit() {
-    releaseReservation();
-    finishVisit();
-  }
-
-  function finishVisit() {
-    if (!visit) return;
+  function finishVisit(visit) {
+    if (!visits.has(visit.id)) return;
     visit.state = GUEST_STATES.finished;
     visit.feedback.destroy();
     removeGuest(visit.character.id);
-    visit = null;
-    spawnRemainingMs = nextSpawnDelay();
+    visits.delete(visit.id);
+    syncPersistedState();
   }
 
-  function nextSpawnDelay() {
-    const fraction = Math.min(1, Math.max(0, Number(randomSource()) || 0));
-    return config.subsequentSpawnDelayMinMs
-      + fraction * (config.subsequentSpawnDelayMaxMs - config.subsequentSpawnDelayMinMs);
+  function targetForState(visit) {
+    if (visit.state === GUEST_STATES.approachingSign) return config.points.sign;
+    if (visit.state === GUEST_STATES.entering) return config.points.outsideDoor;
+    if (visit.state === GUEST_STATES.approachingService) return getServicePoint();
+    if (visit.state === GUEST_STATES.carryingToSeat) return getSeatPoint();
+    if (visit.state === GUEST_STATES.leaving) return config.points.exit;
+    return null;
+  }
+
+  function feedbackForState(visit) {
+    if (visit.state === GUEST_STATES.checkingSign) return "checking";
+    if (visit.state === GUEST_STATES.carryingToSeat) return "carrying-dish";
+    if (visit.state === GUEST_STATES.eating) return visit.mealCompleted ? "meal-complete" : "eating";
+    if (visit.state === GUEST_STATES.leaving && visit.itemId === "lemonade") return "carrying-lemonade";
+    return "moving";
+  }
+
+  function syncPersistedState() {
+    serviceState.guests = [...visits.values()].map((visit) => ({
+      id: visit.id,
+      state: visit.state,
+      stateElapsedMs: visit.stateElapsedMs,
+      position: { ...visit.character.motor.position },
+      itemId: visit.itemId,
+      reservationActive: visit.reservationActive,
+      mealCompleted: visit.mealCompleted,
+      paid: visit.paid,
+    }));
   }
 
   return {
     update,
-    forceSpawn: spawn,
-    isDishReserved: () => reservation,
-    getState: () => visit ? {
-      active: true,
-      id: visit.character.id,
-      state: visit.state,
-      reservedDish: reservation,
-      position: { ...visit.character.motor.position },
-      replans: visit.replans,
-    } : { active: false, state: null, reservedDish: false, spawnRemainingMs },
+    forceSpawn: () => spawn({ requireReservation: false }),
+    isDishReserved: () => [...visits.values()].some((visit) => visit.reservationActive),
+    getState: () => {
+      const guests = [...visits.values()].map((visit) => ({
+        id: visit.id,
+        state: visit.state,
+        reservedDish: visit.reservationActive,
+        itemId: visit.itemId,
+        position: { ...visit.character.motor.position },
+        replans: visit.replans,
+        paid: visit.paid,
+      }));
+      return {
+        active: guests.length > 0,
+        activeCount: guests.length,
+        guests,
+        state: guests[0]?.state ?? null,
+        id: guests[0]?.id ?? null,
+        reservedDish: guests[0]?.reservedDish ?? false,
+        spawnRemainingMs: serviceState.spawnRemainingMs,
+      };
+    },
+    setRandomSource(next) {
+      if (typeof next === "function") randomSource = next;
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      releaseReservation();
-      if (visit) {
+      syncPersistedState();
+      for (const visit of visits.values()) {
         visit.feedback.destroy();
         removeGuest(visit.character.id);
-        visit = null;
       }
+      visits.clear();
     },
   };
 }
 
 function samePoint(a, b) {
-  return a.x === b.x && a.y === b.y;
+  return a?.x === b?.x && a?.y === b?.y;
 }
 
 function isNearPoint(a, b, radius) {

@@ -6,7 +6,6 @@ import {
   TILE_SIZE,
   TREES_TEXTURE_KEY,
 } from "./worldConfig.js";
-import { FARMING_WELL_TEXTURE_KEY } from "./farmingConfig.js";
 
 export const BUILD_ASSET_GROUPS = Object.freeze([
   Object.freeze({
@@ -44,7 +43,6 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
       Object.freeze({ id: "cutting-table", placement: "facility", facilityType: "cutting-table", icon: "cutting-table", labelKey: "hud:kitchen.facilities.cuttingTable" }),
       Object.freeze({ id: "gas-stove", placement: "facility", facilityType: "gas-stove", icon: "gas-stove", labelKey: "hud:kitchen.facilities.gasStove" }),
       Object.freeze({ id: "serving-table", placement: "facility", facilityType: "serving-table", icon: "serving-table", labelKey: "hud:kitchen.facilities.servingTable" }),
-      Object.freeze({ id: "well", placement: "well", textureKey: FARMING_WELL_TEXTURE_KEY, frame: 0, labelKey: "hud:buildMode.assets.well" }),
     ]),
   }),
   Object.freeze({
