@@ -150,16 +150,11 @@ jobs:
 
   preview:
     name: Publish Direct Preview
-    needs:
-      - build
-      - browser
     if: >-
-      always() &&
       github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      needs.build.result == 'success' &&
-      (needs.browser.result == 'success' || needs.browser.result == 'skipped')
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
