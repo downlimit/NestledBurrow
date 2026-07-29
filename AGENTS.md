@@ -3,7 +3,7 @@
 
 ## Route
 
-- Normal flow: compact Lead brief → implementation → preview acceptance when visible → one Ready PR → final-head CI → merge.
+- Normal flow: compact Lead brief → implementation → public PR preview acceptance when visible → one Ready PR → final-head CI → merge.
 - Never ask the user to operate GitHub.
 - Stop before merge only for explicit `не сливать`, report-only work or a real blocker.
 - Draft PR before acceptance is allowed only by explicit user command; it is not a development or CI gate.
@@ -52,11 +52,11 @@ The final report states `Image generation was not invoked.` and confirms that th
 
 Use one strong proof per material risk. A successful proof remains valid until relevant inputs change.
 
-**Feedback gate:** batch remarks, use one healthy managed preview, add only the smallest check for hidden behavior. Defer diff review, build, full checks, screenshots and E2E until acceptance.
+**Feedback gate:** batch remarks, use one healthy public PR preview for user acceptance, add only the smallest check for hidden behavior. A local managed preview is internal proof, not the user-facing link. Defer diff review, build, full checks, screenshots and E2E until acceptance.
 
 **Micro-feedback:** presentation-only value changes may reuse prior proof and preview health. Hidden contract changes still receive one targeted check.
 
-**Fast publication after `принято`:** acknowledge acceptance, stop preview, inspect files/full diff once, run only still-unproven targeted checks for code changed since the last proof. Skip local full check, full/focused E2E and standalone build unless a specific bundling/dependency/hidden risk requires them.
+**Fast publication after `принято`:** acknowledge acceptance, stop local preview, inspect files/full diff once, run only still-unproven targeted checks for code changed since the last proof. Skip local full check, full/focused E2E and standalone build unless a specific bundling/dependency/hidden risk requires them.
 
 **Strict publication:** run `npm run check` once plus only missing task-specific proof. Local E2E is exceptional; full E2E belongs to PR CI.
 
@@ -74,11 +74,13 @@ Environment:
 
 Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
-1. Start `npm run preview:task`, status-confirm exact URL, HTTP, page errors and 320×180 canvas.
-2. Reuse one URL through feedback.
-3. Before `принято`: no stage, commit, push, PR, auto-merge or merge unless the user explicitly requests the Draft exception.
-4. After `принято`: applicable publication route once, commit, push, one Ready PR, native auto-merge and final-head CI.
-5. Player-visible repair returns to preview only when it changes the accepted experience.
+1. Use `npm run preview:task` only for local health: exact URL, HTTP, page errors and 320×180 canvas.
+2. After an explicitly authorized Draft exception, push the task branch. The PR workflow must build and publish a direct static preview from the exact current head.
+3. Give the user only the stable public link posted by the PR workflow. StackBlitz, Codespaces and other links that first construct a development environment are forbidden as acceptance previews.
+4. Reuse the same PR URL through feedback; every synchronize event updates its contents.
+5. Before `принято`: no Ready PR, auto-merge or merge. For ChatGPT direct implementation, `препроверка принята` authorizes only the task branch and Draft preview carrier.
+6. After `принято`: applicable publication route once, Ready PR, native auto-merge and final-head CI.
+7. Player-visible repair returns to preview only when it changes the accepted experience.
 
 ## GitHub
 
