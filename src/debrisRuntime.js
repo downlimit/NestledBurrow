@@ -7,6 +7,13 @@ import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
 import { TILE_SIZE } from "./worldConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
+export const BED_SLEEP_DEPTH_OFFSET = 0.25;
+
+export function sleepingCharacterDepth(bedDepth) {
+  const depth = Number(bedDepth);
+  return Number.isFinite(depth) ? depth + BED_SLEEP_DEPTH_OFFSET : null;
+}
+
 export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelectedItem = () => null }) {
   const visuals = new Map();
   const bedDefinitions = new Map();
@@ -217,6 +224,12 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
   function setSleeping(active, bedId = null) {
     sleeping = Boolean(active);
     sleepingBedId = sleeping ? bedId : null;
+    if (!sleeping) return;
+    const bedVisual = bedVisuals.get(sleepingBedId);
+    const characterVisual = scene.playerCharacter?.visual;
+    const pose = characterVisual?.presentationPose;
+    const depth = sleepingCharacterDepth(bedVisual?.depth);
+    if (pose && depth !== null) characterVisual.setPresentationPose({ ...pose, depth });
   }
 
   RESOURCE_OBJECTS.forEach(createVisual);
