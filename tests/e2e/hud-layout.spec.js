@@ -59,10 +59,10 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
         selectedIndex: null,
         slots: [
           { id: "axe", kind: "tool", quantity: 1 },
+          { id: "pickaxe", kind: "tool", quantity: 1 },
           { id: "hoe", kind: "tool", quantity: 1 },
-          { id: "watering-can", kind: "tool", quantity: 1 },
+          { id: "water-bucket", kind: "tool", quantity: 1 },
           { id: "potato-seed", kind: "loot", quantity: 4 },
-          { id: "potato", kind: "loot", quantity: 3 },
           null, null, null, null, null,
         ],
       },

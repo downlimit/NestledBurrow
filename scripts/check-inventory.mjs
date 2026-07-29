@@ -18,20 +18,29 @@ import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
 import {
   INVENTORY_HUD_AREA,
   INVENTORY_SLOT_AREAS,
+  INVENTORY_WATER_BAR_HEIGHT,
+  INVENTORY_WATER_BAR_WIDTH,
   inventoryCycleDirectionFromKeyboardEvent,
   inventoryCycleIndex,
   inventoryIndexFromKeyboardEvent,
   inventorySlotIndexAt,
+  inventoryWaterBarState,
+  shouldRenderInventoryQuantity,
 } from "../src/inventoryRuntime.js";
+import {
+  THROW_ORIGIN_HEIGHT_RATIO,
+  throwDirectionTowardPoint,
+  throwOriginFromPlayer,
+} from "../src/worldThrowDirection.js";
 
 const inventory = createFreshInventory();
 assert.equal(INVENTORY_SLOT_COUNT, 10);
 assert.equal(inventory.slots.length, 10);
-assert.deepEqual(inventory.slots.slice(0, 3).map((item) => item.id), ["axe", "hoe", "watering-can"]);
-assert(inventory.slots.slice(3).every((item) => item === null));
+assert.deepEqual(inventory.slots.slice(0, 4).map((item) => item.id), ["axe", "pickaxe", "hoe", "water-bucket"]);
+assert(inventory.slots.slice(4).every((item) => item === null));
 const newGameInventory = createNewGameInventory();
 assert.equal(getInventoryQuantity(newGameInventory, "potato-seed"), 4);
-assert.equal(getInventoryQuantity(newGameInventory, "potato"), 3);
+assert.equal(getInventoryQuantity(newGameInventory, "potato"), 0);
 
 assert.equal(addInventoryItem(inventory, createInventoryItem("wood", 3)).status, "inserted");
 assert.equal(addInventoryItem(inventory, createInventoryItem("wood", 2)).status, "stacked");
@@ -39,7 +48,7 @@ assert.equal(getInventoryQuantity(inventory, "wood"), 5);
 const woodIndex = inventory.slots.findIndex((item) => item?.id === "wood");
 assert.equal(swapInventorySlots(inventory, 1, woodIndex).status, "swapped");
 assert.equal(inventory.slots[1].id, "wood");
-assert.equal(inventory.slots[woodIndex].id, "hoe");
+assert.equal(inventory.slots[woodIndex].id, "pickaxe");
 assert.equal(takeInventorySlot(inventory, 1).item.quantity, 5);
 assert.equal(inventory.slots[1], null);
 assert.equal(normalizeInventory({ slots: [...inventory.slots, createInventoryItem("ruby")] }).slots.length, 10);
@@ -49,6 +58,18 @@ assert.equal(INVENTORY_SLOT_AREAS.length, 10);
 assert.equal(INVENTORY_HUD_AREA.x, 41);
 assert.equal(INVENTORY_HUD_AREA.y, 156);
 assert.equal(INVENTORY_HUD_AREA.width, 238);
+assert.equal(shouldRenderInventoryQuantity(createInventoryItem("lemonade", 1)), true, "single consumables keep a visible quantity label");
+assert.equal(shouldRenderInventoryQuantity(createInventoryItem("water-bucket")), false, "tools do not show quantity labels");
+assert.equal(INVENTORY_WATER_BAR_WIDTH, 4);
+assert.equal(INVENTORY_WATER_BAR_HEIGHT, 16);
+assert.deepEqual(inventoryWaterBarState(INVENTORY_SLOT_AREAS[3], 6, 12), {
+  x: INVENTORY_SLOT_AREAS[3].x + 16,
+  y: INVENTORY_SLOT_AREAS[3].y + 3,
+  width: 4,
+  height: 16,
+  ratio: 0.5,
+  fillHeight: 7,
+});
 assert(INVENTORY_SLOT_AREAS.every((rect) => rect.width === 22 && rect.height === 22));
 INVENTORY_SLOT_AREAS.forEach((rect, index) => assert.equal(inventorySlotIndexAt(rect.x + 1, rect.y + 1), index));
 assert.equal(inventoryIndexFromKeyboardEvent({ code: "Digit1" }), 0);
@@ -63,6 +84,11 @@ assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE", repeat: tr
 assert.equal(inventoryCycleIndex(newGameInventory.slots, null, 1), 0);
 assert.equal(inventoryCycleIndex(newGameInventory.slots, 2, 1), 3);
 assert.equal(inventoryCycleIndex(newGameInventory.slots, 0, -1), 4);
+assert.deepEqual(throwDirectionTowardPoint({ x: 10, y: 20 }, { x: 20, y: 20 }, "up"), { x: 1, y: 0 });
+assert.deepEqual(throwDirectionTowardPoint({ x: 10, y: 20 }, { x: 13, y: 24 }, "up"), { x: 0.6, y: 0.8 });
+assert.deepEqual(throwDirectionTowardPoint({ x: 10, y: 20 }, { x: 10, y: 20 }, "left"), { x: -1, y: 0 });
+assert.equal(THROW_ORIGIN_HEIGHT_RATIO, 1 / 3);
+assert.deepEqual(throwOriginFromPlayer({ x: 10, y: 20, displayHeight: 12 }), { x: 10, y: 16 });
 
 const droppedToolInventory = createFreshInventory();
 const droppedAxe = takeInventorySlot(droppedToolInventory, 0).item;
@@ -100,7 +126,7 @@ assert.equal(clear.status, "cleared");
 assert.equal(getInventoryQuantity(rewardState.gameplay.inventory, "wood"), 1);
 
 const fullState = createFreshGameSessionState();
-for (let index = 3; index < 10; index += 1) fullState.gameplay.inventory.slots[index] = createInventoryItem(`future-${index}`, 1);
+for (let index = 4; index < 10; index += 1) fullState.gameplay.inventory.slots[index] = createInventoryItem(`future-${index}`, 1);
 const beforeFull = JSON.parse(JSON.stringify(fullState));
 const blocked = hitResourceNode(fullState, "fallen-log-01", { damage: 99, energyPerHit: 0, tuning: DEFAULT_GAMEPLAY_TUNING });
 assert.equal(blocked.status, "inventory-full");
@@ -109,12 +135,14 @@ assert.deepEqual(JSON.parse(JSON.stringify(fullState)), beforeFull, "full-invent
 
 const runtimeSource = readFileSync("src/inventoryRuntime.js", "utf8");
 const hudSource = readFileSync("src/gameHud.js", "utf8");
-assert(runtimeSource.includes("swapInventorySlots") && runtimeSource.includes("dropSlot(fromIndex)"));
+assert(runtimeSource.includes("swapInventorySlots") && runtimeSource.includes("dropSlot(fromIndex, worldPointFromPointer(scene, pointer))"));
+assert(runtimeSource.includes("throwOriginFromPlayer(sprite)") && runtimeSource.includes("throwDirectionTowardPoint(origin, pointerWorld, character.lastFacing)"));
 assert(runtimeSource.includes("DROP_HITBOX_SIZE = 2"));
 assert(runtimeSource.includes("directionX *= -1") && runtimeSource.includes("directionY *= -1"));
 assert(runtimeSource.includes("findNearestFreePoint"));
 assert(runtimeSource.includes("TOOL_VISIBLE_MS = 1000") && runtimeSource.includes("TOOL_FADE_MS = 1000"));
 assert(runtimeSource.includes("drawBitmapTextInto"), "slot labels use crisp project bitmap glyphs");
+assert(runtimeSource.includes('item.id === "water-bucket"') && runtimeSource.includes("renderWaterBar(rect)"), "bucket fill renders vertically inside its own slot");
 assert(hudSource.includes("createInventoryRuntime(scene"));
 assert(!hudSource.includes("woodValueText"), "old resource text counters are removed");
 

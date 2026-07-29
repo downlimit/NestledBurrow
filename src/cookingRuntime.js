@@ -18,6 +18,7 @@ export function createCookingRuntime(scene, {
   randomSource = Math.random,
   onActiveChange = () => {},
   onPersistentMutation = () => {},
+  onInventoryGain = () => {},
   playEffect = () => {},
 } = {}) {
   let activeStep = null;
@@ -97,6 +98,7 @@ export function createCookingRuntime(scene, {
     render();
     if (result.mutated) {
       playEffect("guest-happy");
+      onInventoryGain(result.inventory);
       onPersistentMutation(result);
     }
     return result;

@@ -8,7 +8,7 @@ This system separates player session progress from developer-authored project de
 
 `gameSessionState.js` owns JSON-safe normalized state. `sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, the ten-slot inventory, dropped world items, resource nodes, kitchen/sign/coin state and other gameplay fields explicitly added to the schema. The currently selected inventory slot and in-flight presentation state are transient.
+Session data includes player/world progress, needs, inventory, dropped items, resources, farm/water state, kitchen serving stock and repair, tavern sign, guest service snapshots and coins. Selected slot and in-flight presentation state are transient.
 
 ## Authoring data
 
@@ -16,22 +16,23 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## `NEW GAME`
 
-`NEW GAME` clears gameplay progress, restores the three starting tools and creates a fresh session while applying the current authored baseline. Browser authoring drafts may intentionally survive so the developer does not lose layout work.
+`NEW GAME` clears gameplay progress and restores four tools, four potato seeds, a dry eight-use water bucket, six lemons in the fixed kitchen sack, a broken stove and an empty service table. Browser authoring drafts may intentionally survive.
 
 ## Invariants
 
 - every persisted field has a normalized owner and migration path;
-- Phaser objects/functions never enter JSON state;
-- corrupted/old data fails safely;
+- Phaser objects/functions never enter JSON state and corrupted/old data fails safely;
 - schema v6 resource counters migrate once into canonical inventory stacks in schema v7;
-- dropped items persist only their stable ID, item payload and resting/logical position;
-- selected slot, drag state, throw arc and fade timers are not persisted;
-- authoring backup version is independent from session schema;
-- a task crossing gameplay save and authoring storage is Strict and reads both this document and `systems/build-and-authoring.md`.
+- schema v9 migrates once to v10: watering can becomes the water bucket, missing tools are inserted without duplicates, legacy prepared/cooked outputs become inventory or deterministic kitchen-adjacent world items, and the serving boolean becomes typed stock;
+- schema v10 preserves active guest IDs and matching reservations; orphan reservations are discarded;
+- the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
+- dropped items persist only stable ID, item payload and logical position;
+- selected slot, drag state, throw arc, gain feedback and fade timers are not persisted;
+- authoring backup version is independent from session schema.
 
 ## Current baseline
 
-Versioned session save/reload and migrations work. Inventory and dropped items survive reload. Authoring layout/profile backups restore across page reload and `NEW GAME`.
+Schema v10 save/reload and migrations work. Inventory, dropped items, farm water/crops, kitchen stock/repair and active service snapshots survive reload. Authoring backups survive page reload and `NEW GAME`.
 
 ## Not yet
 
@@ -39,4 +40,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, domain-specific state checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, domain-specific checks, `check:authoring`, persistence Browser E2E.

@@ -80,6 +80,11 @@ export function createWorldBuildCoordinator(scene, {
     return [...farmState.wells].reverse().find((well) => contains(boundsAt(well), point)) ?? null;
   }
 
+  function editableWellAt(point) {
+    const well = getWellAt(point);
+    return well?.fixed ? null : well;
+  }
+
   for (const well of farmState.wells) createWellVisual(well);
 
   return {
@@ -93,7 +98,7 @@ export function createWorldBuildCoordinator(scene, {
       return item?.placement === "well" ? isWellPlacementBlocked(point) : null;
     },
     getMoveTargetAt(point) {
-      const well = getWellAt(point);
+      const well = editableWellAt(point);
       const visual = well ? wellVisuals.get(well.id) : null;
       return well && visual ? {
         kind: "well",
@@ -115,12 +120,12 @@ export function createWorldBuildCoordinator(scene, {
       return null;
     },
     removeAt(point) {
-      const well = getWellAt(point);
+      const well = editableWellAt(point);
       return well ? removeWell(well.id) : null;
     },
     restore: restoreWell,
     getDemolitionTargetAt(point) {
-      const well = getWellAt(point);
+      const well = editableWellAt(point);
       const visual = well ? wellVisuals.get(well.id) : null;
       return well && visual ? {
         kind: "well",
@@ -133,7 +138,6 @@ export function createWorldBuildCoordinator(scene, {
       } : null;
     },
     getInteractionDefinitions(selectedItem) {
-      if (selectedItem?.id !== "watering-can") return [];
       return farmState.wells.map((well) => ({
         id: `refill-${well.id}`,
         entityId: well.id,
@@ -143,7 +147,9 @@ export function createWorldBuildCoordinator(scene, {
         priority: 24,
         requiresFacing: false,
         facingDotThreshold: -1,
-        prompt: "hud:interaction.refillWateringCan",
+        prompt: selectedItem?.id === "water-bucket"
+          ? "hud:interaction.refillWaterBucket"
+          : "hud:interaction.waterBucketRequired",
         payload: { wellId: well.id },
       }));
     },

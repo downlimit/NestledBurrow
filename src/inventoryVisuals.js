@@ -1,4 +1,6 @@
 import { drawLog, drawRuby, drawStone } from "./resourceVisuals.js";
+import { FARMING_FRAMES, FARMING_TEXTURE_KEY } from "./farmingConfig.js";
+import { LEMONADE_TEXTURE_KEY, lemonadeInventoryFrame } from "./lemonadeConfig.js";
 
 export function drawInventoryItem(graphics, itemId, options = {}) {
   const color = (value) => options.colorOverride ?? value;
@@ -16,25 +18,25 @@ export function drawInventoryItem(graphics, itemId, options = {}) {
     drawRuby(graphics, 0, options);
     return graphics;
   }
-  if (itemId === "axe") {
-    graphics.fillStyle(color(0x6f3f22), 1).fillRect(7, 2, 2, 13);
-    graphics.fillStyle(color(0x9aa3ad), 1).fillRect(3, 2, 8, 3).fillRect(2, 3, 3, 3);
-    graphics.fillStyle(color(0xf2eadc), 0.8).fillRect(4, 2, 3, 1);
-    return graphics;
-  }
-  if (itemId === "hoe") {
-    graphics.fillStyle(color(0x6f3f22), 1).fillRect(7, 2, 2, 13);
-    graphics.fillStyle(color(0x9aa3ad), 1).fillRect(2, 2, 8, 2).fillRect(2, 3, 2, 4);
-    graphics.fillStyle(color(0xf2eadc), 0.8).fillRect(3, 2, 4, 1);
-    return graphics;
-  }
-  if (itemId === "watering-can") {
-    graphics.fillStyle(color(0x3e7f9b), 1).fillRect(3, 6, 9, 7).fillRect(12, 8, 3, 2);
-    graphics.lineStyle(1, color(0x9dd7e6), 1).strokeRect(5.5, 2.5, 6, 5);
-    graphics.fillStyle(color(0x9dd7e6), 1).fillRect(4, 7, 2, 1);
-    return graphics;
-  }
   graphics.fillStyle(color(0x4a332a), 1).fillRect(3, 3, 10, 10);
   graphics.fillStyle(color(0xf2eadc), 0.9).fillRect(7, 5, 2, 5).fillRect(7, 12, 2, 2);
   return graphics;
+}
+
+export function inventoryItemAsset(itemId, gameplay = {}) {
+  const lemonadeFrame = lemonadeInventoryFrame(itemId, gameplay?.farm?.waterBucket?.currentWater ?? 0);
+  if (lemonadeFrame !== null) return { textureKey: LEMONADE_TEXTURE_KEY, frame: lemonadeFrame };
+  if (itemId === "potato-seed") return { textureKey: FARMING_TEXTURE_KEY, frame: FARMING_FRAMES.potatoSeeds };
+  if (itemId === "potato") return { textureKey: FARMING_TEXTURE_KEY, frame: FARMING_FRAMES.potato };
+  if (itemId === "fried-potato-dish") return { textureKey: "facility.fried-potato-dish", frame: 0 };
+  return null;
+}
+
+export function renderInventoryItem(graphics, image, itemId, gameplay, x = 0, y = 0) {
+  const asset = inventoryItemAsset(itemId, gameplay);
+  graphics.clear().setPosition(x, y).setVisible(asset === null);
+  image.setPosition(x, y).setVisible(asset !== null);
+  if (asset) image.setTexture(asset.textureKey, asset.frame);
+  else drawInventoryItem(graphics, itemId);
+  return asset;
 }

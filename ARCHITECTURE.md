@@ -30,7 +30,7 @@
 
 В `src/main.js` нельзя добавлять новую domain logic, самостоятельную state machine, сериализацию, placement algorithm, editor workflow или крупную presentation subsystem.
 
-Текущий файл уже достиг примерно `2898` строк. `scripts/check-architecture-boundaries.mjs` устанавливает жёсткий предел `2900` строк. Это не целевой размер, а предохранитель: следующая содержательная функция обязана сопровождаться локальным выделением, чтобы файл не рос дальше.
+Для `src/main.js` действует жёсткий предел `2900` строк, который устанавливает `scripts/check-architecture-boundaries.mjs`. Текущий файл остаётся ниже него. Это предохранитель: следующая содержательная функция должна сопровождаться локальным выделением, чтобы composition root не рос дальше.
 
 ## Следующие подтверждённые выделения
 
@@ -48,7 +48,9 @@
 
 ### Tavern service
 
-Следующая задача, существенно расширяющая гостя, очередь, блюда, оплату или несколько service stations, должна проверить выделение service orchestration из `WorldScene`. Domain rules остаются в cooking/guest modules, а scene только связывает owners.
+`TavernServiceRuntime` координирует persisted multi-guest service и value-bearing coin runtime. `KitchenInteractionRuntime` делегирует fixed-facility mutations соответствующим domain/runtime owners. Расписание волн принадлежит `tavernServiceDomain.js`, маршруты и состояние визита — `guestRuntime.js`, рецепты/stock/reservations — `cookingDomain.js`, а `WorldScene` только связывает owners и callbacks.
+
+Следующее расширение очереди, меню, staff или нескольких service stations развивает эти owners и не возвращает orchestration в `WorldScene`.
 
 ### Facilities и presentation
 

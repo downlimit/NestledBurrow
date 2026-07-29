@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import { execFileSync } from "node:child_process";
-import { renameSync, rmSync, writeFileSync } from "node:fs";
+import { realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   createColliderDefaultsModuleSource,
@@ -115,5 +115,8 @@ export default defineConfig({
   base: "/NestledBurrow/",
   define: { "import.meta.env.VITE_BUILD_ID": JSON.stringify(resolveBuildId()) },
   plugins: [canonicalAuthoringPlugin()],
-  server: { watch: { ignored: ["**/artifacts/**"] } },
+  server: {
+    fs: { allow: [resolve("."), realpathSync("node_modules")] },
+    watch: { ignored: ["**/artifacts/**"] },
+  },
 });

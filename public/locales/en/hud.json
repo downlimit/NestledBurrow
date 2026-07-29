@@ -68,17 +68,49 @@
     "openSeedShop": "Seed shop",
     "tillSoil": "Till soil",
     "plantPotato": "Plant potato",
+    "plantLemon": "Plant lemon",
     "waterSoil": "Water soil",
     "harvestPotato": "Harvest",
+    "harvestLemon": "Harvest lemons",
     "clearRottenCrop": "Clear rotten crop",
     "destroyCrop": "Cut down crop",
     "destroySoil": "Remove garden bed",
-    "refillWateringCan": "Fill watering can",
-    "wateringCanEmpty": "Watering can is empty",
-    "wateringCanFull": "Watering can is already full",
-    "wateringCanRefilled": "Watering can filled",
+    "refillWaterBucket": "Fill water bucket",
+    "waterBucketRequired": "Select the water bucket",
+    "waterBucketEmpty": "Water bucket is empty",
+    "waterBucketFull": "Water bucket is already full",
+    "waterBucketRefilled": "Water bucket filled: 8",
     "noPotatoSeed": "No potato seeds",
-    "invalidSoil": "This ground cannot be tilled"
+    "noLemonSeed": "No lemon seeds",
+    "invalidSoil": "This ground cannot be tilled",
+    "makeLemonade": "Make lemonade",
+    "noLemon": "A lemon is required",
+    "noWater": "Water is required",
+    "inventoryFull": "Inventory has no room",
+    "takeLemons": "Take lemons",
+    "lemonSackEmpty": "The lemon sack is empty",
+    "serveItem": "Stock serving table",
+    "takeItem": "Take item back",
+    "servingTableDifferentItem": "A different item is on the table",
+    "servingTableFull": "The table already has 4 portions",
+    "servingTableEmpty": "The serving table is empty",
+    "repairStove": "Repair: 10 wood, 8 stone, 10 coins",
+    "repairMissing": "Missing: {categories}",
+    "repairCategory": {
+      "wood": "wood",
+      "stone": "stone",
+      "coins": "coins"
+    },
+    "servingStock": {
+      "lemonade1": "Lemonade 1/4 — take",
+      "lemonade2": "Lemonade 2/4 — take",
+      "lemonade3": "Lemonade 3/4 — take",
+      "lemonade4": "Lemonade 4/4 — take",
+      "friedPotatoDish1": "Potato dish 1/4 — take",
+      "friedPotatoDish2": "Potato dish 2/4 — take",
+      "friedPotatoDish3": "Potato dish 3/4 — take",
+      "friedPotatoDish4": "Potato dish 4/4 — take"
+    }
   },
   "progress": {
     "newGame": "New game",
@@ -98,11 +130,19 @@
   "merchant": {
     "title": "SEED MERCHANT",
     "offer": "Potato seed - 1 coin",
+    "potato-seed": "POTATO",
+    "lemon-seed": "LEMON",
+    "balance": "Coins: {count}",
     "balance_one": "Coins: {count}",
     "balance_few": "Coins: {count}",
     "balance_many": "Coins: {count}",
     "balance_other": "Coins: {count}",
     "buy": "BUY 1",
+    "buyPrice": "BUY · {count}",
+    "buyPrice_one": "BUY · {count}",
+    "buyPrice_few": "BUY · {count}",
+    "buyPrice_many": "BUY · {count}",
+    "buyPrice_other": "BUY · {count}",
     "exit": "SPACE - CLOSE",
     "not-enough-coins": "Not enough coins",
     "inventory-full": "Inventory is full"
@@ -111,8 +151,13 @@
     "facilities": {
       "cuttingTable": "Cutting table",
       "gasStove": "Gas stove",
-      "servingTable": "Serving table"
+      "servingTable": "Serving table",
+      "juicer": "Juicer",
+      "lemonSack": "Lemon sack"
     }
+  },
+  "migration": {
+    "task049": "For a clean game, it is better to start a new game."
   },
   "cooking": {
     "attempt": "Try hard",

@@ -49,7 +49,7 @@ async function faceFarmCell(page) {
   });
   const selectedItem = (await bridge(page, "getFarmingState")).selectedItem;
   await page.keyboard.down("KeyD");
-  if (["hoe", "axe", "watering-can"].includes(selectedItem)) {
+  if (["hoe", "axe", "water-bucket"].includes(selectedItem)) {
     await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 1, y: 0 });
   } else {
     await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
@@ -152,7 +152,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
 
   const well = await bridge(page, "placeWell", WELL_CELL);
   expect(well).toMatchObject({ status: "placed" });
-  await bridge(page, "selectInventorySlot", 1);
+  await bridge(page, "selectInventorySlot", 2);
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-till");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).highlightMode).toBe("hoe-valid");
@@ -215,19 +215,19 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.type).toBe("potato");
 
-  await bridge(page, "selectInventorySlot", 2);
+  await bridge(page, "selectInventorySlot", 3);
+  await bridge(page, "placePlayerAt", { x: 430, y: 504, facing: { x: 1, y: 0 } });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-refill-water-bucket");
+  await pressInteract(page);
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.waterBucket.currentWater).toBe(8);
+  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("well-refill");
+
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-water");
-  await expect.poll(async () => (await bridge(page, "getFarmingState")).highlightMode).toBe("watering-can-valid");
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).highlightMode).toBe("water-bucket-valid");
   await pressInteract(page);
-  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.wateringCan.currentWater).toBe(39);
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.waterBucket.currentWater).toBe(7);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("water");
-
-  await bridge(page, "placePlayerAt", { x: 430, y: 504, facing: { x: 1, y: 0 } });
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-refill-watering-can");
-  await pressInteract(page);
-  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.wateringCan.currentWater).toBe(40);
-  await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("well-refill");
 
   const start = (await bridge(page, "getSession")).gameplay.worldTimeSeconds;
   await bridge(page, "setFarmingWeather", [{
@@ -260,7 +260,11 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await page.reload();
   await boot(page);
   const restored = await bridge(page, "getSession");
-  expect(restored.gameplay.farm.wells).toHaveLength(1);
+  expect(restored.gameplay.farm.wells).toHaveLength(2);
+  expect(restored.gameplay.farm.wells).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: "farm-well-1", fixed: true }),
+    expect.objectContaining({ fixed: false, x: WELL_CELL.x, y: WELL_CELL.y }),
+  ]));
   expect(restored.gameplay.farm.soilCells).toHaveLength(1);
   expect(restored.gameplay.worldItems).toHaveLength(6);
   expect(pageErrors).toEqual([]);
@@ -275,7 +279,7 @@ test("axe removes crop before soil and thrown wood or stone crushes crops", asyn
 
   const plant = async () => {
     if ((await bridge(page, "getFarmingState")).farm.soilCells.length === 0) {
-      await bridge(page, "selectInventorySlot", 1);
+      await bridge(page, "selectInventorySlot", 2);
       await faceFarmCell(page);
       await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-till");
       await pressInteract(page);

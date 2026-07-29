@@ -108,10 +108,11 @@ for (const sample of [
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");
+const guestFeedback = readFileSync("src/guestFeedback.js", "utf8");
 assert(gameHud.includes("createManagedText"), "HUD text surfaces use shared text resolution contract");
 assert(interactionHud.includes("createManagedText"), "dialogue and interaction text surfaces use shared text resolution contract");
-assert(main.includes("const reaction = createManagedText"), "guest reactions use the shared pixel text renderer");
-assert(main.includes("drawPixelThumb") && !main.includes("Segoe UI Emoji"), "meal-complete feedback uses a custom pixel thumb without OS emoji rasterization");
+assert(guestFeedback.includes("const reaction = createManagedText"), "guest reactions use the shared pixel text renderer");
+assert(guestFeedback.includes("drawPixelThumb") && !guestFeedback.includes("Segoe UI Emoji"), "meal-complete feedback uses a custom pixel thumb without OS emoji rasterization");
 assert(interactionHud.includes("speakerText") && interactionHud.includes("bodyText") && interactionHud.includes("promptText"), "dialogue speaker, body and prompt text surfaces are covered");
 assert(gameHud.includes("confirmMessageText") && gameHud.includes("soundTexts"), "confirmation modal and sound panel text surfaces are covered");
 

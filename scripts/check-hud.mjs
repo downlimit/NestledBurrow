@@ -23,6 +23,13 @@ import {
   shouldShakeEnergyAfterInteraction,
 } from "../src/gameHud.js";
 import { INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "../src/inventoryRuntime.js";
+import {
+  THROW_AIM_RADIUS,
+  THROW_AIM_SIZE,
+  createThrowAimIndicator,
+  throwAimPixels,
+  throwAimPose,
+} from "../src/throwAimIndicator.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
 const DIALOGUE_TOP = GAME_HEIGHT - 64;
@@ -57,6 +64,67 @@ assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch s
 assert.equal(INVENTORY_SLOT_AREAS.length, 10, "hotbar exposes ten slots");
 assert.equal(INVENTORY_HUD_AREA.x + INVENTORY_HUD_AREA.width, 279, "hotbar is centered with equal 41 px margins");
 assert.equal(INVENTORY_HUD_AREA.x, 41, "hotbar is centered with equal 41 px margins");
+assert.equal(THROW_AIM_SIZE, 8, "throw aim is exactly 8x8 logical pixels");
+assert.equal(THROW_AIM_RADIUS, 12, "throw aim orbits twelve logical pixels from the lower-torso pivot");
+assert.deepEqual(throwAimPose({ x: 10, y: 20, displayHeight: 12 }, { x: 20, y: 16 }), {
+  x: 22,
+  y: 16,
+  rotation: 0,
+  direction: { x: 1, y: 0 },
+  pivot: { x: 10, y: 16 },
+});
+const upwardThrowAim = throwAimPose({ x: 10, y: 20, displayHeight: 12 }, { x: 10, y: 0 });
+assert.equal(upwardThrowAim.x, 10);
+assert.equal(upwardThrowAim.y, 4);
+assert.equal(upwardThrowAim.rotation, -Math.PI / 2);
+const rightThrowAimPixels = throwAimPixels({ x: 1, y: 0 });
+assert(rightThrowAimPixels.length > 8, "eight-pixel aim has a readable triangular silhouette");
+assert(rightThrowAimPixels.some(({ inner }) => inner), "pixel aim preserves a bright interior");
+assert(rightThrowAimPixels.every(({ x, y }) => Number.isInteger(x) && Number.isInteger(y)), "pixel aim contains only sharp whole-pixel cells");
+assert(rightThrowAimPixels.every(({ x, y }) => x >= -4 && x < 4 && y >= -4 && y < 4), "pixel aim stays inside its 8x8 bounds");
+const throwAimEvents = new Map();
+const throwAimGraphics = {
+  visible: false,
+  x: 0,
+  y: 0,
+  rotation: 0,
+  destroyed: false,
+  setVisible(value) { this.visible = value; return this; },
+  clear() { return this; },
+  fillStyle() { return this; },
+  fillRect() { return this; },
+  setPosition(x, y) { this.x = x; this.y = y; return this; },
+  setRotation(value) { this.rotation = value; return this; },
+  setDepth() { return this; },
+  destroy() { this.destroyed = true; },
+};
+const throwAimCharacter = { sprite: { x: 10, y: 20, displayHeight: 12 }, lastFacing: "down" };
+const throwAimRuntime = createThrowAimIndicator({
+  add: { graphics: () => throwAimGraphics },
+  events: {
+    on(name, callback) { throwAimEvents.set(name, callback); },
+    off(name, callback) { if (throwAimEvents.get(name) === callback) throwAimEvents.delete(name); },
+  },
+}, { getPlayerCharacter: () => throwAimCharacter });
+throwAimRuntime.show({ x: 20, y: 16 });
+assert.deepEqual(throwAimRuntime.getState(), {
+  visible: true,
+  x: 22,
+  y: 16,
+  rotation: 0,
+  pivot: { x: 10, y: 16 },
+  size: 8,
+  radius: 12,
+  target: { x: 20, y: 16 },
+});
+throwAimCharacter.sprite.x = 14;
+throwAimEvents.get("update")();
+assert.equal(throwAimRuntime.getState().x, 26, "throw aim follows the moving player pivot each frame");
+throwAimRuntime.hide();
+assert.equal(throwAimRuntime.getState().visible, false);
+throwAimRuntime.destroy();
+assert.equal(throwAimEvents.has("update"), false, "throw aim releases its frame listener");
+assert.equal(throwAimGraphics.destroyed, true);
 assert(INVENTORY_HUD_AREA.y + INVENTORY_HUD_AREA.height <= GAME_HEIGHT - 2, "hotbar keeps a bottom edge margin");
 for (let index = 0; index < INVENTORY_SLOT_AREAS.length; index += 1) {
   const slot = INVENTORY_SLOT_AREAS[index];
@@ -99,6 +167,7 @@ for (const char of "v devabcdef0123456789") assert(HUD_GLYPHS[char], `bitmap gly
 const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const inventoryRuntime = readFileSync("src/inventoryRuntime.js", "utf8");
+const throwAimIndicator = readFileSync("src/throwAimIndicator.js", "utf8");
 const inventoryVisuals = readFileSync("src/inventoryVisuals.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
 const debrisRuntime = readFileSync("src/debrisRuntime.js", "utf8");
@@ -115,13 +184,21 @@ assert(gameHud.includes("createInventoryRuntime(scene"), "GameHud composes the i
 assert(gameHud.includes("inventoryHud.isPointInHud(x, y)"), "hotbar excludes joystick input");
 assert(!gameHud.includes("drawLog(woodIcon"), "old resource counter panel is removed");
 assert(inventoryRuntime.includes("INVENTORY_SLOT_COUNT") && inventoryRuntime.includes('index === 9 ? "0"'), "hotbar renders 1-9 and 0");
-assert(inventoryRuntime.includes("swapInventorySlots") && inventoryRuntime.includes("dropSlot(fromIndex)"), "drag swaps or drops items");
+assert(inventoryRuntime.includes("swapInventorySlots") && inventoryRuntime.includes("dropSlot(fromIndex, worldPointFromPointer(scene, pointer))"), "drag swaps or drops items toward the cursor");
 assert(inventoryRuntime.includes("TOOL_VISIBLE_MS") && inventoryRuntime.includes("TOOL_FADE_MS"), "tool miniature fades after one second");
 assert(inventoryRuntime.includes("getBlockingColliders") && inventoryRuntime.includes("directionX *= -1"), "dropped items reflect from blocking world geometry");
 assert(inventoryRuntime.includes("DROP_HITBOX_SIZE = 2"), "world item occupancy is 2x2 logical pixels");
-assert(inventoryVisuals.includes('itemId === "axe"') && inventoryVisuals.includes('itemId === "watering-can"'), "tool placeholders are procedural game visuals");
+assert(inventoryVisuals.includes("lemonadeInventoryFrame"), "inventory visuals resolve the canonical lemonade/tool frames");
 assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "localized HUD text keeps the managed font");
 assert(inventoryRuntime.includes("drawBitmapTextInto"), "slot labels and quantities use crisp project bitmap glyphs");
+assert(inventoryRuntime.includes("slotQuantityGraphics") && inventoryRuntime.includes("shouldRenderInventoryQuantity(item)"), "stackable item quantities, including one, render immediately above gain icons");
+assert(inventoryRuntime.includes("INVENTORY_WATER_BAR_WIDTH = 4") && inventoryRuntime.includes("renderWaterBar(rect)"), "bucket water uses a vertical in-slot gauge");
+assert(gameHud.includes("notifyCoinDelta") && gameHud.includes('coinDeltaAmount > 0 ? "+" : ""'), "wallet feedback supports signed collected and dropped coin deltas");
+assert(gameHud.includes("onCoinDrop(worldPointFromPointer(scene, pointer))"), "wallet drag forwards the same world cursor point used by inventory throws");
+assert(gameHud.includes("throwAimIndicator.show(worldPointFromPointer(scene, pointer))"), "wallet drag shares its cursor point with the throw aim");
+assert(inventoryRuntime.includes("setThrowAimTarget(worldPointFromPointer(scene, pointer))"), "inventory drag shares its cursor point with the throw aim");
+assert(throwAimIndicator.includes("throwAimPixels(pose.direction)") && throwAimIndicator.includes("graphics.fillRect(x, y, 1, 1)"), "throw aim rerasterizes an eight-pixel triangle without rotated antialiasing");
+assert(throwAimIndicator.includes('worldDepthFromAnchorY(sprite.y, "throw-aim", 499)'), "player world depth remains above the throw aim");
 assert(gameHud.includes("ratio > 0 ? Math.max(1, Math.round(23 * ratio))"), "low non-zero needs remain visibly filled");
 assert(gameHud.includes("targets: energyBarGraphics"), "low-energy feedback remains intact");
 assert(gameHud.includes("renderNeedTooltip"), "need tooltip remains intact");

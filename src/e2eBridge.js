@@ -63,6 +63,8 @@ export function installWorldE2EBridge(scene) {
       resources: scene.gameHud?.getResourceState?.(),
       ...scene.gameHud?.getLayoutState?.(),
     }),
+    getInventoryGainState: () => scene.gameHud?.getResourceState?.()?.inventoryGain ?? null,
+    getTransientMessageState: () => scene.gameHud?.getTransientMessageState?.() ?? null,
     isHudPoint: ({ x, y }) => scene.isHudPoint(x, y),
     getAudioSettings: () => scene.audioSettings?.getSettings(),
     setAudioChannel: ({ channel, value }) => scene.audioSettings?.setChannel?.(channel, value),
@@ -79,6 +81,7 @@ export function installWorldE2EBridge(scene) {
       present: scene.debrisRuntime?.isPresent?.() ?? false,
       definition: RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID),
       definitions: RESOURCE_OBJECTS,
+      plantedTrees: scene.movementDebugPanel?.authoringRuntime?.getPlantDefinitions?.() ?? [],
       bed: scene.debrisRuntime?.getBedDefinition?.() ?? null,
       beds: scene.debrisRuntime?.getBedDefinitions?.() ?? [],
       wakeTile: BED_WAKE_TILE,
@@ -86,19 +89,40 @@ export function installWorldE2EBridge(scene) {
     getFacilityState: () => ({
       definitions: scene.facilityRuntime?.getDefinitions?.() ?? FACILITIES,
       activeId: scene.facilityRuntime?.getActiveId?.() ?? null,
+      visuals: scene.facilityRuntime?.getVisualStates?.() ?? {},
     }),
     getCookingState: () => scene.cookingRuntime?.getState?.() ?? null,
     getTavernState: () => ({
       open: scene.sessionState.gameplay.tavernOpen,
       sign: scene.tavernSignRuntime?.getState?.(),
-      guest: scene.guestRuntime?.getState?.(),
+      guest: scene.tavernServiceRuntime?.guestRuntime?.getState?.(),
+      service: scene.tavernServiceRuntime?.getState?.(),
     }),
     getCoinState: () => scene.coinRuntime?.getState?.() ?? [],
-    forceGuestSpawn: () => scene.guestRuntime?.forceSpawn?.(),
+    forceGuestSpawn: () => scene.tavernServiceRuntime?.guestRuntime?.forceSpawn?.(),
+    setGuestRandomValue: (value) => scene.tavernServiceRuntime?.guestRuntime?.setRandomSource?.(() => Number(value)),
     setServingDish: (present) => {
-      scene.sessionState.gameplay.kitchen.servingTableHasDish = Boolean(present);
+      scene.sessionState.gameplay.kitchen.servingTable = {
+        itemId: present ? "fried-potato-dish" : null,
+        quantity: present ? 1 : 0,
+        reservations: [],
+      };
       scene.facilityRuntime?.syncKitchenVisuals?.();
     },
+    setServingStock: ({ itemId = null, quantity = 0 } = {}) => {
+      scene.sessionState.gameplay.kitchen.servingTable = {
+        itemId: quantity > 0 ? itemId : null,
+        quantity: Math.max(0, Math.min(4, Math.floor(Number(quantity) || 0))),
+        reservations: [],
+      };
+      scene.facilityRuntime?.syncKitchenVisuals?.();
+      scene.interactionRuntime?.refresh?.();
+    },
+    setFarmWater: (value) => {
+      scene.sessionState.gameplay.farm.waterBucket.currentWater = Math.max(0, Math.min(8, Math.floor(Number(value) || 0)));
+      scene.gameHud?.render?.();
+    },
+    purchaseSeed: (itemId) => scene.merchantRuntime?.purchase?.(itemId),
     attemptCooking: () => scene.cookingRuntime?.attempt?.(),
     completeCooking: () => scene.cookingRuntime?.completeForTest?.(),
     alignCookingMarker: () => scene.cookingRuntime?.alignMarkerForTest?.(),
@@ -193,11 +217,13 @@ function placePlayerNear(scene, entityId) {
   const resource = RESOURCE_OBJECTS.find((item) => item.id === entityId);
   const facility = scene.facilityRuntime?.getDefinition?.(entityId);
   const bed = scene.debrisRuntime?.getBedDefinition?.(entityId);
+  const well = scene.worldBuildCoordinator?.getWellState?.().find((item) => item.id === entityId);
   const sign = entityId === TAVERN_SIGN.id ? { position: TAVERN_SIGN.interactionPosition } : null;
   const target = resource
     ? { position: resource.position }
     : bed ? { position: bed.position }
       : facility ? { position: facility.position }
+        : well ? { position: { x: well.x + 8, y: well.y + 8 } }
         : sign ?? scene.characterSystem.getSnapshot(entityId);
   if (!target?.position) throw new Error(`Unknown E2E placement target: ${entityId}`);
   const player = scene.characterSystem.require(scene.sessionState.playerId);

@@ -44,7 +44,8 @@ test("ten-slot hotbar selects with digits and Q/E, swaps, drops and picks up too
 
   let inventory = inventoryState(await bridge(page, "getHudState"));
   expect(inventory.slots).toHaveLength(10);
-  expect(inventory.slots.slice(0, 3).map((item) => item.id)).toEqual(["axe", "hoe", "watering-can"]);
+  expect(inventory.slots.slice(0, 4).map((item) => item.id))
+    .toEqual(["axe", "pickaxe", "hoe", "water-bucket"]);
 
   await page.keyboard.press("Digit1");
   await expect.poll(async () => inventoryState(await bridge(page, "getHudState")).selectedIndex).toBe(0);
@@ -92,7 +93,7 @@ test("ten-slot hotbar selects with digits and Q/E, swaps, drops and picks up too
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("pickup");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots[0]?.id).toBe("axe");
 
-  for (const toolId of ["hoe", "watering-can"]) {
+  for (const toolId of ["pickaxe", "hoe", "water-bucket"]) {
     const session = await bridge(page, "getSession");
     const slotIndex = session.gameplay.inventory.slots.findIndex((item) => item?.id === toolId);
     await dragLogical(page, SLOT_CENTERS[slotIndex], { x: 160, y: 120 });

@@ -20,6 +20,7 @@ import {
   createPlantedTreeDefinition,
   resolveColliderSelectionPointer,
 } from "../src/editorAuthoringRuntime.js";
+import { createFreshInventory, getInventoryQuantity } from "../src/inventoryDomain.js";
 import {
   STARTING_LAYOUT_STORAGE_KEY,
   STARTING_LAYOUT_VERSION,
@@ -104,7 +105,7 @@ assert.deepEqual(definition.position, { x: 56, y: 104 });
 const sessionState = {
   gameplay: {
     currentEnergy: 100,
-    wood: 0,
+    inventory: createFreshInventory(),
     resourceNodes: {},
   },
 };
@@ -117,8 +118,9 @@ for (let hit = 0; hit < 7; hit += 1) {
   });
 }
 assert.equal(result.status, "cleared");
-assert.deepEqual(result.reward, { resource: "wood", amount: 6 });
-assert.equal(sessionState.gameplay.wood, 6, "a planted tree yields exactly six wood");
+assert.deepEqual(result.reward, { resource: "wood", amount: 5 });
+assert.equal(getInventoryQuantity(sessionState.gameplay.inventory, "wood"), 5, "a planted tree yields exactly five inventory wood");
+assert.equal(result.inventory?.mutated, true);
 assert.equal(sessionState.gameplay.currentEnergy, 96.5);
 assert.equal(getResourceProfile(PLANTED_TREE_PROFILE_ID).kind, "plant");
 

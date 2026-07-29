@@ -26,13 +26,13 @@ export const TAVERN_SIGN = Object.freeze({
 });
 
 export const GUEST_CONFIG = Object.freeze({
-  id: "tavern-guest-01",
+  idPrefix: "tavern-guest",
   profileId: ACTOR_PROFILE_IDS.villager,
   visualProfileId: CHARACTER_VISUAL_PROFILE_IDS.streetNpc,
   tint: 0xf2c66d,
-  initialSpawnDelayMs: 8_000,
-  subsequentSpawnDelayMinMs: 20_000,
-  subsequentSpawnDelayMaxMs: 35_000,
+  initialSpawnDelayMs: 3_000,
+  subsequentSpawnDelayMinMs: 3_000,
+  subsequentSpawnDelayMaxMs: 8_000,
   signCheckMs: 1_500,
   signReactionMs: 900,
   dishWaitMs: 10_000,

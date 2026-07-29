@@ -41,7 +41,6 @@ import { createGameHud, shouldShakeEnergyAfterInteraction } from "./gameHud.js";
 import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
-import { createManagedText } from "./textResolution.js";
 import { createAudioSettingsStore } from "./audioSettings.js";
 import { PhaserAudioRuntime, preloadMusicPlaylist } from "./audioRuntime.js";
 import { HUD_DEPTH } from "./hud.js";
@@ -73,20 +72,16 @@ import {
 } from "./buildAssetCatalog.js";
 import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { getResourceProfile, resourceEffectType } from "./resourceDomain.js";
+import { getResourceProfile, resourceActionForTool, resourceEffectType } from "./resourceDomain.js";
 import { createDebrisRuntime, drawBed } from "./debrisRuntime.js";
-import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, PLATED_DISH_ASSET, preloadFacilityAssets } from "./facilityConfig.js";
+import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
 import { drawFacility } from "./facilityPreviewVisuals.js";
 import { applyNeedsUpdate } from "./needsDomain.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
-import { COOKING_STEP_TYPES, toggleServingDish } from "./cookingDomain.js";
 import { createCookingRuntime } from "./cookingRuntime.js";
-import { createCoinRuntime } from "./coinRuntime.js";
-import { createGuestController } from "./guestController.js";
 import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_KIND } from "./guestConfig.js";
-import { createGuestRuntime } from "./guestRuntime.js";
 import { createTavernSignRuntime } from "./tavernSignRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
@@ -97,8 +92,12 @@ import { FARMING_WELL_TEXTURE_KEY, preloadFarmingAssets, WELL_PROFILE } from "./
 import { createFarmingRuntime } from "./farmingRuntime.js";
 import { createMerchantRuntime } from "./merchantRuntime.js";
 import { createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
+import { preloadLemonadeAssets } from "./lemonadeConfig.js";
+import { createTavernServiceRuntime } from "./tavernServiceRuntime.js";
+import { createKitchenInteractionRuntime } from "./kitchenInteractionRuntime.js";
 import { installWorldE2EBridge } from "./e2eBridge.js";
 import { UiVisibilityCoordinator } from "./uiVisibilityCoordinator.js";
+import { addInventoryItem, createInventoryItem } from "./inventoryDomain.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
@@ -113,6 +112,7 @@ class WorldScene extends Phaser.Scene {
     preloadMusicPlaylist(this, import.meta.env.BASE_URL);
     preloadFacilityAssets(this, import.meta.env.BASE_URL);
     preloadFarmingAssets(this, import.meta.env.BASE_URL);
+    preloadLemonadeAssets(this, import.meta.env.BASE_URL);
     this.load.spritesheet(TAVERN_SIGN_ASSET.key, `${import.meta.env.BASE_URL}${TAVERN_SIGN_ASSET.path}`, {
       frameWidth: TAVERN_SIGN_ASSET.frameWidth,
       frameHeight: TAVERN_SIGN_ASSET.frameHeight,
@@ -368,6 +368,7 @@ class WorldScene extends Phaser.Scene {
       playerId: "player",
       initialEntityIds: NPCS.map((npc) => npc.id),
     });
+    this.pendingTask049MigrationWarning = Boolean(this.sessionState.flags?.["migration.task049WarningPending"]);
     if (loaded?.diagnostic) {
       console.warn("Recovered NestledBurrow session", loaded.diagnostic);
     }
@@ -379,6 +380,7 @@ class WorldScene extends Phaser.Scene {
       sessionState: this.sessionState,
       localization: this.localization,
       onActiveChange: () => this.syncGameplayHudVisibility(), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
       onPersistentMutation: () => {
         this.gameHud?.render?.();
         this.saveSession();
@@ -402,8 +404,6 @@ class WorldScene extends Phaser.Scene {
         ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
       ],
       isInteractionAllowed: (definition) => !this.cookingRuntime?.isActive?.()
-        && !(this.facilityRuntime?.getDefinition?.(definition.payload?.facilityId)?.facilityType === "serving-table"
-          && this.guestRuntime?.isDishReserved?.())
         && (!this.facilityRuntime?.isUsing()
           || (definition.kind === FACILITY_INTERACTION_KIND && definition.id === this.facilityRuntime.getActiveId())),
       runWorldObjectInteraction: (candidate) => this.runWorldObjectInteraction(candidate),
@@ -419,123 +419,32 @@ class WorldScene extends Phaser.Scene {
     this.facilityRuntime = createFacilityRuntime(this, {
       worldLayout: this.worldLayout,
       getKitchenState: () => this.sessionState?.gameplay?.kitchen, getInventoryState: () => this.sessionState?.gameplay?.inventory,
-      isServingDishReserved: () => this.guestRuntime?.isDishReserved?.() ?? false,
+      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
     });
   }
 
   createTavernRuntime() {
-    this.coinRuntime = createCoinRuntime(this, {
-      getPlayerPosition: () => this.playerCharacter?.motor?.position,
-      onCollect: () => {
-        this.sessionState.gameplay.coins += 1;
-        this.gameHud?.render?.();
-        this.saveSession();
-      },
-    });
     this.tavernSignRuntime = createTavernSignRuntime(this, {
       getTavernOpen: () => this.sessionState?.gameplay?.tavernOpen,
       worldLayout: this.worldLayout,
     });
-    const actorProfile = getActorProfile(GUEST_CONFIG.profileId);
-    const visualProfile = getCharacterVisualProfile(GUEST_CONFIG.visualProfileId);
-    this.guestRuntime = createGuestRuntime({
-      config: { ...GUEST_CONFIG, createController: createGuestController },
+    this.tavernServiceRuntime = createTavernServiceRuntime(this, {
+      sessionState: this.sessionState,
       worldLayout: this.worldLayout,
-      createGuest: (controller) => {
-        const character = createCharacter(this, {
-          id: GUEST_CONFIG.id,
-          spawn: GUEST_CONFIG.points.spawn,
-          controller,
-          movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
-          actorProfile,
-          visualProfile,
-        });
-        character.sprite.setTint?.(GUEST_CONFIG.tint);
-        return this.characterSystem.add(character);
-      },
-      removeGuest: (id) => this.characterSystem.remove(id),
-      getTavernOpen: () => this.sessionState.gameplay.tavernOpen,
-      getKitchenState: () => this.sessionState.gameplay.kitchen,
-      getServicePoint: () => this.facilityRuntime?.getDefinitionByType?.("serving-table")?.usePosition
-        ?? GUEST_CONFIG.points.insideDoor,
-      getSeatPoint: () => this.facilityRuntime?.getDefinitionByType?.("table")?.usePosition
-        ?? this.facilityRuntime?.getDefinitionByType?.("serving-table")?.usePosition
-        ?? GUEST_CONFIG.points.insideDoor,
-      onReservationChange: () => {
+      facilityRuntime: this.facilityRuntime,
+      characterSystem: this.characterSystem,
+      createNpcMovementConfig: (profile) => this.createNpcRuntimeMovementConfig(profile),
+      getPlayerPosition: () => this.playerCharacter?.motor?.position,
+      onPersistentMutation: (result) => {
+        if (result?.status === "coin-collected") this.gameHud?.notifyCoinDelta?.(result.value);
         this.facilityRuntime?.syncKitchenVisuals?.();
-        this.interactionRuntime?.refresh?.();
-      },
-      onDishConsumed: ({ position }) => {
-        this.facilityRuntime?.syncKitchenVisuals?.();
-        this.audioRuntime?.playEffect?.("coin-toss"); this.coinRuntime?.spawn?.(position);
         this.gameHud?.render?.();
+        this.interactionRuntime?.refresh?.();
         this.saveSession();
       },
-      createFeedback: (character) => this.createGuestFeedback(character),
     });
-  }
-
-  createGuestFeedback(character) {
-    const marker = this.add.graphics().setDepth(900);
-    const reactionStyle = {
-      fontSize: "7px",
-      color: "#f7e7a1",
-    };
-    const reaction = createManagedText(this, 0, 0, "", reactionStyle).setDepth(902).setVisible(false);
-    const reactionOutline = [[-1, 0], [1, 0], [0, -1], [0, 1]].map(([x, y]) => ({
-      x, y,
-      visual: createManagedText(this, 0, 0, "", { ...reactionStyle, color: "#100b0e" })
-        .setDepth(901)
-        .setAlpha(0.72)
-        .setVisible(false),
-    }));
-    const thumb = this.add.graphics().setDepth(902).setVisible(false);
-    drawPixelThumb(thumb);
-    const carriedDish = this.add.image(0, 0, PLATED_DISH_ASSET.key)
-      .setScale(1, 0.5)
-      .setDepth(901)
-      .setVisible(false);
-    let state = "";
-    return {
-      set: (next) => {
-        const previousState = state; state = next; if (state !== previousState && state === "open-reaction") this.audioRuntime?.playEffect?.("guest-happy"); else if (state !== previousState && ["closed-reaction", "empty-reaction"].includes(state)) this.audioRuntime?.playEffect?.("guest-angry");
-        const reactionText = state === "checking" ? "..."
-          : state === "open-reaction" ? ":D"
-            : state === "closed-reaction" ? ":("
-              : state === "empty-reaction" ? ">:[" : "";
-        const color = ["closed-reaction", "empty-reaction"].includes(state) ? "#ef8b78" : "#f7e7a1";
-        reaction.setText(reactionText).setStyle({ color }).setVisible(Boolean(reactionText));
-        for (const outline of reactionOutline) outline.visual.setText(reactionText).setVisible(Boolean(reactionText));
-        thumb.setVisible(state === "meal-complete");
-        carriedDish.setVisible(["carrying", "eating"].includes(state));
-      },
-      update: () => {
-        const position = character.motor.position;
-        const anchorX = Math.round(position.x);
-        const anchorY = Math.round(position.y - 25);
-        const reactionX = anchorX - Math.floor(reaction.width / 2);
-        const reactionY = anchorY - reaction.height;
-        reaction.setPosition(reactionX, reactionY).setDepth(902 + Math.round(position.y));
-        for (const outline of reactionOutline) outline.visual
-          .setPosition(reactionX + outline.x, reactionY + outline.y)
-          .setDepth(901 + Math.round(position.y));
-        thumb.setPosition(anchorX - 4, anchorY - 8).setDepth(902 + Math.round(position.y));
-        carriedDish.setPosition(anchorX, Math.round(position.y - 19)).setDepth(901 + Math.round(position.y));
-        marker.clear();
-        if (["waiting", "eating"].includes(state)) {
-          const color = state === "waiting" ? 0xf3c969 : state === "eating" ? 0x8bd17c : 0xe7e1c5;
-          marker.fillStyle(color, 1).fillRect(position.x - 2, position.y - 23, 4, 2);
-          if (state === "waiting") marker.fillRect(position.x + 3, position.y - 23, 1, 1);
-        }
-      },
-      destroy: () => {
-        marker.destroy();
-        reaction.destroy();
-        for (const outline of reactionOutline) outline.visual.destroy();
-        thumb.destroy();
-        carriedDish.destroy();
-      },
-    };
+    this.guestRuntime = this.tavernServiceRuntime.guestRuntime;
+    this.coinRuntime = this.tavernServiceRuntime.coinRuntime;
   }
 
   runWorldObjectInteraction(candidate) {
@@ -546,8 +455,13 @@ class WorldScene extends Phaser.Scene {
     }
     const farmingResult = this.farmingRuntime?.handleInteraction?.(candidate);
     if (farmingResult && farmingResult.status !== "ignored") {
+      let presentedFarmingResult = farmingResult;
+      if (farmingResult.messageKey) {
+        this.gameHud?.showTransientMessage?.(farmingResult.messageKey);
+        presentedFarmingResult = { ...farmingResult, transientMessageShown: true };
+      }
       this.suppressNextInteract = true;
-      return farmingResult;
+      return presentedFarmingResult;
     }
     if (candidate.kind === TAVERN_SIGN_KIND) {
       this.sessionState.gameplay.tavernOpen = !this.sessionState.gameplay.tavernOpen; this.audioRuntime?.playEffect?.(this.sessionState.gameplay.tavernOpen ? "tavern-open" : "tavern-close");
@@ -558,25 +472,11 @@ class WorldScene extends Phaser.Scene {
     }
     if (candidate.kind === FACILITY_INTERACTION_KIND) {
       const facility = this.facilityRuntime.getDefinition(candidate.payload.facilityId);
-      if (facility?.facilityType === "cutting-table" || facility?.facilityType === "gas-stove") {
-        const stepType = facility.facilityType === "cutting-table"
-          ? COOKING_STEP_TYPES.preparation
-          : COOKING_STEP_TYPES.frying;
-        const result = this.cookingRuntime.start(stepType);
+      const kitchenResult = this.kitchenInteractionRuntime?.handleFacility?.(facility);
+      if (kitchenResult?.status !== "ignored") {
         this.suppressNextInteract = true;
         this.interactionRuntime?.refresh?.();
-        return result;
-      }
-      if (facility?.facilityType === "serving-table") {
-        const result = toggleServingDish(this.sessionState.gameplay.kitchen); if (result.mutated) this.audioRuntime?.playEffect?.(result.status === "dish-served" ? "dish-serve" : "dish-take");
-        if (result.mutated) {
-          this.facilityRuntime.syncKitchenVisuals();
-          this.gameHud?.render?.();
-          this.saveSession();
-        }
-        this.suppressNextInteract = true;
-        this.interactionRuntime?.refresh?.();
-        return result;
+        return kitchenResult;
       }
       const player = this.characterSystem.require(this.sessionState.playerId);
       const result = this.facilityRuntime.toggle(candidate.payload.facilityId, player.motor);
@@ -592,16 +492,20 @@ class WorldScene extends Phaser.Scene {
       this.suppressNextInteract = true;
       return { status: this.sleeping ? "sleeping" : "awake", mutated: false };
     }
-    if (candidate.kind === "wake-exhausted") return this.tryWakeFromExhaustion(this.e2eWakeRandom ?? Math.random);
+    if (candidate.kind === "wake-exhausted") {
+      return this.tryWakeFromExhaustion(this.e2eWakeRandom ?? Math.random);
+    }
     if (candidate.kind !== RESOURCE_INTERACTION_KIND) return { status: "ignored" };
     const nowMs = globalThis.performance?.now?.() ?? Date.now();
     if (nowMs - this.lastSuccessfulHitAtMs < this.gameplayTuning.universalHitCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
     const definition = RESOURCE_OBJECTS.find((item) => item.id === candidate.payload.resourceId);
     if (!definition) return { status: "unknown-resource", mutated: false };
-    const profile = getResourceProfile(definition.profileId); if (this.gameHud?.getSelectedInventoryItem?.()?.id !== "axe") return { status: "wrong-tool", mutated: false };
+    const profile = getResourceProfile(definition.profileId);
+    const action = resourceActionForTool(profile, this.gameHud?.getSelectedInventoryItem?.()?.id);
+    if (!action) return { status: "wrong-tool", mutated: false };
     const energyBefore = this.sessionState.gameplay.currentEnergy;
     const result = hitResourceNode(this.sessionState, definition.id, {
-      action: profile.preferredAction,
+      action,
       damage: this.gameplayTuning.axeDamage,
       energyPerHit: this.gameplayTuning.energyPerHit,
       tuning: this.gameplayTuning,
@@ -611,6 +515,7 @@ class WorldScene extends Phaser.Scene {
       this.activeResourceProfileId = profile.id;
       this.interactionHud?.triggerCooldownFeedback?.();
       this.gameHud?.render?.();
+      if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory);
       this.applySuccessfulHitFeedback(resourceEffectType(profile, result.status), energyBefore);
       this.debrisRuntime?.hitWithFeedback?.(definition.id, result, () => this.interactionRuntime?.refresh?.());
       this.saveSession();
@@ -688,7 +593,8 @@ class WorldScene extends Phaser.Scene {
       },
       onRefillEnergy: () => { refillEnergy(this.sessionState); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.saveSession(); },
       onAddCookedDish: () => {
-        this.sessionState.gameplay.kitchen.cookedDishes += 1;
+        const result = addInventoryItem(this.sessionState.gameplay.inventory, createInventoryItem("fried-potato-dish", 1));
+        if (result.mutated) this.gameHud?.notifyInventoryGain?.(result);
         this.gameHud?.render?.();
         this.interactionRuntime?.refresh?.();
         this.saveSession();
@@ -914,6 +820,12 @@ class WorldScene extends Phaser.Scene {
       isCoarsePointer: () => this.isCoarsePointer(),
       getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, timeScale: this.simulationScale, selectedTimeScale: this.playerTimeScale, energyFlow: this.getEnergyFlow(), needsFlow: this.needsFlow }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(), onTimeScaleChange: (scale) => { if (scale > 1) this.audioRuntime?.playEffect?.("time-speed-up"); else if (scale === 1 && this.playerTimeScale !== 1) this.audioRuntime?.playEffect?.("time-speed-normal"); this.playerTimeScale = scale; }, onDroppedItemCollision: (item, collider) => this.farmingRuntime?.handleDroppedItemCollision?.(item, collider), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onCoinDrop: (pointerWorld) => this.tavernServiceRuntime?.dropWalletCoin?.({
+        position: this.playerCharacter?.motor?.position,
+        playerSprite: this.playerCharacter?.sprite,
+        facing: this.playerCharacter?.lastFacing,
+        pointerWorld,
+      }),
       onOptionsChange: (active) => { this.audioRuntime?.playEffect?.(active ? "menu-open" : "menu-close"); this.optionsOpen = Boolean(active); this.syncGameplayHudVisibility(); this.cookingRuntime?.setInputSuppressed?.(active); },
       onConfirmationChange: (active) => {
         this.gameHudConfirmationActive = Boolean(active);
@@ -923,6 +835,12 @@ class WorldScene extends Phaser.Scene {
       },
       onNewGame: () => this.startNewGame(),
     });
+    if (this.pendingTask049MigrationWarning) {
+      this.gameHud.showTransientMessage("hud:migration.task049");
+      this.sessionState.flags["migration.task049WarningPending"] = false;
+      this.pendingTask049MigrationWarning = false;
+      this.saveSession();
+    }
   }
 
   createFarmingRuntime() {
@@ -941,6 +859,7 @@ class WorldScene extends Phaser.Scene {
     this.cookingRuntime = createCookingRuntime(this, {
       sessionState: this.sessionState,
       localization: this.localization, playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
       onActiveChange: (active) => {
         this.cookingOverlayActive = Boolean(active);
         this.gameHud?.setGameplayOverlayActive?.(active);
@@ -958,6 +877,21 @@ class WorldScene extends Phaser.Scene {
       },
       onPersistentMutation: () => {
         this.facilityRuntime?.syncKitchenVisuals?.();
+        this.gameHud?.render?.();
+        this.interactionRuntime?.refresh?.();
+        this.saveSession();
+      },
+    });
+    this.kitchenInteractionRuntime = createKitchenInteractionRuntime({
+      sessionState: this.sessionState,
+      facilityRuntime: this.facilityRuntime,
+      cookingRuntime: this.cookingRuntime,
+      localization: this.localization,
+      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
+      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
+      showMessage: (key, options) => this.gameHud?.showTransientMessage?.(key, options),
+      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onPersistentMutation: () => {
         this.gameHud?.render?.();
         this.interactionRuntime?.refresh?.();
         this.saveSession();
@@ -2499,12 +2433,12 @@ class WorldScene extends Phaser.Scene {
     this.cameraRuntime = null;
     this.debrisRuntime?.destroy();
     this.debrisRuntime = null;
+    this.tavernServiceRuntime?.destroy();
+    this.tavernServiceRuntime = null;
+    this.guestRuntime = null;
+    this.coinRuntime = null;
     this.facilityRuntime?.destroy();
     this.facilityRuntime = null;
-    this.guestRuntime?.destroy();
-    this.guestRuntime = null;
-    this.coinRuntime?.destroy();
-    this.coinRuntime = null;
     this.tavernSignRuntime?.destroy();
     this.tavernSignRuntime = null;
     this.cookingRuntime?.destroy();
@@ -2653,9 +2587,8 @@ class WorldScene extends Phaser.Scene {
     this.setNpcAnimationTimeScale(this.simulationScale ?? 1);
     while (worldDeltaMs > 0) {
       const substepMs = Math.min(50, worldDeltaMs);
-      this.guestRuntime?.update(substepMs);
+      this.tavernServiceRuntime?.update(substepMs);
       this.characterSystem?.update(substepMs);
-      this.coinRuntime?.update(substepMs);
       worldDeltaMs -= substepMs;
     }
     this.syncFacilityPresentationPose();
@@ -2803,7 +2736,8 @@ class WorldScene extends Phaser.Scene {
       this.wakeUp();
       return { status: "awake", mutated: true };
     }
-    return { status: "wake-failed", mutated: false };
+    this.gameHud?.showTransientMessage?.("hud:interaction.wakeFailed");
+    return { status: "wake-failed", mutated: false, transientMessageShown: true };
   }
 
   createDayNightRuntime() {
@@ -2878,22 +2812,4 @@ function migrateColliderOverrideGroups(overrides) {
     migrated[groupKey] = value;
   }
   return migrateDirectionalWallOverrides(migrated);
-}
-
-function drawPixelThumb(graphics) {
-  const pattern = ["0011000", "0011000", "0011111", "1111111", "1111111", "0111110", "0011100"];
-  const pixels = new Set();
-  pattern.forEach((row, y) => [...row].forEach((value, x) => { if (value === "1") pixels.add(`${x},${y}`); }));
-  graphics.fillStyle(0x100b0e, 0.72);
-  for (const key of pixels) {
-    const [x, y] = key.split(",").map(Number);
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      if (!pixels.has(`${x + dx},${y + dy}`)) graphics.fillRect(x + dx, y + dy, 1, 1);
-    }
-  }
-  graphics.fillStyle(0xf7e7a1, 1);
-  for (const key of pixels) {
-    const [x, y] = key.split(",").map(Number);
-    graphics.fillRect(x, y, 1, 1);
-  }
 }

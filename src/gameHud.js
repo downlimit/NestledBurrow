@@ -13,6 +13,14 @@ import { GAME_WIDTH } from "./worldConfig.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
 import { createInventoryRuntime, INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "./inventoryRuntime.js";
 import { drawCoinSprite } from "./coinVisual.js";
+import { worldPointFromPointer } from "./worldThrowDirection.js";
+import {
+  createInventoryGainPresentation,
+  INVENTORY_GAIN_DROP_MS,
+  INVENTORY_GAIN_HOLD_MS,
+} from "./inventoryGainPresentation.js";
+import { createTransientMessageRuntime } from "./transientMessageRuntime.js";
+import { createThrowAimIndicator } from "./throwAimIndicator.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -91,6 +99,7 @@ export function createGameHud(scene, options) {
     onOptionsChange = () => {},
     onTimeScaleChange = () => {},
     onDroppedItemCollision = () => {},
+    onCoinDrop = () => ({ status: "unavailable", mutated: false }),
     playEffect = () => {},
     audioSettings,
     getGameplayState = () => null,
@@ -99,6 +108,11 @@ export function createGameHud(scene, options) {
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const energyBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0);
   const energyArrowGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 3).setScrollFactor(0);
+  const coinDragGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 50).setScrollFactor(0).setVisible(false);
+  const coinDeltaText = createManagedText(scene, 0, 0, "", {
+    fontSize: "8px",
+    color: "#efbd79",
+  }).setDepth(HUD_DEPTH + 51).setScrollFactor(0).setVisible(false);
   const buildLabel = compactBuildLabel(buildId);
 
   let destroyed = false;
@@ -120,8 +134,22 @@ export function createGameHud(scene, options) {
   let hoveredNeedId = null;
   let pinnedNeedId = null;
   let needsRowsState = [];
+  let coinDragCandidate = null;
+  let coinDragging = false;
+  let coinDeltaStartedAtMs = 0;
+  let coinDeltaAmount = 0;
 
-  const inventoryHud = createInventoryRuntime(scene, {
+  let inventoryHud = null;
+  const inventoryGainPresentation = createInventoryGainPresentation(scene, {
+    slotAreas: INVENTORY_SLOT_AREAS,
+    getGameplayState,
+    onChange: () => inventoryHud?.render(),
+  });
+  const transientMessages = createTransientMessageRuntime(scene, { localization });
+  const throwAimIndicator = createThrowAimIndicator(scene, {
+    getPlayerCharacter: () => scene.playerCharacter ?? null,
+  });
+  inventoryHud = createInventoryRuntime(scene, {
     getGameplayState,
     getPlayerCharacter: () => scene.playerCharacter ?? null,
     isSuppressed: () => suppressed
@@ -137,9 +165,16 @@ export function createGameHud(scene, options) {
     },
     onWorldItemCollision: onDroppedItemCollision,
     playEffect,
+    onInventoryGain: (result) => inventoryGainPresentation.notify(result),
+    isSlotItemHidden: (slotIndex, itemId) => inventoryGainPresentation.isSlotPending(slotIndex, itemId),
+    setThrowAimTarget: (target) => {
+      if (target) throwAimIndicator.show(target);
+      else throwAimIndicator.hide();
+    },
   });
 
   const optionsHit = createZone(scene, OPTIONS_HIT_AREA);
+  const coinHit = createZone(scene, COIN_HUD_AREA);
   const optionsPanelHit = createZone(scene, OPTIONS_PANEL_AREA).disableInteractive();
   const languageHit = createZone(scene, LANGUAGE_HIT_AREA).disableInteractive();
   const sliderHits = Object.fromEntries(Object.entries(SOUND_SLIDER_RECTS).map(([channel, rect]) => [channel, createZone(scene, rect).disableInteractive()]));
@@ -176,7 +211,41 @@ export function createGameHud(scene, options) {
     pinnedNeedId = null;
     render();
   };
+  const onCoinPointerDown = (pointer, _x, _y, event) => {
+    stop(pointer, event);
+    if (optionsOpen || gameplayOverlayActive || confirmingNewGame || Number(getGameplayState?.()?.coins ?? 0) < 1) return;
+    coinDragCandidate = { x: pointer.x, y: pointer.y };
+    coinDragging = false;
+  };
+  const onCoinPointerMove = (pointer) => {
+    if (!coinDragCandidate) return;
+    if (!coinDragging && Math.hypot(pointer.x - coinDragCandidate.x, pointer.y - coinDragCandidate.y) >= 3) {
+      coinDragging = true;
+    }
+    coinDragGraphics.clear().setVisible(coinDragging);
+    if (coinDragging) {
+      drawCoinSprite(coinDragGraphics, Math.round(pointer.x), Math.round(pointer.y));
+      throwAimIndicator.show(worldPointFromPointer(scene, pointer));
+    }
+  };
+  const finishCoinDrag = (pointer) => {
+    if (!coinDragCandidate) return;
+    const shouldDrop = coinDragging && !scene.isHudPoint?.(pointer.x, pointer.y);
+    coinDragCandidate = null;
+    coinDragging = false;
+    coinDragGraphics.clear().setVisible(false);
+    throwAimIndicator.hide();
+    if (shouldDrop) {
+      const result = onCoinDrop(worldPointFromPointer(scene, pointer));
+      if (result?.mutated) showCoinDelta(-Math.max(1, Number(result.value) || 1));
+    }
+    render();
+  };
+  coinHit.on("pointerdown", onCoinPointerDown);
   scene.input.on("pointerdown", onScenePointerDown);
+  scene.input.on("pointermove", onCoinPointerMove);
+  scene.input.on("pointerup", finishCoinDrag);
+  scene.input.on("pointercancel", finishCoinDrag);
 
   const optionsText = createText(scene);
   const languageText = createText(scene);
@@ -273,6 +342,36 @@ export function createGameHud(scene, options) {
     graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(rect.x + 3.5, rect.y + 3.5, rect.width - 7, rect.height - 7);
     setManagedTextStyle(textObject, scene, textStyle()).setText(labelText).setVisible(true);
     textObject.setPosition(Math.round(rect.x + (rect.width - textObject.width) / 2), Math.round(rect.y + (rect.height - textObject.height) / 2));
+  }
+
+  function showCoinDelta(amount) {
+    const value = Math.trunc(Number(amount) || 0);
+    if (value === 0) return;
+    coinDeltaAmount = coinDeltaText.visible && Math.sign(coinDeltaAmount) === Math.sign(value)
+      ? coinDeltaAmount + value
+      : value;
+    scene.tweens.killTweensOf(coinDeltaText);
+    coinDeltaStartedAtMs = scene.time?.now ?? 0;
+    setManagedTextStyle(coinDeltaText, scene, {
+      fontFamily: localization.getLocale().fontKey,
+      fontSize: "8px",
+      color: coinDeltaAmount > 0 ? "#fff3a6" : "#efbd79",
+    }).setText(`${coinDeltaAmount > 0 ? "+" : ""}${coinDeltaAmount}`)
+      .setPosition(COIN_HUD_AREA.x - 15, COIN_HUD_AREA.y + 10)
+      .setAlpha(1)
+      .setVisible(true);
+    scene.tweens.add({
+      targets: coinDeltaText,
+      x: COIN_HUD_AREA.x - 3,
+      alpha: 0,
+      delay: INVENTORY_GAIN_HOLD_MS,
+      duration: INVENTORY_GAIN_DROP_MS,
+      ease: "Linear",
+      onComplete: () => {
+        coinDeltaAmount = 0;
+        coinDeltaText.setVisible(false);
+      },
+    });
   }
 
   function hideManagedObjects() {
@@ -415,6 +514,7 @@ export function createGameHud(scene, options) {
   function updateInteractivity() {
     if (suppressed) {
       optionsHit.disableInteractive();
+      coinHit.disableInteractive();
       setOptionsPanelInteractive(false);
       setNeedsInteractive(false);
       setTimeControlsInteractive(false);
@@ -426,6 +526,7 @@ export function createGameHud(scene, options) {
     fullscreenHud?.hit?.setInteractive?.({ useHandCursor: true });
     if (confirmingNewGame) {
       optionsHit.disableInteractive();
+      coinHit.disableInteractive();
       setOptionsPanelInteractive(false);
       setNeedsInteractive(false);
       setTimeControlsInteractive(false);
@@ -434,6 +535,11 @@ export function createGameHud(scene, options) {
       return;
     }
     optionsHit.setInteractive({ useHandCursor: true });
+    if (!optionsOpen && !gameplayOverlayActive && Number(getGameplayState?.()?.coins ?? 0) > 0) {
+      coinHit.setInteractive({ useHandCursor: true });
+    } else {
+      coinHit.disableInteractive();
+    }
     setOptionsPanelInteractive(optionsOpen);
     setNeedsInteractive(!optionsOpen && !gameplayOverlayActive);
     setTimeControlsInteractive(!optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping);
@@ -514,10 +620,21 @@ export function createGameHud(scene, options) {
         clockText: clockText.text,
         coinText: coinText.text,
         coinCount: Number(gameplay?.coins ?? 0),
+        coinDragging,
+        coinDelta: {
+          visible: coinDeltaText.visible,
+          text: coinDeltaText.text,
+          x: coinDeltaText.x,
+          alpha: coinDeltaText.alpha,
+          startedAtMs: coinDeltaStartedAtMs,
+        },
+        throwAim: throwAimIndicator.getState(),
         woodText: String(gameplay?.wood ?? 0),
         stoneText: String(gameplay?.stone ?? 0),
         rubyText: String(gameplay?.rubies ?? 0),
         inventory: inventoryHud.getState(),
+        inventoryGain: inventoryGainPresentation.getState(),
+        transientMessage: transientMessages.getState(),
         kitchenTexts: [],
         icons: { wood: false, stone: false, ruby: false },
         energyRatio,
@@ -583,13 +700,23 @@ export function createGameHud(scene, options) {
       if (confirmingNewGame) onConfirmationChange(false);
       unsubscribe?.();
       scene.input.off("pointerdown", onScenePointerDown);
+      scene.input.off("pointermove", onCoinPointerMove);
+      scene.input.off("pointerup", finishCoinDrag);
+      scene.input.off("pointercancel", finishCoinDrag);
+      coinHit.off("pointerdown", onCoinPointerDown);
       inventoryHud.destroy();
-      for (const zone of [optionsHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits, ...timeControlHits]) zone.destroy();
+      inventoryGainPresentation.destroy();
+      transientMessages.destroy();
+      throwAimIndicator.destroy();
+      for (const zone of [optionsHit, coinHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits, ...timeControlHits]) zone.destroy();
       scene.tweens.killTweensOf(energyBarGraphics);
       scene.tweens.killTweensOf(energyArrowGraphics);
+      scene.tweens.killTweensOf(coinDeltaText);
       for (const text of [optionsText, languageText, newGameText, confirmMessageText, confirmText, cancelText, clockText, coinText, needTooltipText, ...Object.values(soundTexts)]) text.destroy();
       energyBarGraphics.destroy();
       energyArrowGraphics.destroy();
+      coinDragGraphics.destroy();
+      coinDeltaText.destroy();
       graphics.destroy();
       if (fullscreenHud) {
         if (fullscreenHandler) fullscreenHud.hit.off("pointerdown", fullscreenHandler);
@@ -601,6 +728,10 @@ export function createGameHud(scene, options) {
     selectInventorySlot: (index) => inventoryHud.selectSlot(index),
     dropInventorySlot: (index) => inventoryHud.dropSlot(index),
     spawnWorldItems: (itemId, quantity, origin) => inventoryHud.spawnWorldItems(itemId, quantity, origin),
+    notifyInventoryGain: (result) => inventoryGainPresentation.notify(result),
+    notifyCoinDelta: (amount) => showCoinDelta(amount),
+    showTransientMessage: (keyOrText, options) => transientMessages.show(keyOrText, options),
+    getTransientMessageState: () => transientMessages.getState(),
   };
 }
 

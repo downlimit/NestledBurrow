@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   FARMING_FRAMES,
   POTATO_CROP_PROFILE,
-  WATERING_CAN_CAPACITY,
+  WATER_BUCKET_CAPACITY,
 } from "../src/farmingConfig.js";
 import {
   advanceFarmTime,
@@ -14,7 +14,7 @@ import {
   harvestPotato,
   moistureMultiplier,
   plantPotato,
-  refillWateringCan,
+  refillWaterBucket,
   soilFrame,
   tillSoil,
   waterSoil,
@@ -72,7 +72,7 @@ assert.deepEqual(
 
 const freshGame = createFreshGameSessionState();
 assert.equal(getInventoryQuantity(freshGame.gameplay.inventory, "potato-seed"), 4);
-assert.equal(getInventoryQuantity(freshGame.gameplay.inventory, "potato"), 3);
+assert.equal(getInventoryQuantity(freshGame.gameplay.inventory, "potato"), 0);
 
 const inventory = createFreshInventory();
 assert.equal(addInventoryItem(inventory, { id: "potato", quantity: 200 }).mutated, true);
@@ -100,13 +100,15 @@ const farm = createFreshFarmState(6 * HOUR);
 const farmInventory = createFreshInventory();
 addInventoryItem(farmInventory, { id: "potato-seed", quantity: 1 });
 assert.equal(tillSoil(farm, { x: 64, y: 64 }).status, "tilled");
-assert.equal(farm.wateringCan.currentWater, WATERING_CAN_CAPACITY);
+assert.equal(farm.waterBucket.currentWater, 0);
+assert.equal(refillWaterBucket(farm).status, "water-bucket-refilled");
+assert.equal(farm.waterBucket.currentWater, WATER_BUCKET_CAPACITY);
 assert.equal(waterSoil(farm, { x: 64, y: 64 }, 6 * HOUR).status, "watered");
-assert.equal(farm.wateringCan.currentWater, WATERING_CAN_CAPACITY - 1);
+assert.equal(farm.waterBucket.currentWater, WATER_BUCKET_CAPACITY - 1);
 assert.equal(plantPotato(farm, { x: 64, y: 64 }, farmInventory, 6 * HOUR).status, "planted");
 assert.equal(getInventoryQuantity(farmInventory, "potato-seed"), 0);
-assert.equal(refillWateringCan(farm).status, "watering-can-refilled");
-assert.equal(farm.wateringCan.currentWater, WATERING_CAN_CAPACITY);
+assert.equal(refillWaterBucket(farm).status, "water-bucket-refilled");
+assert.equal(farm.waterBucket.currentWater, WATER_BUCKET_CAPACITY);
 const moistureFrames = [null, 0, 10 * HOUR, 17 * HOUR].map((age) => soilFrame({ moistureSolarAgeSeconds: age }));
 assert.deepEqual(
   moistureFrames,
@@ -178,12 +180,12 @@ delete legacy.entities["seed-merchant"];
 delete legacy.gameplay.farm;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 7, state: legacy }));
 assert.equal(migrated.status, "loaded");
-assert.equal(SAVE_SCHEMA_VERSION, 9);
+assert.equal(SAVE_SCHEMA_VERSION, 10);
 assert(migrated.state.entities["seed-merchant"]);
 assert.equal(migrated.state.entities["home-npc"], undefined);
 assert.equal(migrated.state.entities["street-npc"], undefined);
 assert.equal(migrated.state.flags["neighborQuest.started"], undefined);
-assert.equal(migrated.state.gameplay.farm.wateringCan.currentWater, WATERING_CAN_CAPACITY);
+assert.equal(migrated.state.gameplay.farm.waterBucket.currentWater, WATER_BUCKET_CAPACITY);
 
 assert.equal(compactPromptWidth(9, false), 19, "desktop prompt applies exactly five pixels of horizontal padding");
 assert.equal(compactPromptWidth(9, true), 28, "coarse pointer prompt has a 28px minimum");
@@ -221,7 +223,7 @@ assert(!mainSource.includes("street-npc"), "composition root has no obsolete str
 assert(!/rawPotatoes|preparedPotatoes/.test(gameHudSource), "obsolete kitchen inventory counters are absent from HUD");
 assert(farmingRuntimeSource.includes("character.motor?.movement?.desiredDirection"), "hoe target uses immediate input direction");
 assert(inventoryRuntimeSource.includes("setTintMode(TINT_MODE_FILL)") && inventoryRuntimeSource.includes("colorOverride: 0xffffff"), "dropped items use opaque-pixel silhouette outlines");
-assert(debrisRuntimeSource.includes('getSelectedItem()?.id === "axe"'), "resource interaction targets require the selected axe");
+assert(debrisRuntimeSource.includes("resourceActionForTool"), "resource interaction targets use the strict resource/tool matrix");
 assert(debrisRuntimeSource.includes("colorOverride: 0x8ed6ff") && debrisRuntimeSource.includes(".setAlpha(0.22)"), "available axe targets use a subtle blue silhouette outline");
 assert(mainSource.includes('status: "wrong-tool"'), "resource handler rejects bypasses without the selected axe");
 
@@ -232,7 +234,10 @@ function plantedFarm(now, hydrated = true) {
   const items = createFreshInventory();
   addInventoryItem(items, { id: "potato-seed", quantity: 1 });
   tillSoil(state, { x: 16, y: 16 });
-  if (hydrated) waterSoil(state, { x: 16, y: 16 }, now);
+  if (hydrated) {
+    refillWaterBucket(state);
+    waterSoil(state, { x: 16, y: 16 }, now);
+  }
   plantPotato(state, { x: 16, y: 16 }, items, now);
   return state;
 }

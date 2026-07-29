@@ -1,13 +1,16 @@
 import { createFreshGameSessionState, normalizeGameSessionState, SESSION_STATE_VERSION } from "./gameSessionState.js";
 import {
   addInventoryItem,
+  addInventoryItemUpTo,
+  createInventoryItem,
   createInventoryFromLegacyCounters,
   createWorldItemId,
   inventoryStackLimit,
 } from "./inventoryDomain.js";
 import { DOOR_LEFT, DOOR_Y, TILE_SIZE } from "./worldConfig.js";
+import { STARTER_WELL, WATER_BUCKET_CAPACITY } from "./farmingConfig.js";
 
-export const SAVE_SCHEMA_VERSION = 9;
+export const SAVE_SCHEMA_VERSION = 10;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -50,6 +53,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 6) envelope = migrateV6Envelope(envelope);
   if (envelope.schemaVersion === 7) envelope = migrateV7Envelope(envelope);
   if (envelope.schemaVersion === 8) envelope = migrateV8Envelope(envelope);
+  if (envelope.schemaVersion === 9) envelope = migrateV9Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -71,6 +75,7 @@ const migrationRegistry = new Map([
   [6, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [7, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [8, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [9, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -205,8 +210,120 @@ function migrateV8Envelope(envelope) {
     remaining -= quantity;
   }
   state.gameplay = gameplay;
+  state.version = 9;
+  return { schemaVersion: 9, state };
+}
+
+function migrateV9Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  gameplay.inventory ??= createInventoryFromLegacyCounters();
+  gameplay.worldItems ??= [];
+  migrateLegacyTools(gameplay);
+
+  const farm = gameplay.farm ?? {};
+  const legacyWater = Number.isSafeInteger(farm.wateringCan?.currentWater)
+    ? farm.wateringCan.currentWater
+    : 0;
+  farm.waterBucket = {
+    capacity: WATER_BUCKET_CAPACITY,
+    currentWater: Math.min(WATER_BUCKET_CAPACITY, Math.max(0, legacyWater)),
+  };
+  delete farm.wateringCan;
+  farm.wells = Array.isArray(farm.wells) ? farm.wells : [];
+  const starterWellIndex = farm.wells.findIndex((well) => well?.id === STARTER_WELL.id);
+  if (starterWellIndex >= 0) farm.wells[starterWellIndex] = { ...STARTER_WELL };
+  else farm.wells.unshift({ ...STARTER_WELL });
+  gameplay.farm = farm;
+
+  const legacyKitchen = gameplay.kitchen ?? {};
+  const preparedPotatoes = safeLegacyQuantity(legacyKitchen.preparedPotatoes);
+  const cookedDishes = safeLegacyQuantity(legacyKitchen.cookedDishes);
+  const servingTableHasDish = Boolean(legacyKitchen.servingTableHasDish);
+  gameplay.kitchen = {
+    starterLemons: 6,
+    stoveRepaired: false,
+    servingTable: {
+      itemId: servingTableHasDish ? "fried-potato-dish" : null,
+      quantity: servingTableHasDish ? 1 : 0,
+      reservations: [],
+    },
+  };
+  migrateLegacyQuantity(gameplay, "sliced-potato", preparedPotatoes);
+  migrateLegacyQuantity(gameplay, "fried-potato-dish", cookedDishes);
+  gameplay.tavernService = { nextGuestId: 0, spawnRemainingMs: 3_000, guests: [] };
+  state.flags ??= {};
+  state.flags["migration.task049WarningPending"] = true;
+  state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };
+}
+
+function migrateLegacyTools(gameplay) {
+  const slots = gameplay.inventory.slots ?? [];
+  for (const slot of slots) {
+    if (slot?.id === "watering-can") {
+      slot.id = "water-bucket";
+      slot.kind = "tool";
+      slot.quantity = 1;
+    }
+  }
+  const tools = ["axe", "pickaxe", "hoe", "water-bucket"];
+  const seen = new Set();
+  for (let index = 0; index < slots.length; index += 1) {
+    const slot = slots[index];
+    if (!tools.includes(slot?.id)) continue;
+    if (seen.has(slot.id)) {
+      slots[index] = null;
+      continue;
+    }
+    seen.add(slot.id);
+    slot.kind = "tool";
+    slot.quantity = 1;
+  }
+  for (const toolId of tools) {
+    if (seen.has(toolId)) continue;
+    let index = slots.findIndex((slot) => slot === null);
+    if (index < 0) {
+      index = slots.findLastIndex((slot) => slot?.kind !== "tool");
+      if (index < 0) continue;
+      dropLegacyItem(gameplay, slots[index]);
+      slots[index] = null;
+    }
+    slots[index] = createInventoryItem(toolId);
+    seen.add(toolId);
+  }
+}
+
+function migrateLegacyQuantity(gameplay, itemId, quantity) {
+  let remaining = quantity;
+  while (remaining > 0) {
+    const batch = Math.min(remaining, inventoryStackLimit(itemId));
+    const result = addInventoryItemUpTo(gameplay.inventory, createInventoryItem(itemId, batch));
+    remaining -= result.accepted ?? 0;
+    if ((result.accepted ?? 0) === 0) {
+      dropLegacyItem(gameplay, createInventoryItem(itemId, batch));
+      remaining -= batch;
+    }
+  }
+}
+
+function dropLegacyItem(gameplay, item) {
+  const index = gameplay.worldItems.length;
+  const offsets = [
+    [0, 0], [12, 0], [-12, 0], [0, 12], [0, -12], [12, 12], [-12, 12], [12, -12], [-12, -12],
+  ];
+  const [dx, dy] = offsets[index % offsets.length];
+  gameplay.worldItems.push({
+    id: createWorldItemId(gameplay.worldItems),
+    item: { ...item },
+    x: (DOOR_LEFT + 1.5) * TILE_SIZE + dx,
+    y: (DOOR_Y - 3) * TILE_SIZE + dy,
+  });
+}
+
+function safeLegacyQuantity(value) {
+  return Number.isSafeInteger(value) && value > 0 ? value : 0;
 }
 
 export function migrateSessionEnvelope(envelope, options = {}) {

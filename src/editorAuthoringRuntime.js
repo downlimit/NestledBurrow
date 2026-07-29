@@ -1,5 +1,5 @@
 import COLLIDER_DEFAULTS from "./colliderDefaults.js";
-import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
+import STARTING_LAYOUT_DEFAULT, { STARTER_TREE_OBJECTS } from "./startingLayoutDefault.js";
 import {
   mergeColliderOverrides,
 } from "./colliderDebugOverrides.js";
@@ -10,6 +10,7 @@ import {
 } from "./startingLayout.js";
 import { PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND } from "./resourceConfig.js";
 import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
+import { addInventoryItem, canAddInventoryItem, createInventoryItem } from "./inventoryDomain.js";
 import { TILE_SIZE } from "./worldConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
@@ -73,18 +74,31 @@ export function applyPlantedTreeWork(sessionState, definition, {
   if (node.cleared) return { status: "already-cleared", mutated: false };
   const cost = Math.max(0, Number(energyPerHit) || 0);
   if (sessionState.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
+  const preview = applyResourceWork({ ...node }, profile, {
+    action: profile.preferredAction,
+    damage,
+    tuning,
+  });
+  if (!preview.mutated) return preview;
+  const rewardItem = preview.status === "cleared"
+    ? createInventoryItem(profile.reward.resource === "rubies" ? "ruby" : profile.reward.resource, profile.reward.amount)
+    : null;
+  if (rewardItem) {
+    const availability = canAddInventoryItem(sessionState.gameplay.inventory, rewardItem);
+    if (!availability.canAdd) return { status: availability.status, mutated: false, reward: profile.reward, item: rewardItem };
+  }
   const result = applyResourceWork(node, profile, {
     action: profile.preferredAction,
     damage,
     tuning,
   });
-  if (!result.mutated) return result;
   sessionState.gameplay.currentEnergy -= cost;
-  if (result.status === "cleared") sessionState.gameplay[profile.reward.resource] += profile.reward.amount;
+  const inventoryResult = rewardItem ? addInventoryItem(sessionState.gameplay.inventory, rewardItem) : null;
   return {
     ...result,
     currentEnergy: sessionState.gameplay.currentEnergy,
     reward: result.status === "cleared" ? profile.reward : null,
+    inventory: inventoryResult,
   };
 }
 
@@ -447,6 +461,7 @@ export function attachEditorAuthoringRuntime(scene, {
         scene.activeResourceProfileId = profile.id;
         scene.interactionHud?.triggerCooldownFeedback?.();
         scene.gameHud?.render?.();
+        if (result.inventory?.mutated) scene.gameHud?.notifyInventoryGain?.(result.inventory);
         scene.applySuccessfulHitFeedback?.(profile.sfx, energyBefore);
         animatePlantHit(object, result, () => scene.interactionRuntime?.refresh?.());
         scene.saveSession?.();
@@ -496,7 +511,14 @@ export function attachEditorAuthoringRuntime(scene, {
     restoreStartingLayout() {
       if (destroyed) return null;
       const layout = loadStartingLayout(storage, STARTING_LAYOUT_DEFAULT);
-      return layout ? applyStartingLayout(scene, layout) : null;
+      if (layout) return applyStartingLayout(scene, layout);
+      for (const object of STARTER_TREE_OBJECTS) {
+        if (scene.buildPlacedObjects.has(object.id)) continue;
+        if (!scene.restoreBuildPlacedObject(JSON.parse(JSON.stringify(object)))) {
+          throw new Error(`Failed to restore starter plant ${object.id}`);
+        }
+      }
+      return null;
     },
     saveStartingLayout() {
       if (destroyed) throw new Error("Authoring runtime is destroyed");

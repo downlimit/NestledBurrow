@@ -202,3 +202,19 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
   - SHA-256: `38663d4ce106c0e7b4ec6dfeaacaeaf7542a60827475a61ae4704afc621e5226`.
 - **Integrity check:** `scripts/check-task-047-assets.mjs` validates PNG geometry, exact hashes, manifest version 2, frame order and soil-moisture metadata.
 - **Delivery:** these binaries are Lead-owned immutable inputs. Codex may integrate and display them but must not generate, redraw, modify, replace or add any tracked binary in Task #047.
+
+## Task #049 Lead-owned lemonade and broken-stove sprites
+
+- **Provenance:** exact project files supplied with the Task #049 integration handoff. Codex integrated the existing bytes and did not generate, redraw, resample, recolor, recompress or replace them.
+- **Canonical manifest:** `public/assets/project/lemonade/NestledBurrow_Lemonade.manifest.json`; 669 bytes; Git blob `bb39108b6c4c0f819155c7428d09c5a22e55f705`.
+- **Lemonade sheet:** `public/assets/project/lemonade/NestledBurrow_Lemonade.png`.
+  - geometry: `288×16`, eighteen horizontal `16×16` semantic frames;
+  - byte length: `1,386`;
+  - SHA-256: `e2b35ab0e8c51ff5e5ad10e9a988f9424f6904102e65d126cb7110e7a356e91f`;
+  - Git blob: `252e80e1cd6f3a7f7e7fe661a255551a2bd4bafd`.
+- **Broken stove:** `public/assets/project/lemonade/NestledBurrow_GasStoveBroken.png`.
+  - geometry: `16×32`;
+  - byte length: `884`;
+  - SHA-256: `d57a2d04ec511f007c1b947ec5623eaf7e6c13458ab86a0b065ab1a51be06715`;
+  - Git blob: `29b9a2f42cee1e57bc1f51b1effe994e1aa4fc48`.
+- **Integrity check:** `scripts/check-task-049.mjs` validates geometry, exact hashes, semantic frame order and confirms that Task #049 changes no tracked binary.

@@ -12,11 +12,11 @@
 | Запрос или область | System-документ | Основные владельцы | Targeted checks |
 |---|---|---|---|
 | движение, joystick, камера, сон, потребности | `systems/character-and-needs.md` | `characterMotor.js`, `input.js`, `mobileJoystick.js`, `cameraFollowRuntime.js`, `needsDomain.js` | `check:input`, `check:mobile-camera`, `check:movement`, `check:needs`, `check:clock-cycle` |
-| ресурсы, добыча, инвентарь, выброшенные предметы, огород, вода, растения | `systems/world-and-resources.md` | `worldLayout.js`, `resourceDomain.js`, `resourceConfig.js`, `debrisRuntime.js`, `inventoryDomain.js`, `inventoryRuntime.js` | `check:inventory`, `check:world`, `check:interaction`, `check:progress` |
-| готовка, кухня, вывеска, гости, монеты | `systems/tavern-service.md` | `cookingDomain.js`, `cookingRuntime.js`, `facilityRuntime.js`, `guestRuntime.js`, `coinRuntime.js` | `check:cooking`, `check:guest`, `check:facilities` |
+| ресурсы, добыча, инвентарь, выброшенные предметы, огород, вода, растения | `systems/world-and-resources.md` | `resourceDomain.js`, `debrisRuntime.js`, `inventoryDomain.js`, `inventoryRuntime.js`, `farmingDomain.js`, `farmingRuntime.js` | `check:inventory`, `check:world`, `check:interaction`, `check:task-047`, `check:task-049` |
+| готовка, кухня, вывеска, гости, монеты | `systems/tavern-service.md` | `cookingDomain.js`, `kitchenInteractionRuntime.js`, `facilityRuntime.js`, `guestRuntime.js`, `tavernServiceRuntime.js`, `coinRuntime.js` | `check:cooking`, `check:guest`, `check:facilities`, `check:task-049` |
 | строительство, стены, перенос, коллайдеры, pivot, авторинг | `systems/build-and-authoring.md` | `buildModeRuntime.js`, `buildWorldGeometry.js`, `editorAuthoringRuntime.js`, `assetProfiles.js`, `startingLayout.js` | `check:build-mode`, `check:authoring`, `check:task-044` |
-| save, migration, NEW GAME, browser draft | `systems/persistence.md` | `gameSessionState.js`, `sessionPersistence.js`, `inventoryDomain.js`, `authoringBackup.js` | `check:inventory`, `check:progress`, `check:authoring` |
-| HUD, inventory presentation, localization, audio, day/night, visual presentation | `systems/presentation.md` | `gameHud.js`, `inventoryRuntime.js`, `inventoryVisuals.js`, `interactionHud.js`, `localization/`, `audioRuntime.js`, `gameClock.js` | `check:inventory`, `check:hud`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:visual` |
+| save, migration, NEW GAME, browser draft | `systems/persistence.md` | `gameSessionState.js`, `sessionPersistence.js`, `inventoryDomain.js`, `authoringBackup.js` | `check:inventory`, `check:progress`, `check:authoring`, `check:task-049` |
+| HUD, inventory presentation, localization, audio, day/night, visual presentation | `systems/presentation.md` | `gameHud.js`, `inventoryRuntime.js`, `inventoryGainPresentation.js`, `transientMessageRuntime.js`, `interactionHud.js`, `localization/`, `audioRuntime.js` | `check:inventory`, `check:hud`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-049`, `check:visual` |
 
 ## Межсистемные задачи
 

@@ -1,10 +1,10 @@
 import { BED_ASSET, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { getResourceProfile } from "./resourceDomain.js";
+import { getResourceProfile, resourceActionForTool } from "./resourceDomain.js";
 import { cellKey } from "./worldLayout.js";
 import { drawResource } from "./resourceVisuals.js";
 import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
-import { TILE_SIZE } from "./worldConfig.js";
+import { TILE_SIZE, TREES_TEXTURE_KEY } from "./worldConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
 export const BED_SLEEP_DEPTH_OFFSET = 0.25;
@@ -61,7 +61,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
     };
     const placementPosition = { x: definition.cell.x * PLACEMENT_CELL_SIZE, y: definition.cell.y * PLACEMENT_CELL_SIZE };
     const graphics = scene.add.graphics().setPosition(placementPosition.x + offset.x, placementPosition.y + offset.y).setDepth(assetDepthFromPivot(placementPosition, pivotOffset, 500, definition.id));
-    drawResource(graphics, profile, stateFor(definition)?.progress ?? 0);
+    drawResourceVisual(graphics, profile, stateFor(definition)?.progress ?? 0);
     visuals.set(definition.id, graphics);
   }
 
@@ -71,7 +71,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
     const offset = scene.assetProfiles?.[`resource:${definition.profileId}`]?.visualOffset ?? { x: 0, y: 0 };
     graphics.setPosition(definition.cell.x * PLACEMENT_CELL_SIZE + offset.x, definition.cell.y * PLACEMENT_CELL_SIZE + offset.y);
     graphics.clear();
-    drawResource(graphics, getResourceProfile(definition.profileId), stateFor(definition)?.progress ?? 0);
+    drawResourceVisual(graphics, getResourceProfile(definition.profileId), stateFor(definition)?.progress ?? 0);
   }
 
   function clearTargetOutline() {
@@ -81,9 +81,13 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
   }
 
   function updateCandidate(candidate) {
-    const definition = candidate?.kind === "work-resource" && getSelectedItem()?.id === "axe"
+    const definition = candidate?.kind === "work-resource"
       ? RESOURCE_OBJECTS.find((item) => item.id === candidate.entityId && isPresent(item))
       : null;
+    if (definition && !resourceActionForTool(getResourceProfile(definition.profileId), getSelectedItem()?.id)) {
+      clearTargetOutline();
+      return;
+    }
     if (definition?.id === targetOutlineId) return;
     clearTargetOutline();
     if (!definition) return;
@@ -100,7 +104,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
         .setPosition(placement.x + visualOffset.x + x, placement.y + visualOffset.y + y)
         .setDepth(assetDepthFromPivot(placement, pivotOffset, 500, definition.id) - 0.1)
         .setAlpha(0.22);
-      drawResource(graphics, profile, stateFor(definition)?.progress ?? 0, { colorOverride: 0x8ed6ff });
+      drawResourceVisual(graphics, profile, stateFor(definition)?.progress ?? 0, { colorOverride: 0x8ed6ff });
       return graphics;
     });
     targetOutlineId = definition.id;
@@ -243,7 +247,9 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
           ? { ...definition, prompt: "hud:interaction.wake" }
           : definition
       ));
-      const resources = getSelectedItem()?.id === "axe" ? RESOURCE_OBJECTS.filter(isPresent) : [];
+      const selectedToolId = getSelectedItem()?.id;
+      const resources = RESOURCE_OBJECTS.filter((definition) => isPresent(definition)
+        && resourceActionForTool(getResourceProfile(definition.profileId), selectedToolId));
       return [...resources, ...beds];
     },
     updateCandidate,
@@ -331,6 +337,18 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
       for (const definition of RESOURCE_OBJECTS) setBlocked(definition, false);
     },
   };
+}
+
+function drawResourceVisual(graphics, profile, progress = 0, options = {}) {
+  if (profile.visual !== "tree") return drawResource(graphics, profile, progress, options);
+  if (!graphics.spriteImage) {
+    bindSpriteVisual(
+      graphics,
+      { key: TREES_TEXTURE_KEY, frame: 0 },
+      options.colorOverride ?? null,
+    );
+  }
+  return graphics;
 }
 
 export function drawBed(graphics, tint = null) {

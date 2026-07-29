@@ -15,7 +15,8 @@ const viteCli = resolve("node_modules/vite/bin/vite.js");
 const command = process.argv[2] ?? "start";
 
 const git = (...args) => {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  const safeDirectory = `safe.directory=${root.replaceAll("\\", "/")}`;
+  const result = spawnSync("git", ["-c", safeDirectory, ...args], { cwd: root, encoding: "utf8" });
   return result.status === 0 ? result.stdout.trim() : "unknown";
 };
 

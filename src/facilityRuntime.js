@@ -7,8 +7,18 @@ import { TILE_SIZE } from "./worldConfig.js";
 import { getKitchenFacilityPrompt } from "./cookingDomain.js";
 import { clearCurrentWorldScene, setCurrentWorldScene } from "./worldSceneRegistry.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
+import {
+  BROKEN_STOVE_TEXTURE_KEY,
+  LEMONADE_FRAMES,
+  LEMONADE_TEXTURE_KEY,
+} from "./lemonadeConfig.js";
 
-export function createFacilityRuntime(scene, { worldLayout, getKitchenState = () => null, getInventoryState = () => null, isServingDishReserved = () => false }) {
+export function createFacilityRuntime(scene, {
+  worldLayout,
+  getKitchenState = () => null,
+  getInventoryState = () => null,
+  getSelectedItem = () => null,
+}) {
   setCurrentWorldScene(scene);
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
   const visuals = new Map();
@@ -36,7 +46,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     worldLayout.setWorldObjectCollider(facility.id, baseCollider, profileKey);
     const offset = scene.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
     const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
-    const image = scene.add.image(facility.visual.x + offset.x, facility.visual.y + offset.y, facility.visual.key)
+    const image = scene.add.image(facility.visual.x + offset.x, facility.visual.y + offset.y, facility.visual.key, facility.visual.frame ?? 0)
       .setOrigin(0, 0)
       .setDepth(assetDepthFromPivot(facility.visual, pivotOffset, 500, facility.id));
     visuals.set(facility.id, image);
@@ -82,14 +92,14 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     return definition ? remove(definition.id) : false;
   }
 
-  function restore(definition) {
-    if (!definition || definitions.has(definition.id) || !createVisual(definition)) return false;
+  function restore(definition, { validateFootprint = true } = {}) {
+    if (!definition || definitions.has(definition.id) || !createVisual(definition, { validateFootprint })) return false;
     definitions.set(definition.id, definition);
     trackEditorId(definition.id);
     return true;
   }
 
-  function replace(definition) {
+  function replace(definition, options = {}) {
     if (!definition) return false;
     const previous = definitions.get(definition.id);
     if (previous) {
@@ -99,12 +109,12 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       definitions.delete(previous.id);
       worldLayout.clearWorldObjectCollider(previous.id);
     }
-    if (restore(definition)) {
+    if (restore(definition, options)) {
       syncKitchenVisuals();
       return true;
     }
     if (previous) {
-      restore(previous);
+      restore(previous, { validateFootprint: false });
       syncKitchenVisuals();
     }
     return false;
@@ -162,6 +172,21 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
   }
 
   function syncKitchenVisuals() {
+    const kitchen = getKitchenState();
+    const stove = [...definitions.values()].find((facility) => facility.facilityType === "gas-stove");
+    if (stove) visuals.get(stove.id)?.setTexture?.(
+      kitchen?.stoveRepaired ? stove.visual.key : BROKEN_STOVE_TEXTURE_KEY,
+      0,
+    );
+    const sack = [...definitions.values()].find((facility) => facility.facilityType === "lemon-sack");
+    if (sack && kitchen?.starterLemons > 0) {
+      if (!visuals.has(sack.id)) createVisual(sack, { validateFootprint: false });
+      visuals.get(sack.id)?.setTexture?.(LEMONADE_TEXTURE_KEY, LEMONADE_FRAMES["lemon-sack-full"]);
+    } else if (sack) {
+      visuals.get(sack.id)?.destroy?.();
+      visuals.delete(sack.id);
+      worldLayout.clearWorldObjectCollider(sack.id);
+    }
     const currentServingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
     const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
     const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
@@ -169,7 +194,10 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     if (currentServingTable) platedDishVisual
       ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2 + offset.x, currentServingTable.footprint.y + 5 + offset.y)
       ?.setDepth?.(assetDepthFromPivot(currentServingTable.visual, pivotOffset, 501, `${currentServingTable.id}:dish`));
-    platedDishVisual?.setVisible?.(Boolean(getKitchenState()?.servingTableHasDish) && !isServingDishReserved());
+    const stock = kitchen?.servingTable;
+    if (stock?.itemId === "lemonade") platedDishVisual?.setTexture?.(LEMONADE_TEXTURE_KEY, LEMONADE_FRAMES.lemonade);
+    else platedDishVisual?.setTexture?.(PLATED_DISH_ASSET.key, 0);
+    platedDishVisual?.setVisible?.(Boolean(stock?.itemId && stock.quantity > 0));
   }
   syncKitchenVisuals();
 
@@ -178,10 +206,12 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
       if (destroyed) return [];
       if (!activeFacilityId) {
         const kitchen = getKitchenState();
-        return [...definitions.values()].map((facility) => {
-          const prompt = kitchen ? getKitchenFacilityPrompt(facility.facilityType, kitchen, getInventoryState()) : null;
-          return prompt ? { ...facility, prompt } : facility;
-        });
+        return [...definitions.values()]
+          .filter((facility) => facility.facilityType !== "lemon-sack" || kitchen?.starterLemons > 0)
+          .map((facility) => {
+            const prompt = kitchen ? getKitchenFacilityPrompt(facility.facilityType, kitchen, getInventoryState(), getSelectedItem()?.id) : null;
+            return prompt ? { ...facility, prompt } : facility;
+          });
       }
       const facility = definitions.get(activeFacilityId);
       return facility ? [{ ...facility, prompt: facility.stopPrompt }] : [];
@@ -194,6 +224,16 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     },
     getDefinitions() {
       return [...definitions.values()];
+    },
+    getVisualStates() {
+      return Object.fromEntries([...definitions.values()].map((facility) => {
+        const visual = visuals.get(facility.id);
+        return [facility.id, visual ? {
+          textureKey: visual.texture?.key ?? visual.textureKey ?? null,
+          frame: visual.frame?.name ?? visual.frame?.index ?? null,
+          visible: visual.visible,
+        } : null];
+      }));
     },
     getAuthoringInstances() {
       return [...definitions.values()].flatMap((facility) => {
@@ -230,7 +270,7 @@ export function createFacilityRuntime(scene, { worldLayout, getKitchenState = ()
     toggle(facilityId, playerMotor) {
       const facility = definitions.get(facilityId);
       if (!facility || destroyed) return { status: "unknown-facility", mutated: false };
-      if (["cutting-table", "gas-stove", "serving-table"].includes(facility.facilityType)) {
+      if (["cutting-table", "gas-stove", "serving-table", "juicer", "lemon-sack"].includes(facility.facilityType)) {
         return { status: "handled-by-cooking", mutated: false };
       }
       if (activeFacilityId === facilityId) {
