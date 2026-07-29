@@ -26,12 +26,13 @@ This system owns screen-space feedback and sensory presentation without becoming
 - HUD reads domain state but does not calculate gameplay rates;
 - options/debug preferences remain separate from gameplay save where appropriate;
 - audio respects master/music/effects ownership;
+- procedural action effects fire only after their owning gameplay mutation succeeds;
 - day/night presentation does not cover HUD or alter gameplay state;
 - player-visible changes require managed preview acceptance.
 
 ## Current baseline
 
-Localized HUD, ten-slot inventory, selected-item marker, dropped-item presentation, needs arrows/tooltips, options, fullscreen, audio playlist, mobile joystick, presentation camera and day/night multiply are integrated.
+Localized HUD, ten-slot inventory, selected-item marker, dropped-item presentation, needs arrows/tooltips, options, fullscreen, audio playlist, distinct procedural gameplay effects, mobile joystick, presentation camera and day/night multiply are integrated.
 
 ## Not yet
 
@@ -39,4 +40,4 @@ Final art direction, accessibility pass, complete controller navigation, stack s
 
 ## Evidence
 
-`check:inventory`, `check:hud`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:visual`, relevant Browser E2E.
+`check:inventory`, `check:hud`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-048`, `check:visual`, relevant Browser E2E.
