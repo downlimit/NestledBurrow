@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "provenance": "Lead-authored deterministic native-grid pixel art; no generative image model or third-party pixels.",
+  "runtimeModule": "src/assets/meleeWeaponSpriteAssets.js",
+  "delivery": "Exact PNG bytes embedded as immutable data:image/png;base64 URIs; runtime decoding must not redraw, resample, recolor or recompress them.",
+  "assets": {
+    "NestledBurrow_SwordItem.png": {
+      "width": 16,
+      "height": 16,
+      "mode": "RGBA",
+      "byteLength": 234,
+      "sha256": "21b6fe14eb4cb4a4d7f5f75007e0a219eac830a6ad389ff574bb09e04844802b",
+      "partialAlphaPixels": 0
+    },
+    "NestledBurrow_BattleAxeItem.png": {
+      "width": 16,
+      "height": 16,
+      "mode": "RGBA",
+      "byteLength": 235,
+      "sha256": "ffcbba7c9cab1fa6e1eec96d5fdbfe6ce40d25961f9ea44b3333c3dbad11967e",
+      "partialAlphaPixels": 0
+    },
+    "NestledBurrow_SwordHeld.png": {
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA",
+      "byteLength": 303,
+      "sha256": "7970cf4ad0c0d8d8ccd835f8611707795b5fa64a4207f71bf9dd6230143df2c9",
+      "partialAlphaPixels": 0
+    },
+    "NestledBurrow_BattleAxeHeld.png": {
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA",
+      "byteLength": 445,
+      "sha256": "8e840e00933d48df2f421614dd42bd02cb26b11ae0683e0a2148552e2eaf5776",
+      "partialAlphaPixels": 0
+    },
+    "NestledBurrow_TrainingDummy.png": {
+      "width": 16,
+      "height": 32,
+      "mode": "RGBA",
+      "byteLength": 373,
+      "sha256": "72575de4f379b6a5def4f23784c97e35d3b511468b3b36f43426c0a2b2abbff1",
+      "partialAlphaPixels": 0,
+      "depthAnchor": { "x": 8, "y": 30 },
+      "collision": { "left": 4, "top": 24, "right": 12, "bottom": 31 }
+    }
+  },
+  "heldPivot": {
+    "x": 16,
+    "y": 27,
+    "originX": 0.5,
+    "originY": 0.84375
+  }
+}
