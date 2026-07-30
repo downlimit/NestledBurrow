@@ -26,8 +26,11 @@ import {
   STARTING_LAYOUT_VERSION,
   captureStartingLayout,
   createStartingLayoutModuleSource,
+  loadStartingLayout,
+  normalizeStartingLayout,
   saveStartingLayoutToProject,
 } from "../src/startingLayout.js";
+import STARTING_LAYOUT_DEFAULT from "../src/startingLayoutDefault.js";
 import { getResourceProfile } from "../src/resourceDomain.js";
 
 function createStorage() {
@@ -152,6 +155,9 @@ function captureScene(cleared) {
       houseWallTiles: [],
     },
     facilityRuntime: { getDefinitions: () => [] },
+    meleeRuntime: {
+      getStartingLayoutFurniture: () => [{ id: "training-dummy-01", kind: "training-dummy", position: { x: 144, y: 50 } }],
+    },
     debrisRuntime: { getBedDefinitions: () => [] },
     sessionState: {
       gameplay: {
@@ -165,11 +171,60 @@ function captureScene(cleared) {
 const activeLayout = captureStartingLayout(captureScene(false));
 assert.equal(activeLayout.version, STARTING_LAYOUT_VERSION);
 assert.equal(activeLayout.buildObjects.length, 1);
+assert.deepEqual(activeLayout.furniture, [{ id: "training-dummy-01", kind: "training-dummy", position: { x: 144, y: 50 } }]);
 assert.equal(activeLayout.buildObjects[0].kind, "plant");
 assert.equal(activeLayout.buildObjects[0].sprites, undefined);
 assert.equal(captureStartingLayout(captureScene(true)).buildObjects.length, 0, "a chopped plant is not authored into the next starting layout");
 const layoutModule = createStartingLayoutModuleSource(activeLayout);
 assert(layoutModule.includes('"kind": "plant"'));
+const canonicalLayout = normalizeStartingLayout(STARTING_LAYOUT_DEFAULT);
+assert.equal(canonicalLayout.buildObjects.length, 157, "the recovered browser-authored topology is canonical");
+assert.deepEqual(canonicalLayout.facilities.map((facility) => facility.id), [
+  "editor-table-3",
+  "editor-toilet-2",
+  "home-cutting-table-01",
+  "home-gas-stove-01",
+  "home-juicer-01",
+  "home-lemon-sack-01",
+  "home-serving-table-01",
+  "home-shower-01",
+], "the latest canonical save removes the extra home table");
+assert.deepEqual(canonicalLayout.furniture, [{
+  id: "training-dummy-01",
+  kind: "training-dummy",
+  position: { x: 584, y: 480 },
+}], "the training dummy position is part of the recovered canonical furniture layout");
+assert.equal(canonicalLayout.facilities.some((facility) => (
+  facility.footprint.x <= -10000 || facility.footprint.y <= -10000
+)), false, "temporary facility staging coordinates never enter the canonical layout");
+assert.throws(() => captureStartingLayout({
+  ...captureScene(false),
+  facilityRuntime: {
+    getDefinitions: () => [{ id: "staged-facility", footprint: { x: -10256, y: -10000 } }],
+  },
+}), /temporary staging position/, "capture fails closed while a facility remains staged");
+const corruptedDraftStorage = createStorage();
+corruptedDraftStorage.setItem(STARTING_LAYOUT_STORAGE_KEY, JSON.stringify({
+  ...canonicalLayout,
+  facilities: [...canonicalLayout.facilities, {
+    id: "staged-facility",
+    footprint: { x: -10256, y: -10000 },
+  }],
+}));
+const recoveredDraft = loadStartingLayout(corruptedDraftStorage, canonicalLayout);
+assert.equal(recoveredDraft.facilities.some((facility) => facility.id === "staged-facility"), false);
+assert.deepEqual(
+  JSON.parse(corruptedDraftStorage.getItem(STARTING_LAYOUT_STORAGE_KEY)),
+  recoveredDraft,
+  "legacy browser drafts discard only temporary facility staging records",
+);
+
+const savedLayoutStorage = createStorage();
+await saveStartingLayoutToProject(captureScene(false), {
+  storage: savedLayoutStorage,
+  fetchImpl: async () => ({ ok: true, text: async () => "" }),
+});
+assert.equal(savedLayoutStorage.getItem(STARTING_LAYOUT_STORAGE_KEY), null, "a successful project write clears its browser draft");
 
 const failedLayoutStorage = createStorage();
 await assert.rejects(() => saveStartingLayoutToProject(captureScene(false), {

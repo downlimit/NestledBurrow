@@ -73,7 +73,8 @@ assert(!debrisSource.includes("0x315c8a"));
 
 const colliders = new Map(); const images = [];
 const scene = { add: { image(x, y, key, frame = 0) { const image = { x, y, key, frame, visible: true, setOrigin() { return this; }, setPosition(nextX, nextY) { this.x = nextX; this.y = nextY; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, setTexture(nextKey, nextFrame = 0) { this.key = nextKey; this.frame = nextFrame; return this; }, setFrame(nextFrame) { this.frame = nextFrame; return this; }, destroy() { this.destroyed = true; } }; images.push(image); return image; } } };
-const worldLayout = { getEffectiveCollider(bounds) { return bounds; }, isBlockedBox() { return false; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
+let blockFacilityPlacement = false;
+const worldLayout = { getEffectiveCollider(bounds) { return bounds; }, isBlockedBox() { return blockFacilityPlacement; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
 const kitchen = { starterLemons: 6, stoveRepaired: false, servingTable: { itemId: null, quantity: 0, reservations: [] } };
 const inventory = createNewGameInventory();
 const runtime = createFacilityRuntime(scene, { worldLayout, getKitchenState: () => kitchen, getInventoryState: () => inventory });
@@ -99,6 +100,9 @@ const fixedCuttingTable = FACILITIES.find((facility) => facility.facilityType ==
 assert.equal(runtime.remove(fixedCuttingTable.id), false, "fixed kitchen facilities cannot be removed");
 assert.equal(runtime.getDemolitionTargetAt(fixedCuttingTable.position), null, "fixed kitchen facilities cannot be selected for demolition");
 const shower = runtime.getDefinitions().find((facility) => facility.facilityType === "shower");
+blockFacilityPlacement = true;
+assert.equal(runtime.replace(shower, { validateFootprint: false }), true, "canonical restore bypasses transient footprint and use-position blockers");
+blockFacilityPlacement = false;
 const movedShower = runtime.move(shower.id, { x: 640, y: 320 });
 assert(movedShower && runtime.getDefinition(shower.id).footprint.x === 640, "editable facility moves to a snapped destination");
 assert.equal(runtime.replace(movedShower.previous), true, "facility move can be undone with its original definition");

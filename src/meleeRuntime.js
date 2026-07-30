@@ -510,6 +510,25 @@ export function createMeleeRuntime(scene, {
     return { previous, current: next };
   }
 
+  function getStartingLayoutFurniture() {
+    return [{
+      id: TRAINING_DUMMY.id,
+      kind: "training-dummy",
+      position: { ...trainingDummy.home },
+    }];
+  }
+
+  function restoreStartingLayoutFurniture(definitions) {
+    const definition = definitions?.find?.((candidate) => candidate.id === TRAINING_DUMMY.id);
+    if (!definition || definition.kind !== "training-dummy") return false;
+    const point = { x: Number(definition.position?.x), y: Number(definition.position?.y) };
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+    trainingDummy.home = point;
+    trainingDummy.returnMotion = null;
+    setDummyPosition(point);
+    return true;
+  }
+
   function isDummyPlacementBlocked(point) {
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return true;
     const box = dummyColliderAt(point);
@@ -536,6 +555,8 @@ export function createMeleeRuntime(scene, {
     getAimDirection: () => isMeleeStepActive(state) ? { ...state.direction } : null,
     getBuildMoveTargetAt,
     moveBuildTarget,
+    getStartingLayoutFurniture,
+    restoreStartingLayoutFurniture,
     restoreBuildTarget(point) { trainingDummy.home = { ...point }; setDummyPosition(point); },
     renderBuildPreview(point) { return scene.add.image(point.x, point.y, TRAINING_DUMMY.asset.textureKey).setOrigin(0).setDepth(8988).setTint(isDummyPlacementBlocked(point) ? 0xff5364 : 0x7dff9a).setAlpha(0.58); },
     getState: () => ({

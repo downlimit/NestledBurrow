@@ -364,6 +364,7 @@ assert(gameHud.includes("mode.mode !== INVENTORY_MODES.COMBAT"), "combat action 
 assert(combatLoadout.includes('slot.kind === "action" && slot.id === actionId'), "number slots cannot resolve as combat actions");
 assert(!readFileSync("src/meleeRuntime.js", "utf8").includes("addEventListener"));
 const meleeRuntime = readFileSync("src/meleeRuntime.js", "utf8");
+assert(meleeRuntime.includes("getStartingLayoutFurniture") && meleeRuntime.includes("restoreStartingLayoutFurniture"), "training dummy is canonical-layout furniture");
 assert(meleeRuntime.includes('result.status === "started" || result.status === "switched"'), "switching weapons immediately starts the new presentation");
 assert(meleeRuntime.includes("activeTrails") && meleeRuntime.includes("meleeBodyCenter(getPlayerCharacter()?.motor?.position)"), "melee shapes follow the player's body center");
 assert(meleeRuntime.includes("movementSpeedMultiplier") && meleeRuntime.includes("updateKnockbacks(deltaMs)") && meleeRuntime.includes("updateDummyReturn(deltaMs)"));

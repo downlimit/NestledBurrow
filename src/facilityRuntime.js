@@ -36,13 +36,13 @@ export function createFacilityRuntime(scene, {
     const profileKey = `facility:${facility.facilityType}`;
     const baseCollider = boundsFor(facility);
     const effectiveCollider = worldLayout.getEffectiveCollider(baseCollider, profileKey);
-    if ((validateFootprint && worldLayout.isBlockedBox(effectiveCollider))
+    if (validateFootprint && (worldLayout.isBlockedBox(effectiveCollider)
       || worldLayout.isBlockedBox({
         left: facility.usePosition.x - 2,
         right: facility.usePosition.x + 2,
         top: facility.usePosition.y - 2,
         bottom: facility.usePosition.y + 2,
-      })) return false;
+      }))) return false;
     worldLayout.setWorldObjectCollider(facility.id, baseCollider, profileKey);
     const offset = scene.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
     const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
