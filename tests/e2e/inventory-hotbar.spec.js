@@ -35,6 +35,10 @@ function inventoryState(hud) {
   return hud.resources.inventory;
 }
 
+function droppedWorldItems(session) {
+  return session.gameplay.worldItems.filter((item) => !item.id.startsWith("starter-melee-"));
+}
+
 test("ten-slot hotbar selects with digits and Q/E, swaps, drops and picks up tools", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop pointer and keyboard route captures game integration once");
   mkdirSync(EVIDENCE_DIR, { recursive: true });
@@ -78,18 +82,18 @@ test("ten-slot hotbar selects with digits and Q/E, swaps, drops and picks up too
   await dragLogical(page, SLOT_CENTERS[9], SLOT_CENTERS[3]);
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots[3]?.id).toBe("axe");
   await dragLogical(page, SLOT_CENTERS[3], { x: 160, y: 120 });
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(1);
+  await expect.poll(async () => droppedWorldItems(await bridge(page, "getSession"))).toHaveLength(1);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("drop");
   expect((await bridge(page, "getSession")).gameplay.inventory.slots[3]).toBeNull();
   await page.waitForTimeout(500);
 
-  const dropped = (await bridge(page, "getSession")).gameplay.worldItems[0];
+  const dropped = droppedWorldItems(await bridge(page, "getSession"))[0];
   expect(dropped.item).toMatchObject({ id: "axe", kind: "tool", quantity: 1 });
   await page.locator("canvas").screenshot({ path: `${EVIDENCE_DIR}/inventory-dropped-in-game.png` });
   await testInfo.attach("inventory-dropped-in-game", { path: `${EVIDENCE_DIR}/inventory-dropped-in-game.png`, contentType: "image/png" });
 
   await bridge(page, "placePlayerAt", { x: dropped.x, y: dropped.y, facing: { x: 0, y: 1 } });
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(0);
+  await expect.poll(async () => droppedWorldItems(await bridge(page, "getSession"))).toHaveLength(0);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("pickup");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots[0]?.id).toBe("axe");
 
@@ -97,11 +101,11 @@ test("ten-slot hotbar selects with digits and Q/E, swaps, drops and picks up too
     const session = await bridge(page, "getSession");
     const slotIndex = session.gameplay.inventory.slots.findIndex((item) => item?.id === toolId);
     await dragLogical(page, SLOT_CENTERS[slotIndex], { x: 160, y: 120 });
-    await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(1);
+    await expect.poll(async () => droppedWorldItems(await bridge(page, "getSession"))).toHaveLength(1);
     await page.waitForTimeout(500);
-    const toolDrop = (await bridge(page, "getSession")).gameplay.worldItems[0];
+    const toolDrop = droppedWorldItems(await bridge(page, "getSession"))[0];
     await bridge(page, "placePlayerAt", { x: toolDrop.x, y: toolDrop.y, facing: { x: 0, y: 1 } });
-    await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(0);
+    await expect.poll(async () => droppedWorldItems(await bridge(page, "getSession"))).toHaveLength(0);
     await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots.some((item) => item?.id === toolId)).toBe(true);
   }
   expect(pageErrors).toEqual([]);
