@@ -99,6 +99,13 @@ import { installWorldE2EBridge } from "./e2eBridge.js";
 import { UiVisibilityCoordinator } from "./uiVisibilityCoordinator.js";
 import { addInventoryItem, createInventoryItem } from "./inventoryDomain.js";
 import { createGameCanvasInputGuard } from "./gameCanvasInputGuard.js";
+import {
+  createMeleeStartingWorldItems,
+  isMeleeWeaponId,
+  preloadMeleeAssets,
+  resolveMeleeActionItem,
+} from "./meleeConfig.js";
+import { createMeleeRuntime } from "./meleeRuntime.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
@@ -114,6 +121,7 @@ class WorldScene extends Phaser.Scene {
     preloadFacilityAssets(this, import.meta.env.BASE_URL);
     preloadFarmingAssets(this, import.meta.env.BASE_URL);
     preloadLemonadeAssets(this, import.meta.env.BASE_URL);
+    preloadMeleeAssets(this);
     this.load.spritesheet(TAVERN_SIGN_ASSET.key, `${import.meta.env.BASE_URL}${TAVERN_SIGN_ASSET.path}`, {
       frameWidth: TAVERN_SIGN_ASSET.frameWidth,
       frameHeight: TAVERN_SIGN_ASSET.frameHeight,
@@ -200,6 +208,7 @@ class WorldScene extends Phaser.Scene {
     this.createHud();
     this.createFarmingRuntime();
     this.createCookingRuntime();
+    this.createMeleeRuntime();
     this.attachSceneListeners();
     this.createJoystick();
     this.createBuildMode();
@@ -271,6 +280,7 @@ class WorldScene extends Phaser.Scene {
       spawn: this.worldLayout.spawn,
       controller: createPlayerController({
         getInputDirection: () => this.getMovementVector(),
+        getAimDirection: () => this.meleeRuntime?.getAimDirection?.() ?? null,
         getActions: () => this.frameActions,
       }),
       movementConfig: this.movementConfig,
@@ -340,6 +350,7 @@ class WorldScene extends Phaser.Scene {
       this.syncGameplayHudVisibility();
     };
     this.input.keyboard.on("keydown-X", this.onHudToggleKey);
+    this.frameMeleeItem = null;
     this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
   }
 
@@ -364,11 +375,7 @@ class WorldScene extends Phaser.Scene {
   createSessionAndInteractionRuntime() {
     this.sessionPersistence = this.createPersistence();
     const loaded = this.sessionPersistence?.load();
-    this.sessionState = loaded?.state ?? createFreshGameSessionState({
-      currentWorldId: "village",
-      playerId: "player",
-      initialEntityIds: NPCS.map((npc) => npc.id),
-    });
+    this.sessionState = loaded?.state ?? this.createFreshSessionState();
     this.pendingTask049MigrationWarning = Boolean(this.sessionState.flags?.["migration.task049WarningPending"]);
     if (loaded?.diagnostic) {
       console.warn("Recovered NestledBurrow session", loaded.diagnostic);
@@ -413,7 +420,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   createDebrisRuntime() {
-    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout, getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null });
+    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout, getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null, getGameplayTuning: () => this.gameplayTuning, onPersistentMutation: (result) => { this.gameHud?.render?.(); if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory); this.interactionRuntime?.refresh?.(); this.saveSession(); } });
   }
 
   createFacilityRuntime() {
@@ -567,11 +574,23 @@ class WorldScene extends Phaser.Scene {
 
   createPersistence() {
     try {
-      return createSessionPersistence({ storage: window.localStorage });
+      return createSessionPersistence({
+        storage: window.localStorage,
+        createFreshState: () => this.createFreshSessionState(),
+      });
     } catch (error) {
       console.warn("Session persistence unavailable", error);
       return null;
     }
+  }
+
+  createFreshSessionState() {
+    return createFreshGameSessionState({
+      currentWorldId: "village",
+      playerId: "player",
+      initialEntityIds: NPCS.map((npc) => npc.id),
+      initialWorldItems: createMeleeStartingWorldItems(this.worldLayout),
+    });
   }
 
   saveSession() {
@@ -901,6 +920,27 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
+  createMeleeRuntime() {
+    this.meleeRuntime = createMeleeRuntime(this, {
+      worldLayout: this.worldLayout,
+      getPlayerCharacter: () => this.playerCharacter,
+      getSelectedItem: () => this.frameMeleeItem,
+      getControllerMoveDirection: () => this.getControllerMoveDirection(),
+      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      damageLog: (resourceId, multiplier) => this.debrisRuntime?.damageLog?.(resourceId, multiplier),
+      isSuppressed: () => Boolean(
+        this.sleeping
+        || this.optionsOpen
+        || this.gameHudConfirmationActive
+        || this.buildMode?.isActive?.()
+        || this.cookingRuntime?.isActive?.()
+        || this.facilityRuntime?.isUsing?.()
+        || this.interactionRuntime?.isDialogueActive?.()
+        || this.merchantRuntime?.isActive?.()
+      ),
+    });
+  }
+
   createBuildMode() {
     this.buildPlacedObjects = new Map();
     this.buildWallEdges = new Map();
@@ -1018,6 +1058,8 @@ class WorldScene extends Phaser.Scene {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const coordinated = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint);
     if (coordinated) return coordinated;
+    const dummy = this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint);
+    if (dummy) return dummy;
     const facility = this.facilityRuntime?.getDefinitionAt?.(hitPoint);
     if (facility) {
       const profileKey = `facility:${facility.facilityType}`;
@@ -1079,7 +1121,8 @@ class WorldScene extends Phaser.Scene {
       ? this.worldBuildCoordinator?.move?.(target, point)
       : target.kind === "facility"
       ? this.facilityRuntime?.move?.(target.definition.id, point)
-      : target.kind === "bed" ? this.debrisRuntime?.moveBed?.(target.definition.id, point) : null;
+      : target.kind === "bed" ? this.debrisRuntime?.moveBed?.(target.definition.id, point)
+      : target.kind === "training-dummy" ? this.meleeRuntime?.moveBuildTarget?.(point) : null;
     if (!result) return { status: "blocked" };
     this.recordBuildUndo(() => {
       if (target.kind === "well") {
@@ -1087,6 +1130,7 @@ class WorldScene extends Phaser.Scene {
         this.worldBuildCoordinator?.restore?.(result.previous);
         this.saveSession();
       } else if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
+      else if (target.kind === "training-dummy") this.meleeRuntime?.restoreBuildTarget?.(result.previous);
       else this.debrisRuntime?.replaceBed?.(result.previous);
       this.facilityRuntime?.syncKitchenVisuals?.();
       this.interactionRuntime?.refresh?.();
@@ -1100,6 +1144,7 @@ class WorldScene extends Phaser.Scene {
   renderBuildMovePreview(target, point) {
     this.clearBuildPreview();
     if (!target?.definition) return;
+    if (target.kind === "training-dummy") { this.buildPreviewObjects.push(this.meleeRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "well") {
       this.addBuildPreviewImage(
         point.x,
@@ -1122,6 +1167,7 @@ class WorldScene extends Phaser.Scene {
     this.clearBuildPreview();
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const target = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint)
+      ?? this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
       ?? this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
     if (!target) return false;
@@ -2451,6 +2497,8 @@ class WorldScene extends Phaser.Scene {
     this.cookingRuntime = null;
     this.farmingRuntime?.destroy();
     this.farmingRuntime = null;
+    this.meleeRuntime?.destroy();
+    this.meleeRuntime = null;
     this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
     this.merchantRuntime?.destroy();
     this.merchantRuntime = null;
@@ -2586,6 +2634,7 @@ class WorldScene extends Phaser.Scene {
 
   update(_time, delta) {
     this.sampleFrameActions();
+    this.meleeRuntime?.handleActions?.(this.frameActions);
     const realDeltaMs = delta;
     this.updateGameplayTime(realDeltaMs);
     this.cookingRuntime?.update?.(realDeltaMs);
@@ -2594,7 +2643,9 @@ class WorldScene extends Phaser.Scene {
     while (worldDeltaMs > 0) {
       const substepMs = Math.min(50, worldDeltaMs);
       this.tavernServiceRuntime?.update(substepMs);
+      this.meleeRuntime?.beforeCharacterUpdate?.(substepMs);
       this.characterSystem?.update(substepMs);
+      this.meleeRuntime?.afterCharacterUpdate?.(substepMs);
       worldDeltaMs -= substepMs;
     }
     this.syncFacilityPresentationPose();
@@ -2602,6 +2653,7 @@ class WorldScene extends Phaser.Scene {
       presentationPosition: this.getPlayerCameraPosition(),
       speed: this.playerCharacter?.speed ?? 0,
       deltaMs: realDeltaMs,
+      maxPresentationSpeed: this.meleeRuntime?.getCameraFollowSpeedLimit?.(),
     });
     this.interactionRuntime?.update({ actions: this.frameActions });
     const currentCandidate = this.interactionRuntime?.getCurrentCandidate?.() ?? null;
@@ -2613,24 +2665,30 @@ class WorldScene extends Phaser.Scene {
   }
 
   sampleFrameActions() {
+    const pointerActionId = this.meleeRuntime?.consumePointerAction?.() ?? null;
     if (this.buildMode?.isActive?.() || this.cookingRuntime?.isActive?.()) {
       this.isRunning = false;
+      this.frameMeleeItem = null;
       this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
       return;
     }
-    const nextRunning = Boolean(this.runKey?.isDown || this.mobileJoystick?.isSprinting?.()) && !this.sleeping; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
-    this.syncPlayerEnergyTarget();
-    this.syncLowEnergyMarker();
     const keyboardPressed =
       Phaser.Input.Keyboard.JustDown(this.interactKeys.SPACE);
+    const shiftPressed = Phaser.Input.Keyboard.JustDown(this.runKey);
     const heldResourceInteract = this.interactKeys.SPACE.isDown && this.interactionRuntime?.getCurrentCandidate?.()?.kind === RESOURCE_INTERACTION_KIND;
     const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
     const mobileHeldResourceInteract = this.interactionHud?.isInteractHeld?.()
       && this.interactionRuntime?.getCurrentCandidate?.()?.kind === RESOURCE_INTERACTION_KIND;
     const interactionBlocked = this.gameHud?.isInventoryInteractionBlocked?.() ?? false;
+    const actionIds = [keyboardPressed || mobilePressed ? "space" : null, pointerActionId, shiftPressed ? "shift" : null].filter(Boolean);
+    this.frameMeleeItem = resolveMeleeActionItem(actionIds, (actionId) => this.gameHud?.getCombatActionItem?.(actionId));
+    const shiftMeleeEquipped = isMeleeWeaponId(this.gameHud?.getCombatActionItem?.("shift")?.id);
+    const nextRunning = Boolean((this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()) && !this.sleeping; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
+    this.syncPlayerEnergyTarget();
+    this.syncLowEnergyMarker();
     this.frameActions = Object.freeze({
       interact: interactionBlocked || this.suppressNextInteract ? false : (keyboardPressed || heldResourceInteract || mobilePressed || mobileHeldResourceInteract),
-      primary: false,
+      primary: Boolean(this.frameMeleeItem) && !this.suppressNextInteract,
       secondary: false,
     });
     this.suppressNextInteract = false;
@@ -2761,6 +2819,11 @@ class WorldScene extends Phaser.Scene {
   }
 
   getMovementVector() {
+    if (this.meleeRuntime?.isTranslationLocked?.()) return { x: 0, y: 0 };
+    return this.getControllerMoveDirection();
+  }
+
+  getControllerMoveDirection() {
     if (this.pivotEditEnabled) return { x: 0, y: 0 };
     if (isPlayerMovementSuppressed({
       sleeping: this.sleeping,

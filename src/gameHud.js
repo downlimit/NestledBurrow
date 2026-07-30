@@ -19,6 +19,7 @@ import {
   COMBAT_PANEL_AREA,
   COMBAT_SLOT_DEFINITIONS,
   createInventoryModeRuntime,
+  INVENTORY_MODES,
 } from "./inventoryModeRuntime.js";
 import { drawCoinSprite } from "./coinVisual.js";
 import { worldPointFromPointer } from "./worldThrowDirection.js";
@@ -155,13 +156,17 @@ export function createGameHud(scene, options) {
   let inventoryHud = null;
   let combatLoadoutHud = null;
   let inventoryGainPresentation = null;
+  let inventoryModeHud = null;
   const isInventoryModeSuppressed = () => suppressed
     || confirmingNewGame
     || optionsOpen
     || gameplayOverlayActive
     || Boolean(scene.interactionRuntime?.isDialogueActive?.())
     || Boolean(scene.merchantRuntime?.isActive?.())
-    || Boolean(scene.buildMode?.isActive?.());
+    || Boolean(scene.buildMode?.isActive?.())
+    || Boolean(getGameplayState?.()?.sleeping)
+    || Boolean(scene.facilityRuntime?.isUsing?.())
+    || Boolean(scene.cookingRuntime?.isActive?.());
   const transientMessages = createTransientMessageRuntime(scene, { localization });
   const throwAimIndicator = createThrowAimIndicator(scene, {
     getPlayerCharacter: () => scene.playerCharacter ?? null,
@@ -176,6 +181,15 @@ export function createGameHud(scene, options) {
     getGameplayState,
     onPersistentMutation: persistInventoryMutation,
     playEffect,
+    onWorldDrop: (source, pointer) => inventoryHud?.dropLoadoutSlot?.(
+      source.panel,
+      source.index,
+      worldPointFromPointer(scene, pointer),
+    ),
+    onAimTarget: (pointer) => {
+      if (pointer) throwAimIndicator.show(worldPointFromPointer(scene, pointer));
+      else throwAimIndicator.hide();
+    },
   });
   inventoryHud = createInventoryRuntime(scene, {
     getGameplayState,
@@ -186,11 +200,13 @@ export function createGameHud(scene, options) {
     playEffect,
     onInventoryGain: (result) => inventoryGainPresentation?.notify?.(result),
     isSlotItemHidden: (slotIndex, itemId) => inventoryGainPresentation?.isSlotPending?.(slotIndex, itemId) ?? false,
+    isHeldItemSuppressed: () => Boolean(scene.meleeRuntime?.isAttacking?.()),
     setThrowAimTarget: (target) => {
       if (target) throwAimIndicator.show(target);
       else throwAimIndicator.hide();
     },
     loadoutDragCoordinator,
+    isCombatMode: () => inventoryModeHud?.getState?.().stableMode === INVENTORY_MODES.COMBAT,
   });
   combatLoadoutHud = createCombatLoadoutRuntime(scene, {
     slotDefinitions: COMBAT_SLOT_DEFINITIONS,
@@ -204,12 +220,14 @@ export function createGameHud(scene, options) {
     onChange: () => inventoryHud?.render(),
     presentation: inventoryHud.presentation,
   });
-  const inventoryModeHud = createInventoryModeRuntime(scene, {
+  inventoryModeHud = createInventoryModeRuntime(scene, {
     inventoryPresentation: inventoryHud.presentation,
     combatPresentation: combatLoadoutHud.presentation,
     loadoutDragCoordinator,
     isSuppressed: isInventoryModeSuppressed,
     onStateChange: () => {
+      const mode = inventoryModeHud?.getState?.();
+      if (mode?.stableMode === INVENTORY_MODES.COMBAT && !mode.altDown) inventoryHud?.clearSelection?.();
       scene.syncGameplayHudVisibility?.();
       scene.interactionRuntime?.refresh?.();
     },
@@ -732,6 +750,7 @@ export function createGameHud(scene, options) {
         timeControlsVisible: !suppressed && !optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping,
         inventoryMode: inventoryModeHud.getState(),
         combatLoadout: combatLoadoutHud.getState(),
+        loadoutDrag: loadoutDragCoordinator.getState(),
       };
     },
     isPointInHud(x, y) {
@@ -782,6 +801,11 @@ export function createGameHud(scene, options) {
       }
     },
     getSelectedInventoryItem: () => inventoryHud.getSelectedItem(),
+    getCombatActionItem(actionId) {
+      const mode = inventoryModeHud.getState();
+      if (mode.suppressed || mode.transitioning || mode.altDown || mode.mode !== INVENTORY_MODES.COMBAT) return null;
+      return combatLoadoutHud.getActionItem(actionId);
+    },
     getInventoryModeState: () => inventoryModeHud.getState(),
     isInventoryInteractionBlocked: () => inventoryModeHud.getState().interactionBlocked,
     selectInventorySlot: (index) => inventoryHud.selectSlot(index),

@@ -214,6 +214,10 @@ export function createCombatLoadoutRuntime(scene, {
   return {
     render,
     presentation,
+    getActionItem(actionId) {
+      const index = slotDefinitions.findIndex((slot) => slot.kind === "action" && slot.id === actionId);
+      return index >= 0 ? cloneInventoryItem(slots()[index]) : null;
+    },
     getState: () => ({
       slots: slots().map((item) => cloneInventoryItem(item)),
       quantityLabels: slots().flatMap((item, slotIndex) => (

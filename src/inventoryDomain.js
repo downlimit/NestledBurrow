@@ -4,7 +4,22 @@ export const LOADOUT_PANELS = Object.freeze({
   PEACEFUL: "peaceful",
   COMBAT: "combat",
 });
-export const INVENTORY_TOOL_IDS = Object.freeze(["axe", "pickaxe", "hoe", "water-bucket"]);
+export const COMBAT_ACTION_SLOT_INDEXES = Object.freeze({
+  space: 0,
+  lmb: 1,
+  rmb: 2,
+  shift: 3,
+});
+export const COMBAT_NUMBER_SLOT_INDEXES = Object.freeze([4, 5, 6, 7, 8, 9]);
+export const COMBAT_ITEM_ACTION_PREFERENCES = Object.freeze({
+  sword: "lmb",
+  "battle-axe": "rmb",
+  bow: "space",
+  crossbow: "space",
+  amulet: "shift",
+  "blink-amulet": "shift",
+});
+export const INVENTORY_TOOL_IDS = Object.freeze(["axe", "pickaxe", "hoe", "water-bucket", "sword", "battle-axe"]);
 export const INVENTORY_ITEM_IDS = Object.freeze([
   ...INVENTORY_TOOL_IDS,
   "wood", "stone", "ruby", "potato-seed", "potato", "lemon-seed", "lemon",
@@ -15,6 +30,8 @@ export const INVENTORY_ITEM_KINDS = Object.freeze({
   pickaxe: "tool",
   hoe: "tool",
   "water-bucket": "tool",
+  sword: "tool",
+  "battle-axe": "tool",
   wood: "loot",
   stone: "loot",
   ruby: "loot",
@@ -269,6 +286,76 @@ export function addInventoryItem(inventory, item) {
     slots: plan.map(({ slotIndex }) => slotIndex),
     plan,
     item: { ...normalized },
+  };
+}
+
+export function preferredCombatActionIdForItem(itemId) {
+  const id = normalizeItemId(itemId);
+  return COMBAT_ITEM_ACTION_PREFERENCES[id] ?? null;
+}
+
+export function routePickedInventoryItem({ inventory, combatLoadout }, item, { combatMode = false } = {}) {
+  const normalized = normalizeInventoryBatch(item);
+  const allSlots = [...(inventory?.slots ?? []), ...(combatLoadout?.slots ?? [])];
+  if (normalized.kind === "tool" && allSlots.some((slot) => slot?.id === normalized.id)) {
+    return { status: "duplicate-tool", mutated: false, panel: null, item: normalized };
+  }
+
+  const preferredAction = preferredCombatActionIdForItem(normalized.id);
+  const combatSlotIndexes = preferredAction
+    ? [COMBAT_ACTION_SLOT_INDEXES[preferredAction], ...COMBAT_NUMBER_SLOT_INDEXES]
+    : combatMode
+      ? COMBAT_NUMBER_SLOT_INDEXES
+      : [];
+  if (combatSlotIndexes.length > 0 && Array.isArray(combatLoadout?.slots)) {
+    const combatResult = addInventoryItemToSlots(combatLoadout.slots, combatSlotIndexes, normalized);
+    if (combatResult.mutated) return { ...combatResult, panel: LOADOUT_PANELS.COMBAT };
+  }
+
+  const peacefulResult = addInventoryItem(inventory, normalized);
+  return { ...peacefulResult, panel: peacefulResult.mutated ? LOADOUT_PANELS.PEACEFUL : null };
+}
+
+function addInventoryItemToSlots(slots, slotIndexes, item) {
+  const plan = [];
+  if (item.kind === "tool") {
+    const slotIndex = slotIndexes.find((index) => slots[index] === null);
+    if (slotIndex === undefined) return { status: "combat-slots-full", mutated: false, item };
+    plan.push({ slotIndex, added: 1, quantity: 1, wasEmpty: true });
+  } else {
+    const limit = inventoryStackLimit(item.id);
+    let remaining = item.quantity;
+    for (const slotIndex of slotIndexes) {
+      const existing = slots[slotIndex];
+      if (existing?.id !== item.id || existing.kind !== "loot" || existing.quantity >= limit) continue;
+      const added = Math.min(remaining, limit - existing.quantity);
+      plan.push({ slotIndex, added, quantity: existing.quantity + added, wasEmpty: false });
+      remaining -= added;
+      if (remaining === 0) break;
+    }
+    for (const slotIndex of slotIndexes) {
+      if (remaining === 0) break;
+      if (slots[slotIndex] !== null) continue;
+      const added = Math.min(remaining, limit);
+      plan.push({ slotIndex, added, quantity: added, wasEmpty: true });
+      remaining -= added;
+    }
+    if (remaining > 0) return { status: "combat-slots-full", mutated: false, item };
+  }
+
+  for (const operation of plan) {
+    const existing = slots[operation.slotIndex];
+    slots[operation.slotIndex] = existing
+      ? { ...existing, quantity: operation.quantity }
+      : createInventoryItem(item.id, operation.quantity);
+  }
+  return {
+    status: plan.some(({ wasEmpty }) => wasEmpty) ? "inserted" : "stacked",
+    mutated: true,
+    slotIndex: plan[0]?.slotIndex ?? -1,
+    slots: plan.map(({ slotIndex }) => slotIndex),
+    plan,
+    item: { ...item },
   };
 }
 

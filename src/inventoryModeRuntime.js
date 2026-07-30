@@ -106,6 +106,16 @@ export function reduceInventoryModeState(state, event) {
       };
     case "ALT_UP":
       if (!state.altDown) return state;
+      if (event.stableMode === INVENTORY_MODES.PEACEFUL || event.stableMode === INVENTORY_MODES.COMBAT) {
+        return {
+          ...state,
+          mode: event.stableMode,
+          stableMode: event.stableMode,
+          holdOriginMode: event.stableMode,
+          altDown: false,
+          holdTriggered: false,
+        };
+      }
       if (state.holdTriggered) {
         return {
           ...state,
@@ -223,8 +233,9 @@ export function createInventoryModeRuntime(scene, {
     const peaceful = stable && state.mode === INVENTORY_MODES.PEACEFUL;
     inventoryPresentation.setInputEnabled(peaceful);
     const loadoutEditing = !state.suppressed && state.altDown;
-    loadoutDragCoordinator?.setEnabled?.(loadoutEditing);
-    combatPresentation.setDragEnabled(loadoutEditing);
+    const combatDragging = loadoutEditing || (stable && state.mode === INVENTORY_MODES.COMBAT);
+    loadoutDragCoordinator?.setEnabled?.(combatDragging);
+    combatPresentation.setDragEnabled(combatDragging);
   }
 
   function emitStateChange() {
@@ -347,7 +358,14 @@ export function createInventoryModeRuntime(scene, {
     syncSuppression();
     if (state.suppressed || !state.altDown) return;
     const wasHold = state.holdTriggered;
-    state = reduceInventoryModeState(state, { type: "ALT_UP" });
+    const pointer = scene.input?.activePointer;
+    const releasePanel = loadoutDragCoordinator?.releasePanelAt?.(pointer?.x, pointer?.y);
+    const releaseMode = releasePanel === "combat"
+      ? INVENTORY_MODES.COMBAT
+      : releasePanel === "peaceful"
+        ? INVENTORY_MODES.PEACEFUL
+        : null;
+    state = reduceInventoryModeState(state, { type: "ALT_UP", stableMode: releaseMode });
     transitionTo(state.mode, wasHold ? LOADOUT_EDIT_TRANSITION_MS : INVENTORY_MODE_TRANSITION_MS);
   }
 

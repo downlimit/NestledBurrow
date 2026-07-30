@@ -187,14 +187,14 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
       stone: inventoryQuantity(session.gameplay, "stone"),
       tools: session.gameplay.inventory.slots.slice(0, 4).map((item) => item.id),
       node: session.gameplay.resourceNodes["fallen-log-01"],
-      worldItems: session.gameplay.worldItems,
+      worldItems: session.gameplay.worldItems.map((item) => item.item.id),
     };
   }).toEqual({
     wood: 0,
     stone: 0,
     tools: ["axe", "pickaxe", "hoe", "water-bucket"],
     node: { cleared: false, progress: 0 },
-    worldItems: [],
+    worldItems: ["sword", "battle-axe"],
   });
   expect((await bridge(page, "getSession")).gameplay.currentEnergy).toBeGreaterThan(95);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");

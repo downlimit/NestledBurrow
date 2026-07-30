@@ -246,9 +246,9 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-harvest");
   await page.waitForTimeout(100);
   await pressInteract(page);
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems).toHaveLength(6);
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems.filter((item) => item.item.id === "potato")).toHaveLength(6);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("harvest");
-  const drops = (await bridge(page, "getSession")).gameplay.worldItems;
+  const drops = (await bridge(page, "getSession")).gameplay.worldItems.filter((item) => item.item.id === "potato");
   expect(drops.every((drop) => drop.item.id === "potato" && drop.item.quantity === 1)).toBe(true);
   await page.waitForTimeout(450);
   await page.locator("canvas").screenshot({ path: `${EVIDENCE_DIR}/potato-loop-integrated.png` });
@@ -266,7 +266,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
     expect.objectContaining({ fixed: false, x: WELL_CELL.x, y: WELL_CELL.y }),
   ]));
   expect(restored.gameplay.farm.soilCells).toHaveLength(1);
-  expect(restored.gameplay.worldItems).toHaveLength(6);
+  expect(restored.gameplay.worldItems.filter((item) => item.item.id === "potato")).toHaveLength(6);
   expect(pageErrors).toEqual([]);
 });
 

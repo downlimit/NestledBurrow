@@ -45,7 +45,7 @@ const characterVisual = readFileSync("src/characterVisual.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 assert(interactionHud.includes("isInteractHeld()"), "mobile interaction exposes held state");
 assert(main.includes("mobileHeldResourceInteract") && main.includes("RESOURCE_INTERACTION_KIND"), "held mobile interaction repeats only repeatable resources");
-assert(main.includes("this.runKey?.isDown || this.mobileJoystick?.isSprinting?.()"), "keyboard and mobile sprint share one running state");
+assert(main.includes("(this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()"), "keyboard and mobile sprint share one running state while Shift can own a combat action");
 assert(main.includes("presentationPosition: this.getPlayerCameraPosition()"), "camera uses the interaction-safe focus position");
 assert(main.includes("this.facilityRuntime?.isUsing?.() || this.sleeping"), "facility use and sleep keep the camera anchored to the unchanged motor position");
 assert(characterVisual.includes("setPresentationPose(pose)") && !characterVisual.includes("sleepingPose"), "facility and sleep use a general visual presentation boundary");

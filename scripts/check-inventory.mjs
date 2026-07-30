@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import {
   INVENTORY_SLOT_COUNT,
   COMBAT_LOADOUT_SLOT_COUNT,
+  COMBAT_ACTION_SLOT_INDEXES,
+  COMBAT_NUMBER_SLOT_INDEXES,
   LOADOUT_PANELS,
   addInventoryItem,
   createEmptyCombatLoadout,
@@ -13,6 +15,8 @@ import {
   normalizeInventory,
   normalizeCombatLoadout,
   normalizeWorldItems,
+  preferredCombatActionIdForItem,
+  routePickedInventoryItem,
   swapInventorySlots,
   swapLoadoutSlots,
   takeInventorySlot,
@@ -50,6 +54,68 @@ const combatLoadout = createEmptyCombatLoadout();
 assert.equal(COMBAT_LOADOUT_SLOT_COUNT, 10);
 assert.equal(combatLoadout.slots.length, 10);
 assert(combatLoadout.slots.every((item) => item === null));
+assert.deepEqual(COMBAT_ACTION_SLOT_INDEXES, { space: 0, lmb: 1, rmb: 2, shift: 3 });
+assert.deepEqual(COMBAT_NUMBER_SLOT_INDEXES, [4, 5, 6, 7, 8, 9]);
+assert.equal(preferredCombatActionIdForItem("sword"), "lmb");
+assert.equal(preferredCombatActionIdForItem("battle-axe"), "rmb");
+assert.equal(preferredCombatActionIdForItem("crossbow"), "space");
+assert.equal(preferredCombatActionIdForItem("blink-amulet"), "shift");
+
+const swordPickupInventory = createFreshInventory();
+const swordPickupCombat = createEmptyCombatLoadout();
+const swordPickup = routePickedInventoryItem(
+  { inventory: swordPickupInventory, combatLoadout: swordPickupCombat },
+  createInventoryItem("sword"),
+);
+assert.equal(swordPickup.panel, LOADOUT_PANELS.COMBAT);
+assert.equal(swordPickup.slotIndex, COMBAT_ACTION_SLOT_INDEXES.lmb);
+assert.equal(swordPickupCombat.slots[COMBAT_ACTION_SLOT_INDEXES.lmb].id, "sword");
+
+const axePickupInventory = createFreshInventory();
+const axePickupCombat = createEmptyCombatLoadout();
+const axePickup = routePickedInventoryItem(
+  { inventory: axePickupInventory, combatLoadout: axePickupCombat },
+  createInventoryItem("battle-axe"),
+);
+assert.equal(axePickup.slotIndex, COMBAT_ACTION_SLOT_INDEXES.rmb);
+
+const peacefulPickupInventory = createFreshInventory();
+const peacefulPickupCombat = createEmptyCombatLoadout();
+const peacefulWood = routePickedInventoryItem(
+  { inventory: peacefulPickupInventory, combatLoadout: peacefulPickupCombat },
+  createInventoryItem("wood"),
+);
+assert.equal(peacefulWood.panel, LOADOUT_PANELS.PEACEFUL);
+
+const combatPickupInventory = createFreshInventory();
+const combatPickupCombat = createEmptyCombatLoadout();
+const combatWood = routePickedInventoryItem(
+  { inventory: combatPickupInventory, combatLoadout: combatPickupCombat },
+  createInventoryItem("wood"),
+  { combatMode: true },
+);
+assert.equal(combatWood.panel, LOADOUT_PANELS.COMBAT);
+assert.equal(combatWood.slotIndex, COMBAT_NUMBER_SLOT_INDEXES[0]);
+
+const occupiedActionInventory = createFreshInventory();
+const occupiedActionCombat = createEmptyCombatLoadout();
+occupiedActionCombat.slots[COMBAT_ACTION_SLOT_INDEXES.lmb] = createInventoryItem("wood");
+const numericSword = routePickedInventoryItem(
+  { inventory: occupiedActionInventory, combatLoadout: occupiedActionCombat },
+  createInventoryItem("sword"),
+);
+assert.equal(numericSword.slotIndex, COMBAT_NUMBER_SLOT_INDEXES[0], "occupied preferred action falls back to combat number 1");
+
+const fullCombatInventory = createFreshInventory();
+const fullCombatLoadout = createEmptyCombatLoadout();
+for (const index of [COMBAT_ACTION_SLOT_INDEXES.lmb, ...COMBAT_NUMBER_SLOT_INDEXES]) {
+  fullCombatLoadout.slots[index] = createInventoryItem(`occupied-${index}`);
+}
+const peacefulSwordFallback = routePickedInventoryItem(
+  { inventory: fullCombatInventory, combatLoadout: fullCombatLoadout },
+  createInventoryItem("sword"),
+);
+assert.equal(peacefulSwordFallback.panel, LOADOUT_PANELS.PEACEFUL);
 const loadoutInventory = createNewGameInventory();
 const equipped = swapLoadoutSlots(
   { inventory: loadoutInventory, combatLoadout },
@@ -168,6 +234,8 @@ assert.deepEqual(JSON.parse(JSON.stringify(fullState)), beforeFull, "full-invent
 const runtimeSource = readFileSync("src/inventoryRuntime.js", "utf8");
 const hudSource = readFileSync("src/gameHud.js", "utf8");
 assert(runtimeSource.includes("swapInventorySlots") && runtimeSource.includes("dropSlot(fromIndex, worldPointFromPointer(scene, pointer))"));
+assert(runtimeSource.includes("routePickedInventoryItem") && runtimeSource.includes("combatMode: isCombatMode()"));
+assert(hudSource.includes("dropLoadoutSlot") && readFileSync("src/loadoutDragCoordinator.js", "utf8").includes("onWorldDrop(source, pointer)"), "loadout edit can drop combat slots into the world");
 assert(runtimeSource.includes("throwOriginFromPlayer(sprite)") && runtimeSource.includes("throwDirectionTowardPoint(origin, pointerWorld, character.lastFacing)"));
 assert(runtimeSource.includes("DROP_HITBOX_SIZE = 2"));
 assert(runtimeSource.includes("directionX *= -1") && runtimeSource.includes("directionY *= -1"));

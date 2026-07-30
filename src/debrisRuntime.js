@@ -1,6 +1,7 @@
 import { BED_ASSET, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile, resourceActionForTool } from "./resourceDomain.js";
+import { hitResourceNode } from "./gameSessionState.js";
 import { cellKey } from "./worldLayout.js";
 import { drawResource } from "./resourceVisuals.js";
 import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
@@ -14,7 +15,13 @@ export function sleepingCharacterDepth(bedDepth) {
   return Number.isFinite(depth) ? depth + BED_SLEEP_DEPTH_OFFSET : null;
 }
 
-export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelectedItem = () => null }) {
+export function createDebrisRuntime(scene, {
+  sessionState,
+  worldLayout,
+  getSelectedItem = () => null,
+  getGameplayTuning = () => ({}),
+  onPersistentMutation = () => {},
+}) {
   const visuals = new Map();
   const bedDefinitions = new Map();
   const bedVisuals = new Map();
@@ -126,6 +133,24 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
       yoyo: true,
       onComplete: () => { graphics.setPosition(anchorX, anchorY); onComplete(); },
     });
+  }
+
+  function damageLog(resourceId, damageMultiplier = 0.5) {
+    const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
+    const profile = definition ? getResourceProfile(definition.profileId) : null;
+    if (profile?.kind !== "log") return { status: "wrong-resource", mutated: false };
+    const tuning = getGameplayTuning();
+    const result = hitResourceNode(sessionState, resourceId, {
+      action: "chop",
+      damage: Math.max(0, Number(tuning.axeDamage) || 0) * Math.max(0, Number(damageMultiplier) || 0),
+      energyPerHit: 0,
+      tuning,
+    });
+    if (result.mutated) {
+      hitWithFeedback(resourceId, result);
+      onPersistentMutation(result);
+    }
+    return result;
   }
 
   function clearWithFeedback(resourceId, onComplete = () => {}) {
@@ -323,7 +348,7 @@ export function createDebrisRuntime(scene, { sessionState, worldLayout, getSelec
       const graphics = visuals.get(id);
       return graphics ? { x: graphics.x, y: graphics.y, highlighted: targetOutlineId === id } : null;
     },
-    hitWithFeedback, clearWithFeedback, setSleeping,
+    hitWithFeedback, clearWithFeedback, damageLog, setSleeping,
     rebuild() { for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); RESOURCE_OBJECTS.forEach(createVisual); },
     destroy() {
       destroyed = true;

@@ -1,9 +1,9 @@
 import {
   INVENTORY_SLOT_COUNT,
-  addInventoryItem,
-  canAddInventoryItem,
   cloneInventoryItem,
   createWorldItemId,
+  LOADOUT_PANELS,
+  routePickedInventoryItem,
   swapInventorySlots,
   takeInventorySlot,
 } from "./inventoryDomain.js";
@@ -114,8 +114,10 @@ export function createInventoryRuntime(scene, options = {}) {
     playEffect = () => {},
     onInventoryGain = () => {},
     isSlotItemHidden = () => false,
+    isHeldItemSuppressed = () => false,
     setThrowAimTarget = () => {},
     loadoutDragCoordinator = null,
+    isCombatMode = () => false,
   } = options;
 
   const presentationContainer = scene.add.container(0, 0).setDepth(HUD_DEPTH + 4).setScrollFactor(0);
@@ -305,11 +307,15 @@ export function createInventoryRuntime(scene, options = {}) {
   }
 
   function dropSlot(slotIndex, pointerWorld = null) {
-    const currentInventory = inventory();
+    return dropLoadoutSlot(LOADOUT_PANELS.PEACEFUL, slotIndex, pointerWorld);
+  }
+
+  function dropLoadoutSlot(panel, slotIndex, pointerWorld = null) {
+    const collection = panel === LOADOUT_PANELS.COMBAT ? gameplay()?.combatLoadout : inventory();
     const character = getPlayerCharacter?.();
     const sprite = character?.sprite;
-    if (!currentInventory || !sprite) return { status: "unavailable", mutated: false };
-    const taken = takeInventorySlot(currentInventory, slotIndex);
+    if (!collection || !sprite) return { status: "unavailable", mutated: false };
+    const taken = takeInventorySlot(collection, slotIndex);
     if (!taken.mutated) return taken;
     const origin = throwOriginFromPlayer(sprite);
     const direction = throwDirectionTowardPoint(origin, pointerWorld, character.lastFacing);
@@ -333,12 +339,12 @@ export function createInventoryRuntime(scene, options = {}) {
       arcHeight: 0,
       bounces: 0,
     });
-    if (selectedIndex === slotIndex) setSelection(null);
+    if (panel === LOADOUT_PANELS.PEACEFUL && selectedIndex === slotIndex) setSelection(null);
     playEffect("drop");
     render();
     syncWorldVisuals();
-    onPersistentMutation({ status: "dropped", mutated: true, slotIndex, worldItem });
-    return { status: "dropped", mutated: true, worldItem };
+    onPersistentMutation({ status: "dropped", mutated: true, panel, slotIndex, worldItem });
+    return { status: "dropped", mutated: true, panel, worldItem };
   }
 
   function render() {
@@ -439,6 +445,7 @@ export function createInventoryRuntime(scene, options = {}) {
   function updateHeldItem(nowMs) {
     heldGraphics.clear().setVisible(false);
     heldImage.setVisible(false);
+    if (isHeldItemSuppressed()) return;
     if (!worldPresentationActive() || selectedIndex === null) return;
     const item = inventory()?.slots?.[selectedIndex] ?? null;
     const character = getPlayerCharacter?.();
@@ -549,9 +556,10 @@ export function createInventoryRuntime(scene, options = {}) {
     for (const worldItem of [...worldItems()]) {
       if (motions.has(worldItem.id)) continue;
       if (Math.hypot(sprite.x - worldItem.x, sprite.y - worldItem.y) > DROP_PICKUP_RADIUS) continue;
-      const availability = canAddInventoryItem(currentInventory, worldItem.item);
-      if (!availability.canAdd) continue;
-      const result = addInventoryItem(currentInventory, worldItem.item);
+      const result = routePickedInventoryItem({
+        inventory: currentInventory,
+        combatLoadout: gameplay()?.combatLoadout,
+      }, worldItem.item, { combatMode: isCombatMode() });
       if (!result.mutated) continue;
       const index = worldItems().findIndex((item) => item.id === worldItem.id);
       if (index >= 0) worldItems().splice(index, 1);
@@ -559,7 +567,7 @@ export function createInventoryRuntime(scene, options = {}) {
       worldVisuals.delete(worldItem.id);
       playEffect("pickup");
       render();
-      onInventoryGain(result);
+      if (result.panel !== LOADOUT_PANELS.COMBAT) onInventoryGain(result);
       onPersistentMutation({ status: "picked-up", mutated: true, worldItem, inventory: result });
     }
   }
@@ -702,6 +710,7 @@ export function createInventoryRuntime(scene, options = {}) {
     render,
     update,
     dropSlot,
+    dropLoadoutSlot,
     presentation,
     selectSlot(index) {
       const next = Number(index);
@@ -713,6 +722,12 @@ export function createInventoryRuntime(scene, options = {}) {
       return selectedIndex === next;
     },
     getSelectedIndex: () => selectedIndex,
+    clearSelection() {
+      if (selectedIndex === null) return false;
+      setSelection(null);
+      render();
+      return true;
+    },
     getSelectedItem: () => cloneInventoryItem(selectedIndex === null ? null : inventory()?.slots?.[selectedIndex]),
     spawnWorldItems,
     getState: () => ({

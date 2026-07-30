@@ -9,6 +9,8 @@ export function createLoadoutDragCoordinator(scene, {
   getGameplayState = () => null,
   onPersistentMutation = () => {},
   playEffect = () => {},
+  onWorldDrop = () => {},
+  onAimTarget = () => {},
 } = {}) {
   const dragGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 60).setScrollFactor(0).setVisible(false);
   const dragImage = scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0)
@@ -21,6 +23,7 @@ export function createLoadoutDragCoordinator(scene, {
   let candidate = null;
   let dragging = false;
   let destroyed = false;
+  let transferredDuringEdit = false;
 
   function slotsFor(panel) {
     const gameplay = getGameplayState?.();
@@ -88,6 +91,7 @@ export function createLoadoutDragCoordinator(scene, {
     if (!dragging) return;
     stop(pointer);
     renderDrag(pointer);
+    onAimTarget(pointer);
   }
 
   function handlePointerUp(pointer) {
@@ -97,13 +101,17 @@ export function createLoadoutDragCoordinator(scene, {
     cancel();
     if (!enabled || !wasDragging) return;
     const target = targetAt(pointer.x, pointer.y);
-    if (!target) return;
+    if (!target) {
+      onWorldDrop(source, pointer);
+      return;
+    }
     const gameplay = getGameplayState?.();
     const result = swapLoadoutSlots({
       inventory: gameplay?.inventory,
       combatLoadout: gameplay?.combatLoadout,
     }, source, target);
     if (!result.mutated) return;
+    transferredDuringEdit = true;
     playEffect("inventory-change");
     for (const registration of panels.values()) registration.onChange?.(result);
     onPersistentMutation(result);
@@ -114,6 +122,7 @@ export function createLoadoutDragCoordinator(scene, {
     dragging = false;
     dragGraphics.clear().setVisible(false);
     dragImage.setVisible(false);
+    onAimTarget(null);
   }
 
   scene.input.on("pointermove", handlePointerMove);
@@ -131,10 +140,16 @@ export function createLoadoutDragCoordinator(scene, {
     },
     begin,
     setEnabled(value) {
-      enabled = Boolean(value);
+      const nextEnabled = Boolean(value);
+      if (nextEnabled && !enabled) transferredDuringEdit = false;
+      enabled = nextEnabled;
       if (!enabled) cancel();
     },
     isEnabled: () => enabled,
+    releasePanelAt(x, y) {
+      if (!transferredDuringEdit) return null;
+      return targetAt(x, y)?.panel ?? null;
+    },
     getState: () => ({
       enabled,
       dragging,

@@ -67,15 +67,16 @@ test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inacti
     transitioning: false,
     earVisible: false,
     peaceful: { scale: 0.3, alpha: 0, inputEnabled: false },
-    combat: { scale: 1, alpha: 1, inputEnabled: false },
+    combat: { scale: 1, alpha: 1, inputEnabled: true },
   });
   await expect.poll(() => interactionHud(page)).toMatchObject({
     suppressed: true,
     promptVisible: false,
   });
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
   await page.keyboard.press("Digit2");
   await page.keyboard.press("KeyE");
-  expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+  expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
 
   await tapAlt(page);
   await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
@@ -179,6 +180,10 @@ test("held Alt supports persistent drag in both directions between peaceful and 
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.combatLoadout.slots[0]?.id).toBe("axe");
   expect((await bridge(page, "getSession")).gameplay.inventory.slots[0]).toBeNull();
   await page.keyboard.up("Alt");
+  await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({
+    mode: "COMBAT",
+    stableMode: "COMBAT",
+  });
 
   await page.reload();
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
@@ -200,6 +205,59 @@ test("held Alt supports persistent drag in both directions between peaceful and 
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.inventory.slots[0]?.id).toBe("axe");
   expect((await bridge(page, "getSession")).gameplay.combatLoadout.slots[0]).toBeNull();
   await page.keyboard.up("Alt");
+  await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({
+    mode: "PEACEFUL",
+    stableMode: "PEACEFUL",
+  });
+});
+
+test("combat loadout items can be dropped into the world and combat pickup uses number slots", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "Task #053 defines desktop physical Alt only");
+  await boot(page);
+
+  await page.keyboard.down("Alt");
+  await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({ mode: "LOADOUT_EDIT", transitioning: false });
+  let mode = await inventoryMode(page);
+  let source = await transformedSlotPoint(page, mode.peaceful, { x: 43, y: 156, width: 22, height: 22 });
+  let target = await transformedSlotPoint(page, mode.combat, mode.combat.slots[0]);
+  await page.mouse.move(source.x, source.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({
+    mode: "COMBAT",
+    stableMode: "COMBAT",
+    transitioning: false,
+    combat: { inputEnabled: true },
+  });
+
+  mode = await inventoryMode(page);
+  source = await transformedSlotPoint(page, mode.combat, mode.combat.slots[0]);
+  await page.mouse.click(source.x, source.y);
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.combatLoadout.slots[0]?.id).toBe("axe");
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems.some((item) => item.item.id === "axe")).toBe(false);
+  target = await canvasPoint(page, { x: 160, y: 80 });
+  await page.mouse.move(source.x, source.y);
+  await page.mouse.down();
+  await expect.poll(async () => (await bridge(page, "getHudState")).loadoutDrag).toMatchObject({
+    enabled: true,
+    dragging: false,
+    source: { panel: "combat", index: 0 },
+  });
+  await page.mouse.move(target.x, target.y, { steps: 4 });
+  await expect.poll(async () => (await bridge(page, "getHudState")).loadoutDrag).toMatchObject({ dragging: true });
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.throwAim).toMatchObject({ visible: true });
+  await page.mouse.up();
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems.some((item) => item.item.id === "axe")).toBe(true);
+  expect((await bridge(page, "getSession")).gameplay.combatLoadout.slots[0]).toBeNull();
+  await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({ mode: "COMBAT", stableMode: "COMBAT" });
+
+  await page.waitForTimeout(500);
+  const dropped = (await bridge(page, "getSession")).gameplay.worldItems.find((item) => item.item.id === "axe");
+  await bridge(page, "placePlayerAt", { x: dropped.x, y: dropped.y, facing: { x: 0, y: 1 } });
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems.some((item) => item.item.id === "axe")).toBe(false);
+  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.combatLoadout.slots[4]?.id).toBe("axe");
 });
 
 test("options and build mode suppress Alt without changing the stable mode", async ({ page }, testInfo) => {
