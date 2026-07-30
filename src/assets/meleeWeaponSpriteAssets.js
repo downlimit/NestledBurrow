@@ -1,0 +1,61 @@
+// Lead-authored immutable native-grid sprite payloads for Task #051.
+// Provenance: deterministic pixel editing; no generative image model or third-party pixels.
+// Runtime must decode these exact PNG data URIs without redraw, resampling, recoloring or recompression.
+
+export const MELEE_WEAPON_SPRITE_ASSETS = Object.freeze({
+  swordItem: Object.freeze({
+    textureKey: "melee.sword.item",
+    sourceName: "NestledBurrow_SwordItem.png",
+    width: 16,
+    height: 16,
+    byteLength: 234,
+    sha256: "21b6fe14eb4cb4a4d7f5f75007e0a219eac830a6ad389ff574bb09e04844802b",
+    dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAsUlEQVR42mNgGHLgxdPj/3XlZf/D+Eykap626ix5Nu85eez/npPHUGxnYGBgYCFGc13/lP+Hjp3DKsdEjGY7KyMGBgYGhvUTOhkuP3zMSLSz6/qn/N9z8tj/uv4pGE6nmmYU58AUBhaUM9hZGTEcOnaONGfrysv+39Fi+V9XXpZ0Z+vKy/6HYZghxOiDOy3dXPX/sRc/4BIkhbauvOz/h9uj/qebq5Ic2ozIgUeyzdQAAC1gYQrRvtbOAAAAAElFTkSuQmCC",
+  }),
+  battleAxeItem: Object.freeze({
+    textureKey: "melee.battle-axe.item",
+    sourceName: "NestledBurrow_BattleAxeItem.png",
+    width: 16,
+    height: 16,
+    byteLength: 235,
+    sha256: "ffcbba7c9cab1fa6e1eec96d5fdbfe6ce40d25961f9ea44b3333c3dbad11967e",
+    dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAsklEQVR42mNgGFJAV172P7oYCymaAgvKGRgmdML5lx8+ZmQhxubAgnIGOysjBgYGBgY7q5UMOjKMDK5WYQwMDAwMTIRsDywoZ2BgYGA4dOwcw6Fj5zDU4DXg8sPHjN/29jNYfV0Ktd2I4dCxc3DbGRgYGBgJOb/ERxnuZy7nQob1EzrhhhMd8nvKHf/jiwm8mtv9tP+THefINpOsmf4268rL/t/RYkmyzYzYQpfoKKIGAAC2hUNZBREUQAAAAABJRU5ErkJggg==",
+  }),
+  swordHeld: Object.freeze({
+    textureKey: "melee.sword.held",
+    sourceName: "NestledBurrow_SwordHeld.png",
+    width: 32,
+    height: 32,
+    byteLength: 303,
+    sha256: "7970cf4ad0c0d8d8ccd835f8611707795b5fa64a4207f71bf9dd6230143df2c9",
+    x: Object.freeze(16),
+    y: Object.freeze(27),
+    originX: Object.freeze(0.5),
+    originY: Object.freeze(0.84375),
+    dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA9klEQVR42mNgoBDoysv+ZxgooCsv+//F0+P/KXEEE7V8Tq4jmCixPLCgnGHaqrMMu4+tItsRTJRGg52VEUX6mRgGGFDFAVee/B/hITDqgJHngMsPHzOSIj4aBaMOGJ4OkLd0ZDh38hTFDmAkVyO2up+cbMhIjkXUKjcYGBgYWIgxYMsMW4brZ++TbLGmsSKDT8Zh6obAlhm2eA3FJo8vBCiKAisJDjj72IsfZEUBI7kJsD9ChWH1gScYDiA1IZKdDQtX3EHh90eoDGxBhO4gmjuAXB8PuihgIdcB3aky8LzOwMBAVjlBkQNggFyLyc6GxBTNpGRFAEQNWzJT4dNPAAAAAElFTkSuQmCC",
+  }),
+  battleAxeHeld: Object.freeze({
+    textureKey: "melee.battle-axe.held",
+    sourceName: "NestledBurrow_BattleAxeHeld.png",
+    width: 32,
+    height: 32,
+    byteLength: 445,
+    sha256: "8e840e00933d48df2f421614dd42bd02cb26b11ae0683e0a2148552e2eaf5776",
+    x: Object.freeze(16),
+    y: Object.freeze(27),
+    originX: Object.freeze(0.5),
+    originY: Object.freeze(0.84375),
+    dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABhElEQVR42mNgGEpAV172P7XNZKSmxZcfPmakqgOwWRxYUI5V7foJnWQ5gpEUi+2sjBgOHTvHcO7kKayGPTy+n+TQYMEnufvYKgYGBgaGK0+Ii3p5S0e4I3TlZf8T4wi8DiDWYvSQgkUHtpBEdxQLPt+T4wA7KyMGBoZynGmEYAjgS/GHjp1jYGBgYDAyN8OZDhCOQHcAdrVM+IJfR4bkXMUwoX8GSeqZ8PmWnCgwMjcjST3ONLB+Qic82GBZkBRQGBZOnZIQOU3ACiFcCUre0pHByNwMpzy2XEBRUdydKsOgaazIcP3sfYbS2U9QsiCxhRFJqQzdId2pMnB26ewnZNULJCdzYiomUuoD0vMZkiOi9PkYTDXFIIluxR2yKiMmatbt5FTHVHUAOWB4OYCcJtvQDQErCQ6GBy9/UewAFnI1HnvxgyFKn49h9YEnA+MAGAh1gJaGB54wHHvxY+CigBzLR6NgUEQB2Q4I9BVhCPQVYfjD+4PhD+8PlKp5SBVEA94eAACnEqtGPIuzKQAAAABJRU5ErkJggg==",
+  }),
+  trainingDummy: Object.freeze({
+    textureKey: "melee.training-dummy",
+    sourceName: "NestledBurrow_TrainingDummy.png",
+    width: 16,
+    height: 32,
+    byteLength: 373,
+    sha256: "72575de4f379b6a5def4f23784c97e35d3b511468b3b36f43426c0a2b2abbff1",
+    depthAnchor: Object.freeze({"x":8,"y":30}),
+    collision: Object.freeze({"left":4,"top":24,"right":12,"bottom":31}),
+    dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAgCAYAAAAbifjMAAABPElEQVR42mNgoBAwYhPUlZf9j0388sPHjAQNgGnePM0NLnb9wj2Gsll3sBrCiK65K02FQdNAieH6hXtwcRgfmyFM2JyKrJiBgYHBN2sX8WEAcwU2UDbrDoYXmKgeC7hiAFdMsGDTnGuowMDAwMAga8rC8Pj0HxQDJjMw/McbiLmGCgx6KoIYNmMTQzEA2emX7rzHUIgshqyWBZupj9heQ+iLDAwMbAhxuV+iGGpRDIjS52OYfP4BzjCYfP4Bbi8wMDAwLLv4ieRoxJoOcAUYNsCCHr+68rL/sQUirnSA1QXofsXnIiZ8NsAC8NKd91gDEGeBgp4qYZqxFSh4M1OUPh+DkjoLTs1E5cbT11+RHo0UpwNkYKopRpkBI8AL1C8To/T5MJyN7IplDLIoZSILOc7G6gVCTiemoiULAACMnYxH+PehfQAAAABJRU5ErkJggg==",
+  }),
+});
