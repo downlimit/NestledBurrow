@@ -27,6 +27,7 @@ jobs:
       lane: ${{ steps.classify.outputs.lane }}
       full_validation: ${{ steps.classify.outputs.full_validation }}
       browser: ${{ steps.classify.outputs.browser }}
+      preview: ${{ steps.classify.outputs.preview }}
 
     steps:
       - name: Checkout repository
@@ -150,9 +151,11 @@ jobs:
 
   preview:
     name: Publish Direct Preview
+    needs: scope
     if: >-
       github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.scope.outputs.preview == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
