@@ -25,6 +25,7 @@ const isCiMeta = (path) =>
     "scripts/check-pr-scope.mjs",
     "scripts/check-doc-contracts.mjs",
     "scripts/check-task-identity-contract.mjs",
+    "scripts/check-pr-preview-contract.mjs",
     "scripts/manage-task-preview.mjs",
   ].includes(path) || path.startsWith("tasks/");
 
@@ -34,12 +35,22 @@ const isMicro = (path) =>
   path.endsWith(".bat") ||
   path.endsWith(".cmd");
 
+const isPreviewRelevant = (path) =>
+  !isCiMeta(path) &&
+  !isMicro(path) &&
+  !path.startsWith(".github/workflows/") &&
+  path !== "requirements-dev.txt";
+
 export function classifyPaths(paths) {
   const normalized = paths.filter(Boolean).map(normalize);
   if (normalized.some(isStrict)) return "strict";
   if (normalized.some((path) => !isCiMeta(path) && !isMicro(path))) return "runtime";
   if (normalized.some(isCiMeta)) return "ci-meta";
   return "micro";
+}
+
+export function requiresPreview(paths) {
+  return paths.filter(Boolean).map(normalize).some(isPreviewRelevant);
 }
 
 function readArgument(name) {
@@ -64,6 +75,7 @@ function runCli() {
     `lane=${lane}`,
     `full_validation=${lane === "runtime" || lane === "strict"}`,
     `browser=${lane === "runtime" || lane === "strict"}`,
+    `preview=${requiresPreview(paths)}`,
   ].join("\n");
   console.log(`PR scope: ${lane} (${paths.length} changed path${paths.length === 1 ? "" : "s"})`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${output}\n`);

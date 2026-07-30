@@ -9,6 +9,8 @@ const project = read("PROJECT.md");
 const obsoleteTerm = ["пере", "проверка"].join("");
 
 assert.match(workflow, /Publish Direct Preview/);
+assert.match(workflow, /preview: \$\{\{ steps\.classify\.outputs\.preview \}\}/);
+assert.match(workflow, /needs\.scope\.outputs\.preview == 'true'/);
 assert.match(workflow, /npm run build -- --base=\.\//);
 assert.match(workflow, /preview-pr-\$\{\{ github\.event\.pull_request\.number \}\}/);
 assert.match(workflow, /raw\.githack\.com/);
