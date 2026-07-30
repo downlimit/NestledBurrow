@@ -54,7 +54,7 @@ test("fresh Task 049 world has four tools, fixed kitchen/well and six trees", as
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
-  expect(session.version).toBe(10);
+  expect(session.version).toBe(11);
   expect(session.gameplay.inventory.slots.slice(0, 5).map((item) => item?.id)).toEqual([
     "axe", "pickaxe", "hoe", "water-bucket", "potato-seed",
   ]);

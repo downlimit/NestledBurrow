@@ -8,16 +8,18 @@ import { normalizeTavernServiceState } from "./tavernServiceDomain.js";
 import {
   addInventoryItem,
   canAddInventoryItem,
+  createEmptyCombatLoadout,
   createInventoryFromLegacyCounters,
   createInventoryItem,
   createNewGameInventory,
   getInventoryQuantity,
   normalizeInventory,
+  normalizeCombatLoadout,
   normalizeWorldItems,
   resetInventory,
 } from "./inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 10;
+export const SESSION_STATE_VERSION = 11;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -152,6 +154,9 @@ function normalizeGameplayState(value = {}) {
   const inventory = value.inventory
     ? normalizeInventory(value.inventory)
     : createInventoryFromLegacyCounters({ wood: value.wood ?? 0, stone: value.stone ?? 0, rubies: value.rubies ?? 0 });
+  const combatLoadout = normalizeCombatLoadout(value.combatLoadout ?? createEmptyCombatLoadout(), {
+    reservedToolIds: inventory.slots.filter((item) => item?.kind === "tool").map((item) => item.id),
+  });
   const kitchen = normalizeKitchenState(value.kitchen ?? {});
   const tavernService = normalizeTavernServiceState(value.tavernService ?? {});
   const resumableReservations = new Set(tavernService.guests
@@ -163,6 +168,7 @@ function normalizeGameplayState(value = {}) {
     currentEnergy,
     maximumEnergy,
     inventory,
+    combatLoadout,
     worldItems: normalizeWorldItems(value.worldItems ?? []),
     resourceNodes,
     worldTimeSeconds,

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { FULLSCREEN_HIT_AREA, HUD_GLYPHS, compactBuildLabel, isPointInRect, measureBitmapText } from "../src/hud.js";
+import { FULLSCREEN_HIT_AREA, FULLSCREEN_PANEL_AREA, HUD_GLYPHS, compactBuildLabel, isPointInRect, measureBitmapText } from "../src/hud.js";
 import {
   CLOCK_HUD_AREA,
+  COIN_HUD_AREA,
   ENERGY_HUD_AREA,
   NEEDS_HUD_AREA,
   NEED_ROW_AREAS,
@@ -24,6 +25,14 @@ import {
 } from "../src/gameHud.js";
 import { INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "../src/inventoryRuntime.js";
 import {
+  COMBAT_PANEL_AREA,
+  COMBAT_SLOT_DEFINITIONS,
+  INVENTORY_MODE_LAYOUTS,
+  INVENTORY_MODES,
+  PEACEFUL_EAR_AREA,
+  transformPresentationRect,
+} from "../src/inventoryModeRuntime.js";
+import {
   THROW_AIM_RADIUS,
   THROW_AIM_SIZE,
   createThrowAimIndicator,
@@ -42,6 +51,9 @@ const rects = [
   NEW_GAME_HIT_AREA,
   INVENTORY_HUD_AREA,
   ...INVENTORY_SLOT_AREAS,
+  COMBAT_PANEL_AREA,
+  ...COMBAT_SLOT_DEFINITIONS.map(({ x, y, width, height }) => ({ x, y, width, height })),
+  PEACEFUL_EAR_AREA,
   ENERGY_HUD_AREA,
   NEEDS_HUD_AREA,
   NEED_TOOLTIP_AREA,
@@ -61,9 +73,20 @@ assert.equal(CLOCK_HUD_AREA.x + CLOCK_HUD_AREA.width / 2, GAME_WIDTH / 2, "clock
 assert(OPTIONS_HIT_AREA.x + OPTIONS_HIT_AREA.width < CLOCK_HUD_AREA.x, "Options and centered clock are separate top zones");
 assert(CLOCK_HUD_AREA.x + CLOCK_HUD_AREA.width < FULLSCREEN_HIT_AREA.x, "centered clock and fullscreen are separate top zones");
 assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch sized");
+assert.equal(COIN_HUD_AREA.y, FULLSCREEN_PANEL_AREA.y, "coin panel aligns vertically with the visible fullscreen button");
+assert.equal(COIN_HUD_AREA.height, FULLSCREEN_PANEL_AREA.height, "coin panel matches the visible fullscreen button height");
 assert.equal(INVENTORY_SLOT_AREAS.length, 10, "hotbar exposes ten slots");
-assert.equal(INVENTORY_HUD_AREA.x + INVENTORY_HUD_AREA.width, 279, "hotbar is centered with equal 41 px margins");
-assert.equal(INVENTORY_HUD_AREA.x, 41, "hotbar is centered with equal 41 px margins");
+assert.equal(INVENTORY_HUD_AREA.x, 43, "hotbar shifts two pixels right to separate its standard first-slot outline from the Q/E ear");
+assert.equal(INVENTORY_HUD_AREA.x + INVENTORY_HUD_AREA.width, 281, "shifted hotbar remains inside the 320 px viewport");
+assert.equal(PEACEFUL_EAR_AREA.x + PEACEFUL_EAR_AREA.width, INVENTORY_HUD_AREA.x - 1, "Q/E ear leaves one logical pixel before the standard first-slot outline");
+assert.deepEqual(COMBAT_SLOT_DEFINITIONS.map(({ label }) => label), ["SPACE", "LMB", "RMB", "SHIFT", "1", "2", "3", "4", "5", "6"]);
+assert.equal(COMBAT_SLOT_DEFINITIONS.length, 10, "combat HUD exposes four action slots and six numbered slots");
+const loadoutLayout = INVENTORY_MODE_LAYOUTS[INVENTORY_MODES.LOADOUT_EDIT];
+const loadoutPeacefulRect = transformPresentationRect(INVENTORY_HUD_AREA, loadoutLayout.peaceful);
+const loadoutCombatRect = transformPresentationRect(COMBAT_PANEL_AREA, loadoutLayout.combat);
+assert(loadoutPeacefulRect.y + loadoutPeacefulRect.height < loadoutCombatRect.y, "loadout panels remain vertically separated at 320x180");
+assert.equal(loadoutLayout.peaceful.alpha, 1);
+assert.equal(loadoutLayout.combat.alpha, 1);
 assert.equal(THROW_AIM_SIZE, 8, "throw aim is exactly 8x8 logical pixels");
 assert.equal(THROW_AIM_RADIUS, 12, "throw aim orbits twelve logical pixels from the lower-torso pivot");
 assert.deepEqual(throwAimPose({ x: 10, y: 20, displayHeight: 12 }, { x: 20, y: 16 }), {
@@ -162,11 +185,12 @@ const pulseSamples = [1, 2, 3, 4, 5, 6].flatMap((seed) => [0, 300, 600, 1000, 18
 assert(pulseSamples.every((alpha) => alpha >= 0 && alpha <= 0.9));
 assert(pulseSamples.some((alpha) => alpha > 0.85));
 assert(pulseSamples.some((alpha) => alpha === 0));
-for (const char of "v devabcdef0123456789") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
+for (const char of "v devabcdef0123456789<>") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
 
 const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const inventoryRuntime = readFileSync("src/inventoryRuntime.js", "utf8");
+const inventoryModeRuntime = readFileSync("src/inventoryModeRuntime.js", "utf8");
 const throwAimIndicator = readFileSync("src/throwAimIndicator.js", "utf8");
 const inventoryVisuals = readFileSync("src/inventoryVisuals.js", "utf8");
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
@@ -181,6 +205,7 @@ assert(gameHud.includes('localization.t("hud:options.title")'));
 assert.equal(ruHud.options.title, "Опции");
 assert.equal(enHud.options.title, "Options");
 assert(gameHud.includes("createInventoryRuntime(scene"), "GameHud composes the inventory owner");
+assert(gameHud.includes("createInventoryModeRuntime(scene"), "GameHud composes peaceful/combat presentation owner");
 assert(gameHud.includes("inventoryHud.isPointInHud(x, y)"), "hotbar excludes joystick input");
 assert(!gameHud.includes("drawLog(woodIcon"), "old resource counter panel is removed");
 assert(inventoryRuntime.includes("INVENTORY_SLOT_COUNT") && inventoryRuntime.includes('index === 9 ? "0"'), "hotbar renders 1-9 and 0");
@@ -193,6 +218,10 @@ assert(gameHud.includes("fontFamily: localization.getLocale().fontKey"), "locali
 assert(inventoryRuntime.includes("drawBitmapTextInto"), "slot labels and quantities use crisp project bitmap glyphs");
 assert(inventoryRuntime.includes("slotQuantityGraphics") && inventoryRuntime.includes("shouldRenderInventoryQuantity(item)"), "stackable item quantities, including one, render immediately above gain icons");
 assert(inventoryRuntime.includes("INVENTORY_WATER_BAR_WIDTH = 4") && inventoryRuntime.includes("renderWaterBar(rect)"), "bucket water uses a vertical in-slot gauge");
+assert(inventoryModeRuntime.includes('drawBitmapTextInto(graphics, PEACEFUL_EAR_AREA.x + 1, PEACEFUL_EAR_AREA.y + 2, "Q"')
+  && inventoryModeRuntime.includes("drawFilledArrow"), "first peaceful slot owns the compact Q/E ear with filled arrows");
+assert(!inventoryRuntime.includes("if (index === 0)"), "every inventory slot uses the same typed rectangular outline");
+assert(inventoryModeRuntime.includes("INVENTORY_MODE_TRANSITION_MS = 250") && inventoryModeRuntime.includes('INVENTORY_MODE_EASE = "Sine.InOut"'), "mode transition uses the accelerated duration and non-overshooting ease");
 assert(gameHud.includes("notifyCoinDelta") && gameHud.includes('coinDeltaAmount > 0 ? "+" : ""'), "wallet feedback supports signed collected and dropped coin deltas");
 assert(gameHud.includes("onCoinDrop(worldPointFromPointer(scene, pointer))"), "wallet drag forwards the same world cursor point used by inventory throws");
 assert(gameHud.includes("throwAimIndicator.show(worldPointFromPointer(scene, pointer))"), "wallet drag shares its cursor point with the throw aim");
@@ -206,4 +235,4 @@ assert(interactionHud.includes("setSuppressed(value)"), "interaction HUD suppres
 assert(debrisRuntime.includes('from "./resourceVisuals.js"'), "world debris uses shared resource visuals");
 assert(resourceVisuals.includes("export function drawLog") && resourceVisuals.includes("export function drawStone") && resourceVisuals.includes("export function drawRuby"));
 
-console.log("hud checks passed: ten-slot inventory, bitmap labels, world drops and existing HUD contracts are aligned");
+console.log("hud checks passed: peaceful/combat/loadout layouts, ten-slot inventory, bitmap labels and world drops are aligned");

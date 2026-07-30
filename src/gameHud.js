@@ -1,6 +1,7 @@
 import { isFullscreenActive, isFullscreenSupported, toggleFullscreen } from "./fullscreen.js";
 import {
   FULLSCREEN_HIT_AREA,
+  FULLSCREEN_PANEL_AREA,
   HUD_COLORS,
   HUD_DEPTH,
   compactBuildLabel,
@@ -12,6 +13,13 @@ import {
 import { GAME_WIDTH } from "./worldConfig.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
 import { createInventoryRuntime, INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "./inventoryRuntime.js";
+import { createCombatLoadoutRuntime } from "./combatLoadoutRuntime.js";
+import { createLoadoutDragCoordinator } from "./loadoutDragCoordinator.js";
+import {
+  COMBAT_PANEL_AREA,
+  COMBAT_SLOT_DEFINITIONS,
+  createInventoryModeRuntime,
+} from "./inventoryModeRuntime.js";
 import { drawCoinSprite } from "./coinVisual.js";
 import { worldPointFromPointer } from "./worldThrowDirection.js";
 import {
@@ -24,7 +32,12 @@ import { createThrowAimIndicator } from "./throwAimIndicator.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
-export const COIN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 82, y: 4, width: 46, height: 30 });
+export const COIN_HUD_AREA = Object.freeze({
+  x: GAME_WIDTH - 82,
+  y: FULLSCREEN_PANEL_AREA.y,
+  width: 46,
+  height: FULLSCREEN_PANEL_AREA.height,
+});
 export const CLOCK_HUD_AREA = Object.freeze({ x: 120, y: 4, width: 80, height: 24 });
 export const TIME_CONTROL_SPEEDS = Object.freeze([0, 1, 4, 16]);
 export const TIME_CONTROL_HUD_AREA = Object.freeze({ x: 120, y: 29, width: 80, height: 13 });
@@ -140,36 +153,65 @@ export function createGameHud(scene, options) {
   let coinDeltaAmount = 0;
 
   let inventoryHud = null;
-  const inventoryGainPresentation = createInventoryGainPresentation(scene, {
-    slotAreas: INVENTORY_SLOT_AREAS,
-    getGameplayState,
-    onChange: () => inventoryHud?.render(),
-  });
+  let combatLoadoutHud = null;
+  let inventoryGainPresentation = null;
+  const isInventoryModeSuppressed = () => suppressed
+    || confirmingNewGame
+    || optionsOpen
+    || gameplayOverlayActive
+    || Boolean(scene.interactionRuntime?.isDialogueActive?.())
+    || Boolean(scene.merchantRuntime?.isActive?.())
+    || Boolean(scene.buildMode?.isActive?.());
   const transientMessages = createTransientMessageRuntime(scene, { localization });
   const throwAimIndicator = createThrowAimIndicator(scene, {
     getPlayerCharacter: () => scene.playerCharacter ?? null,
   });
+  const persistInventoryMutation = () => {
+    inventoryHud?.render?.();
+    combatLoadoutHud?.render?.();
+    scene.interactionRuntime?.refresh?.();
+    scene.saveSession?.();
+  };
+  const loadoutDragCoordinator = createLoadoutDragCoordinator(scene, {
+    getGameplayState,
+    onPersistentMutation: persistInventoryMutation,
+    playEffect,
+  });
   inventoryHud = createInventoryRuntime(scene, {
     getGameplayState,
     getPlayerCharacter: () => scene.playerCharacter ?? null,
-    isSuppressed: () => suppressed
-      || confirmingNewGame
-      || optionsOpen
-      || gameplayOverlayActive
-      || Boolean(scene.interactionRuntime?.isDialogueActive?.())
-      || Boolean(scene.buildMode?.isActive?.()),
-    onPersistentMutation: () => {
-      inventoryHud.render();
-      scene.interactionRuntime?.refresh?.();
-      scene.saveSession?.();
-    },
+    isSuppressed: isInventoryModeSuppressed,
+    onPersistentMutation: persistInventoryMutation,
     onWorldItemCollision: onDroppedItemCollision,
     playEffect,
-    onInventoryGain: (result) => inventoryGainPresentation.notify(result),
-    isSlotItemHidden: (slotIndex, itemId) => inventoryGainPresentation.isSlotPending(slotIndex, itemId),
+    onInventoryGain: (result) => inventoryGainPresentation?.notify?.(result),
+    isSlotItemHidden: (slotIndex, itemId) => inventoryGainPresentation?.isSlotPending?.(slotIndex, itemId) ?? false,
     setThrowAimTarget: (target) => {
       if (target) throwAimIndicator.show(target);
       else throwAimIndicator.hide();
+    },
+    loadoutDragCoordinator,
+  });
+  combatLoadoutHud = createCombatLoadoutRuntime(scene, {
+    slotDefinitions: COMBAT_SLOT_DEFINITIONS,
+    getGameplayState,
+    isSuppressed: isInventoryModeSuppressed,
+    dragCoordinator: loadoutDragCoordinator,
+  });
+  inventoryGainPresentation = createInventoryGainPresentation(scene, {
+    slotAreas: INVENTORY_SLOT_AREAS,
+    getGameplayState,
+    onChange: () => inventoryHud?.render(),
+    presentation: inventoryHud.presentation,
+  });
+  const inventoryModeHud = createInventoryModeRuntime(scene, {
+    inventoryPresentation: inventoryHud.presentation,
+    combatPresentation: combatLoadoutHud.presentation,
+    loadoutDragCoordinator,
+    isSuppressed: isInventoryModeSuppressed,
+    onStateChange: () => {
+      scene.syncGameplayHudVisibility?.();
+      scene.interactionRuntime?.refresh?.();
     },
   });
 
@@ -380,6 +422,7 @@ export function createGameHud(scene, options) {
 
   function render() {
     if (destroyed) return;
+    inventoryModeHud.syncSuppression();
     graphics.clear();
     energyBarGraphics.clear();
     energyArrowGraphics.clear();
@@ -387,12 +430,14 @@ export function createGameHud(scene, options) {
     if (suppressed) {
       fullscreenHud?.graphics?.clear?.();
       inventoryHud.render();
+      combatLoadoutHud.render();
       updateInteractivity();
       return;
     }
     if (confirmingNewGame) renderConfirmation();
     else renderNormalHud();
     inventoryHud.render();
+    combatLoadoutHud.render();
     updateInteractivity();
     if (fullscreenHud) renderFullscreenIcon(fullscreenHud.graphics, isFullscreenActive(document, gameContainer));
   }
@@ -421,7 +466,11 @@ export function createGameHud(scene, options) {
   function renderCoinBalance(gameplay) {
     graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(COIN_HUD_AREA.x, COIN_HUD_AREA.y, COIN_HUD_AREA.width, COIN_HUD_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 0.8).strokeRect(COIN_HUD_AREA.x + 0.5, COIN_HUD_AREA.y + 0.5, COIN_HUD_AREA.width - 1, COIN_HUD_AREA.height - 1);
-    drawCoinSprite(graphics, COIN_HUD_AREA.x + COIN_HUD_AREA.width - 10, COIN_HUD_AREA.y + 14);
+    drawCoinSprite(
+      graphics,
+      COIN_HUD_AREA.x + COIN_HUD_AREA.width - 10,
+      Math.round(COIN_HUD_AREA.y + COIN_HUD_AREA.height / 2) - 1,
+    );
     setManagedTextStyle(coinText, scene, textStyle({ fontSize: "8px" })).setText(String(gameplay.coins ?? 0)).setVisible(true);
     coinText.setPosition(COIN_HUD_AREA.x + COIN_HUD_AREA.width - 18 - coinText.width, Math.round(COIN_HUD_AREA.y + (COIN_HUD_AREA.height - coinText.height) / 2));
   }
@@ -668,6 +717,8 @@ export function createGameHud(scene, options) {
           resources: INVENTORY_HUD_AREA,
           inventory: INVENTORY_HUD_AREA,
           inventorySlots: INVENTORY_SLOT_AREAS,
+          combat: COMBAT_PANEL_AREA,
+          combatSlots: COMBAT_SLOT_DEFINITIONS,
           energy: ENERGY_HUD_AREA,
           needs: NEEDS_HUD_AREA,
           needRows: NEED_ROW_AREAS,
@@ -679,12 +730,15 @@ export function createGameHud(scene, options) {
           confirmation: NEW_GAME_CONFIRM_PANEL,
         },
         timeControlsVisible: !suppressed && !optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping,
+        inventoryMode: inventoryModeHud.getState(),
+        combatLoadout: combatLoadoutHud.getState(),
       };
     },
     isPointInHud(x, y) {
       if (suppressed) return false;
       if (confirmingNewGame) return isPointInRect(x, y, NEW_GAME_CONFIRM_PANEL) || Boolean(fullscreenHud && isPointInRect(x, y, FULLSCREEN_HIT_AREA));
       return inventoryHud.isPointInHud(x, y)
+        || combatLoadoutHud.isPointInHud(x, y)
         || isPointInRect(x, y, OPTIONS_HIT_AREA)
         || Boolean(!optionsOpen && !gameplayOverlayActive && isPointInRect(x, y, COIN_HUD_AREA))
         || Boolean(!optionsOpen && !gameplayOverlayActive && !getGameplayState?.()?.sleeping
@@ -704,8 +758,11 @@ export function createGameHud(scene, options) {
       scene.input.off("pointerup", finishCoinDrag);
       scene.input.off("pointercancel", finishCoinDrag);
       coinHit.off("pointerdown", onCoinPointerDown);
-      inventoryHud.destroy();
+      inventoryModeHud.destroy();
+      combatLoadoutHud.destroy();
+      loadoutDragCoordinator.destroy();
       inventoryGainPresentation.destroy();
+      inventoryHud.destroy();
       transientMessages.destroy();
       throwAimIndicator.destroy();
       for (const zone of [optionsHit, coinHit, optionsPanelHit, languageHit, ...Object.values(sliderHits), newGameHit, confirmHit, cancelHit, ...needHits, ...timeControlHits]) zone.destroy();
@@ -725,6 +782,8 @@ export function createGameHud(scene, options) {
       }
     },
     getSelectedInventoryItem: () => inventoryHud.getSelectedItem(),
+    getInventoryModeState: () => inventoryModeHud.getState(),
+    isInventoryInteractionBlocked: () => !inventoryModeHud.getState().peaceful.inputEnabled,
     selectInventorySlot: (index) => inventoryHud.selectSlot(index),
     dropInventorySlot: (index) => inventoryHud.dropSlot(index),
     spawnWorldItems: (itemId, quantity, origin) => inventoryHud.spawnWorldItems(itemId, quantity, origin),

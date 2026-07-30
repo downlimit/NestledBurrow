@@ -33,7 +33,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const fresh = createFreshGameSessionState();
 assert.deepEqual(fresh.gameplay.kitchen, DEFAULT_KITCHEN_STATE);
 assert.equal(fresh.version, SESSION_STATE_VERSION);
-assert.equal(SAVE_SCHEMA_VERSION, 10);
+assert.equal(SAVE_SCHEMA_VERSION, 11);
 assert.equal(getInventoryQuantity(fresh.gameplay.inventory, "potato"), 0);
 assert.equal(fresh.gameplay.kitchen.starterLemons, 6);
 assert.equal(fresh.gameplay.kitchen.stoveRepaired, false);

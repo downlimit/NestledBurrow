@@ -31,6 +31,7 @@ export function createInventoryGainPresentation(scene, {
   slotAreas,
   getGameplayState = () => null,
   onChange = () => {},
+  presentation = null,
 } = {}) {
   const activeLabels = new Map();
   const activeIcons = new Set();
@@ -61,6 +62,7 @@ export function createInventoryGainPresentation(scene, {
       .setDepth(HUD_DEPTH + 20)
       .setScrollFactor(0)
       .setScale(INVENTORY_GAIN_ICON_HOLD_SCALE);
+    presentation?.addObjects?.(container);
     const pair = {
       container,
       outline,
@@ -108,6 +110,7 @@ export function createInventoryGainPresentation(scene, {
       }).setDepth(HUD_DEPTH + 21).setScrollFactor(0);
       entry = { key, text, aggregate };
       activeLabels.set(key, entry);
+      presentation?.addObjects?.(text);
     } else {
       scene.tweens.killTweensOf(entry.text);
       entry.aggregate = aggregate;

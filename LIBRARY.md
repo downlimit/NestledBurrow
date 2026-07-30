@@ -16,7 +16,7 @@
 | готовка, кухня, вывеска, гости, монеты | `systems/tavern-service.md` | `cookingDomain.js`, `kitchenInteractionRuntime.js`, `facilityRuntime.js`, `guestRuntime.js`, `tavernServiceRuntime.js`, `coinRuntime.js` | `check:cooking`, `check:guest`, `check:facilities`, `check:task-049` |
 | строительство, стены, перенос, коллайдеры, pivot, авторинг | `systems/build-and-authoring.md` | `buildModeRuntime.js`, `buildWorldGeometry.js`, `editorAuthoringRuntime.js`, `assetProfiles.js`, `startingLayout.js` | `check:build-mode`, `check:authoring`, `check:task-044` |
 | save, migration, NEW GAME, browser draft | `systems/persistence.md` | `gameSessionState.js`, `sessionPersistence.js`, `inventoryDomain.js`, `authoringBackup.js` | `check:inventory`, `check:progress`, `check:authoring`, `check:task-049` |
-| HUD, inventory presentation, localization, audio, day/night, visual presentation | `systems/presentation.md` | `gameHud.js`, `inventoryRuntime.js`, `inventoryGainPresentation.js`, `transientMessageRuntime.js`, `interactionHud.js`, `localization/`, `audioRuntime.js` | `check:inventory`, `check:hud`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-049`, `check:visual` |
+| HUD, inventory/combat loadout presentation and drag, localization, audio, day/night, visual presentation | `systems/presentation.md` | `gameHud.js`, `inventoryRuntime.js`, `combatLoadoutRuntime.js`, `loadoutDragCoordinator.js`, `inventoryModeRuntime.js`, `inventoryGainPresentation.js`, `transientMessageRuntime.js`, `interactionHud.js`, `localization/`, `audioRuntime.js` | `check:inventory`, `check:hud`, `check:task-051`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-049`, `check:visual` |
 
 ## Межсистемные задачи
 
