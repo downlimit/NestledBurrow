@@ -23,7 +23,7 @@ export const INVENTORY_QUANTITY_DEPTH = HUD_DEPTH + 22;
 export const INVENTORY_WATER_BAR_WIDTH = 4;
 export const INVENTORY_WATER_BAR_HEIGHT = 16;
 export const INVENTORY_HUD_AREA = Object.freeze({
-  x: 41,
+  x: 43,
   y: 156,
   width: INVENTORY_SLOT_COUNT * INVENTORY_SLOT_SIZE + (INVENTORY_SLOT_COUNT - 1) * INVENTORY_SLOT_GAP,
   height: INVENTORY_SLOT_SIZE,
@@ -34,6 +34,18 @@ export const INVENTORY_SLOT_AREAS = Object.freeze(Array.from({ length: INVENTORY
   width: INVENTORY_SLOT_SIZE,
   height: INVENTORY_SLOT_SIZE,
 })));
+
+export function inventorySlotLabelScreenPosition(rect, {
+  x = 0,
+  y = 0,
+  scaleX = 1,
+  scaleY = 1,
+} = {}) {
+  return {
+    x: Math.round(x + (rect.x + 2) * scaleX),
+    y: Math.round(y + (rect.y + 2) * scaleY),
+  };
+}
 
 const TOOL_VISIBLE_MS = 1000;
 const TOOL_FADE_MS = 1000;
@@ -103,25 +115,41 @@ export function createInventoryRuntime(scene, options = {}) {
     onInventoryGain = () => {},
     isSlotItemHidden = () => false,
     setThrowAimTarget = () => {},
+    loadoutDragCoordinator = null,
   } = options;
 
-  const hudGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 4).setScrollFactor(0);
-  const slotItemGraphics = INVENTORY_SLOT_AREAS.map(() => scene.add.graphics().setDepth(HUD_DEPTH + 5).setScrollFactor(0));
+  const presentationContainer = scene.add.container(0, 0).setDepth(HUD_DEPTH + 4).setScrollFactor(0);
+  const hudGraphics = scene.add.graphics().setScrollFactor(0);
+  const slotLabelGraphics = INVENTORY_SLOT_AREAS.map(() => scene.add.graphics()
+    .setDepth(HUD_DEPTH + 28)
+    .setScrollFactor(0));
+  const slotItemGraphics = INVENTORY_SLOT_AREAS.map(() => scene.add.graphics().setScrollFactor(0));
   const slotItemImages = INVENTORY_SLOT_AREAS.map(() => scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0)
-    .setOrigin(0).setDepth(HUD_DEPTH + 5).setScrollFactor(0).setVisible(false));
+    .setOrigin(0).setScrollFactor(0).setVisible(false));
   const slotQuantityGraphics = INVENTORY_SLOT_AREAS.map(() => scene.add.graphics()
     .setDepth(INVENTORY_QUANTITY_DEPTH)
     .setScrollFactor(0));
-  const dragGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 7).setScrollFactor(0).setVisible(false);
-  const dragImage = scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0).setOrigin(0).setDepth(HUD_DEPTH + 7).setScrollFactor(0).setVisible(false);
+  const dragGraphics = scene.add.graphics().setScrollFactor(0).setVisible(false);
+  const dragImage = scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0).setOrigin(0).setScrollFactor(0).setVisible(false);
   const heldGraphics = scene.add.graphics().setDepth(900).setVisible(false);
   const heldImage = scene.add.image(0, 0, FARMING_TEXTURE_KEY, 0).setOrigin(0).setDepth(900).setVisible(false);
-  const waterBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 6).setScrollFactor(0).setVisible(false);
+  const waterBarGraphics = scene.add.graphics().setScrollFactor(0).setVisible(false);
   const slotZones = INVENTORY_SLOT_AREAS.map((rect, index) => createSlotZone(scene, rect, index));
+  presentationContainer.add([
+    hudGraphics,
+    ...slotItemGraphics,
+    ...slotItemImages,
+    waterBarGraphics,
+    ...slotZones,
+    dragGraphics,
+    dragImage,
+  ]);
   const worldVisuals = new Map();
   const motions = new Map();
 
   let destroyed = false;
+  let presentationVisible = true;
+  let presentationInputEnabled = true;
   let selectedIndex = null;
   let lastSelectedIndex = null;
   let selectedAtMs = 0;
@@ -140,7 +168,23 @@ export function createInventoryRuntime(scene, options = {}) {
     return gameplay()?.worldItems ?? [];
   }
 
+  function panelVisible() {
+    return !destroyed && !isSuppressed() && presentationVisible;
+  }
+
   function active() {
+    return panelVisible() && presentationInputEnabled;
+  }
+
+  function loadoutDragActive() {
+    return panelVisible() && Boolean(loadoutDragCoordinator?.isEnabled?.());
+  }
+
+  function pointerActive() {
+    return active() || loadoutDragActive();
+  }
+
+  function worldPresentationActive() {
     return !destroyed && !isSuppressed();
   }
 
@@ -157,8 +201,12 @@ export function createInventoryRuntime(scene, options = {}) {
       .setInteractive({ useHandCursor: true });
     zone.on("pointerdown", (pointer, _localX, _localY, event) => {
       stop(pointer, event);
-      if (!active()) return;
+      if (!pointerActive()) return;
       const current = inventory()?.slots?.[index] ?? null;
+      if (loadoutDragActive()) {
+        if (current) loadoutDragCoordinator.begin("peaceful", index, pointer, event);
+        return;
+      }
       if (!current) {
         setSelection(null);
         selectedAtMs = scene.time.now;
@@ -295,9 +343,11 @@ export function createInventoryRuntime(scene, options = {}) {
 
   function render() {
     if (destroyed) return;
-    const visible = active();
+    const visible = panelVisible();
+    presentationContainer.setVisible(visible);
     hudGraphics.clear().setVisible(visible);
-    slotZones.forEach((zone) => visible ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive());
+    slotZones.forEach((zone) => pointerActive() ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive());
+    slotLabelGraphics.forEach((graphics) => graphics.clear());
     slotItemGraphics.forEach((graphics) => graphics.clear().setVisible(visible));
     slotItemImages.forEach((image) => image.setVisible(false));
     slotQuantityGraphics.forEach((graphics) => graphics.clear().setVisible(visible));
@@ -307,15 +357,16 @@ export function createInventoryRuntime(scene, options = {}) {
       dragImage.setVisible(false);
       heldGraphics.clear().setVisible(false);
       heldImage.setVisible(false);
+      syncScreenLabels();
       return;
     }
     const slots = inventory()?.slots ?? [];
     INVENTORY_SLOT_AREAS.forEach((rect, index) => {
       const selected = selectedIndex === index;
       hudGraphics.fillStyle(HUD_COLORS.panel, 0.9).fillRect(rect.x, rect.y, rect.width, rect.height);
-      hudGraphics.lineStyle(selected ? 2 : 1, selected ? 0xf0c45c : HUD_COLORS.border, selected ? 1 : 0.9)
-        .strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
-      drawBitmapTextInto(hudGraphics, rect.x + 2, rect.y + 2, index === 9 ? "0" : String(index + 1), {
+      hudGraphics.lineStyle(selected ? 2 : 1, selected ? 0xf0c45c : HUD_COLORS.border, selected ? 1 : 0.9);
+      hudGraphics.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+      drawBitmapTextInto(slotLabelGraphics[index], 0, 0, index === 9 ? "0" : String(index + 1), {
         color: selected ? 0xf0c45c : HUD_COLORS.light,
         shadow: 0,
       });
@@ -325,8 +376,8 @@ export function createInventoryRuntime(scene, options = {}) {
         const text = String(item.quantity);
         drawBitmapTextInto(
           slotQuantityGraphics[index],
-          rect.x + rect.width - measureBitmapText(text) - 2,
-          rect.y + 13,
+          0,
+          0,
           text,
           { shadow: 0 },
         );
@@ -340,6 +391,7 @@ export function createInventoryRuntime(scene, options = {}) {
       graphics.setScale(1).setAlpha(alpha);
       image.setAlpha(alpha);
     });
+    syncScreenLabels();
   }
 
   function renderDrag(x, y) {
@@ -354,16 +406,40 @@ export function createInventoryRuntime(scene, options = {}) {
 
   function update(time, deltaMs) {
     if (destroyed) return;
+    syncScreenLabels();
     updateMotions(Math.max(0, Number(deltaMs) || 0));
     syncWorldVisuals();
     collectNearbyWorldItems();
     updateHeldItem(Number(time) || scene.time.now);
   }
 
+  function syncScreenLabels() {
+    const visible = panelVisible() && presentationContainer.visible && presentationContainer.alpha > 0.001;
+    const scaleX = presentationContainer.scaleX || 1;
+    const scaleY = presentationContainer.scaleY || 1;
+    const alpha = presentationContainer.alpha;
+    const slots = inventory()?.slots ?? [];
+    INVENTORY_SLOT_AREAS.forEach((rect, index) => {
+      const labelPosition = inventorySlotLabelScreenPosition(rect, presentationContainer);
+      slotLabelGraphics[index]
+        .setPosition(labelPosition.x, labelPosition.y)
+        .setAlpha(alpha)
+        .setVisible(visible);
+      const text = shouldRenderInventoryQuantity(slots[index]) ? String(slots[index].quantity) : "";
+      slotQuantityGraphics[index]
+        .setPosition(
+          Math.round(presentationContainer.x + (rect.x + rect.width - 2) * scaleX - measureBitmapText(text)),
+          Math.round(presentationContainer.y + (rect.y + 13) * scaleY),
+        )
+        .setAlpha(alpha)
+        .setVisible(visible && text.length > 0);
+    });
+  }
+
   function updateHeldItem(nowMs) {
     heldGraphics.clear().setVisible(false);
     heldImage.setVisible(false);
-    if (!active() || selectedIndex === null) return;
+    if (!worldPresentationActive() || selectedIndex === null) return;
     const item = inventory()?.slots?.[selectedIndex] ?? null;
     const character = getPlayerCharacter?.();
     const sprite = character?.sprite;
@@ -573,6 +649,52 @@ export function createInventoryRuntime(scene, options = {}) {
   scene.input.on("pointercancel", handlePointerCancel);
   scene.input.keyboard?.on?.("keydown", handleKeyDown);
   scene.events.on("update", update);
+
+  const presentation = {
+    getTransformTarget: () => presentationContainer,
+    addObjects(...objects) {
+      presentationContainer.add(objects.flat().filter(Boolean));
+    },
+    setVisible(value) {
+      presentationVisible = Boolean(value);
+      if (!presentationVisible) handlePointerCancel();
+      presentationContainer.setVisible(panelVisible());
+      syncScreenLabels();
+    },
+    setInputEnabled(value) {
+      presentationInputEnabled = Boolean(value);
+      if (!presentationInputEnabled) handlePointerCancel();
+      slotZones.forEach((zone) => pointerActive() ? zone.setInteractive({ useHandCursor: true }) : zone.disableInteractive());
+    },
+    isInputEnabled: () => presentationInputEnabled,
+    syncScreenLabels,
+    getState: () => ({
+      x: presentationContainer.x,
+      y: presentationContainer.y,
+      scale: presentationContainer.scaleX,
+      alpha: presentationContainer.alpha,
+      visible: panelVisible(),
+      inputEnabled: presentationInputEnabled,
+      labelScreenScale: 1,
+    }),
+  };
+
+  function handleLoadoutChange(result) {
+    if (selectedIndex !== null && (
+      (result?.from?.panel === "peaceful" && result.from.index === selectedIndex)
+      || (result?.to?.panel === "peaceful" && result.to.index === selectedIndex)
+    )) {
+      setSelection(null);
+    }
+    render();
+  }
+
+  const unregisterLoadoutPanel = loadoutDragCoordinator?.registerPanel?.("peaceful", {
+    presentation,
+    slotAreas: INVENTORY_SLOT_AREAS,
+    onChange: handleLoadoutChange,
+  });
+
   render();
   syncWorldVisuals();
 
@@ -580,6 +702,7 @@ export function createInventoryRuntime(scene, options = {}) {
     render,
     update,
     dropSlot,
+    presentation,
     selectSlot(index) {
       const next = Number(index);
       if (!Number.isInteger(next) || next < 0 || next >= INVENTORY_SLOT_COUNT) return false;
@@ -601,7 +724,7 @@ export function createInventoryRuntime(scene, options = {}) {
         item && isSlotItemHidden(index, item.id) ? [index] : []
       )),
       quantityLabels: (inventory()?.slots ?? []).flatMap((item, slotIndex) => (
-        shouldRenderInventoryQuantity(item) ? [{ slotIndex, text: String(item.quantity), depth: INVENTORY_QUANTITY_DEPTH }] : []
+        shouldRenderInventoryQuantity(item) ? [{ slotIndex, text: String(item.quantity), depth: INVENTORY_QUANTITY_DEPTH, screenScale: 1 }] : []
       )),
       waterBars: (inventory()?.slots ?? []).flatMap((item, slotIndex) => (
         item?.id === "water-bucket"
@@ -612,10 +735,18 @@ export function createInventoryRuntime(scene, options = {}) {
           ) }]
           : []
       )),
+      presentation: presentation.getState(),
       worldItems: worldItems().map((item) => ({ ...item, item: cloneInventoryItem(item.item) })),
     }),
     isPointInHud(x, y) {
-      return active() && isPointInRect(x, y, INVENTORY_HUD_AREA);
+      if (!pointerActive()) return false;
+      const scaleX = presentationContainer.scaleX || 1;
+      const scaleY = presentationContainer.scaleY || 1;
+      return isPointInRect(
+        (x - presentationContainer.x) / scaleX,
+        (y - presentationContainer.y) / scaleY,
+        INVENTORY_HUD_AREA,
+      );
     },
     destroy() {
       if (destroyed) return;
@@ -626,19 +757,15 @@ export function createInventoryRuntime(scene, options = {}) {
       scene.input.off("pointercancel", handlePointerCancel);
       scene.input.keyboard?.off?.("keydown", handleKeyDown);
       scene.events.off("update", update);
-      slotZones.forEach((zone) => zone.destroy());
-      slotItemGraphics.forEach((graphics) => graphics.destroy());
-      slotItemImages.forEach((image) => image.destroy());
-      slotQuantityGraphics.forEach((graphics) => graphics.destroy());
+      unregisterLoadoutPanel?.();
       for (const visual of worldVisuals.values()) visual.destroy();
       worldVisuals.clear();
       motions.clear();
-      hudGraphics.destroy();
-      dragGraphics.destroy();
-      dragImage.destroy();
+      presentationContainer.destroy(true);
+      slotLabelGraphics.forEach((graphics) => graphics.destroy());
+      slotQuantityGraphics.forEach((graphics) => graphics.destroy());
       heldGraphics.destroy();
       heldImage.destroy();
-      waterBarGraphics.destroy();
     },
   };
 }

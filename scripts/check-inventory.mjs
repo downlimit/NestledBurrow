@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   INVENTORY_SLOT_COUNT,
+  COMBAT_LOADOUT_SLOT_COUNT,
+  LOADOUT_PANELS,
   addInventoryItem,
+  createEmptyCombatLoadout,
   createFreshInventory,
   createInventoryItem,
   createNewGameInventory,
   getInventoryQuantity,
   normalizeInventory,
+  normalizeCombatLoadout,
   normalizeWorldItems,
   swapInventorySlots,
+  swapLoadoutSlots,
   takeInventorySlot,
 } from "../src/inventoryDomain.js";
 import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
@@ -41,6 +46,32 @@ assert(inventory.slots.slice(4).every((item) => item === null));
 const newGameInventory = createNewGameInventory();
 assert.equal(getInventoryQuantity(newGameInventory, "potato-seed"), 4);
 assert.equal(getInventoryQuantity(newGameInventory, "potato"), 0);
+const combatLoadout = createEmptyCombatLoadout();
+assert.equal(COMBAT_LOADOUT_SLOT_COUNT, 10);
+assert.equal(combatLoadout.slots.length, 10);
+assert(combatLoadout.slots.every((item) => item === null));
+const loadoutInventory = createNewGameInventory();
+const equipped = swapLoadoutSlots(
+  { inventory: loadoutInventory, combatLoadout },
+  { panel: LOADOUT_PANELS.PEACEFUL, index: 0 },
+  { panel: LOADOUT_PANELS.COMBAT, index: 4 },
+);
+assert.equal(equipped.mutated, true);
+assert.equal(loadoutInventory.slots[0], null);
+assert.equal(combatLoadout.slots[4].id, "axe");
+const unequipped = swapLoadoutSlots(
+  { inventory: loadoutInventory, combatLoadout },
+  { panel: LOADOUT_PANELS.COMBAT, index: 4 },
+  { panel: LOADOUT_PANELS.PEACEFUL, index: 0 },
+);
+assert.equal(unequipped.mutated, true);
+assert.equal(loadoutInventory.slots[0].id, "axe");
+assert.equal(combatLoadout.slots[4], null);
+assert.deepEqual(
+  normalizeCombatLoadout({ slots: [createInventoryItem("axe")] }, { reservedToolIds: ["axe"] }).slots,
+  Array.from({ length: COMBAT_LOADOUT_SLOT_COUNT }, () => null),
+  "normalization cannot duplicate a tool across peaceful inventory and combat loadout",
+);
 
 assert.equal(addInventoryItem(inventory, createInventoryItem("wood", 3)).status, "inserted");
 assert.equal(addInventoryItem(inventory, createInventoryItem("wood", 2)).status, "stacked");
@@ -55,7 +86,7 @@ assert.equal(normalizeInventory({ slots: [...inventory.slots, createInventoryIte
 assert.deepEqual(normalizeWorldItems([{ id: "dropped-item-1", item: { id: "wood", quantity: 2 }, x: 20, y: 30 }]), [{ id: "dropped-item-1", item: { id: "wood", kind: "loot", quantity: 2 }, x: 20, y: 30 }]);
 
 assert.equal(INVENTORY_SLOT_AREAS.length, 10);
-assert.equal(INVENTORY_HUD_AREA.x, 41);
+assert.equal(INVENTORY_HUD_AREA.x, 43);
 assert.equal(INVENTORY_HUD_AREA.y, 156);
 assert.equal(INVENTORY_HUD_AREA.width, 238);
 assert.equal(shouldRenderInventoryQuantity(createInventoryItem("lemonade", 1)), true, "single consumables keep a visible quantity label");
@@ -115,6 +146,7 @@ const serialized = JSON.parse(serializeSessionEnvelope(migrated.state));
 assert.equal(serialized.schemaVersion, SAVE_SCHEMA_VERSION);
 assert.equal(serialized.state.version, SESSION_STATE_VERSION);
 assert("inventory" in serialized.state.gameplay);
+assert("combatLoadout" in serialized.state.gameplay);
 assert("worldItems" in serialized.state.gameplay);
 assert(!("wood" in serialized.state.gameplay));
 assert(!("stone" in serialized.state.gameplay));
@@ -143,7 +175,10 @@ assert(runtimeSource.includes("findNearestFreePoint"));
 assert(runtimeSource.includes("TOOL_VISIBLE_MS = 1000") && runtimeSource.includes("TOOL_FADE_MS = 1000"));
 assert(runtimeSource.includes("drawBitmapTextInto"), "slot labels use crisp project bitmap glyphs");
 assert(runtimeSource.includes('item.id === "water-bucket"') && runtimeSource.includes("renderWaterBar(rect)"), "bucket fill renders vertically inside its own slot");
+assert(runtimeSource.includes("presentationContainer") && runtimeSource.includes("setInputEnabled(value)"), "screen hotbar exposes the presentation-only transform/input adapter");
+assert(runtimeSource.includes("worldPresentationActive()"), "held world-space item visibility stays outside panel interactivity");
 assert(hudSource.includes("createInventoryRuntime(scene"));
+assert(hudSource.includes("presentation: inventoryHud.presentation"), "inventory gain cues share the hotbar transform");
 assert(!hudSource.includes("woodValueText"), "old resource text counters are removed");
 
-console.log("inventory checks passed: ten slots, swap/drop ownership, migration, atomic rewards and input geometry");
+console.log("inventory checks passed: ten slots, swap/drop ownership, presentation adapter, migration, atomic rewards and input geometry");

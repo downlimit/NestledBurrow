@@ -8,6 +8,8 @@
 - Stop before merge only for explicit `не сливать`, report-only work or a real blocker.
 - Draft PR before acceptance is allowed only by explicit user command; it is not a development or CI gate.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
+- Late Task-number collision: when a number was free at work start and becomes occupied on `origin/main` before publication finishes, Codex may assign the current `ROADMAP.md` next-free number without further confirmation. Rebase onto current `origin/main` and update the Task identity, task-specific files/checks, branch, commit and PR consistently while preserving the accepted name and scope.
+- If the collided number already has a PR, close that obsolete PR, establish one replacement Ready PR, and then remove the obsolete remote branch. Treat this replacement as the same publication cycle.
 
 ## Context
 
@@ -81,6 +83,7 @@ Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and
 5. Before `принято`: no Ready PR, auto-merge or merge. For ChatGPT direct implementation, `препроверка принята` authorizes only the task branch and Draft preview carrier.
 6. After `принято`: applicable publication route once, Ready PR, native auto-merge and final-head CI.
 7. Player-visible repair returns to preview only when it changes the accepted experience.
+8. Private-repository preview fallback: after accepted managed preview, PR CI verifies and uploads the exact-head static `dist` artifact and posts its authenticated link. Anonymous CDN publication remains the public-repository route.
 
 ## GitHub
 
