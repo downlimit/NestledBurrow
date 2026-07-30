@@ -420,7 +420,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   createDebrisRuntime() {
-    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout, getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null });
+    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout, getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null, getGameplayTuning: () => this.gameplayTuning, onPersistentMutation: (result) => { this.gameHud?.render?.(); if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory); this.interactionRuntime?.refresh?.(); this.saveSession(); } });
   }
 
   createFacilityRuntime() {
@@ -927,6 +927,7 @@ class WorldScene extends Phaser.Scene {
       getSelectedItem: () => this.frameMeleeItem,
       getControllerMoveDirection: () => this.getControllerMoveDirection(),
       playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      damageLog: (resourceId, multiplier) => this.debrisRuntime?.damageLog?.(resourceId, multiplier),
       isSuppressed: () => Boolean(
         this.sleeping
         || this.optionsOpen

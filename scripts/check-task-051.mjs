@@ -24,6 +24,7 @@ import {
   createAutoTargetSearchSnapshot,
   createMeleeCombatState,
   createMeleeGeometrySnapshot,
+  doesMeleeSnapshotIntersectRect,
   effectiveKnockbackDistance,
   isCombatAnchorInMeleeSnapshot,
   knockbackEaseOut,
@@ -36,6 +37,7 @@ import {
   dashDistanceForInterval,
   HELD_WEAPON_SCALE,
   heldWeaponAngleDeg,
+  MELEE_HIT_SOUND_STAGGER_MS,
   meleeSectorPoints,
   SWORD_CAMERA_MAX_FOLLOW_SPEED,
   SWORD_SWING_VISUAL_SPEED_MULTIPLIER,
@@ -48,7 +50,8 @@ import {
   inventoryStackLimit,
 } from "../src/inventoryDomain.js";
 import { inventoryItemAsset } from "../src/inventoryVisuals.js";
-import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
+import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
+import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
 import { SAVE_SCHEMA_VERSION, deserializeSessionEnvelope, serializeSessionEnvelope } from "../src/sessionPersistence.js";
 import { aggregateTransientNumber } from "../src/transientNumberPresentation.js";
 
@@ -71,7 +74,9 @@ assert.equal(sword.autoTargetSearchScale, 1.5);
 assert.equal(sword.baseHalfWidthPx, 7);
 assert.equal(sword.knockbackDistancePx, 15);
 assert.equal(SWORD_ATTACK_TIME_SCALE, 0.85);
-assert.equal(sword.forcedMoveDistancePx, 17);
+assert.equal(sword.forcedMoveDistancePx, 12.75);
+assert.equal(MELEE_HIT_SOUND_STAGGER_MS, 50, "multiple hit sounds are staggered by 50 ms");
+assert.equal(axe.resourceDamageMultiplier, 0.5, "battle axe deals half peaceful axe damage to logs");
 assert.equal(sword.forcedMoveDurationMs, 42.5);
 assert.equal(sword.movementLockAfterHitMs, 212.5);
 assert.deepEqual(sword.steps.map(({ windupMs, totalDurationMs, hitArcDeg }) => [windupMs, totalDurationMs, hitArcDeg]), [
@@ -99,6 +104,18 @@ assert.deepEqual(axe.steps.map(({ windupMs, totalDurationMs, hitArcDeg }) => [wi
   [150, 500, 60], [150, 500, 142.5], [150, 500, 225], [150, 500, 360],
 ]);
 assert.equal(axe.steps[1].hitArcDeg, (axe.steps[0].hitArcDeg + axe.steps[2].hitArcDeg) / 2);
+
+const combatResourceSession = createFreshGameSessionState();
+const combatLog = RESOURCE_OBJECTS.find((definition) => definition.profileId === "log-small");
+const combatEnergyBefore = combatResourceSession.gameplay.currentEnergy;
+const combatLogResult = hitResourceNode(combatResourceSession, combatLog.id, {
+  action: "chop",
+  damage: DEFAULT_GAMEPLAY_TUNING.axeDamage * axe.resourceDamageMultiplier,
+  energyPerHit: 0,
+  tuning: DEFAULT_GAMEPLAY_TUNING,
+});
+assert.equal(combatLogResult.progress, 0.5 / DEFAULT_GAMEPLAY_TUNING.smallLogChopHp);
+assert.equal(combatLogResult.currentEnergy, combatEnergyBefore, "battle axe log damage does not spend peaceful work energy");
 
 const loadedUris = [];
 preloadMeleeAssets({ load: { image: (key, uri) => loadedUris.push([key, uri]) } });
@@ -209,6 +226,17 @@ assert.equal(swordState.phase, "cooldown");
 advanceMeleeCombat(swordState, 1);
 assert.equal(swordState.phase, "idle");
 
+const weaponSwitchState = createMeleeCombatState();
+requestMeleeAttack(weaponSwitchState, "sword", { x: 1, y: 0 }, { x: 0, y: 1 });
+advanceMeleeCombat(weaponSwitchState, 42.5);
+assert.deepEqual(requestMeleeAttack(weaponSwitchState, "battle-axe", { x: 0, y: -1 }, { x: 1, y: 0 }), {
+  status: "switched", accepted: true, previousWeaponId: "sword", weaponId: "battle-axe", stepIndex: 0,
+});
+assert.equal(weaponSwitchState.weaponId, "battle-axe");
+assert.equal(weaponSwitchState.stepIndex, 0);
+assert.equal(weaponSwitchState.buffered, false, "switching weapons clears the old combo buffer");
+assert.deepEqual(advanceMeleeCombat(weaponSwitchState, 150), [{ type: "hit", weaponId: "battle-axe", stepIndex: 0 }]);
+
 const axeState = createMeleeCombatState();
 requestMeleeAttack(axeState, "battle-axe", { x: 0, y: 1 }, { x: 1, y: 0 });
 assert.equal(advanceMeleeCombat(axeState, 149).length, 0);
@@ -229,6 +257,8 @@ assert.equal(isCombatAnchorInMeleeSnapshot(sector, boundary), true, "range and a
 assert.equal(isCombatAnchorInMeleeSnapshot(sector, { x: boundary.x * 1.001, y: boundary.y * 1.001 }), false);
 assert.equal(isCombatAnchorInMeleeSnapshot(sector, { x: 0, y: 6 }), true, "wide flat base crosses the character body");
 assert.equal(isCombatAnchorInMeleeSnapshot(sector, { x: -0.01, y: 0 }), false, "hybrid shape does not damage behind its flat base");
+assert.equal(doesMeleeSnapshotIntersectRect(sector, { left: 36, top: -4, right: 44, bottom: 4 }), true, "sword shape intersects a stone collider in front");
+assert.equal(doesMeleeSnapshotIntersectRect(sector, { left: -12, top: -4, right: -4, bottom: 4 }), false, "stone collider behind the sword does not ring");
 const fullCircle = createMeleeGeometrySnapshot({ ...sector, arcDeg: 360 });
 assert.equal(isCombatAnchorInMeleeSnapshot(fullCircle, { x: -16, y: 0 }), true);
 const alreadyHit = new Set();
@@ -270,8 +300,8 @@ assert.equal(effectiveKnockbackDistance(45, 0.5), 22.5);
 assert.equal(effectiveKnockbackDistance(45, 1), 0);
 assert(knockbackEaseOut(0.25) > 0.5 && knockbackEaseOut(0.75) > 0.9, "knockback starts sharply and eases out");
 
-assert.equal(dashDistanceForInterval(sword, 0, 21.25), 8.5);
-assert.equal(dashDistanceForInterval(sword, 21.25, 21.25), 8.5);
+assert.equal(dashDistanceForInterval(sword, 0, 21.25), 6.375);
+assert.equal(dashDistanceForInterval(sword, 21.25, 21.25), 6.375);
 assert.equal(dashDistanceForInterval(sword, 42.5, 50), 0);
 assert.equal(dashDistanceForInterval(axe, 0, 500), 0);
 const swordAngleState = { weaponId: "sword", stepIndex: 0, direction: { x: 1, y: 0 } };
@@ -334,13 +364,19 @@ assert(gameHud.includes("mode.mode !== INVENTORY_MODES.COMBAT"), "combat action 
 assert(combatLoadout.includes('slot.kind === "action" && slot.id === actionId'), "number slots cannot resolve as combat actions");
 assert(!readFileSync("src/meleeRuntime.js", "utf8").includes("addEventListener"));
 const meleeRuntime = readFileSync("src/meleeRuntime.js", "utf8");
+assert(meleeRuntime.includes('result.status === "started" || result.status === "switched"'), "switching weapons immediately starts the new presentation");
 assert(meleeRuntime.includes("activeTrails") && meleeRuntime.includes("meleeBodyCenter(getPlayerCharacter()?.motor?.position)"), "melee shapes follow the player's body center");
 assert(meleeRuntime.includes("movementSpeedMultiplier") && meleeRuntime.includes("updateKnockbacks(deltaMs)") && meleeRuntime.includes("updateDummyReturn(deltaMs)"));
 assert(meleeRuntime.includes("createActorNavigation") && meleeRuntime.includes("findGridPath"), "dummy return uses collision-aware A*");
 assert(meleeRuntime.includes("isDummyPathBlocked") && meleeRuntime.includes("blockedWaitMs >= TRAINING_DUMMY.blockedPathWaitMs"), "dummy waits one cell before a blocker for three seconds before replanning");
 assert(meleeRuntime.includes("dummyNavigationEnvironment(true)") && meleeRuntime.includes("getFootBox(motor.position"), "dummy movement preserves player collision");
-assert(meleeRuntime.includes("setTintFill(0xffffff)") && meleeRuntime.includes("hitLiftPx: TRAINING_DUMMY.hitReaction.heightPx"), "dummy flashes white and hops two presentation pixels on hit");
+assert(meleeRuntime.includes("ensureWhiteSilhouetteTexture") && meleeRuntime.includes("trainingDummy.flashSprite.setVisible(true)") && meleeRuntime.includes(".setAlpha(0.7)"), "dummy shows a 70%-opaque renderer-independent white silhouette on hit");
 assert(meleeRuntime.includes("hold: TRAINING_DUMMY.hitReaction.holdMs") && meleeRuntime.includes("yoyo: true"), "dummy hit hop holds at its peak and lands within the 200 ms reaction");
+assert(meleeRuntime.includes('groupKey === "resource:ruby-node"') && meleeRuntime.includes('"melee-metal-ring"'), "sword and battle axe ring when their real shape intersects stone or ruby");
+assert(meleeRuntime.includes('startsWith("resource:log-")') && meleeRuntime.includes('"melee-log-thud"'), "logs produce a dull melee impact");
+assert(meleeRuntime.includes("index * MELEE_HIT_SOUND_STAGGER_MS"), "multiple hit sounds from one swing use the shared stagger interval");
+assert(meleeRuntime.includes('hitEffect: "training-dummy-hit"') && meleeRuntime.includes("target.hitEffect ?? combatEffect"), "training dummy routes its own impact sound through the shared stagger queue");
+assert(main.includes("damageLog: (resourceId, multiplier)") && meleeRuntime.includes("profile.resourceDamageMultiplier"), "battle axe resource damage routes only through log damage");
 const persistence = readFileSync("src/sessionPersistence.js", "utf8");
 assert(!persistence.includes('"sword"') && !persistence.includes('"battle-axe"'), "save migration does not inject melee weapons");
 

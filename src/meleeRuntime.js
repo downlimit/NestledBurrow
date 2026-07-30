@@ -9,6 +9,7 @@ import {
   createMeleeCombatState,
   createMeleeGeometrySnapshot,
   currentMeleeStep,
+  doesMeleeSnapshotIntersectRect,
   effectiveKnockbackDistance,
   isMeleeStepActive,
   knockbackEaseOut,
@@ -34,6 +35,7 @@ const HELD_Y_OFFSET = 8;
 export const HELD_WEAPON_SCALE = 0.5;
 export const SWORD_SWING_VISUAL_SPEED_MULTIPLIER = 3;
 export const SWORD_CAMERA_MAX_FOLLOW_SPEED = 90;
+export const MELEE_HIT_SOUND_STAGGER_MS = 50;
 
 export function createMeleeRuntime(scene, {
   worldLayout,
@@ -42,6 +44,7 @@ export function createMeleeRuntime(scene, {
   getControllerMoveDirection = () => ({ x: 0, y: 0 }),
   isSuppressed = () => false,
   playEffect = () => {},
+  damageLog = () => ({ status: "ignored", mutated: false }),
   getCombatTargets = () => [],
   debugEnabled = MELEE_DEBUG_ENABLED,
 } = {}) {
@@ -57,6 +60,7 @@ export function createMeleeRuntime(scene, {
   const hitTargetIds = new Set();
   const activeTrails = new Set();
   const activeKnockbacks = new Set();
+  const pendingHitSoundTimers = new Set();
   let destroyed = false;
   let savedFacingTurnSpeed = null;
   let savedMovementMaxSpeed = null;
@@ -64,6 +68,7 @@ export function createMeleeRuntime(scene, {
   let cameraStabilizeRemainingMs = 0;
   let lastHitSnapshot = null;
   let lastFoundTargetCount = 0;
+  let lastStoneHitCount = 0;
   let pendingPointerAction = null;
   let dummyHitTween = null;
   let dummyFlashTimer = null;
@@ -85,7 +90,7 @@ export function createMeleeRuntime(scene, {
       getControllerMoveDirection(),
       character?.motor?.movement?.facingDirection,
     );
-    if (result.status === "started") {
+    if (result.status === "started" || result.status === "switched") {
       startStepPresentation();
       updateHeldPresentation();
     }
@@ -177,7 +182,6 @@ export function createMeleeRuntime(scene, {
     const profile = getMeleeWeaponProfile(event.weaponId);
     const step = profile?.steps?.[event.stepIndex];
     if (!motor || !profile || !step) return;
-    playEffect(event.weaponId === "sword" ? "sword-hit" : "battle-axe-hit");
     const facingAxis = profile.turnMode === MELEE_TURN_MODES.instant
       ? state.direction
       : motor.movement.facingDirection;
@@ -200,6 +204,8 @@ export function createMeleeRuntime(scene, {
     const snapshot = createMeleeGeometrySnapshot({ ...initialSnapshot, facingAxis: autoTarget.direction });
     lastHitSnapshot = snapshot;
     const targets = queryMeleeTargets(snapshot, combatTargets(), hitTargetIds);
+    const resourceHits = meleeResourceHits(snapshot);
+    lastStoneHitCount = resourceHits.filter((hit) => hit.material === "metal").length;
     lastFoundTargetCount = targets.length;
     for (const target of targets) {
       hitTargetIds.add(target.id);
@@ -212,6 +218,17 @@ export function createMeleeRuntime(scene, {
       });
       scheduleKnockback(target, profile, origin);
     }
+    if (event.weaponId === "battle-axe") {
+      for (const hit of resourceHits.filter((entry) => entry.material === "log")) {
+        damageLog(hit.id, profile.resourceDamageMultiplier);
+      }
+    }
+    const combatEffect = event.weaponId === "sword" ? "sword-hit" : "battle-axe-hit";
+    const effects = [
+      ...targets.map((target) => target.hitEffect ?? combatEffect),
+      ...resourceHits.map((hit) => hit.material === "metal" ? "melee-metal-ring" : "melee-log-thud"),
+    ];
+    playHitSoundSequence(effects.length ? effects : [combatEffect]);
     createTrail(snapshot, step);
     renderDebug(snapshot, targets.length);
   }
@@ -232,6 +249,29 @@ export function createMeleeRuntime(scene, {
         activeTrails.delete(trail);
         trail.destroy();
       },
+    });
+  }
+
+  function meleeResourceHits(snapshot) {
+    return (worldLayout?.getWorldObjectColliders?.() ?? []).flatMap((collider) => {
+      const groupKey = String(collider.groupKey);
+      const material = groupKey.startsWith("resource:log-") ? "log"
+        : groupKey.startsWith("resource:stone-") || groupKey === "resource:ruby-node" ? "metal"
+          : null;
+      return material && doesMeleeSnapshotIntersectRect(snapshot, collider.rect)
+        ? [{ id: collider.id, material }]
+        : [];
+    });
+  }
+
+  function playHitSoundSequence(effectTypes) {
+    effectTypes.forEach((effectType, index) => {
+      if (index === 0) { playEffect(effectType); return; }
+      const timer = scene.time.delayedCall(index * MELEE_HIT_SOUND_STAGGER_MS, () => {
+        pendingHitSoundTimers.delete(timer);
+        if (!destroyed) playEffect(effectType);
+      });
+      pendingHitSoundTimers.add(timer);
     });
   }
 
@@ -296,6 +336,7 @@ export function createMeleeRuntime(scene, {
         y: trainingDummy.position.y + TRAINING_DUMMY.damageAnchorOffset.y,
       },
       knockbackResistance: TRAINING_DUMMY.knockbackResistance,
+      hitEffect: "training-dummy-hit",
       applyKnockbackDelta: moveDummyBy,
       onHit: ({ atMs }) => {
         trainingDummy.lastHitAtMs = atMs;
@@ -309,9 +350,9 @@ export function createMeleeRuntime(scene, {
     dummyHitTween?.stop?.();
     dummyFlashTimer?.remove?.();
     trainingDummy.hitLiftPx = 0;
-    dummySprite.setTintFill(0xffffff);
+    trainingDummy.flashSprite.setVisible(true);
     dummyFlashTimer = scene.time.delayedCall(TRAINING_DUMMY.hitReaction.flashMs, () => {
-      dummySprite.clearTint();
+      trainingDummy.flashSprite.setVisible(false);
       dummyFlashTimer = null;
     });
     dummyHitTween = scene.tweens.add({
@@ -502,6 +543,7 @@ export function createMeleeRuntime(scene, {
       direction: { ...state.direction },
       lastHitSnapshot,
       lastFoundTargetCount,
+      lastStoneHitCount,
       damageNumbers: damageNumbers.getState(),
       dummy: trainingDummyTarget(),
     }),
@@ -520,10 +562,13 @@ export function createMeleeRuntime(scene, {
       scene.input.off("pointerdown", onPointerDown);
       heldImage.destroy();
       for (const trail of activeTrails) trail.destroy();
+      for (const timer of pendingHitSoundTimers) timer.remove?.();
+      pendingHitSoundTimers.clear();
       activeTrails.clear();
       debugGraphics.destroy();
       dummyHitTween?.stop?.();
       dummyFlashTimer?.remove?.();
+      trainingDummy.flashSprite.destroy();
       dummySprite.destroy();
       damageNumbers.destroy();
     },
@@ -558,12 +603,18 @@ export function meleeSectorPoints(snapshot, segments = 20) {
 function createTrainingDummy(scene, worldLayout) {
   const asset = TRAINING_DUMMY.asset;
   const position = findTrainingDummyPoint(worldLayout);
+  const flashTextureKey = ensureWhiteSilhouetteTexture(scene, asset);
   const sprite = scene.add.image(position.x, position.y, asset.textureKey)
     .setOrigin(0)
     .setDepth(worldDepthFromAnchorY(
       position.y + asset.depthAnchor.y,
       TRAINING_DUMMY.id,
     ));
+  const flashSprite = scene.add.image(position.x, position.y, flashTextureKey)
+    .setOrigin(0)
+    .setDepth(sprite.depth + 0.01)
+    .setAlpha(0.7)
+    .setVisible(false);
   worldLayout?.setWorldObjectCollider?.(
     TRAINING_DUMMY.id,
     {
@@ -575,7 +626,23 @@ function createTrainingDummy(scene, worldLayout) {
     "melee:training-dummy",
     { kind: "training-dummy", fixed: true },
   );
-  return { sprite, position, home: { ...position }, lastHitAtMs: -Infinity, returnMotion: null, hitLiftPx: 0 };
+  return { sprite, flashSprite, position, home: { ...position }, lastHitAtMs: -Infinity, returnMotion: null, hitLiftPx: 0 };
+}
+
+function ensureWhiteSilhouetteTexture(scene, asset) {
+  const key = `${asset.textureKey}.hit-flash`;
+  if (scene.textures.exists(key)) return key;
+  const source = scene.textures.get(asset.textureKey).getSourceImage();
+  const texture = scene.textures.createCanvas(key, asset.width, asset.height);
+  const context = texture.getContext();
+  context.clearRect(0, 0, asset.width, asset.height);
+  context.drawImage(source, 0, 0);
+  context.globalCompositeOperation = "source-in";
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, asset.width, asset.height);
+  context.globalCompositeOperation = "source-over";
+  texture.refresh();
+  return key;
 }
 
 function dummyColliderAt(position) {
@@ -596,8 +663,10 @@ function boxesOverlap(a, b) {
 }
 
 function syncTrainingDummy(trainingDummy, worldLayout) {
-  const { position, sprite } = trainingDummy;
-  sprite.setPosition(position.x, position.y - trainingDummy.hitLiftPx).setDepth(worldDepthFromAnchorY(position.y + TRAINING_DUMMY.asset.depthAnchor.y, TRAINING_DUMMY.id));
+  const { position, sprite, flashSprite } = trainingDummy;
+  const depth = worldDepthFromAnchorY(position.y + TRAINING_DUMMY.asset.depthAnchor.y, TRAINING_DUMMY.id);
+  sprite.setPosition(position.x, position.y - trainingDummy.hitLiftPx).setDepth(depth);
+  flashSprite.setPosition(sprite.x, sprite.y).setDepth(depth + 0.01);
   worldLayout?.setWorldObjectCollider?.(TRAINING_DUMMY.id, dummyColliderAt(position), "melee:training-dummy", { kind: "training-dummy", fixed: true });
 }
 

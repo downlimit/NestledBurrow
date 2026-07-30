@@ -20,6 +20,11 @@ export function createMeleeCombatState() {
 export function requestMeleeAttack(state, weaponId, moveDirection, currentFacing) {
   const profile = getMeleeWeaponProfile(weaponId);
   if (!profile) return { status: "not-melee", accepted: false };
+  if (state.weaponId && state.weaponId !== profile.id && state.phase !== "idle") {
+    const previousWeaponId = state.weaponId;
+    beginMeleeStep(state, profile, 0, moveDirection, currentFacing);
+    return { status: "switched", accepted: true, previousWeaponId, weaponId: profile.id, stepIndex: 0 };
+  }
   if (state.phase === "cooldown") return { status: "cooldown", accepted: false };
   if (isMeleeStepActive(state)) {
     if (state.buffered) return { status: "buffer-full", accepted: false };
@@ -119,6 +124,31 @@ export function isCombatAnchorInMeleeSnapshot(snapshot, anchor) {
   if (distance > snapshot.radius + EPSILON) return false;
   if (snapshot.arcDeg >= 360 || distance <= EPSILON) return true;
   return pointInPolygonInclusive(target, meleeShapePoints(snapshot));
+}
+
+export function doesMeleeSnapshotIntersectRect(snapshot, rect) {
+  const box = normalizedRect(rect);
+  if (!box) return false;
+  if (snapshot.arcDeg >= 360) {
+    const x = Math.max(box.left, Math.min(snapshot.origin.x, box.right));
+    const y = Math.max(box.top, Math.min(snapshot.origin.y, box.bottom));
+    return Math.hypot(x - snapshot.origin.x, y - snapshot.origin.y) <= snapshot.radius + EPSILON;
+  }
+  const polygon = meleeShapePoints(snapshot);
+  const corners = [
+    { x: box.left, y: box.top }, { x: box.right, y: box.top },
+    { x: box.right, y: box.bottom }, { x: box.left, y: box.bottom },
+  ];
+  if (corners.some((point) => pointInPolygonInclusive(point, polygon))) return true;
+  if (polygon.some((point) => pointInRectInclusive(point, box))) return true;
+  for (let polygonIndex = 0; polygonIndex < polygon.length; polygonIndex += 1) {
+    const a = polygon[polygonIndex];
+    const b = polygon[(polygonIndex + 1) % polygon.length];
+    for (let edgeIndex = 0; edgeIndex < corners.length; edgeIndex += 1) {
+      if (segmentsIntersect(a, b, corners[edgeIndex], corners[(edgeIndex + 1) % corners.length])) return true;
+    }
+  }
+  return false;
 }
 
 export function meleeBodyCenter(position) {
@@ -266,4 +296,28 @@ function pointInPolygonInclusive(point, polygon) {
 function distanceSquared(a, b) {
   const point = finitePoint(a);
   return (point.x - b.x) ** 2 + (point.y - b.y) ** 2;
+}
+
+function normalizedRect(rect) {
+  const values = [rect?.left, rect?.top, rect?.right, rect?.bottom].map(Number);
+  if (!values.every(Number.isFinite)) return null;
+  return { left: Math.min(values[0], values[2]), top: Math.min(values[1], values[3]), right: Math.max(values[0], values[2]), bottom: Math.max(values[1], values[3]) };
+}
+
+function pointInRectInclusive(point, rect) {
+  return point.x >= rect.left - EPSILON && point.x <= rect.right + EPSILON
+    && point.y >= rect.top - EPSILON && point.y <= rect.bottom + EPSILON;
+}
+
+function segmentsIntersect(a, b, c, d) {
+  const cross = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const abC = cross(a, b, c);
+  const abD = cross(a, b, d);
+  const cdA = cross(c, d, a);
+  const cdB = cross(c, d, b);
+  const crosses = ((abC <= EPSILON && abD >= -EPSILON) || (abC >= -EPSILON && abD <= EPSILON))
+    && ((cdA <= EPSILON && cdB >= -EPSILON) || (cdA >= -EPSILON && cdB <= EPSILON));
+  return crosses
+    && Math.max(Math.min(a.x, b.x), Math.min(c.x, d.x)) <= Math.min(Math.max(a.x, b.x), Math.max(c.x, d.x)) + EPSILON
+    && Math.max(Math.min(a.y, b.y), Math.min(c.y, d.y)) <= Math.min(Math.max(a.y, b.y), Math.max(c.y, d.y)) + EPSILON;
 }

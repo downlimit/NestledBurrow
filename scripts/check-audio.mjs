@@ -23,11 +23,14 @@ const task047Effects = [
   "menu-close", "cooking-success", "cooking-miss", "dish-serve", "dish-take",
   "sprint-on", "sprint-off", "tavern-open", "tavern-close", "guest-happy",
   "guest-angry", "coin-toss", "purchase",
-  "sword-hit", "battle-axe-hit",
+  "sword-hit", "melee-metal-ring", "melee-log-thud", "training-dummy-hit", "battle-axe-hit",
 ];
 assert(task047Effects.every((id) => PROCEDURAL_SFX[id]?.voices?.length > 0), "every requested gameplay event has a procedural effect");
 assert(PROCEDURAL_SFX["crop-stage"].voices.every((voice) => voice.gain <= 0.016), "crop growth stays deliberately quiet");
 assert.notDeepEqual(PROCEDURAL_SFX["sword-hit"], PROCEDURAL_SFX["battle-axe-hit"], "sword and battle axe use distinct synthetic strike profiles");
+assert(PROCEDURAL_SFX["melee-metal-ring"].voices.length >= 3, "melee hits on stone and ruby layer synthetic metallic partials");
+assert(PROCEDURAL_SFX["melee-log-thud"].noise?.filterFrequency <= 500, "melee hits on logs stay deliberately dull");
+assert(PROCEDURAL_SFX["training-dummy-hit"].noise?.filterFrequency <= 700, "training dummy has a distinct stuffed-frame impact");
 assert.equal(resourceEffectType(getResourceProfile("log-small"), "hit"), "wood-hit");
 assert.equal(resourceEffectType(getResourceProfile("stone-small"), "cleared"), "stone-break");
 assert.equal(resourceEffectType(getResourceProfile("ruby-node"), "hit"), "ruby-hit");

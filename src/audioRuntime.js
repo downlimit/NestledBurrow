@@ -28,6 +28,19 @@ export const PROCEDURAL_SFX = Object.freeze({
     { oscillator: "sawtooth", startFrequency: 980, endFrequency: 260, durationSeconds: 0.085, gain: 0.042 },
     { oscillator: "sine", startFrequency: 1420, endFrequency: 720, durationSeconds: 0.07, gain: 0.024, delaySeconds: 0.01 },
   ], { durationSeconds: 0.055, gain: 0.02, filterFrequency: 3200, seed: 79 }),
+  "melee-metal-ring": effect([
+    { oscillator: "triangle", startFrequency: 1280, endFrequency: 980, durationSeconds: 0.34, gain: 0.046 },
+    { oscillator: "sine", startFrequency: 1840, endFrequency: 1460, durationSeconds: 0.46, gain: 0.028, delaySeconds: 0.012 },
+    { oscillator: "sine", startFrequency: 2460, endFrequency: 1980, durationSeconds: 0.28, gain: 0.014, delaySeconds: 0.024 },
+  ], { durationSeconds: 0.045, gain: 0.012, filterFrequency: 5200, seed: 89 }),
+  "melee-log-thud": effect([
+    { oscillator: "triangle", startFrequency: 118, endFrequency: 54, durationSeconds: 0.14, gain: 0.064 },
+    { oscillator: "square", startFrequency: 76, endFrequency: 42, durationSeconds: 0.1, gain: 0.024, delaySeconds: 0.012 },
+  ], { durationSeconds: 0.09, gain: 0.034, filterFrequency: 460, seed: 97 }),
+  "training-dummy-hit": effect([
+    { oscillator: "triangle", startFrequency: 176, endFrequency: 86, durationSeconds: 0.11, gain: 0.052 },
+    { oscillator: "square", startFrequency: 104, endFrequency: 66, durationSeconds: 0.075, gain: 0.018, delaySeconds: 0.01 },
+  ], { durationSeconds: 0.075, gain: 0.028, filterFrequency: 680, seed: 101 }),
   "battle-axe-hit": effect([
     { oscillator: "triangle", startFrequency: 210, endFrequency: 48, durationSeconds: 0.17, gain: 0.075 },
     { oscillator: "square", startFrequency: 96, endFrequency: 38, durationSeconds: 0.14, gain: 0.032, delaySeconds: 0.018 },

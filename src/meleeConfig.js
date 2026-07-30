@@ -36,6 +36,7 @@ export const MELEE_WEAPON_PROFILES = Object.freeze({
   sword: Object.freeze({
     id: "sword",
     damage: 1,
+    resourceDamageMultiplier: 0,
     rangePx: 48,
     comboLength: 5,
     postComboCooldownMs: 700,
@@ -47,7 +48,7 @@ export const MELEE_WEAPON_PROFILES = Object.freeze({
     baseHalfWidthPx: 7,
     knockbackDistancePx: 15,
     knockbackDurationMs: 180,
-    forcedMoveDistancePx: 17,
+    forcedMoveDistancePx: 12.75,
     forcedMoveDurationMs: 42.5,
     movementLockAfterHitMs: 212.5,
     itemAsset: MELEE_WEAPON_SPRITE_ASSETS.swordItem,
@@ -63,6 +64,7 @@ export const MELEE_WEAPON_PROFILES = Object.freeze({
   "battle-axe": Object.freeze({
     id: "battle-axe",
     damage: 2,
+    resourceDamageMultiplier: 0.5,
     rangePx: 48,
     comboLength: 4,
     postComboCooldownMs: 1000,
