@@ -59,6 +59,15 @@ assert.equal(state.stableMode, INVENTORY_MODES.COMBAT, "held Alt never toggles t
 assert.equal(state.altDown, false);
 
 state = reduceInventoryModeState(state, { type: "ALT_DOWN" });
+state = reduceInventoryModeState(state, { type: "ALT_HOLD" });
+state = reduceInventoryModeState(state, { type: "ALT_UP", stableMode: INVENTORY_MODES.PEACEFUL });
+assert.equal(state.mode, INVENTORY_MODES.PEACEFUL, "a completed transfer may activate the panel under the release pointer");
+
+state = reduceInventoryModeState(state, { type: "ALT_DOWN" });
+state = reduceInventoryModeState(state, { type: "ALT_UP" });
+assert.equal(state.mode, INVENTORY_MODES.COMBAT, "short Alt still toggles after the transfer-selected mode");
+
+state = reduceInventoryModeState(state, { type: "ALT_DOWN" });
 state = reduceInventoryModeState(state, { type: "ALT_UP" });
 assert.equal(state.mode, INVENTORY_MODES.PEACEFUL, "second short Alt toggles COMBAT back to PEACEFUL");
 
@@ -181,8 +190,13 @@ assert.deepEqual(
 );
 assert(combatSource.includes("inventorySlotLabelScreenPosition(rect, presentationContainer)"), "combat number labels reuse the peaceful slot anchor");
 assert(dragSource.includes("swapLoadoutSlots") && hudSource.includes("createLoadoutDragCoordinator"), "both panels share one atomic loadout drag coordinator");
+assert(modeSource.includes("stable && state.mode === INVENTORY_MODES.COMBAT"), "stable combat HUD keeps drag-to-world enabled without holding Alt");
+assert(dragSource.includes("onAimTarget(pointer)") && hudSource.includes("throwAimIndicator.show(worldPointFromPointer(scene, pointer))"), "combat drag reuses the peaceful world-throw aim indicator");
+assert(dragSource.includes("releasePanelAt") && modeSource.includes("stableMode: releaseMode"), "a successful transfer activates the panel under the Alt-release pointer");
 assert(modeSource.includes("interactionBlocked: !state.suppressed") && modeSource.includes("state.mode !== INVENTORY_MODES.PEACEFUL"), "mode owner separates Alt/combat interaction blocking from modal suppression");
 assert(hudSource.includes("isInventoryInteractionBlocked: () => inventoryModeHud.getState().interactionBlocked"), "GameHud exposes the canonical interaction block from the mode owner");
+assert(hudSource.includes("inventoryHud?.clearSelection?.()"), "entering combat clears the peaceful tool selection and its target highlight");
+assert(hudSource.includes("getGameplayState?.()?.sleeping") && hudSource.includes("scene.facilityRuntime?.isUsing?.()") && hudSource.includes("scene.cookingRuntime?.isActive?.()"), "peaceful-only sleep, facility use and cooking suppress combat inventory switching");
 assert(mainSource.includes('"inventory-action-blocked"') && mainSource.includes("isInventoryInteractionBlocked"), "interaction HUD is hidden whenever inventory mode blocks interaction");
 assert(mainSource.includes("interactionBlocked || this.suppressNextInteract"), "frame input ignores interaction while Alt or combat mode blocks it");
 assert(!persistenceSource.includes("LOADOUT_EDIT") && !persistenceSource.includes("inventoryMode"), "UI mode remains transient and outside save data");

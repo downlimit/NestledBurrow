@@ -66,7 +66,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 
 assert.equal(SESSION_STATE_VERSION, 11);
 assert.equal(SAVE_SCHEMA_VERSION, 11);
-assert.deepEqual(INVENTORY_TOOL_IDS, ["axe", "pickaxe", "hoe", "water-bucket"]);
+assert.deepEqual(INVENTORY_TOOL_IDS, ["axe", "pickaxe", "hoe", "water-bucket", "sword", "battle-axe"]);
 for (const id of ["pickaxe", "water-bucket", "lemon-seed", "lemon", "sliced-potato", "lemonade", "fried-potato-dish"]) {
   assert(INVENTORY_ITEM_IDS.includes(id), `inventory contains ${id}`);
 }
@@ -243,7 +243,8 @@ assert.equal(migrated.status, "loaded");
 assert.equal(migrated.state.flags["migration.task049WarningPending"], true);
 assert.deepEqual(
   migrated.state.gameplay.inventory.slots.filter((item) => item?.kind === "tool").map((item) => item.id).sort(),
-  [...INVENTORY_TOOL_IDS].sort(),
+  ["axe", "pickaxe", "hoe", "water-bucket"].sort(),
+  "legacy migration keeps the four historical starter tools and does not add melee weapons",
 );
 assert.equal(new Set(migrated.state.gameplay.inventory.slots.filter((item) => item?.kind === "tool").map((item) => item.id)).size, 4);
 assert.equal(migrated.state.gameplay.farm.waterBucket.currentWater, 6);

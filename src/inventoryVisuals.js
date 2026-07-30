@@ -1,6 +1,7 @@
 import { drawLog, drawRuby, drawStone } from "./resourceVisuals.js";
 import { FARMING_FRAMES, FARMING_TEXTURE_KEY } from "./farmingConfig.js";
 import { LEMONADE_TEXTURE_KEY, lemonadeInventoryFrame } from "./lemonadeConfig.js";
+import { getMeleeWeaponProfile } from "./meleeConfig.js";
 
 export function drawInventoryItem(graphics, itemId, options = {}) {
   const color = (value) => options.colorOverride ?? value;
@@ -24,6 +25,8 @@ export function drawInventoryItem(graphics, itemId, options = {}) {
 }
 
 export function inventoryItemAsset(itemId, gameplay = {}) {
+  const meleeAsset = getMeleeWeaponProfile(itemId)?.itemAsset;
+  if (meleeAsset) return { textureKey: meleeAsset.textureKey, frame: 0 };
   const lemonadeFrame = lemonadeInventoryFrame(itemId, gameplay?.farm?.waterBucket?.currentWater ?? 0);
   if (lemonadeFrame !== null) return { textureKey: LEMONADE_TEXTURE_KEY, frame: lemonadeFrame };
   if (itemId === "potato-seed") return { textureKey: FARMING_TEXTURE_KEY, frame: FARMING_FRAMES.potatoSeeds };

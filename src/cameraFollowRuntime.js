@@ -15,28 +15,48 @@ export function cameraFollowStep(state, {
   speed,
   movingSpeedThreshold,
   deltaSeconds,
+  maxPresentationSpeed = null,
   tuning = DEFAULT_CAMERA_TUNING,
 }) {
   const config = normalizeCameraTuning(tuning);
   const delta = Math.min(0.1, Math.max(0, Number(deltaSeconds) || 0));
+  const presentation = limitedPresentationPosition(
+    state.presentation ?? presentationPosition,
+    presentationPosition,
+    maxPresentationSpeed,
+    delta,
+  );
   const alpha = 1 - Math.exp(-config.backPointFollowRate * delta);
   const back = {
-    x: state.back.x + (presentationPosition.x - state.back.x) * alpha,
-    y: state.back.y + (presentationPosition.y - state.back.y) * alpha,
+    x: state.back.x + (presentation.x - state.back.x) * alpha,
+    y: state.back.y + (presentation.y - state.back.y) * alpha,
   };
   const front = {
-    x: presentationPosition.x + (presentationPosition.x - back.x),
-    y: presentationPosition.y + (presentationPosition.y - back.y),
+    x: presentation.x + (presentation.x - back.x),
+    y: presentation.y + (presentation.y - back.y),
   };
   const moving = Number(speed) > Number(movingSpeedThreshold);
   const progressDelta = delta / config.cameraLeadTransitionSeconds;
   const progress = Math.min(1, Math.max(0, state.progress + (moving ? progressDelta : -progressDelta)));
   const weight = progress * progress * (3 - 2 * progress);
-  const target = {
+  const rawTarget = {
     x: back.x + (front.x - back.x) * weight,
     y: back.y + (front.y - back.y) * weight,
   };
-  return { back, front, target, progress, moving };
+  const target = limitedPresentationPosition(state.target ?? rawTarget, rawTarget, maxPresentationSpeed, delta);
+  return { presentation, back, front, target, progress, moving };
+}
+
+function limitedPresentationPosition(previous, current, maxSpeed, deltaSeconds) {
+  const speed = Number(maxSpeed);
+  if (!(speed > 0) || !Number.isFinite(speed) || !(deltaSeconds > 0)) return { ...current };
+  const deltaX = current.x - previous.x;
+  const deltaY = current.y - previous.y;
+  const distance = Math.hypot(deltaX, deltaY);
+  const maximumDistance = speed * deltaSeconds;
+  if (distance <= maximumDistance || distance < 0.0001) return { ...current };
+  const scale = maximumDistance / distance;
+  return { x: previous.x + deltaX * scale, y: previous.y + deltaY * scale };
 }
 
 export class CameraFollowRuntime {
@@ -55,6 +75,7 @@ export class CameraFollowRuntime {
 
   reset(presentationPosition) {
     this.state = {
+      presentation: { ...presentationPosition },
       back: { ...presentationPosition },
       front: { ...presentationPosition },
       target: { ...presentationPosition },
@@ -64,12 +85,13 @@ export class CameraFollowRuntime {
     this.followTarget?.setPosition(presentationPosition.x, presentationPosition.y);
   }
 
-  update({ presentationPosition, speed, deltaMs }) {
+  update({ presentationPosition, speed, deltaMs, maxPresentationSpeed = null }) {
     this.state = cameraFollowStep(this.state, {
       presentationPosition,
       speed,
       movingSpeedThreshold: this.movingSpeedThreshold,
       deltaSeconds: (Number(deltaMs) || 0) / 1000,
+      maxPresentationSpeed,
       tuning: this.tuning,
     });
     this.followTarget.setPosition(this.state.target.x, this.state.target.y);
@@ -78,6 +100,7 @@ export class CameraFollowRuntime {
 
   getState() {
     return {
+      presentation: { ...this.state.presentation },
       back: { ...this.state.back },
       front: { ...this.state.front },
       target: { ...this.state.target },

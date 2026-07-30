@@ -203,7 +203,10 @@ export function createFreshGameSessionState(options = {}) {
     entities: createDictionary(),
     flags: createDictionary(),
     dialogue: createDialogueState(),
-    gameplay: normalizeGameplayState({ inventory: createNewGameInventory(), worldItems: [] }),
+    gameplay: normalizeGameplayState({
+      inventory: createNewGameInventory(),
+      worldItems: options.initialWorldItems ?? [],
+    }),
   };
   ensureSessionEntity(state, playerId);
   for (const entityId of options.initialEntityIds ?? options.entityIds ?? DEFAULT_ENTITY_IDS) ensureSessionEntity(state, entityId);

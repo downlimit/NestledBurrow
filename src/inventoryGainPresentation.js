@@ -2,6 +2,7 @@ import { HUD_DEPTH } from "./hud.js";
 import { FARMING_TEXTURE_KEY } from "./farmingConfig.js";
 import { drawInventoryItem, inventoryItemAsset, renderInventoryItem } from "./inventoryVisuals.js";
 import { createManagedText, setManagedTextStyle } from "./textResolution.js";
+import { aggregateTransientNumber, restartTransientNumberTween } from "./transientNumberPresentation.js";
 
 export const INVENTORY_GAIN_HOLD_MS = 700;
 export const INVENTORY_GAIN_DROP_MS = 300;
@@ -13,18 +14,13 @@ const TINT_MODE_FILL = 1;
 
 export function aggregateInventoryGain(active, { itemId, slotIndex, added, nowMs }, durationMs = INVENTORY_GAIN_DURATION_MS) {
   const key = `${itemId}:${slotIndex}`;
-  const previous = active.get(key);
-  const amount = Math.max(1, Math.floor(Number(added) || 1));
-  const next = {
+  return aggregateTransientNumber(active, {
     key,
     itemId,
     slotIndex,
-    amount: (previous?.amount ?? 0) + amount,
-    startedAtMs: Number(nowMs) || 0,
-    expiresAtMs: (Number(nowMs) || 0) + durationMs,
-  };
-  active.set(key, next);
-  return next;
+    amount: added,
+    nowMs,
+  }, durationMs);
 }
 
 export function createInventoryGainPresentation(scene, {
@@ -112,7 +108,6 @@ export function createInventoryGainPresentation(scene, {
       activeLabels.set(key, entry);
       presentation?.addObjects?.(text);
     } else {
-      scene.tweens.killTweensOf(entry.text);
       entry.aggregate = aggregate;
     }
     const startY = rect.y - 9;
@@ -122,16 +117,13 @@ export function createInventoryGainPresentation(scene, {
       fontSize: "8px",
       color: "#fff3a6",
     }).setText(`+${aggregate.amount}`)
-      .setPosition(Math.round(rect.x + (rect.width - entry.text.width) / 2), startY)
-      .setAlpha(1)
       .setVisible(true);
-    scene.tweens.add({
-      targets: entry.text,
-      y: endY,
-      alpha: 0,
-      delay: INVENTORY_GAIN_HOLD_MS,
-      duration: INVENTORY_GAIN_DROP_MS,
-      ease: "Linear",
+    restartTransientNumberTween(scene, {
+      text: entry.text,
+      start: { x: rect.x + (rect.width - entry.text.width) / 2, y: startY },
+      end: { x: rect.x + (rect.width - entry.text.width) / 2, y: endY },
+      holdMs: INVENTORY_GAIN_HOLD_MS,
+      dropMs: INVENTORY_GAIN_DROP_MS,
       onComplete: () => {
         if (activeLabels.get(key) !== entry) return;
         activeLabels.delete(key);
