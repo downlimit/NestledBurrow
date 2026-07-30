@@ -98,6 +98,7 @@ import { createKitchenInteractionRuntime } from "./kitchenInteractionRuntime.js"
 import { installWorldE2EBridge } from "./e2eBridge.js";
 import { UiVisibilityCoordinator } from "./uiVisibilityCoordinator.js";
 import { addInventoryItem, createInventoryItem } from "./inventoryDomain.js";
+import { createGameCanvasInputGuard } from "./gameCanvasInputGuard.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
@@ -386,7 +387,7 @@ class WorldScene extends Phaser.Scene {
         this.saveSession();
       },
     });
-    this.uiVisibilityCoordinator = new UiVisibilityCoordinator(); this.uiVisibilityCoordinator.register(this.interactionHud, ["gameplay-overlay", "option-sensitive", "merchant-active"]); this.uiVisibilityCoordinator.register(this.merchantRuntime, ["gameplay-overlay", "option-sensitive"]);
+    this.uiVisibilityCoordinator = new UiVisibilityCoordinator(); this.uiVisibilityCoordinator.register(this.interactionHud, ["gameplay-overlay", "option-sensitive", "merchant-active", "inventory-action-blocked"]); this.uiVisibilityCoordinator.register(this.merchantRuntime, ["gameplay-overlay", "option-sensitive"]);
     applyGameplayTuning(this.sessionState, this.gameplayTuning);
     this.syncPlayerEnergyTarget();
     this.interactionRuntime = createInteractionRuntime({
@@ -841,6 +842,7 @@ class WorldScene extends Phaser.Scene {
       this.pendingTask049MigrationWarning = false;
       this.saveSession();
     }
+    this.syncGameplayHudVisibility();
   }
 
   createFarmingRuntime() {
@@ -1067,6 +1069,7 @@ class WorldScene extends Phaser.Scene {
     this.uiVisibilityCoordinator?.setClassHidden("gameplay-overlay", gameplayOverlay);
     this.uiVisibilityCoordinator?.setClassHidden("option-sensitive", this.optionsOpen);
     this.uiVisibilityCoordinator?.setClassHidden("merchant-active", this.merchantRuntime?.isActive?.());
+    this.uiVisibilityCoordinator?.setClassHidden("inventory-action-blocked", this.gameHud?.isInventoryInteractionBlocked?.() ?? false);
     if (this.gameHudHidden) this.mobileJoystick?.reset?.();
   }
 
@@ -2386,6 +2389,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   attachSceneListeners() {
+    this.gameCanvasInputGuard = createGameCanvasInputGuard(this.game.canvas);
     this.onFullscreenChange = () => {
       this.syncIntegerZoom();
       this.updateFullscreenHud();
@@ -2412,6 +2416,8 @@ class WorldScene extends Phaser.Scene {
   destroySceneListeners() {
     if (!this.sceneListenersAttached) return;
     this.sceneListenersAttached = false;
+    this.gameCanvasInputGuard?.destroy();
+    this.gameCanvasInputGuard = null;
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.mobileJoystick?.destroy();
@@ -2621,8 +2627,9 @@ class WorldScene extends Phaser.Scene {
     const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
     const mobileHeldResourceInteract = this.interactionHud?.isInteractHeld?.()
       && this.interactionRuntime?.getCurrentCandidate?.()?.kind === RESOURCE_INTERACTION_KIND;
+    const interactionBlocked = this.gameHud?.isInventoryInteractionBlocked?.() ?? false;
     this.frameActions = Object.freeze({
-      interact: this.suppressNextInteract ? false : (keyboardPressed || heldResourceInteract || mobilePressed || mobileHeldResourceInteract),
+      interact: interactionBlocked || this.suppressNextInteract ? false : (keyboardPressed || heldResourceInteract || mobilePressed || mobileHeldResourceInteract),
       primary: false,
       secondary: false,
     });

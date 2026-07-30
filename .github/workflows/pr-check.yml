@@ -179,6 +179,7 @@ jobs:
         run: npm run build -- --base=./
 
       - name: Publish preview branch
+        if: github.event.repository.private == false
         id: publish
         env:
           PREVIEW_BRANCH: preview-pr-${{ github.event.pull_request.number }}
@@ -203,6 +204,7 @@ jobs:
           echo "preview_url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
 
       - name: Verify public preview
+        if: github.event.repository.private == false
         env:
           PREVIEW_URL: ${{ steps.publish.outputs.preview_url }}
         run: |
@@ -219,6 +221,7 @@ jobs:
           exit 1
 
       - name: Publish preview link to PR
+        if: github.event.repository.private == false
         uses: actions/github-script@v7
         env:
           PREVIEW_URL: ${{ steps.publish.outputs.preview_url }}
@@ -226,6 +229,52 @@ jobs:
           script: |
             const marker = '<!-- nestled-burrow-direct-preview -->';
             const body = `${marker}\n## Игровая препроверка\n\n[Открыть игру](${process.env.PREVIEW_URL})\n\nЭто готовая статическая сборка текущего head. Ничего устанавливать или запускать не нужно.`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Verify private preview artifact
+        if: github.event.repository.private
+        run: grep -q '<title>NestledBurrow</title>' dist/index.html
+
+      - name: Upload private preview artifact
+        if: github.event.repository.private
+        id: private-preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-preview-pr-${{ github.event.pull_request.number }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish private preview artifact link to PR
+        if: github.event.repository.private
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.private-preview.outputs.artifact-url }}
+        with:
+          script: |
+            const marker = '<!-- nestled-burrow-direct-preview -->';
+            const body = `${marker}\n## Игровая препроверка\n\n[Скачать статическую сборку текущего head](${process.env.PREVIEW_URL})\n\nРепозиторий приватный, поэтому анонимный CDN недоступен. Архив содержит готовый \`dist\`; установка и сборка не требуются.`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,

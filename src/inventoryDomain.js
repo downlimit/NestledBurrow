@@ -1,4 +1,9 @@
 export const INVENTORY_SLOT_COUNT = 10;
+export const COMBAT_LOADOUT_SLOT_COUNT = 10;
+export const LOADOUT_PANELS = Object.freeze({
+  PEACEFUL: "peaceful",
+  COMBAT: "combat",
+});
 export const INVENTORY_TOOL_IDS = Object.freeze(["axe", "pickaxe", "hoe", "water-bucket"]);
 export const INVENTORY_ITEM_IDS = Object.freeze([
   ...INVENTORY_TOOL_IDS,
@@ -97,6 +102,38 @@ export function createNewGameInventory() {
   const inventory = createFreshInventory();
   inventory.slots[4] = createInventoryItem("potato-seed", 4);
   return inventory;
+}
+
+export function createEmptyCombatLoadout() {
+  return {
+    slots: Array.from({ length: COMBAT_LOADOUT_SLOT_COUNT }, () => null),
+  };
+}
+
+export function normalizeCombatLoadout(value = {}, { reservedToolIds = [] } = {}) {
+  assertPlainRecord(value, "Combat loadout");
+  const source = value.slots ?? createEmptyCombatLoadout().slots;
+  if (!Array.isArray(source)) throw new Error("Combat loadout slots must be an array");
+  const slots = Array.from({ length: COMBAT_LOADOUT_SLOT_COUNT }, () => null);
+  const seenTools = new Set(reservedToolIds);
+
+  source.slice(0, COMBAT_LOADOUT_SLOT_COUNT).forEach((raw, index) => {
+    if (raw === null || raw === undefined) return;
+    assertPlainRecord(raw, `Combat loadout slot ${index}`);
+    const id = normalizeItemId(raw.id);
+    const kind = itemKind(id);
+    const quantity = kind === "tool" ? 1 : normalizeQuantity(raw.quantity);
+    if (quantity > inventoryStackLimit(id)) {
+      throw new Error(`Combat loadout stack exceeds limit ${inventoryStackLimit(id)}: ${id}`);
+    }
+    if (kind === "tool") {
+      if (seenTools.has(id)) return;
+      seenTools.add(id);
+    }
+    slots[index] = { id, kind, quantity };
+  });
+
+  return { slots };
 }
 
 export function normalizeInventory(value = {}) {
@@ -298,6 +335,34 @@ export function swapInventorySlots(inventory, fromIndex, toIndex) {
   return { status: "swapped", mutated: true, fromIndex, toIndex };
 }
 
+export function swapLoadoutSlots({ inventory, combatLoadout }, from, to) {
+  const collections = {
+    [LOADOUT_PANELS.PEACEFUL]: inventory?.slots,
+    [LOADOUT_PANELS.COMBAT]: combatLoadout?.slots,
+  };
+  const fromSlots = collections[from?.panel];
+  const toSlots = collections[to?.panel];
+  if (!Array.isArray(fromSlots) || !Array.isArray(toSlots)) {
+    throw new Error("Loadout transfer requires peaceful and combat slot collections");
+  }
+  assertCollectionSlotIndex(from?.index, fromSlots.length, "Loadout source");
+  assertCollectionSlotIndex(to?.index, toSlots.length, "Loadout target");
+  if (from.panel === to.panel && from.index === to.index) {
+    return { status: "unchanged", mutated: false, from: { ...from }, to: { ...to } };
+  }
+  const item = fromSlots[from.index];
+  if (!item) return { status: "empty-slot", mutated: false, from: { ...from }, to: { ...to } };
+  fromSlots[from.index] = toSlots[to.index];
+  toSlots[to.index] = item;
+  return {
+    status: "loadout-swapped",
+    mutated: true,
+    from: { ...from },
+    to: { ...to },
+    item: cloneInventoryItem(item),
+  };
+}
+
 export function takeInventorySlot(inventory, slotIndex) {
   assertSlotIndex(slotIndex);
   const item = inventory.slots[slotIndex];
@@ -339,5 +404,11 @@ export function normalizeWorldItems(value = []) {
 function assertSlotIndex(index) {
   if (!Number.isInteger(index) || index < 0 || index >= INVENTORY_SLOT_COUNT) {
     throw new Error(`Inventory slot index must be in 0..${INVENTORY_SLOT_COUNT - 1}`);
+  }
+}
+
+function assertCollectionSlotIndex(index, slotCount, label) {
+  if (!Number.isInteger(index) || index < 0 || index >= slotCount) {
+    throw new Error(`${label} index must be in 0..${slotCount - 1}`);
   }
 }

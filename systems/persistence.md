@@ -8,7 +8,7 @@ This system separates player session progress from developer-authored project de
 
 `gameSessionState.js` owns JSON-safe normalized state. `sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, inventory, dropped items, resources, farm/water state, kitchen serving stock and repair, tavern sign, guest service snapshots and coins. Selected slot and in-flight presentation state are transient.
+Session data includes player/world progress, needs, peaceful inventory, combat loadout, dropped items, resources, farm/water state, kitchen serving stock and repair, tavern sign, guest service snapshots and coins. Selected slot and in-flight presentation state are transient.
 
 ## Authoring data
 
@@ -25,14 +25,15 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 - schema v6 resource counters migrate once into canonical inventory stacks in schema v7;
 - schema v9 migrates once to v10: watering can becomes the water bucket, missing tools are inserted without duplicates, legacy prepared/cooked outputs become inventory or deterministic kitchen-adjacent world items, and the serving boolean becomes typed stock;
 - schema v10 preserves active guest IDs and matching reservations; orphan reservations are discarded;
+- schema v10 migrates once to v11 by adding an empty ten-slot combat loadout; later drag swaps persist the single physical item owner across peaceful and combat slots;
 - the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
 - dropped items persist only stable ID, item payload and logical position;
-- selected slot, drag state, throw arc, gain feedback and fade timers are not persisted;
+- selected slot, in-flight drag state, throw arc, gain feedback and fade timers are not persisted;
 - authoring backup version is independent from session schema.
 
 ## Current baseline
 
-Schema v10 save/reload and migrations work. Inventory, dropped items, farm water/crops, kitchen stock/repair and active service snapshots survive reload. Authoring backups survive page reload and `NEW GAME`.
+Schema v11 save/reload and migrations work. Peaceful inventory, combat loadout, dropped items, farm water/crops, kitchen stock/repair and active service snapshots survive reload. Authoring backups survive page reload and `NEW GAME`.
 
 ## Not yet
 

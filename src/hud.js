@@ -10,6 +10,12 @@ export const HUD_COLORS = {
 };
 
 export const FULLSCREEN_HIT_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
+export const FULLSCREEN_PANEL_AREA = Object.freeze({
+  x: FULLSCREEN_HIT_AREA.x + 3,
+  y: FULLSCREEN_HIT_AREA.y + 3,
+  width: FULLSCREEN_HIT_AREA.width - 6,
+  height: FULLSCREEN_HIT_AREA.height - 6,
+});
 export const FULLSCREEN_ICON_RECT = Object.freeze({ x: GAME_WIDTH - 26, y: 12, size: 14 });
 export const BUILD_LABEL = Object.freeze({ x: GAME_WIDTH - 128, y: 8 });
 
@@ -44,6 +50,8 @@ export const HUD_GLYPHS = Object.freeze({
   x: ["00000", "00000", "10001", "01010", "00100", "01010", "10001"],
   y: ["00000", "00000", "10001", "10001", "01111", "00001", "01110"],
   z: ["00000", "00000", "11111", "00010", "00100", "01000", "11111"],
+  "<": ["00001", "00010", "00100", "01000", "00100", "00010", "00001"],
+  ">": ["10000", "01000", "00100", "00010", "00100", "01000", "10000"],
   ".": ["00000", "00000", "00000", "00000", "00000", "01100", "01100"],
   a: ["00000", "00000", "01110", "00001", "01111", "10001", "01111"],
   b: ["10000", "10000", "10110", "11001", "10001", "11001", "10110"],
@@ -120,8 +128,18 @@ export function drawFullscreenIcon(scene, active) {
 export function renderFullscreenIcon(graphics, active) {
   const { x, y, size } = FULLSCREEN_ICON_RECT;
   graphics.clear();
-  graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(FULLSCREEN_HIT_AREA.x + 3, FULLSCREEN_HIT_AREA.y + 3, 24, 24);
-  graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(FULLSCREEN_HIT_AREA.x + 3.5, FULLSCREEN_HIT_AREA.y + 3.5, 23, 23);
+  graphics.fillStyle(HUD_COLORS.panel, 0.78).fillRect(
+    FULLSCREEN_PANEL_AREA.x,
+    FULLSCREEN_PANEL_AREA.y,
+    FULLSCREEN_PANEL_AREA.width,
+    FULLSCREEN_PANEL_AREA.height,
+  );
+  graphics.lineStyle(1, HUD_COLORS.border, 0.9).strokeRect(
+    FULLSCREEN_PANEL_AREA.x + 0.5,
+    FULLSCREEN_PANEL_AREA.y + 0.5,
+    FULLSCREEN_PANEL_AREA.width - 1,
+    FULLSCREEN_PANEL_AREA.height - 1,
+  );
   graphics.fillStyle(HUD_COLORS.light, 0.95);
   const corners = active
     ? [[x + 5, y + 5, -1, -1], [x + size - 6, y + 5, 1, -1], [x + 5, y + size - 6, -1, 1], [x + size - 6, y + size - 6, 1, 1]]

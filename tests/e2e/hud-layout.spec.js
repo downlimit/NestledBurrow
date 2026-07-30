@@ -44,9 +44,10 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
     areas: {
       options: { x: 8, y: 4, width: 74, height: 30 },
       clock: { x: 120, y: 4, width: 80, height: 24 },
+      coins: { x: 238, y: 7, width: 46, height: 24 },
       fullscreen: { x: 286, y: 4, width: 30, height: 30 },
-      resources: { x: 41, y: 156, width: 238, height: 22 },
-      inventory: { x: 41, y: 156, width: 238, height: 22 },
+      resources: { x: 43, y: 156, width: 238, height: 22 },
+      inventory: { x: 43, y: 156, width: 238, height: 22 },
       energy: { x: 252, y: 38, width: 60, height: 68 },
       needs: { x: 252, y: 38, width: 60, height: 68 },
     },
