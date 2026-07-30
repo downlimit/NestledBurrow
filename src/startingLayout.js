@@ -1,9 +1,37 @@
-import { TILE_SIZE } from "./worldConfig.js";
+import { TILE_SIZE, TREES_TEXTURE_KEY } from "./worldConfig.js";
 import { WALL_COLLIDER_GROUPS, wallColliderGroup } from "./buildWorldGeometry.js";
 
 export const STARTING_LAYOUT_STORAGE_KEY = "nestledBurrow.startingLayout";
 export const STARTING_LAYOUT_VERSION = 1;
 export const STARTING_LAYOUT_SAVE_ENDPOINT = "__nestledburrow/save-starting-layout";
+
+const TREE_ITEM = Object.freeze({
+  id: "tree",
+  placement: "tree",
+  objectType: "plant",
+  resourceProfileId: "tree-planted",
+  labelKey: "hud:buildMode.assets.tree",
+  textureKey: TREES_TEXTURE_KEY,
+  frame: 0,
+});
+
+const TREE_POINTS = Object.freeze([
+  [48, 304], [128, 304], [224, 304],
+  [736, 304], [832, 304], [912, 304],
+]);
+
+// Keep fallback fixtures in this stable owner. startingLayoutDefault.js is
+// intentionally replaced by the in-game canonical-layout writer.
+export const STARTER_TREE_OBJECTS = Object.freeze(TREE_POINTS.map(([x, y], index) => Object.freeze({
+  id: `starter-tree-${String(index + 1).padStart(2, "0")}`,
+  kind: "plant",
+  item: TREE_ITEM,
+  point: Object.freeze({ x, y }),
+  bounds: Object.freeze({ left: x, right: x + 48, top: y, bottom: y + 64 }),
+  collider: true,
+  colliderBounds: Object.freeze({ left: x + 16, right: x + 32, top: y + 48, bottom: y + 64 }),
+  colliderGroup: "resource:tree-planted",
+})));
 
 const BUILD_KINDS = new Set(["wall", "wall-node", "ground", "floor", "carpet", "tree", "plant", "placed"]);
 
@@ -118,6 +146,7 @@ export function normalizeStartingLayout(value) {
     removedCanonicalWalls: normalizeStringArray(value.removedCanonicalWalls ?? [], "removedCanonicalWalls"),
     buildObjects,
     facilities: normalizeDefinitionArray(value.facilities ?? [], "facilities"),
+    furniture: normalizeDefinitionArray(value.furniture ?? [], "furniture"),
     beds: normalizeDefinitionArray(value.beds ?? [], "beds"),
   };
 }
@@ -133,6 +162,15 @@ function shouldCaptureBuildObject(scene, object) {
   return !scene.sessionState?.gameplay?.resourceNodes?.[object.id]?.cleared;
 }
 
+function isTemporaryStagingFacility(definition) {
+  return definition?.footprint?.y === -10000 && definition?.footprint?.x <= -10000;
+}
+
+function recoverTemporaryStagingFacilities(layout) {
+  const facilities = layout.facilities.filter((definition) => !isTemporaryStagingFacility(definition));
+  return facilities.length === layout.facilities.length ? layout : { ...layout, facilities };
+}
+
 export function captureStartingLayout(scene) {
   if (!scene?.buildPlacedObjects || !scene?.worldLayout) throw new Error("Build mode is not ready");
   const canonicalFloorKeys = scene.worldLayout.houseFloorTiles.map((tile) => scene.buildCellKey({
@@ -146,13 +184,19 @@ export function captureStartingLayout(scene) {
       const { sprites: _sprites, resourceDefinition: _resourceDefinition, resourceCleared: _resourceCleared, ...serializable } = object;
       return cloneJson(serializable);
     });
+  const facilities = scene.facilityRuntime?.getDefinitions?.() ?? [];
+  const stagedFacility = facilities.find(isTemporaryStagingFacility);
+  if (stagedFacility) {
+    throw new Error(`Facility ${stagedFacility.id} remains in a temporary staging position`);
+  }
   return normalizeStartingLayout({
     version: STARTING_LAYOUT_VERSION,
     nextBuildObjectId: Number(scene.nextBuildObjectId) || 0,
     removedCanonicalFloors: canonicalFloorKeys.filter((key) => !scene.floorSprites.has(key)),
     removedCanonicalWalls: canonicalWallIds.filter((id) => !scene.wallSprites.has(id)),
     buildObjects,
-    facilities: scene.facilityRuntime?.getDefinitions?.() ?? [],
+    facilities,
+    furniture: scene.meleeRuntime?.getStartingLayoutFurniture?.() ?? [],
     beds: scene.debrisRuntime?.getBedDefinitions?.() ?? [],
   });
 }
@@ -190,12 +234,18 @@ export async function saveStartingLayoutToProject(scene, {
   } catch (error) {
     throw markLocalLayoutSave(error, layout);
   }
+  storage?.removeItem?.(STARTING_LAYOUT_STORAGE_KEY);
   return layout;
 }
 
 export function loadStartingLayout(storage = globalThis.localStorage, projectDefault = null) {
   const source = storage?.getItem?.(STARTING_LAYOUT_STORAGE_KEY);
-  if (source) return normalizeStartingLayout(JSON.parse(source));
+  if (source) {
+    const layout = normalizeStartingLayout(JSON.parse(source));
+    const recovered = recoverTemporaryStagingFacilities(layout);
+    if (recovered !== layout) storage?.setItem?.(STARTING_LAYOUT_STORAGE_KEY, JSON.stringify(recovered));
+    return recovered;
+  }
   return projectDefault ? normalizeStartingLayout(projectDefault) : null;
 }
 
@@ -270,6 +320,11 @@ export function applyStartingLayout(scene, value) {
   scene.nextBuildObjectId = Math.max(Number(scene.nextBuildObjectId) || 0, layout.nextBuildObjectId);
 
   restoreFacilities(scene, layout.facilities);
+  const unsupportedFurniture = layout.furniture.filter((definition) => definition.kind !== "training-dummy");
+  if (unsupportedFurniture.length) throw new Error(`Unsupported starting furniture ${unsupportedFurniture[0].id}`);
+  if (layout.furniture.length && !scene.meleeRuntime?.restoreStartingLayoutFurniture?.(layout.furniture)) {
+    throw new Error("Failed to restore starting furniture");
+  }
   restoreBeds(scene, layout.beds);
   scene.facilityRuntime?.syncKitchenVisuals?.();
   scene.interactionRuntime?.refresh?.();

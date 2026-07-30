@@ -1,5 +1,5 @@
 import COLLIDER_DEFAULTS from "./colliderDefaults.js";
-import STARTING_LAYOUT_DEFAULT, { STARTER_TREE_OBJECTS } from "./startingLayoutDefault.js";
+import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
 import {
   mergeColliderOverrides,
 } from "./colliderDebugOverrides.js";
@@ -7,6 +7,7 @@ import {
   applyStartingLayout,
   loadStartingLayout,
   saveStartingLayoutToProject,
+  STARTER_TREE_OBJECTS,
 } from "./startingLayout.js";
 import { PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND } from "./resourceConfig.js";
 import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";

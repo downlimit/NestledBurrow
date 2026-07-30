@@ -53,7 +53,7 @@ import { normalizeCoinValue } from "../src/coinRuntime.js";
 import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
 import { RESOURCE_OBJECTS } from "../src/resourceConfig.js";
 import { getResourceProfile, resourceActionForTool } from "../src/resourceDomain.js";
-import { STARTER_TREE_OBJECTS } from "../src/startingLayoutDefault.js";
+import { STARTER_TREE_OBJECTS } from "../src/startingLayout.js";
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/sessionPersistence.js";
 import {
   GUEST_ACTIVE_CAP,

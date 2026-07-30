@@ -6,7 +6,7 @@ This system owns player-facing construction interactions and developer-facing ca
 
 ## Player-facing build contract
 
-- library selects walls, surfaces, furniture, facilities and plants;
+- library selects walls, surfaces, furniture, facilities and plants; movable training dummies participate in canonical furniture persistence;
 - placement, move and demolition use the same world geometry;
 - existing objects can be dragged without jumping their grabbed point under the cursor;
 - validation uses effective profile colliders;
@@ -19,6 +19,8 @@ This system owns player-facing construction interactions and developer-facing ca
 - collider and layout drafts can live in browser storage;
 - a versioned backup moves drafts between browsers;
 - local dev endpoints may write checked-in defaults;
+- the generated starting-layout module owns only the canonical default value; fallback fixtures stay in `startingLayout.js` so repeated saves cannot remove required exports;
+- temporary facility staging coordinates fail closed during capture, are removed from legacy browser drafts, and are never promoted into the canonical layout;
 - static GitHub Pages cannot commit the repository;
 - `NEW GAME` restores the authored starting baseline, not arbitrary runtime edits.
 

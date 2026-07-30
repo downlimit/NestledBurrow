@@ -326,13 +326,13 @@ export class MovementDebugPanel {
     try {
       if (!this.authoringRuntime?.saveStartingLayout) throw new Error("Authoring runtime is unavailable");
       const layout = await this.authoringRuntime.saveStartingLayout();
-      const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.beds?.length ?? 0);
+      const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.furniture?.length ?? 0) + (layout?.beds?.length ?? 0);
       this.setAuthoringStatus(`Топология и расстановка записаны в исходники проекта: ${count} объектов`);
     } catch (error) {
       console.warn("Starting layout save failed", error);
       if (error?.localSaved) {
         const layout = error.savedValue;
-        const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.beds?.length ?? 0);
+        const count = (layout?.buildObjects?.length ?? 0) + (layout?.facilities?.length ?? 0) + (layout?.furniture?.length ?? 0) + (layout?.beds?.length ?? 0);
         this.setAuthoringStatus(`Топология и расстановка сохранены в браузере: ${count} объектов. Статический веб-билд не может записать репозиторий.`);
       } else {
         this.setAuthoringStatus("Ошибка сохранения топологии и расстановки", true);
