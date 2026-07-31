@@ -1,8 +1,8 @@
 import {
   FARMING_FRAMES,
   CROP_PROFILES,
-  HYDRATED_ROT_SECONDS,
-  NEVER_WATERED_ROT_SECONDS,
+  DRY_CROP_ROT_SECONDS,
+  DRY_SEED_ROT_SECONDS,
   SOLAR_DAY_END_SECONDS,
   SOLAR_DAY_START_SECONDS,
   STARTER_WELL,
@@ -65,6 +65,7 @@ function normalizeCrop(value, label) {
     plantedAt: finiteNonNegative(value.plantedAt, 0, `${label}.plantedAt`),
     firstHydratedAt: nullableTime(value.firstHydratedAt, `${label}.firstHydratedAt`),
     lastHydratedAt: nullableTime(value.lastHydratedAt, `${label}.lastHydratedAt`),
+    dryExposureSeconds: finiteNonNegative(value.dryExposureSeconds, 0, `${label}.dryExposureSeconds`),
     effectiveGrowthSeconds,
     growthDayIndex: integer(value.growthDayIndex, Math.floor(Number(value.plantedAt) / SECONDS_PER_DAY), `${label}.growthDayIndex`),
     growthTodaySeconds: finiteNonNegative(value.growthTodaySeconds, 0, `${label}.growthTodaySeconds`),
@@ -155,6 +156,7 @@ export function plantCrop(farm, point, inventory, worldTimeSeconds, cropType) {
     plantedAt: now,
     firstHydratedAt: hydrated ? now : null,
     lastHydratedAt: hydrated ? now : null,
+    dryExposureSeconds: 0,
     effectiveGrowthSeconds: 0,
     growthDayIndex: Math.floor(now / SECONDS_PER_DAY),
     growthTodaySeconds: 0,
@@ -294,10 +296,11 @@ export function advanceFarmTime(farm, targetWorldTimeSeconds, environment = {}) 
 
 function integrateCell(cell, start, end, duration, solar, weather) {
   let mutated = false;
+  const dryAtStart = !weather.precipitation && moistureMultiplier(cell.moistureSolarAgeSeconds) === 0;
   const crop = cell.crop;
   if (crop) {
     ensureGrowthDay(crop, Math.floor(start / SECONDS_PER_DAY));
-    if (!crop.rotten && shouldRot(crop, start, weather)) {
+    if (!crop.rotten && shouldRot(crop)) {
       crop.rotten = true;
       crop.mature = false;
       mutated = true;
@@ -327,7 +330,11 @@ function integrateCell(cell, start, end, duration, solar, weather) {
     cell.moistureSolarAgeSeconds += duration;
     mutated = duration > 0 || mutated;
   }
-  if (cell.crop && !cell.crop.rotten && shouldRot(cell.crop, end, weather)) {
+  if (cell.crop && !cell.crop.rotten && dryAtStart && duration > 0) {
+    cell.crop.dryExposureSeconds += duration;
+    mutated = true;
+  }
+  if (cell.crop && !cell.crop.rotten && shouldRot(cell.crop)) {
     cell.crop.rotten = true;
     cell.crop.mature = false;
     mutated = true;
@@ -340,6 +347,7 @@ function hydrateCell(cell, worldTimeSeconds) {
   if (!cell.crop || cell.crop.rotten) return;
   cell.crop.firstHydratedAt ??= worldTimeSeconds;
   cell.crop.lastHydratedAt = worldTimeSeconds;
+  cell.crop.dryExposureSeconds = 0;
 }
 
 function normalizeCollider(value) {
@@ -359,12 +367,12 @@ function boxesTouch(a, b) {
   return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
 }
 
-function shouldRot(crop, worldTimeSeconds, weather) {
-  if (crop.rotten || weather.precipitation) return crop.rotten;
-  const deadline = crop.firstHydratedAt === null
-    ? crop.plantedAt + NEVER_WATERED_ROT_SECONDS
-    : crop.lastHydratedAt + HYDRATED_ROT_SECONDS;
-  return worldTimeSeconds >= deadline - EPSILON;
+function dryRotThreshold(crop) {
+  return crop.firstHydratedAt === null ? DRY_SEED_ROT_SECONDS : DRY_CROP_ROT_SECONDS;
+}
+
+function shouldRot(crop) {
+  return crop.rotten || crop.dryExposureSeconds >= dryRotThreshold(crop) - EPSILON;
 }
 
 function ensureGrowthDay(crop, dayIndex) {
@@ -400,11 +408,9 @@ function nextBoundary(farm, cursor, target, weather, segments) {
     }
     const crop = cell.crop;
     if (!crop || crop.rotten) continue;
-    if (!weather.precipitation) {
-      const deadline = crop.firstHydratedAt === null
-        ? crop.plantedAt + NEVER_WATERED_ROT_SECONDS
-        : crop.lastHydratedAt + HYDRATED_ROT_SECONDS;
-      if (deadline > cursor + EPSILON) next = Math.min(next, deadline);
+    if (!weather.precipitation && moistureMultiplier(cell.moistureSolarAgeSeconds) === 0) {
+      const remainingDrySeconds = dryRotThreshold(crop) - crop.dryExposureSeconds;
+      if (remainingDrySeconds > EPSILON) next = Math.min(next, cursor + remainingDrySeconds);
     }
     if (!isSolarTime(cursor)) continue;
     const moisture = weather.precipitation ? 1 : moistureMultiplier(cell.moistureSolarAgeSeconds);

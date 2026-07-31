@@ -27,8 +27,8 @@ export const POTATO_REQUIRED_GROWTH_SECONDS = 8 * 60 * 60;
 export const POTATO_DAILY_GROWTH_CAP_SECONDS = 4 * 60 * 60;
 export const LEMON_REQUIRED_GROWTH_SECONDS = 4 * 60 * 60;
 export const LEMON_DAILY_GROWTH_CAP_SECONDS = 4 * 60 * 60;
-export const NEVER_WATERED_ROT_SECONDS = 72 * 60 * 60;
-export const HYDRATED_ROT_SECONDS = 24 * 60 * 60;
+export const DRY_SEED_ROT_SECONDS = 24 * 60 * 60;
+export const DRY_CROP_ROT_SECONDS = 48 * 60 * 60;
 
 export const POTATO_CROP_PROFILE = Object.freeze({
   id: "potato",

@@ -145,11 +145,15 @@ for (let target = 4 * HOUR + 900; target <= 42 * HOUR; target += 900) {
 assert.deepEqual(smallSteps, largeStep, "large and small time steps produce the same farm state");
 
 const neverWatered = plantedFarm(6 * HOUR, false);
-advanceFarmTime(neverWatered, 78 * HOUR);
+advanceFarmTime(neverWatered, 30 * HOUR - 1);
+assert.equal(neverWatered.soilCells[0].crop.rotten, false);
+advanceFarmTime(neverWatered, 30 * HOUR);
 assert.equal(neverWatered.soilCells[0].crop.rotten, true);
 assert.equal(cropFrame(neverWatered.soilCells[0].crop), FARMING_FRAMES.cropPlantedRotten);
 const hydratedRot = plantedFarm(6 * HOUR);
 advanceFarmTime(hydratedRot, 30 * HOUR);
+assert.equal(hydratedRot.soilCells[0].crop.rotten, false);
+advanceFarmTime(hydratedRot, 83 * HOUR);
 assert.equal(hydratedRot.soilCells[0].crop.rotten, true);
 assert.equal(cropFrame(hydratedRot.soilCells[0].crop), FARMING_FRAMES.cropRotten);
 
