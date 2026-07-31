@@ -105,7 +105,7 @@ const runtimeConfig = Object.freeze({
   },
 });
 
-function scenario({ open, itemId, quantity = 1 }) {
+function scenario({ open, itemId, quantity = 1, isBlockedBox = () => false }) {
   const kitchen = normalizeKitchenState({
     servingTable: { itemId, quantity, reservations: [] },
   });
@@ -119,7 +119,7 @@ function scenario({ open, itemId, quantity = 1 }) {
   const runtime = createGuestRuntime({
     config: runtimeConfig,
     serviceState,
-    worldLayout: { bounds, cellSize: 8, isBlockedCell: () => false, isBlockedBox: () => false },
+    worldLayout: { bounds, cellSize: 8, isBlockedCell: () => false, isBlockedBox },
     createGuest(controller, id, position) {
       controllers.set(id, controller);
       const actor = {
@@ -185,6 +185,16 @@ dineIn.finish();
 assert(dineIn.states.includes(GUEST_STATES.carryingToSeat));
 assert(dineIn.states.includes(GUEST_STATES.eating));
 assert.deepEqual(dineIn.payments.map(({ itemId, value }) => ({ itemId, value })), [{ itemId: "fried-potato-dish", value: 4 }]);
+
+const blockedDoorTarget = scenario({
+  open: true,
+  itemId: "fried-potato-dish",
+  isBlockedBox: (box) => box.right > 16 && box.left < 32 && box.bottom > 88 && box.top < 104,
+});
+assert.equal(blockedDoorTarget.runtime.forceSpawn(), "tavern-guest-1");
+blockedDoorTarget.finish();
+assert(blockedDoorTarget.states.includes(GUEST_STATES.entering), "guest approaches a reachable point beside an obstructed door target");
+assert(blockedDoorTarget.states.includes(GUEST_STATES.eating), "guest continues service after the obstructed door target");
 
 const multi = scenario({ open: true, itemId: "lemonade", quantity: 2 });
 assert.equal(multi.runtime.forceSpawn(), "tavern-guest-1");

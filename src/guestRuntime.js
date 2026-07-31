@@ -6,6 +6,9 @@ import {
   sampleGuestWaveSize,
 } from "./tavernServiceDomain.js";
 
+const NAVIGATION_CELL_SIZE = 16;
+const TARGET_SEARCH_RADIUS_CELLS = 2;
+
 export const GUEST_STATES = Object.freeze({
   approachingSign: "approaching-sign",
   checkingSign: "checking-sign",
@@ -271,17 +274,17 @@ export function createGuestRuntime({
     if (!visits.has(visit.id)) return false;
     const character = visit.character;
     const navigation = createActorNavigation(worldLayout, {
-      cellSize: 16,
+      cellSize: NAVIGATION_CELL_SIZE,
       footWidth: character.footWidth,
       footDepth: character.footDepth,
     });
-    const path = findGridPath({
+    const path = candidateTargetsAround(target).reduce((match, goal) => match ?? findGridPath({
       start: character.motor.position,
-      goal: target,
+      goal,
       bounds: worldLayout.bounds,
-      cellSize: 16,
+      cellSize: NAVIGATION_CELL_SIZE,
       ...navigation,
-    });
+    }), null);
     if (!path) return false;
     visit.target = { ...target };
     visit.path = path.length > 0 ? path : [{ ...target }];
@@ -398,4 +401,20 @@ function samePoint(a, b) {
 
 function isNearPoint(a, b, radius) {
   return Math.hypot(a.x - b.x, a.y - b.y) <= radius;
+}
+
+function candidateTargetsAround(target) {
+  const candidates = [{ ...target }];
+  for (let radius = 1; radius <= TARGET_SEARCH_RADIUS_CELLS; radius += 1) {
+    for (let y = -radius; y <= radius; y += 1) {
+      for (let x = -radius; x <= radius; x += 1) {
+        if (Math.max(Math.abs(x), Math.abs(y)) !== radius) continue;
+        candidates.push({
+          x: target.x + x * NAVIGATION_CELL_SIZE,
+          y: target.y + y * NAVIGATION_CELL_SIZE,
+        });
+      }
+    }
+  }
+  return candidates;
 }
