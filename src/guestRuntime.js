@@ -192,7 +192,7 @@ export function createGuestRuntime({
         visit.itemId = reservation.itemId;
         onReservationChange({ guestId: visit.id, active: true, itemId: reservation.itemId });
       }
-      transition(visit, GUEST_STATES.entering, config.points.outsideDoor);
+      transition(visit, GUEST_STATES.approachingService, getServicePoint());
       return;
     }
     if (visit.state === GUEST_STATES.eating) {

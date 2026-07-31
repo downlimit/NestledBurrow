@@ -219,6 +219,15 @@ export function getInventoryQuantity(inventory, itemId) {
     .reduce((total, item) => total + item.quantity, 0);
 }
 
+export function getLoadoutItemQuantity({ inventory, combatLoadout }, itemId) {
+  const id = normalizeItemId(itemId);
+  const peacefulQuantity = getInventoryQuantity(inventory, id);
+  const combatQuantity = normalizeCombatLoadout(combatLoadout).slots
+    .filter((item) => item?.id === id)
+    .reduce((total, item) => total + item.quantity, 0);
+  return peacefulQuantity + combatQuantity;
+}
+
 export function findInventoryStack(inventory, itemId) {
   const id = normalizeItemId(itemId);
   const limit = inventoryStackLimit(id);
@@ -410,6 +419,25 @@ export function takeInventoryItem(inventory, itemId, quantity = 1) {
     if (slot.quantity === 0) inventory.slots[slotIndex] = null;
   }
   return { status: "taken", mutated: true, slots, item: { id, kind: itemKind(id), quantity } };
+}
+
+export function takeLoadoutItem({ inventory, combatLoadout }, itemId, quantity = 1) {
+  const id = normalizeItemId(itemId);
+  const requested = normalizeQuantity(quantity);
+  if (getLoadoutItemQuantity({ inventory, combatLoadout }, id) < requested) {
+    return { status: "insufficient-quantity", mutated: false, item: createInventoryItem(id, Math.min(requested, inventoryStackLimit(id))) };
+  }
+  const peacefulQuantity = Math.min(requested, getInventoryQuantity(inventory, id));
+  const peaceful = peacefulQuantity > 0 ? takeInventoryItem(inventory, id, peacefulQuantity) : null;
+  const combatQuantity = requested - peacefulQuantity;
+  const combat = combatQuantity > 0 ? takeInventoryItem(combatLoadout, id, combatQuantity) : null;
+  return {
+    status: "taken",
+    mutated: true,
+    peaceful,
+    combat,
+    item: { id, kind: itemKind(id), quantity: requested },
+  };
 }
 
 export function swapInventorySlots(inventory, fromIndex, toIndex) {

@@ -99,14 +99,17 @@ assert.equal(interactServingTable(kitchen, inventory, null).status, "item-taken"
 
 const repairGameplay = createFreshGameSessionState().gameplay;
 assert.equal(repairStove(repairGameplay).status, "repair-missing");
-addInventoryItem(repairGameplay.inventory, createInventoryItem("wood", STOVE_REPAIR_COST.wood));
-addInventoryItem(repairGameplay.inventory, createInventoryItem("stone", STOVE_REPAIR_COST.stone));
+addInventoryItem(repairGameplay.inventory, createInventoryItem("wood", 4));
+repairGameplay.combatLoadout.slots[4] = createInventoryItem("wood", STOVE_REPAIR_COST.wood - 4);
+repairGameplay.combatLoadout.slots[5] = createInventoryItem("stone", STOVE_REPAIR_COST.stone);
 repairGameplay.coins = STOVE_REPAIR_COST.coins;
 assert.equal(repairStove(repairGameplay).status, "stove-repaired");
 assert.equal(repairGameplay.kitchen.stoveRepaired, true);
 assert.equal(repairGameplay.coins, 0);
 assert.equal(getInventoryQuantity(repairGameplay.inventory, "wood"), 0);
 assert.equal(getInventoryQuantity(repairGameplay.inventory, "stone"), 0);
+assert.equal(repairGameplay.combatLoadout.slots[4], null);
+assert.equal(repairGameplay.combatLoadout.slots[5], null);
 
 const repairMessages = [];
 const repairRuntime = createKitchenInteractionRuntime({

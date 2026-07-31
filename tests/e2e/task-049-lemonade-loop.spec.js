@@ -50,7 +50,13 @@ function quantity(session, itemId) {
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
-test("fresh Task 049 world has four tools, fixed kitchen/well and six trees", async ({ page }, testInfo) => {
+function combatQuantity(session, itemId) {
+  return session.gameplay.combatLoadout.slots
+    .filter((item) => item?.id === itemId)
+    .reduce((sum, item) => sum + item.quantity, 0);
+}
+
+test("fresh Task 049 world has four tools, fixed kitchen/well and three trees", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
@@ -69,7 +75,7 @@ test("fresh Task 049 world has four tools, fixed kitchen/well and six trees", as
   });
   const debris = await bridge(page, "getDebrisState");
   expect(debris.definitions.filter(({ profileId }) => profileId === "tree-planted")).toHaveLength(0);
-  await expect.poll(async () => (await bridge(page, "getDebrisState")).plantedTrees.length).toBe(6);
+  await expect.poll(async () => (await bridge(page, "getDebrisState")).plantedTrees.length).toBe(3);
   expect((await bridge(page, "getDebrisState")).plantedTrees.every(({ profileId }) => profileId === "tree-planted")).toBe(true);
   const facilities = await bridge(page, "getFacilityState");
   expect(facilities.definitions.map(({ facilityType }) => facilityType)).toEqual(expect.arrayContaining([
@@ -188,14 +194,16 @@ test("stove repair spends the exact atomic cost and survives reload", async ({ p
   const promptRect = (await bridge(page, "getInteractionHudState")).promptRect;
   expect(repairMessage.rect.y + repairMessage.rect.height).toBeLessThan(promptRect.y);
 
-  await bridge(page, "addInventoryItem", { itemId: "wood", quantity: 10 });
-  await bridge(page, "addInventoryItem", { itemId: "stone", quantity: 8 });
+  await bridge(page, "addCombatInventoryItem", { itemId: "wood", quantity: 10 });
+  await bridge(page, "addCombatInventoryItem", { itemId: "stone", quantity: 8 });
   await bridge(page, "setCoins", 10);
   await interactWith(page, "home-gas-stove-01");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen.stoveRepaired).toBe(true);
   const repaired = await bridge(page, "getSession");
   expect(quantity(repaired, "wood")).toBe(0);
   expect(quantity(repaired, "stone")).toBe(0);
+  expect(combatQuantity(repaired, "wood")).toBe(0);
+  expect(combatQuantity(repaired, "stone")).toBe(0);
   expect(repaired.gameplay.coins).toBe(0);
   expect((await bridge(page, "getFacilityState")).visuals["home-gas-stove-01"].textureKey).toBe("facility.gas-stove");
   await page.reload();

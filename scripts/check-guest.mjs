@@ -105,7 +105,14 @@ const runtimeConfig = Object.freeze({
   },
 });
 
-function scenario({ open, itemId, quantity = 1, isBlockedBox = () => false }) {
+function scenario({
+  open,
+  itemId,
+  quantity = 1,
+  isBlockedBox = () => false,
+  servicePoint = { x: 72, y: 46 },
+  seatPoint = { x: 120, y: 78 },
+}) {
   const kitchen = normalizeKitchenState({
     servingTable: { itemId, quantity, reservations: [] },
   });
@@ -134,8 +141,8 @@ function scenario({ open, itemId, quantity = 1, isBlockedBox = () => false }) {
     },
     removeGuest(id) { controllers.delete(id); return actors.delete(id); },
     getTavernOpen: () => open,
-    getServicePoint: () => ({ x: 72, y: 46 }),
-    getSeatPoint: () => ({ x: 120, y: 78 }),
+    getServicePoint: () => servicePoint,
+    getSeatPoint: () => seatPoint,
     getAvailablePortions: () => kitchen.servingTable.quantity - kitchen.servingTable.reservations.length,
     reserveItem: (guestId) => reserveServingItem(kitchen, guestId),
     releaseReservation: (guestId) => releaseServingReservation(kitchen, guestId),
@@ -189,12 +196,14 @@ assert.deepEqual(dineIn.payments.map(({ itemId, value }) => ({ itemId, value }))
 const blockedDoorTarget = scenario({
   open: true,
   itemId: "fried-potato-dish",
+  servicePoint: { x: 72, y: 110 },
   isBlockedBox: (box) => box.right > 16 && box.left < 32 && box.bottom > 88 && box.top < 104,
 });
 assert.equal(blockedDoorTarget.runtime.forceSpawn(), "tavern-guest-1");
 blockedDoorTarget.finish();
-assert(blockedDoorTarget.states.includes(GUEST_STATES.entering), "guest approaches a reachable point beside an obstructed door target");
-assert(blockedDoorTarget.states.includes(GUEST_STATES.eating), "guest continues service after the obstructed door target");
+assert.equal(blockedDoorTarget.states.includes(GUEST_STATES.entering), false, "guest does not enter the house before visiting an outdoor service point");
+assert(blockedDoorTarget.states.includes(GUEST_STATES.approachingService), "guest walks directly from the sign to the outdoor service point");
+assert(blockedDoorTarget.states.includes(GUEST_STATES.eating), "guest continues service while the unused door target is obstructed");
 
 const multi = scenario({ open: true, itemId: "lemonade", quantity: 2 });
 assert.equal(multi.runtime.forceSpawn(), "tavern-guest-1");
