@@ -4,8 +4,11 @@ import {
   canAddInventoryItem,
   createInventoryItem,
   getInventoryQuantity,
+  getLoadoutItemQuantity,
+  normalizeCombatLoadout,
   normalizeInventory,
   takeInventoryItem,
+  takeLoadoutItem,
 } from "./inventoryDomain.js";
 
 export const COOKING_STEP_TYPES = Object.freeze({
@@ -264,15 +267,20 @@ export function consumeServingReservation(kitchen, guestId) {
 export function repairStove(gameplay) {
   const kitchen = gameplay?.kitchen;
   if (!kitchen || kitchen.stoveRepaired) return { status: "already-repaired", mutated: false };
+  const inventoryCollections = { inventory: gameplay.inventory, combatLoadout: gameplay.combatLoadout };
   const missing = [];
-  if (getInventoryQuantity(gameplay.inventory, "wood") < STOVE_REPAIR_COST.wood) missing.push("wood");
-  if (getInventoryQuantity(gameplay.inventory, "stone") < STOVE_REPAIR_COST.stone) missing.push("stone");
+  if (getLoadoutItemQuantity(inventoryCollections, "wood") < STOVE_REPAIR_COST.wood) missing.push("wood");
+  if (getLoadoutItemQuantity(inventoryCollections, "stone") < STOVE_REPAIR_COST.stone) missing.push("stone");
   if ((gameplay.coins ?? 0) < STOVE_REPAIR_COST.coins) missing.push("coins");
   if (missing.length) return { status: "repair-missing", messageKey: "hud:interaction.repairMissing", missing, mutated: false };
-  const next = normalizeInventory(gameplay.inventory);
-  takeInventoryItem(next, "wood", STOVE_REPAIR_COST.wood);
-  takeInventoryItem(next, "stone", STOVE_REPAIR_COST.stone);
-  commitInventory(gameplay.inventory, next);
+  const next = {
+    inventory: normalizeInventory(gameplay.inventory),
+    combatLoadout: normalizeCombatLoadout(gameplay.combatLoadout),
+  };
+  takeLoadoutItem(next, "wood", STOVE_REPAIR_COST.wood);
+  takeLoadoutItem(next, "stone", STOVE_REPAIR_COST.stone);
+  commitInventory(gameplay.inventory, next.inventory);
+  commitInventory(gameplay.combatLoadout, next.combatLoadout);
   gameplay.coins -= STOVE_REPAIR_COST.coins;
   kitchen.stoveRepaired = true;
   return { status: "stove-repaired", mutated: true, cost: STOVE_REPAIR_COST };

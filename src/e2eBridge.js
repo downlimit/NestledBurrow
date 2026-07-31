@@ -4,7 +4,7 @@ import { BED_WAKE_TILE } from "./debrisConfig.js";
 import { FACILITIES } from "./facilityConfig.js";
 import { TAVERN_SIGN } from "./guestConfig.js";
 import { DEFAULT_RESOURCE_ID, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { addInventoryItem, createInventoryItem } from "./inventoryDomain.js";
+import { addInventoryItem, createInventoryItem, routePickedInventoryItem } from "./inventoryDomain.js";
 
 export function installWorldE2EBridge(scene) {
   if (!import.meta.env.VITE_E2E) return null;
@@ -46,6 +46,16 @@ export function installWorldE2EBridge(scene) {
     },
     addInventoryItem: ({ itemId, quantity = 1 }) => {
       const result = addInventoryItem(scene.sessionState.gameplay.inventory, createInventoryItem(itemId, quantity));
+      scene.gameHud?.render?.();
+      return result;
+    },
+    addCombatInventoryItem: ({ itemId, quantity = 1 }) => {
+      const gameplay = scene.sessionState.gameplay;
+      const result = routePickedInventoryItem(
+        { inventory: gameplay.inventory, combatLoadout: gameplay.combatLoadout },
+        createInventoryItem(itemId, quantity),
+        { combatMode: true },
+      );
       scene.gameHud?.render?.();
       return result;
     },
