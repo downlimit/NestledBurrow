@@ -36,8 +36,8 @@ test.describe("Task #030 player needs", () => {
     expect((await snapshot(page)).activity.facility).toBeNull();
 
     for (const [facilityId, needId, stopPrompt] of [
-      ["home-toilet-01", "toilet", "hud:interaction.leaveToilet"],
-      ["home-table-01", "satiety", "hud:interaction.stopEating"],
+      ["editor-toilet-2", "toilet", "hud:interaction.leaveToilet"],
+      ["editor-table-3", "satiety", "hud:interaction.stopEating"],
     ]) {
       await page.evaluate(({ facilityId, needId }) => {
         const api = window.__NESTLED_BURROW_E2E__;
