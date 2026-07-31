@@ -1,0 +1,2 @@
+GitHub Pages redeploy trigger after repository visibility changed to public.
+Triggered: 2026-07-31T10:55:00Z
