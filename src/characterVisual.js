@@ -81,6 +81,8 @@ export class CharacterVisual {
       y: pose.y,
       facing: pose.facing ?? "down",
       angle: pose.angle ?? 0,
+      originX: pose.originX ?? 0.5,
+      originY: pose.originY ?? 0.5,
       depth: pose.depth,
       showSleepMarker: Boolean(pose.showSleepMarker),
     } : null;
@@ -111,7 +113,7 @@ export class CharacterVisual {
     const idleFrame = this.frames[this.presentationPose.facing][this.idleFrameIndex];
     this.sprite.anims.stop();
     applyFrameReference(this.sprite, idleFrame);
-    this.sprite.setOrigin?.(0.5, 0.5);
+    this.sprite.setOrigin?.(this.presentationPose.originX, this.presentationPose.originY);
     this.sprite.setAngle?.(this.presentationPose.angle);
     this.sprite.setPosition(this.presentationPose.x, this.presentationPose.y);
     this.sprite.setDepth(this.presentationPose.depth ?? worldDepthFromAnchorY(this.presentationPose.y, this.id, 501));

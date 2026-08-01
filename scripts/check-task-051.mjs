@@ -116,7 +116,7 @@ const combatLogResult = hitResourceNode(combatResourceSession, combatLog.id, {
   tuning: DEFAULT_GAMEPLAY_TUNING,
 });
 assert.equal(combatLogResult.progress, 0.5 / DEFAULT_GAMEPLAY_TUNING.smallLogChopHp);
-assert.equal(combatLogResult.currentEnergy, combatEnergyBefore, "battle axe log damage does not spend peaceful work energy");
+assert.equal(combatLogResult.currentEnergy, combatEnergyBefore, "log-node mutation does not double-charge the accepted melee action");
 
 const loadedUris = [];
 preloadMeleeAssets({ load: { image: (key, uri) => loadedUris.push([key, uri]) } });

@@ -230,3 +230,22 @@ test("logs and stones always show a work target from every approach angle", asyn
     }
   }
 });
+
+test("resource aiming follows the faced visual center when nearby logs compete", async ({ page }) => {
+  await boot(page);
+  const definitions = (await bridge(page, "getDebrisState")).definitions;
+  const leftLog = definitions.find((item) => item.id === "yard-log-02");
+  const rightLog = definitions.find((item) => item.id === "yard-log-03");
+  const position = {
+    x: (leftLog.position.x + rightLog.position.x) / 2,
+    y: Math.max(leftLog.position.y, rightLog.position.y) + 11,
+  };
+  await bridge(page, "selectInventorySlot", 0);
+  for (const target of [leftLog, rightLog]) {
+    await bridge(page, "placePlayerAt", {
+      ...position,
+      facing: { x: target.position.x - position.x, y: target.position.y - position.y },
+    });
+    await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { entityId: target.id } });
+  }
+});

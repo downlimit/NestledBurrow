@@ -94,6 +94,11 @@ export function createInteractionTarget(options) {
   const facingDotThreshold = options?.facingDotThreshold ?? 0;
   const prompt = options?.prompt;
   const payload = assertPlainSerializablePayload(options?.payload);
+  const availabilityDistance = options?.availabilityDistance;
+  const explicitAimPosition = options?.aimPosition;
+  const aimPosition = explicitAimPosition ?? position;
+  const targetingMode = options?.targetingMode ?? "priority-distance";
+  const targetingGroup = options?.targetingGroup ?? null;
 
   assertNonEmptyString(id, "Interaction target ID");
   assertNonEmptyString(entityId, "Interaction entity ID");
@@ -103,6 +108,9 @@ export function createInteractionTarget(options) {
   }
   assertFiniteNumber(position.x, "Interaction position x");
   assertFiniteNumber(position.y, "Interaction position y");
+  if (!isPlainObject(aimPosition)) throw new Error("Interaction aim position must be a plain object");
+  assertFiniteNumber(aimPosition.x, "Interaction aim position x");
+  assertFiniteNumber(aimPosition.y, "Interaction aim position y");
   assertFiniteNumber(radius, "Interaction radius");
   if (radius <= 0) {
     throw new Error("Interaction radius must be greater than 0");
@@ -116,8 +124,11 @@ export function createInteractionTarget(options) {
     throw new Error("Interaction facingDotThreshold must be between -1 and 1");
   }
   assertNonEmptyString(prompt, "Interaction prompt");
+  if (availabilityDistance !== undefined) assertFiniteNumber(availabilityDistance, "Interaction availability distance");
+  if (!["priority-distance", "facing-first"].includes(targetingMode)) throw new Error("Interaction targetingMode is invalid");
+  if (targetingGroup !== null) assertNonEmptyString(targetingGroup, "Interaction targeting group");
 
-  return deepFreeze({
+  const target = {
     id,
     entityId,
     kind,
@@ -128,7 +139,12 @@ export function createInteractionTarget(options) {
     facingDotThreshold,
     prompt,
     payload,
-  });
+    targetingMode,
+    targetingGroup,
+  };
+  if (explicitAimPosition !== undefined) target.aimPosition = { x: aimPosition.x, y: aimPosition.y };
+  if (availabilityDistance !== undefined) target.availabilityDistance = availabilityDistance;
+  return deepFreeze(target);
 }
 
 function normalize(vector) {
@@ -139,19 +155,29 @@ function normalize(vector) {
   return { x: vector.x / length, y: vector.y / length };
 }
 
-function isAvailable(source, target, distance, dx, dy) {
+function facingDot(source, target) {
+  const aimPosition = target.aimPosition ?? target.position;
+  const direction = normalize({
+    x: aimPosition.x - source.position.x,
+    y: aimPosition.y - source.position.y,
+  });
+  const facing = normalize(source.facingDirection);
+  return direction && facing ? direction.x * facing.x + direction.y * facing.y : null;
+}
+
+function isAvailable(source, target, distance, aimDot) {
   if (source.id === target.entityId || distance > target.radius) {
     return false;
   }
-  if (!target.requiresFacing || distance === 0) {
+  const aimPosition = target.aimPosition ?? target.position;
+  const aimDistance = Math.hypot(
+    aimPosition.x - source.position.x,
+    aimPosition.y - source.position.y,
+  );
+  if (!target.requiresFacing || aimDistance === 0) {
     return true;
   }
-  const direction = normalize({ x: dx, y: dy });
-  const facing = normalize(source.facingDirection);
-  if (!direction || !facing) {
-    return false;
-  }
-  return direction.x * facing.x + direction.y * facing.y >= target.facingDotThreshold;
+  return aimDot !== null && aimDot >= target.facingDotThreshold;
 }
 
 export function findBestInteractionTarget(sourceSnapshot, targets) {
@@ -159,8 +185,9 @@ export function findBestInteractionTarget(sourceSnapshot, targets) {
   for (const target of targets) {
     const dx = target.position.x - sourceSnapshot.position.x;
     const dy = target.position.y - sourceSnapshot.position.y;
-    const distance = Math.hypot(dx, dy);
-    if (!isAvailable(sourceSnapshot, target, distance, dx, dy)) {
+    const distance = target.availabilityDistance ?? Math.hypot(dx, dy);
+    const aimDot = facingDot(sourceSnapshot, target);
+    if (!isAvailable(sourceSnapshot, target, distance, aimDot)) {
       continue;
     }
 
@@ -171,14 +198,12 @@ export function findBestInteractionTarget(sourceSnapshot, targets) {
       prompt: target.prompt,
       payload: cloneJsonLike(target.payload, "Interaction payload"),
       distance,
+      aimDot: aimDot ?? -1,
+      targetingMode: target.targetingMode,
+      targetingGroup: target.targetingGroup,
     };
 
-    if (
-      !best ||
-      target.priority > best.priority ||
-      (target.priority === best.priority && distance < best.distance) ||
-      (target.priority === best.priority && distance === best.distance && target.id < best.targetId)
-    ) {
+    if (!best || isBetterCandidate(candidate, target.priority, best)) {
       best = { ...candidate, priority: target.priority };
     }
   }
@@ -186,6 +211,17 @@ export function findBestInteractionTarget(sourceSnapshot, targets) {
   if (!best) {
     return null;
   }
-  const { priority, ...snapshot } = best;
+  const { priority, aimDot, targetingMode, targetingGroup, ...snapshot } = best;
   return snapshot;
+}
+
+function isBetterCandidate(candidate, priority, best) {
+  const sharedFacingGroup = candidate.targetingMode === "facing-first"
+    && best.targetingMode === "facing-first"
+    && candidate.targetingGroup !== null
+    && candidate.targetingGroup === best.targetingGroup;
+  if (sharedFacingGroup && candidate.aimDot !== best.aimDot) return candidate.aimDot > best.aimDot;
+  if (priority !== best.priority) return priority > best.priority;
+  if (candidate.distance !== best.distance) return candidate.distance < best.distance;
+  return candidate.targetId < best.targetId;
 }

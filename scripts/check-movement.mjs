@@ -15,12 +15,12 @@ import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "../src/movement
 const config = { ...DEFAULT_MOVEMENT_CONFIG };
 const close = (a, b, epsilon = 0.001) => Math.abs(a - b) <= epsilon;
 
-assert.equal(energyTargetSpeedMultiplier(25, 100), 1);
-assert(close(energyTargetSpeedMultiplier(13, 100), 0.8125));
-assert(close(energyTargetSpeedMultiplier(5, 100), 0.4791667));
-assert.equal(energyTargetSpeedMultiplier(1, 100), 0.25);
+assert(close(energyTargetSpeedMultiplier(25, 100), 0.95));
+assert(close(energyTargetSpeedMultiplier(13, 100), 0.83));
+assert(close(energyTargetSpeedMultiplier(5, 100), 0.7));
+assert(close(energyTargetSpeedMultiplier(1, 100), 0.62));
 assert.equal(energyTargetSpeedMultiplier(0, 100), 0.25);
-assert.equal(energyTargetSpeedMultiplier(50, 200), 1, "energy curve uses maximumEnergy instead of absolute points");
+assert(close(energyTargetSpeedMultiplier(50, 200), 0.95), "energy curve uses maximumEnergy instead of absolute points");
 const firstFatigueFrame = stepSpeedMultiplier(1, 0.25, 16);
 assert(firstFatigueFrame < 1 && firstFatigueFrame > 0.25, "effective multiplier starts moving without jumping to target");
 assert.equal(stepSpeedMultiplier(firstFatigueFrame, 0.25, 500), 0.25, "effective multiplier reaches the target after enough time");

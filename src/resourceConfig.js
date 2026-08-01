@@ -1,35 +1,43 @@
 import { TILE_SIZE } from "./worldConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
+import { TOILET_ACCIDENT_TIMELINE_TUNING } from "./toiletAccidentTimelineRuntime.js";
 
 export const RESOURCE_INTERACTION_KIND = "work-resource";
+export const EXTRACTABLE_TARGETING_GROUP = "extractable";
 export const PLACEMENT_CELL_SIZE = TILE_SIZE / 2;
 
 export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
   maximumEnergy: 100,
   axeDamage: 1,
   smallLogChopHp: 7,
-  energyPerHit: 0.5,
-  awakeDrainAmount: 0.25,
-  awakeWalkDrainAmount: 0.75,
-  awakeRunDrainAmount: 1.5,
-  lowEnergyIdleRegenPerSecond: 1.5 / 1.66,
+  energyPerHit: 0.2,
   runSpeedMultiplier: 1.66,
   exhaustionSleepScaleMultiplier: 0.5,
   exhaustionWakeCooldownSeconds: 1.5,
   universalHitCooldownSeconds: 0.66,
-  minimumFatigueSpeedMultiplier: 0.25,
+  minimumFatigueSpeedMultiplier: 0.5,
   sleepTimeScale: 32,
   realSecondsPerGameDay: 1440,
-  sleepEnergyPerGameHour: 12.5,
+  sleepEnergyPerGameHour: 14,
   backPointFollowRate: 5,
   cameraLeadTransitionSeconds: 2,
   needs: Object.freeze({
     flowArrowRatios: Object.freeze([1, 2.5]),
-    novelty: Object.freeze({ base: -0.25, running: 9, commonResource: -1.5, ruby: 8 }),
-    satiety: Object.freeze({ base: -0.165, runningMultiplier: 1.3, resourceMultiplier: 3, table: 10 }),
-    toilet: Object.freeze({ base: -0.225, showerMultiplier: 0.5, toilet: 10 }),
-    lustre: Object.freeze({ base: -0.15, toiletMultiplier: 1.5, shower: 10 }),
-    dialogue: Object.freeze({ base: -0.05, nearNpc: 0.5, radius: 48 }),
+    facilityRecoveryPerGameHour: 600,
+    physicalActivityWindowSeconds: 0.66,
+    novelty: Object.freeze({ base: -1 }),
+    satiety: Object.freeze({ base: -7 }),
+    toilet: Object.freeze({ base: -6 }),
+    lustre: Object.freeze({
+      base: -1,
+      activitySurcharge: Object.freeze({ running: 1, watering: 0.5, axe: 2, hoe: 2, pickaxe: 3 }),
+    }),
+    dialogue: Object.freeze({ base: -2, sharedRest: 6, meaningfulConversationGain: 20, radius: 48 }),
+    toolCosts: Object.freeze({ axe: 0.2, pickaxe: 0.3, hoe: 0.15, watering: 0.1, sword: 0.75, "battle-axe": 0.1 }),
+    sleep: Object.freeze({ energyPerGameHour: 14 }),
+    catchBreath: Object.freeze({ delayRealSeconds: 3, energyPerRealSecond: 1, ceiling: 15 }),
+    collapse: Object.freeze({ minimumGameHours: 2, wakeEnergy: 25 }),
+    toiletAccident: TOILET_ACCIDENT_TIMELINE_TUNING,
   }),
 });
 
@@ -66,7 +74,7 @@ function makeResource([id, profileId, cellX, cellY], worldId) {
     id, entityId: id, worldId, roomId: worldId === "village" ? "yard" : "nest", kind: RESOURCE_INTERACTION_KIND, profileId,
     cell: Object.freeze({ x: cellX, y: cellY }), position,
     radius: profile.size === "large" ? 36 : 30, priority: profile.kind === "ruby" ? 1.5 : 1,
-    requiresFacing: false, facingDotThreshold: -1, prompt: profile.prompt,
+    requiresFacing: false, facingDotThreshold: -1, targetingMode: "facing-first", targetingGroup: EXTRACTABLE_TARGETING_GROUP, prompt: profile.prompt,
     payload: Object.freeze({ resourceId: id }),
   });
 }
@@ -87,10 +95,6 @@ export function normalizeGameplayTuning(value = {}) {
     axeDamage: number(value.axeDamage, DEFAULT_GAMEPLAY_TUNING.axeDamage, 0, 999),
     smallLogChopHp: integer(value.smallLogChopHp ?? value.hitsPerLog, DEFAULT_GAMEPLAY_TUNING.smallLogChopHp, 1, 99),
     energyPerHit: number(value.energyPerHit ?? value.clearingEnergyCost, DEFAULT_GAMEPLAY_TUNING.energyPerHit, 0, 999),
-    awakeDrainAmount: number(value.awakeDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeDrainAmount, 0, 999),
-    awakeWalkDrainAmount: number(value.awakeWalkDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeWalkDrainAmount, 0, 999),
-    awakeRunDrainAmount: number(value.awakeRunDrainAmount, DEFAULT_GAMEPLAY_TUNING.awakeRunDrainAmount, 0, 999),
-    lowEnergyIdleRegenPerSecond: number(value.lowEnergyIdleRegenPerSecond, DEFAULT_GAMEPLAY_TUNING.lowEnergyIdleRegenPerSecond, 0, 999),
     runSpeedMultiplier: number(value.runSpeedMultiplier, DEFAULT_GAMEPLAY_TUNING.runSpeedMultiplier, 1, 4),
     exhaustionSleepScaleMultiplier: number(value.exhaustionSleepScaleMultiplier, DEFAULT_GAMEPLAY_TUNING.exhaustionSleepScaleMultiplier, 0.1, 1),
     exhaustionWakeCooldownSeconds: number(value.exhaustionWakeCooldownSeconds, DEFAULT_GAMEPLAY_TUNING.exhaustionWakeCooldownSeconds, 0, 30),

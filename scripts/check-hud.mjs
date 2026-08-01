@@ -20,9 +20,11 @@ import {
   OPTIONS_PANEL_AREA,
   SOUND_SLIDER_RECTS,
   isEnergyCritical,
+  needFlowPhaseOffset,
   needFlowPulseAlpha,
   shouldShakeEnergyAfterInteraction,
 } from "../src/gameHud.js";
+import { NEED_FLOW_PULSE_TUNING } from "../src/presentationTuning.js";
 import { INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "../src/inventoryRuntime.js";
 import {
   COMBAT_PANEL_AREA,
@@ -181,10 +183,46 @@ assert.equal(shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore: 19
 assert.equal(shouldShakeEnergyAfterInteraction({ mutated: false, energyBefore: 3, currentEnergy: 3, maximumEnergy: 100 }), false);
 assert.equal(isEnergyCritical(14, 100), true);
 assert.equal(isEnergyCritical(15, 100), false);
-const pulseSamples = [1, 2, 3, 4, 5, 6].flatMap((seed) => [0, 300, 600, 1000, 1800].map((time) => needFlowPulseAlpha(2, time, seed)));
-assert(pulseSamples.every((alpha) => alpha >= 0 && alpha <= 0.9));
-assert(pulseSamples.some((alpha) => alpha > 0.85));
-assert(pulseSamples.some((alpha) => alpha === 0));
+assert.deepEqual(Object.fromEntries(Object.entries(NEED_FLOW_PULSE_TUNING).map(([tier, profile]) => [tier, profile.cycleMs])), {
+  slow: 4500,
+  medium: 4000,
+  strong: 3500,
+});
+assert.deepEqual(Object.fromEntries(Object.entries(NEED_FLOW_PULSE_TUNING).map(([tier, profile]) => [tier, profile.transparentHoldMs])), {
+  slow: 3000,
+  medium: 1750,
+  strong: 500,
+});
+assert.deepEqual(Object.fromEntries(Object.entries(NEED_FLOW_PULSE_TUNING).map(([tier, profile]) => [tier, profile.cycleMs - profile.transparentHoldMs])), {
+  slow: 1500,
+  medium: 2250,
+  strong: 3000,
+});
+assert(Object.values(NEED_FLOW_PULSE_TUNING).every(({ fadeInMs, fadeOutMs }) => fadeInMs === 180 && fadeOutMs === 180), "fade-in and fade-out stay constant across flow tiers");
+assert.equal(NEED_FLOW_PULSE_TUNING.medium.transparentHoldMs, (NEED_FLOW_PULSE_TUNING.slow.transparentHoldMs + NEED_FLOW_PULSE_TUNING.strong.transparentHoldMs) / 2);
+assert.equal(NEED_FLOW_PULSE_TUNING.medium.cycleMs - NEED_FLOW_PULSE_TUNING.medium.transparentHoldMs, ((NEED_FLOW_PULSE_TUNING.slow.cycleMs - NEED_FLOW_PULSE_TUNING.slow.transparentHoldMs) + (NEED_FLOW_PULSE_TUNING.strong.cycleMs - NEED_FLOW_PULSE_TUNING.strong.transparentHoldMs)) / 2);
+assert(Object.isFrozen(NEED_FLOW_PULSE_TUNING) && Object.values(NEED_FLOW_PULSE_TUNING).every(Object.isFrozen), "need pulse tuning is deeply immutable");
+const pulseAtPhase = (arrows, phase, seed = "energy") => {
+  const profile = [null, NEED_FLOW_PULSE_TUNING.slow, NEED_FLOW_PULSE_TUNING.medium, NEED_FLOW_PULSE_TUNING.strong][arrows];
+  return needFlowPulseAlpha(arrows, phase - needFlowPhaseOffset(seed, profile.cycleMs), seed);
+};
+for (const [arrows, profile] of Object.values(NEED_FLOW_PULSE_TUNING).map((profile, index) => [index + 1, profile])) {
+  const fadeIn = [0, 0.25, 0.5, 0.75, 1].map((part) => pulseAtPhase(arrows, profile.fadeInMs * part));
+  assert(fadeIn.every((alpha, index) => index === 0 || alpha >= fadeIn[index - 1]), `tier ${arrows} fade-in is monotonic`);
+  assert.equal(fadeIn[0], 0);
+  assert.equal(fadeIn.at(-1), profile.peakAlpha);
+  assert.equal(pulseAtPhase(arrows, profile.fadeInMs + profile.peakHoldMs / 2), profile.peakAlpha, `tier ${arrows} holds peak alpha`);
+  const fadeOutStart = profile.fadeInMs + profile.peakHoldMs;
+  const fadeOut = [0, 0.25, 0.5, 0.75, 1].map((part) => pulseAtPhase(arrows, fadeOutStart + profile.fadeOutMs * part));
+  assert(fadeOut.every((alpha, index) => index === 0 || alpha <= fadeOut[index - 1]), `tier ${arrows} fade-out is monotonic`);
+  assert.equal(fadeOut[0], profile.peakAlpha);
+  assert.equal(fadeOut.at(-1), 0);
+  assert.equal(pulseAtPhase(arrows, profile.cycleMs - profile.transparentHoldMs / 2), 0, `tier ${arrows} transparent hold is exact zero`);
+}
+const needPhaseOffsets = NEED_ROW_IDS.map((id) => needFlowPhaseOffset(id, NEED_FLOW_PULSE_TUNING.medium.cycleMs));
+assert.equal(new Set(needPhaseOffsets).size, NEED_ROW_IDS.length, "need rows have distinct stable phase offsets");
+assert.deepEqual(NEED_ROW_IDS.map((id) => needFlowPhaseOffset(id, NEED_FLOW_PULSE_TUNING.medium.cycleMs)), needPhaseOffsets, "same row seeds reproduce the same rhythm");
+assert.equal(needFlowPulseAlpha(0, 100, "energy"), 0, "zero arrows remain fully hidden");
 for (const char of "v devabcdef0123456789<>") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
 
 const main = readFileSync("src/main.js", "utf8");

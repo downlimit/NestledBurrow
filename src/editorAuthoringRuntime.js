@@ -9,8 +9,8 @@ import {
   saveStartingLayoutToProject,
   STARTER_TREE_OBJECTS,
 } from "./startingLayout.js";
-import { PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND } from "./resourceConfig.js";
-import { getResourceProfile } from "./resourceDomain.js";
+import { EXTRACTABLE_TARGETING_GROUP, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND } from "./resourceConfig.js";
+import { getResourceProfile, resourceActionForTool } from "./resourceDomain.js";
 import { hitResourceDefinition } from "./gameSessionState.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
@@ -56,6 +56,8 @@ export function createPlantedTreeDefinition(object) {
     priority: 1,
     requiresFacing: false,
     facingDotThreshold: -1,
+    targetingMode: "facing-first",
+    targetingGroup: EXTRACTABLE_TARGETING_GROUP,
     prompt: profile.prompt,
     payload: Object.freeze({ resourceId: object.id }),
   });
@@ -71,11 +73,15 @@ export function ensurePlantedTreeNode(sessionState, resourceId) {
 export function applyPlantedTreeWork(sessionState, definition, {
   damage = 1,
   energyPerHit = 0,
+  toolId = getResourceProfile(definition.profileId).requiredTool,
   tuning = {},
 } = {}) {
+  const profile = getResourceProfile(definition.profileId);
+  const action = resourceActionForTool(profile, toolId);
+  if (!action) return { status: "wrong-tool", mutated: false };
   ensurePlantedTreeNode(sessionState, definition.id);
   return hitResourceDefinition(sessionState, definition, {
-    action: getResourceProfile(definition.profileId).preferredAction,
+    action,
     damage,
     energyPerHit,
     tuning,

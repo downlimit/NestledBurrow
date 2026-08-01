@@ -25,7 +25,7 @@ const FIELDS = Object.freeze([
 export function loadMovementDebugConfig() { return {}; }
 
 export class MovementDebugPanel {
-  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onBuildGridVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onVisualOffsetEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onColliderRound = () => ({ status: "empty" }), onPivotAlign = () => null, onVisualOffsetReset = () => null, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
+  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onSetNeedsDebugPreset = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onBuildGridVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onVisualOffsetEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onColliderRound = () => ({ status: "empty" }), onPivotAlign = () => null, onVisualOffsetReset = () => null, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
     this.enabled = Boolean(enabled);
     this.gameplayTuning = gameplayTuning;
     this.onGameplayTuningChange = onGameplayTuningChange;
@@ -231,6 +231,10 @@ export class MovementDebugPanel {
     const actionDefinitions = [
       ["Сбросить баланс-забег", onResetBalanceRun],
       ["Восполнить энергию", onRefillEnergy],
+      ["Потребности: голод", () => onSetNeedsDebugPreset("hungry")],
+      ["Потребности: истощение", () => onSetNeedsDebugPreset("exhausted")],
+      ["Потребности: срочно в туалет", () => onSetNeedsDebugPreset("urgent-toilet")],
+      ["Потребности: убрать debug", () => onSetNeedsDebugPreset("clear")],
       ["Добавить готовое блюдо", onAddCookedDish],
       ["Вернуть значения по умолчанию", () => this.resetDefaults()],
       ["Сохранить топологию и расстановку", () => void this.persistStartingLayout()],

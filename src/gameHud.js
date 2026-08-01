@@ -30,6 +30,7 @@ import {
 } from "./inventoryGainPresentation.js";
 import { createTransientMessageRuntime } from "./transientMessageRuntime.js";
 import { createThrowAimIndicator } from "./throwAimIndicator.js";
+import { NEED_FLOW_PROFILE_BY_ARROWS } from "./presentationTuning.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -85,21 +86,32 @@ export function isEnergyCritical(currentEnergy, maximumEnergy) {
 }
 
 export function needFlowPulseAlpha(arrows, nowMs, seed = 0) {
-  const intensity = Math.min(3, Math.max(1, Math.round(arrows) || 1));
+  const requestedArrows = Math.round(Number(arrows));
+  if (!Number.isFinite(requestedArrows) || requestedArrows <= 0) return 0;
+  const intensity = Math.min(3, requestedArrows);
+  const profile = NEED_FLOW_PROFILE_BY_ARROWS[intensity];
   const time = Number(nowMs) || 0;
-  const stableSeed = Number(seed) || 0;
-  const randomUnit = (salt) => {
-    const value = Math.sin(stableSeed * 127.1 + salt * 311.7) * 43758.5453;
-    return value - Math.floor(value);
-  };
-  const baseInterval = [0, 2600, 1700, 900][intensity];
-  const interval = baseInterval * (0.78 + randomUnit(1) * 0.5);
-  const activeDuration = 420 + randomUnit(2) * 420;
-  const phaseOffset = randomUnit(3) * interval;
-  const drift = Math.sin(time * (0.00009 + randomUnit(4) * 0.00041) + randomUnit(5) * Math.PI * 2) * (80 + randomUnit(6) * 210)
-    + Math.sin(time * (0.000031 + randomUnit(7) * 0.00017) + randomUnit(8) * Math.PI * 2) * (35 + randomUnit(9) * 125);
-  const phase = ((time + phaseOffset + drift) % interval + interval) % interval;
-  return phase < activeDuration ? Math.sin(Math.PI * phase / activeDuration) * 0.9 : 0;
+  const phaseOffset = needFlowPhaseOffset(seed, profile.cycleMs);
+  const phase = ((time + phaseOffset) % profile.cycleMs + profile.cycleMs) % profile.cycleMs;
+  if (phase < profile.fadeInMs) return smoothstep01(phase / profile.fadeInMs) * profile.peakAlpha;
+  if (phase < profile.fadeInMs + profile.peakHoldMs) return profile.peakAlpha;
+  if (phase < profile.fadeInMs + profile.peakHoldMs + profile.fadeOutMs) {
+    const fadePhase = (phase - profile.fadeInMs - profile.peakHoldMs) / profile.fadeOutMs;
+    return (1 - smoothstep01(fadePhase)) * profile.peakAlpha;
+  }
+  return 0;
+}
+
+export function needFlowPhaseOffset(seed, cycleMs) {
+  const text = String(seed ?? "");
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
+  return (hash >>> 0) / 0x100000000 * cycleMs;
+}
+
+function smoothstep01(value) {
+  const t = Math.min(1, Math.max(0, value));
+  return t * t * (3 - 2 * t);
 }
 
 export function createGameHud(scene, options) {
@@ -527,7 +539,7 @@ export function createGameHud(scene, options) {
       const critical = id === "energy" && ratio < 0.15;
       const fillWidth = ratio > 0 ? Math.max(1, Math.round(23 * ratio)) : 0;
       energyBarGraphics.fillStyle(critical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(rect.x + 12, rect.y + 3, fillWidth, 4);
-      drawNeedFlow(energyArrowGraphics, rect.x + 40, rect.y + 2, flow, scene.time.now, index + 1);
+      drawNeedFlow(energyArrowGraphics, rect.x + 40, rect.y + 2, flow, scene.time.now, id);
       return { id, symbol: NEED_ROW_SYMBOLS[index], ratio, flow };
     });
     const energy = needsRowsState[1];
@@ -826,7 +838,9 @@ function drawEnergyArrow(graphics, x, y, direction, alpha = 0.9) {
 
 function drawNeedFlow(graphics, x, y, flow, nowMs, seed) {
   if (!flow?.direction) return;
-  const arrows = Math.min(3, Math.max(1, Math.round(flow.arrows) || 1));
+  const requestedArrows = Math.round(Number(flow.arrows));
+  if (!Number.isFinite(requestedArrows) || requestedArrows <= 0) return;
+  const arrows = Math.min(3, requestedArrows);
   const alpha = needFlowPulseAlpha(arrows, nowMs, seed);
   if (alpha <= 0) return;
   for (let index = 0; index < arrows; index += 1) drawEnergyArrow(graphics, x + index * 5, y, flow.direction, alpha);
