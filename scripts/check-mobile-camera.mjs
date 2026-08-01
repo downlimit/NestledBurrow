@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { cameraFollowStep, normalizeCameraTuning } from "../src/cameraFollowRuntime.js";
+import { CameraFollowRuntime, cameraFollowStep, normalizeCameraTuning } from "../src/cameraFollowRuntime.js";
 import { JOYSTICK, clampJoystickCenter } from "../src/input.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
 
@@ -39,6 +39,26 @@ assert(Math.abs(oneStep.back.x - tenSteps.back.x) < 1e-9, "B interpolation is fr
 assert(oneStep.front.x > 100, "F mirrors B beyond the presentation point");
 assert(oneStep.progress > 0 && oneStep.progress < 1, "movement begins a gradual B-to-F transition");
 assert(oneStep.target.x < oneStep.front.x, "camera starts closer to B than F");
+
+const cameraTarget = {
+  x: null,
+  y: null,
+  setPosition(x, y) { this.x = x; this.y = y; return this; },
+  destroy() {},
+};
+const camera = { roundPixels: false, startFollow() {}, stopFollow() {} };
+const cameraRuntime = new CameraFollowRuntime({
+  add: { zone() { return cameraTarget; } },
+  cameras: { main: camera },
+}, {
+  presentationPosition: { x: 10.4, y: 20.6 },
+  movingSpeedThreshold: 2,
+});
+assert.equal(camera.roundPixels, true, "active camera always rounds scroll for pixel-art world visuals");
+assert.deepEqual({ x: cameraTarget.x, y: cameraTarget.y }, { x: 10, y: 21 }, "camera follow target is pixel-aligned at reset");
+cameraRuntime.update({ presentationPosition: { x: 11.6, y: 21.6 }, speed: 0, deltaMs: 16 });
+assert(Number.isInteger(cameraTarget.x) && Number.isInteger(cameraTarget.y), "camera follow target remains pixel-aligned while moving");
+cameraRuntime.destroy();
 const interactionHud = readFileSync("src/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");
 const characterVisual = readFileSync("src/characterVisual.js", "utf8");

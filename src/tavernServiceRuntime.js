@@ -21,6 +21,7 @@ export function createTavernServiceRuntime(scene, {
   characterSystem,
   createNpcMovementConfig,
   getPlayerPosition = () => null,
+  getSignPoint = () => GUEST_CONFIG.points.sign,
   onPersistentMutation = () => {},
   randomSource = Math.random,
 } = {}) {
@@ -88,6 +89,7 @@ export function createTavernServiceRuntime(scene, {
     },
     removeGuest: (id) => characterSystem.remove(id),
     getTavernOpen: () => sessionState.gameplay.tavernOpen,
+    getSignPoint,
     getServicePoint,
     getSeatPoint,
     reserveSeat,

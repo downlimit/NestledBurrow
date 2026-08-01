@@ -10,9 +10,8 @@ import {
   STARTER_TREE_OBJECTS,
 } from "./startingLayout.js";
 import { PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND } from "./resourceConfig.js";
-import { applyResourceWork, getResourceProfile } from "./resourceDomain.js";
-import { addInventoryItem, canAddInventoryItem, createInventoryItem } from "./inventoryDomain.js";
-import { TILE_SIZE } from "./worldConfig.js";
+import { getResourceProfile } from "./resourceDomain.js";
+import { hitResourceDefinition } from "./gameSessionState.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
 
@@ -41,9 +40,13 @@ export function createPlantedTreeDefinition(object) {
   return Object.freeze({
     id: object.id,
     entityId: object.id,
+    worldId: "village",
     roomId: "yard",
     kind: RESOURCE_INTERACTION_KIND,
     profileId,
+    visualPosition: Object.freeze({ ...object.point }),
+    visualBounds: Object.freeze({ ...object.bounds }),
+    colliderBounds: Object.freeze({ ...collider }),
     cell: Object.freeze({
       x: Math.round(collider.left / PLACEMENT_CELL_SIZE),
       y: Math.round(collider.top / PLACEMENT_CELL_SIZE),
@@ -70,37 +73,13 @@ export function applyPlantedTreeWork(sessionState, definition, {
   energyPerHit = 0,
   tuning = {},
 } = {}) {
-  const profile = getResourceProfile(definition.profileId);
-  const node = ensurePlantedTreeNode(sessionState, definition.id);
-  if (node.cleared) return { status: "already-cleared", mutated: false };
-  const cost = Math.max(0, Number(energyPerHit) || 0);
-  if (sessionState.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };
-  const preview = applyResourceWork({ ...node }, profile, {
-    action: profile.preferredAction,
+  ensurePlantedTreeNode(sessionState, definition.id);
+  return hitResourceDefinition(sessionState, definition, {
+    action: getResourceProfile(definition.profileId).preferredAction,
     damage,
+    energyPerHit,
     tuning,
   });
-  if (!preview.mutated) return preview;
-  const rewardItem = preview.status === "cleared"
-    ? createInventoryItem(profile.reward.resource === "rubies" ? "ruby" : profile.reward.resource, profile.reward.amount)
-    : null;
-  if (rewardItem) {
-    const availability = canAddInventoryItem(sessionState.gameplay.inventory, rewardItem);
-    if (!availability.canAdd) return { status: availability.status, mutated: false, reward: profile.reward, item: rewardItem };
-  }
-  const result = applyResourceWork(node, profile, {
-    action: profile.preferredAction,
-    damage,
-    tuning,
-  });
-  sessionState.gameplay.currentEnergy -= cost;
-  const inventoryResult = rewardItem ? addInventoryItem(sessionState.gameplay.inventory, rewardItem) : null;
-  return {
-    ...result,
-    currentEnergy: sessionState.gameplay.currentEnergy,
-    reward: result.status === "cleared" ? profile.reward : null,
-    inventory: inventoryResult,
-  };
 }
 
 export function resolveColliderSelectionPointer(entries, selectionBoundsById, pointer) {
@@ -128,37 +107,6 @@ function isPlantedTreeObject(object) {
       || object.item?.resourceProfileId === PLANTED_TREE_PROFILE_ID);
 }
 
-function createTreeSprites(scene, object) {
-  if (object.sprites?.length) return object.sprites;
-  const sprites = [];
-  const profileKey = `resource:${object.item.resourceProfileId ?? PLANTED_TREE_PROFILE_ID}`;
-  const profile = scene.assetProfiles?.[profileKey];
-  const depth = assetDepthFromPivot(
-    object.point,
-    profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
-    500,
-    object.id,
-  );
-  for (let row = 0; row < 4; row += 1) {
-    for (let column = 0; column < 3; column += 1) {
-      const offset = profile?.visualOffset ?? { x: 0, y: 0 };
-      sprites.push(scene.add.image(
-        object.point.x + column * TILE_SIZE + offset.x,
-        object.point.y + row * TILE_SIZE + offset.y,
-        object.item.textureKey,
-        row * 9 + column,
-      ).setOrigin(0).setDepth(depth));
-    }
-  }
-  object.sprites = sprites;
-  return sprites;
-}
-
-function destroyTreeSprites(object) {
-  for (const sprite of object.sprites ?? []) sprite.destroy?.();
-  object.sprites = [];
-}
-
 export function attachEditorAuthoringRuntime(scene, {
   storage = globalThis.localStorage,
   fetchImpl = globalThis.fetch,
@@ -181,32 +129,21 @@ export function attachEditorAuthoringRuntime(scene, {
     return ensurePlantedTreeNode(scene.sessionState, id);
   }
 
-  function setPlantCollider(object, active) {
-    scene.worldLayout.clearWorldObjectCollider(object.id);
-    if (!active) return;
-    scene.worldLayout.setWorldObjectCollider(
-      object.id,
-      object.colliderBounds,
-      `resource:${object.item.resourceProfileId}`,
-    );
-  }
-
   function restorePlantVisual(object) {
-    if (stateFor(object.id).cleared) {
-      destroyTreeSprites(object);
-      setPlantCollider(object, false);
-      object.resourceCleared = true;
-      return;
-    }
-    createTreeSprites(scene, object);
-    setPlantCollider(object, true);
-    object.resourceCleared = false;
+    scene.debrisRuntime?.registerResource?.(object.resourceDefinition, {
+      onVisualChange: (visual) => { object.sprites = visual ? [visual] : []; },
+    });
+    object.resourceCleared = stateFor(object.id).cleared;
   }
 
   function registerPlant(object) {
     if (!isPlantedTreeObject(object)) return null;
+    const ownedVisual = scene.debrisRuntime?.getResourceVisual?.(object.id);
+    for (const sprite of object.sprites ?? []) if (sprite !== ownedVisual) sprite.destroy?.();
+    scene.worldLayout.clearWorldObjectCollider(object.id);
+    object.sprites = [];
     object.kind = "plant";
-    object.item = { ...object.item, resourceProfileId: PLANTED_TREE_PROFILE_ID, objectType: "plant" };
+    object.item = { ...object.item, worldId: "village", resourceProfileId: PLANTED_TREE_PROFILE_ID, objectType: "plant" };
     object.collider = true;
     object.colliderGroup = `resource:${PLANTED_TREE_PROFILE_ID}`;
     object.resourceDefinition = createPlantedTreeDefinition(object);
@@ -227,21 +164,10 @@ export function attachEditorAuthoringRuntime(scene, {
     return { x: Number(offset?.x) || 0, y: Number(offset?.y) || 0 };
   }
 
-  function plantAuthoringInstances() {
-    return [...plants.values()].flatMap((object) => object.sprites?.length ? [{
-      id: object.id,
-      profileKey: `resource:${object.item.resourceProfileId}`,
-      anchor: { ...object.point },
-      bounds: { ...object.bounds },
-      targets: object.sprites,
-    }] : []);
-  }
-
   function getAuthoringInstances() {
     return [
       ...(scene.debrisRuntime?.getAuthoringInstances?.() ?? []),
       ...(scene.facilityRuntime?.getAuthoringInstances?.() ?? []),
-      ...plantAuthoringInstances(),
     ].filter((instance) => scene.assetProfiles?.[instance.profileKey]);
   }
 
@@ -262,21 +188,6 @@ export function attachEditorAuthoringRuntime(scene, {
         - ((b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top)))[0]?.instance ?? null;
   }
 
-  function applyPlantOffset(profileKey, offset) {
-    for (const object of plants.values()) {
-      if (`resource:${object.item.resourceProfileId}` !== profileKey) continue;
-      for (let index = 0; index < (object.sprites?.length ?? 0); index += 1) {
-        const sprite = object.sprites[index];
-        const row = Math.floor(index / 3);
-        const column = index % 3;
-        sprite.setPosition?.(
-          object.point.x + column * TILE_SIZE + offset.x,
-          object.point.y + row * TILE_SIZE + offset.y,
-        );
-      }
-    }
-  }
-
   function applyProfileVisualOffset(profileKey, value) {
     const offset = { x: Math.round(Number(value?.x) || 0), y: Math.round(Number(value?.y) || 0) };
     const current = scene.assetProfiles?.[profileKey];
@@ -287,7 +198,6 @@ export function attachEditorAuthoringRuntime(scene, {
     });
     scene.debrisRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
     scene.facilityRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
-    applyPlantOffset(profileKey, offset);
     return offset;
   }
 
@@ -336,7 +246,7 @@ export function attachEditorAuthoringRuntime(scene, {
     if (!isPlantedTreeObject(object)) return;
     plants.delete(object.id);
     selectionBoundsById.delete(object.id);
-    if (removeState) delete scene.sessionState?.gameplay?.resourceNodes?.[object.id];
+    scene.debrisRuntime?.unregisterResource?.(object.id, { removeState });
     scene.interactionRuntime?.refresh?.();
   }
 
@@ -384,91 +294,6 @@ export function attachEditorAuthoringRuntime(scene, {
       selectionBoundsById,
       pointer,
     ));
-  }
-
-  const originalInteractionDefinitions = scene.debrisRuntime?.getInteractionDefinitions?.bind(scene.debrisRuntime);
-  if (originalInteractionDefinitions) {
-    scene.debrisRuntime.getInteractionDefinitions = () => [
-      ...originalInteractionDefinitions(),
-      ...[...plants.values()]
-        .filter((object) => !stateFor(object.id).cleared)
-        .map((object) => object.resourceDefinition),
-    ];
-  }
-
-  const originalRebuildDebris = scene.debrisRuntime?.rebuild?.bind(scene.debrisRuntime);
-  if (originalRebuildDebris) {
-    scene.debrisRuntime.rebuild = () => {
-      const result = originalRebuildDebris();
-      for (const object of plants.values()) restorePlantVisual(object);
-      scene.interactionRuntime?.refresh?.();
-      return result;
-    };
-  }
-
-  function animatePlantHit(object, result, onComplete) {
-    const sprites = object.sprites ?? [];
-    if (result.status === "cleared") {
-      setPlantCollider(object, false);
-      object.resourceCleared = true;
-      if (!sprites.length || !scene.tweens?.add) {
-        destroyTreeSprites(object);
-        onComplete();
-        return;
-      }
-      scene.tweens.add({
-        targets: sprites,
-        alpha: 0,
-        scaleY: 0.55,
-        duration: 160,
-        ease: "Quad.easeOut",
-        onComplete: () => { destroyTreeSprites(object); onComplete(); },
-      });
-      return;
-    }
-    if (!sprites.length || !scene.tweens?.add) return onComplete();
-    const origins = sprites.map((sprite) => ({ sprite, x: sprite.x }));
-    scene.tweens.add({
-      targets: sprites,
-      x: "+=1",
-      duration: 60,
-      yoyo: true,
-      onComplete: () => {
-        for (const origin of origins) origin.sprite.x = origin.x;
-        onComplete();
-      },
-    });
-  }
-
-  const originalRunWorldObjectInteraction = scene.runWorldObjectInteraction?.bind(scene);
-  if (originalRunWorldObjectInteraction) {
-    scene.runWorldObjectInteraction = (candidate) => {
-      const resourceId = candidate?.payload?.resourceId;
-      const object = plants.get(resourceId);
-      if (!object || candidate.kind !== RESOURCE_INTERACTION_KIND) return originalRunWorldObjectInteraction(candidate);
-      const nowMs = globalThis.performance?.now?.() ?? Date.now();
-      if (nowMs - scene.lastSuccessfulHitAtMs < scene.gameplayTuning.universalHitCooldownSeconds * 1000) {
-        return { status: "cooldown", mutated: false };
-      }
-      const profile = getResourceProfile(object.resourceDefinition.profileId);
-      const energyBefore = scene.sessionState.gameplay.currentEnergy;
-      const result = applyPlantedTreeWork(scene.sessionState, object.resourceDefinition, {
-        damage: scene.gameplayTuning.axeDamage,
-        energyPerHit: scene.gameplayTuning.energyPerHit,
-        tuning: scene.gameplayTuning,
-      });
-      if (result.mutated) {
-        scene.lastSuccessfulHitAtMs = nowMs;
-        scene.activeResourceProfileId = profile.id;
-        scene.interactionHud?.triggerCooldownFeedback?.();
-        scene.gameHud?.render?.();
-        if (result.inventory?.mutated) scene.gameHud?.notifyInventoryGain?.(result.inventory);
-        scene.applySuccessfulHitFeedback?.(profile.sfx, energyBefore);
-        animatePlantHit(object, result, () => scene.interactionRuntime?.refresh?.());
-        scene.saveSession?.();
-      }
-      return result;
-    };
   }
 
   for (const object of scene.buildPlacedObjects?.values?.() ?? []) registerPlant(object);

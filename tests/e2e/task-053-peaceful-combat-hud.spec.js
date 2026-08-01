@@ -287,7 +287,7 @@ test("options and build mode suppress Alt without changing the stable mode", asy
   await expect.poll(() => inventoryMode(page)).toMatchObject({ suppressed: false, stableMode: "PEACEFUL" });
 });
 
-test("new game restarts the scene without touching destroyed inventory zones", async ({ page }, testInfo) => {
+test("new game reloads one clean runtime without touching destroyed inventory zones", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "Task #053 lifecycle regression is covered on desktop");
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -305,10 +305,12 @@ test("new game restarts the scene without touching destroyed inventory zones", a
     await page.mouse.click(target.x, target.y);
   }
 
-  await expect.poll(() => page.evaluate(
+  await page.waitForFunction(
     () => Boolean(window.__NESTLED_BURROW_E2E__)
       && !window.__NESTLED_BURROW_E2E__.__task053PreviousBridge,
-  ), { timeout: 3000 }).toBe(true);
+    null,
+    { timeout: 3_000 },
+  );
   await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
     mode: "PEACEFUL",
     stableMode: "PEACEFUL",

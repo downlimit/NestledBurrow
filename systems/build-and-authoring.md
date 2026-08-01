@@ -6,7 +6,8 @@ This system owns player-facing construction interactions and developer-facing ca
 
 ## Player-facing build contract
 
-- library selects walls, surfaces, furniture, facilities and plants; movable training dummies participate in canonical furniture persistence;
+- every opening starts with no selected catalog asset, so the opening pointer cannot leak through and select a wall;
+- library selects walls, surfaces, furniture, facilities and plants; movable training dummies and the tavern sign participate in canonical furniture persistence;
 - placement, move and demolition use the same world geometry;
 - existing objects can be dragged without jumping their grabbed point under the cursor;
 - validation uses effective profile colliders;

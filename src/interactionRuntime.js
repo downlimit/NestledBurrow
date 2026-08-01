@@ -8,7 +8,8 @@ import {
 export function createInteractionRuntime({
   sessionState,
   characterSystem,
-  interactionDefinitions,
+  interactionDefinitions = [],
+  getInteractionDefinitions = () => interactionDefinitions,
   getDialogueDefinition,
   resolveDialogueId,
   completeDialogue,
@@ -43,8 +44,9 @@ export function createInteractionRuntime({
   function findCandidate() {
     const player = characterSystem.getSnapshot(sessionState.playerId);
     const targets = [];
-    for (const definition of interactionDefinitions) {
+    for (const definition of getInteractionDefinitions()) {
       if (!isInteractionAllowed(definition)) continue;
+      if (!characterSystem.has(definition.entityId)) continue;
       const snapshot = characterSystem.getSnapshot(definition.entityId);
       targets.push(createInteractionTarget({
         ...definition,
@@ -154,6 +156,10 @@ export function createInteractionRuntime({
       if (destroyed) return;
       if (isSessionDialogueActive(sessionState)) showCurrentDialogueLine();
       else if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
+    },
+    resetCandidate() {
+      currentCandidate = null;
+      presenter?.hidePrompt?.();
     },
     destroy() {
       if (destroyed) return;

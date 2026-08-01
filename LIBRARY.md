@@ -11,6 +11,7 @@
 
 | Запрос или область | System-документ | Основные владельцы | Targeted checks |
 |---|---|---|---|
+| локации, переход Нора ↔ Гнездо, world bounds, location lifecycle | `systems/world-and-resources.md` + `systems/character-and-needs.md` | `worldLocationConfig.js`, `worldLocationCoordinator.js`, `worldLocationLifecycle.js`, `nestWorldLayout.js` | `check:task-059`, focused location Browser E2E |
 | движение, joystick, камера, сон, потребности | `systems/character-and-needs.md` | `characterMotor.js`, `input.js`, `mobileJoystick.js`, `cameraFollowRuntime.js`, `needsDomain.js` | `check:input`, `check:mobile-camera`, `check:movement`, `check:needs`, `check:clock-cycle` |
 | Дикий Атолл, экспедиции, сегменты, пороги, события забега, подготовка и прогресс глубины | `systems/wild-atoll.md` | `WildAtollPrototype/` как standalone-макет; production owner ещё не создан | `check:docs` |
 | ресурсы, добыча, инвентарь, выброшенные предметы, огород, вода, растения | `systems/world-and-resources.md` | `resourceDomain.js`, `debrisRuntime.js`, `inventoryDomain.js`, `inventoryRuntime.js`, `farmingDomain.js`, `farmingRuntime.js` | `check:inventory`, `check:world`, `check:interaction`, `check:task-047`, `check:task-049`, `check:task-056` |

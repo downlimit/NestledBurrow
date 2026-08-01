@@ -71,7 +71,10 @@ const facilityWorld = {
   setWorldObjectCollider(id, rect, groupKey) { registrations.set(id, { rect: { ...rect }, groupKey }); },
   clearWorldObjectCollider(id) { registrations.delete(id); },
 };
-const facilityRuntime = createFacilityRuntime({ assetProfiles: profiles, add: { image: () => new DisplayStub() } }, { worldLayout: facilityWorld });
+const facilityRuntime = createFacilityRuntime({ assetProfiles: profiles, add: {
+  graphics: () => new DisplayStub(),
+  image: () => new DisplayStub(),
+} }, { worldLayout: facilityWorld });
 const stove = facilityRuntime.add("gas-stove", { x: 640, y: 400 });
 assert(stove);
 assert(placementChecks.some((rect) => rect.left === 640 && rect.top === 416 && rect.bottom === 432), "facility placement validates the edited effective collider");

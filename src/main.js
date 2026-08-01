@@ -26,12 +26,13 @@ import {
   TILE_SIZE,
   TREES_IMAGE_PATH,
   TREES_TEXTURE_KEY,
-  WORLD_HEIGHT,
-  WORLD_WIDTH,
 } from "./worldConfig.js";
 import { createWorldLayout } from "./worldLayout.js";
+import { WORLD_IDS } from "./worldLocationConfig.js";
+import { createWorldLocationCoordinator } from "./worldLocationCoordinator.js";
+import { canTransitionWorldLocation, destroyWorldLocation, mountWorldLocation, renderWorldLocation } from "./worldLocationLifecycle.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitResourceNode, refillEnergy, regenerateEnergy, resetBalanceRun } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitResourceDefinition, refillEnergy, regenerateEnergy, resetBalanceRun } from "./gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
@@ -71,8 +72,9 @@ import {
   getBuildWallFrames,
 } from "./buildAssetCatalog.js";
 import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
-import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
+import { DEFAULT_RESOURCE_ID, getResourceObjectsForWorld, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile, resourceActionForTool, resourceEffectType } from "./resourceDomain.js";
+import { drawResourceVisual } from "./resourceVisuals.js";
 import { createDebrisRuntime, drawBed } from "./debrisRuntime.js";
 import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
@@ -81,17 +83,17 @@ import { applyNeedsUpdate } from "./needsDomain.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
 import { createCookingRuntime } from "./cookingRuntime.js";
-import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_KIND } from "./guestConfig.js";
+import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_BUILD_KIND, TAVERN_SIGN_KIND } from "./guestConfig.js";
 import { createTavernSignRuntime } from "./tavernSignRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
   toPhaserFrame,
 } from "./characterVisualProfiles.js";
-import { FARMING_WELL_TEXTURE_KEY, preloadFarmingAssets, WELL_PROFILE } from "./farmingConfig.js";
+import { preloadFarmingAssets, WELL_PROFILE } from "./farmingConfig.js";
 import { createFarmingRuntime } from "./farmingRuntime.js";
 import { createMerchantRuntime } from "./merchantRuntime.js";
-import { createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
+import { createWellPresentation, createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
 import { preloadLemonadeAssets } from "./lemonadeConfig.js";
 import { createTavernServiceRuntime } from "./tavernServiceRuntime.js";
 import { createKitchenInteractionRuntime } from "./kitchenInteractionRuntime.js";
@@ -104,8 +106,11 @@ import {
   isMeleeWeaponId,
   preloadMeleeAssets,
   resolveMeleeActionItem,
+  TRAINING_DUMMY,
 } from "./meleeConfig.js";
 import { createMeleeRuntime } from "./meleeRuntime.js";
+import { loadStartingLayout } from "./startingLayout.js";
+import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
@@ -172,29 +177,38 @@ class WorldScene extends Phaser.Scene {
 
   create() {
     this.movementDebugEnabled = true;
-    this.worldLayout = createWorldLayout();
-      this.colliderOverrides = migrateColliderOverrideGroups(loadColliderDebugOverrides(window.localStorage));
-      this.assetProfiles = loadAssetProfiles(window.localStorage, this.colliderOverrides);
-      for (const [profileKey, profile] of Object.entries(this.assetProfiles)) {
-        this.colliderOverrides[profileKey] = profile.colliderOffsets;
-      }
-    saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
-    for (const [id, offsets] of Object.entries(this.colliderOverrides)) {
-      this.worldLayout.setColliderOverride(id, offsets);
+    this.colliderOverrides = migrateColliderOverrideGroups(loadColliderDebugOverrides(window.localStorage));
+    this.assetProfiles = loadAssetProfiles(window.localStorage, this.colliderOverrides);
+    for (const [profileKey, profile] of Object.entries(this.assetProfiles)) {
+      this.colliderOverrides[profileKey] = profile.colliderOffsets;
     }
+    saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
+    this.createGameplayTuning();
+    this.loadSessionState();
+    this.worldLocationCoordinator = createWorldLocationCoordinator({
+      sessionState: this.sessionState,
+      createLayout: (worldId) => createWorldLayout(worldId),
+      applyColliderOverrides: (layout) => this.applyColliderOverridesToLayout(layout),
+      getPlayerCharacter: () => this.playerCharacter,
+      canTransition: () => this.canTransitionLocation(),
+      beforeLocationChange: () => this.destroyLocationLifecycle(),
+      applyLocationLayout: ({ layout }) => this.applyLocationLayout(layout),
+      afterLocationChange: () => this.mountLocationLifecycle(),
+      setCameraBounds: (bounds) => this.cameras.main.setBounds(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top),
+      resetCamera: (position) => this.cameraRuntime?.reset?.(position),
+      refreshInteractions: () => this.interactionRuntime?.refresh?.(),
+      saveSession: () => this.saveSession(),
+    });
+    this.worldLayout = this.worldLocationCoordinator.createInitialLayout();
     this.characterSystem = createCharacterSystem({ collisionEnvironment: this.worldLayout });
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.setBounds(0, 0, this.worldLayout.bounds.right, this.worldLayout.bounds.bottom);
     this.renderWorld();
     this.createCharacterAnimations();
     this.createInput();
     this.createCharacters();
     this.createAudio();
-    this.createGameplayTuning();
     this.createCameraRuntime();
     this.createSessionAndInteractionRuntime();
-    this.createDebrisRuntime();
-    this.createFacilityRuntime();
-    this.createTavernRuntime();
     this.sleeping = false;
     this.exhaustedSleeping = false;
     this.isRunning = false;
@@ -203,44 +217,24 @@ class WorldScene extends Phaser.Scene {
     this.autosaveAccumulatorSeconds = 0;
     this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY;
     this.lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
-    this.createMovementDebugPanel();
     this.createDayNightRuntime();
     this.createHud();
-    this.createFarmingRuntime();
-    this.createCookingRuntime();
-    this.createMeleeRuntime();
+    this.mountLocationLifecycle();
     this.attachSceneListeners();
     this.createJoystick();
-    this.createBuildMode();
     this.syncIntegerZoom();
     this.installE2EBridge();
   }
 
-  renderWorld() {
-    this.groundSprites = new Map();
-    this.worldLayout.groundTiles.forEach((tile) => {
-      const sprite = this.addTile(tile, OUTDOOR_TEXTURE_KEY, 0);
-      this.groundSprites.set(this.buildCellKey({ x: tile.x * TILE_SIZE, y: tile.y * TILE_SIZE }), { sprite, tile });
-    });
-    this.floorSprites = new Map();
-    this.worldLayout.houseFloorTiles.forEach((tile) => {
-      const sprite = this.addTile(tile, HOUSE_TEXTURE_KEY, 20);
-      this.floorSprites.set(this.buildCellKey({ x: tile.x * TILE_SIZE, y: tile.y * TILE_SIZE }), { sprite, tile });
-    });
-    this.wallSprites = new Map();
-    this.worldLayout.houseWallTiles.forEach((tile) => {
-      this.wallSprites.set(tile.id, this.createCanonicalWallEntry(tile));
-    });
-    this.worldLayout.decorationTiles.forEach((tile) =>
-      this.addTile(tile, TREES_TEXTURE_KEY, tile.depth),
-    );
-  }
+  renderWorld() { renderWorldLocation(this, { outdoorTextureKey: OUTDOOR_TEXTURE_KEY, houseTextureKey: HOUSE_TEXTURE_KEY, treesTextureKey: TREES_TEXTURE_KEY, tileSize: TILE_SIZE }); }
 
   addTile(tile, textureKey, depth) {
-    return this.add
+    const sprite = this.add
       .image(tile.worldX ?? tile.x * TILE_SIZE, tile.worldY ?? tile.y * TILE_SIZE, textureKey, tile.frame)
       .setOrigin(0, 0)
       .setDepth(depth);
+    this.worldRenderSprites?.push?.(sprite);
+    return sprite;
   }
 
   createCanonicalWallEntry(tile) {
@@ -250,6 +244,7 @@ class WorldScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setCrop(supplement.cropX, 0, supplement.cropWidth, TILE_SIZE)
       .setDepth(depth));
+    this.worldRenderSprites?.push?.(...extraSprites);
     const sprite = this.addTile(tile, HOUSE_TEXTURE_KEY, depth);
     return { sprite, extraSprites, tile };
   }
@@ -288,7 +283,13 @@ class WorldScene extends Phaser.Scene {
       visualProfile: playerVisualProfile,
     });
     this.characterSystem.add(this.playerCharacter);
+    this.player = this.characterSystem.require("player").sprite;
+  }
+
+  mountVillageCharacters() {
+    this.npcMovementConfigs = [];
     for (const npc of NPCS) {
+      if (this.characterSystem.has(npc.id)) continue;
       const actorProfile = getActorProfile(npc.profileId);
       const visualProfile = getCharacterVisualProfile(npc.visualProfileId);
       this.characterSystem.add(createCharacter(this, {
@@ -305,7 +306,11 @@ class WorldScene extends Phaser.Scene {
         visualProfile,
       }));
     }
-    this.player = this.characterSystem.require("player").sprite;
+  }
+
+  destroyVillageCharacters() {
+    for (const npc of NPCS) this.characterSystem?.remove?.(npc.id);
+    this.npcMovementConfigs = [];
   }
 
   createNpcRuntimeMovementConfig(profile) {
@@ -364,6 +369,14 @@ class WorldScene extends Phaser.Scene {
     this.gameplayTuning = loadGameplayDebugTuning({ enabled: this.movementDebugEnabled });
   }
 
+  loadSessionState() {
+    this.sessionPersistence = this.createPersistence();
+    const loaded = this.sessionPersistence?.load();
+    this.sessionState = loaded?.state ?? this.createFreshSessionState();
+    this.pendingTask049MigrationWarning = Boolean(this.sessionState.flags?.["migration.task049WarningPending"]);
+    if (loaded?.diagnostic) console.warn("Recovered NestledBurrow session", loaded.diagnostic);
+  }
+
   createCameraRuntime() {
     this.cameraRuntime = new CameraFollowRuntime(this, {
       presentationPosition: this.getPlayerPresentationPosition(),
@@ -373,34 +386,19 @@ class WorldScene extends Phaser.Scene {
   }
 
   createSessionAndInteractionRuntime() {
-    this.sessionPersistence = this.createPersistence();
-    const loaded = this.sessionPersistence?.load();
-    this.sessionState = loaded?.state ?? this.createFreshSessionState();
-    this.pendingTask049MigrationWarning = Boolean(this.sessionState.flags?.["migration.task049WarningPending"]);
-    if (loaded?.diagnostic) {
-      console.warn("Recovered NestledBurrow session", loaded.diagnostic);
-    }
     this.interactionHud = createInteractionHud(this, {
       isCoarsePointer: () => this.isCoarsePointer(),
       localization: this.localization,
     });
-    this.merchantRuntime = createMerchantRuntime(this, {
-      sessionState: this.sessionState,
-      localization: this.localization,
-      onActiveChange: () => this.syncGameplayHudVisibility(), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
-      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
-      onPersistentMutation: () => {
-        this.gameHud?.render?.();
-        this.saveSession();
-      },
-    });
-    this.uiVisibilityCoordinator = new UiVisibilityCoordinator(); this.uiVisibilityCoordinator.register(this.interactionHud, ["gameplay-overlay", "option-sensitive", "merchant-active", "inventory-action-blocked"]); this.uiVisibilityCoordinator.register(this.merchantRuntime, ["gameplay-overlay", "option-sensitive"]);
+    this.uiVisibilityCoordinator = new UiVisibilityCoordinator();
+    this.uiVisibilityCoordinator.register(this.interactionHud, ["gameplay-overlay", "option-sensitive", "merchant-active", "inventory-action-blocked"]);
     applyGameplayTuning(this.sessionState, this.gameplayTuning);
     this.syncPlayerEnergyTarget();
     this.interactionRuntime = createInteractionRuntime({
       sessionState: this.sessionState,
       characterSystem: this.characterSystem,
-      interactionDefinitions: INTERACTION_DEFINITIONS,
+      interactionDefinitions: [],
+      getInteractionDefinitions: () => this.worldLocationCoordinator?.hasCapability("npcs") ? INTERACTION_DEFINITIONS : [],
       getDialogueDefinition,
       onPersistentMutation: () => { this.gameHud?.render?.(); this.saveSession(); },
       getStaticInteractionDefinitions: () => [
@@ -419,8 +417,31 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
+  createMerchantRuntime() {
+    this.merchantRuntime = createMerchantRuntime(this, {
+      sessionState: this.sessionState,
+      localization: this.localization,
+      onActiveChange: () => this.syncGameplayHudVisibility(),
+      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
+      onPersistentMutation: () => {
+        this.gameHud?.render?.();
+        this.saveSession();
+      },
+    });
+    this.unregisterMerchantVisibility = this.uiVisibilityCoordinator?.register?.(this.merchantRuntime, ["gameplay-overlay", "option-sensitive"]);
+  }
+
   createDebrisRuntime() {
-    this.debrisRuntime = createDebrisRuntime(this, { sessionState: this.sessionState, worldLayout: this.worldLayout, getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null, getGameplayTuning: () => this.gameplayTuning, onPersistentMutation: (result) => { this.gameHud?.render?.(); if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory); this.interactionRuntime?.refresh?.(); this.saveSession(); } });
+    this.debrisRuntime = createDebrisRuntime(this, {
+      sessionState: this.sessionState,
+      worldLayout: this.worldLayout,
+      resourceDefinitions: getResourceObjectsForWorld(this.worldLocationCoordinator.getCurrentDefinition().id),
+      includeBed: this.worldLocationCoordinator.hasCapability("homeSystems"),
+      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
+      getGameplayTuning: () => this.gameplayTuning,
+      onPersistentMutation: (result) => { this.gameHud?.render?.(); if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory); this.interactionRuntime?.refresh?.(); this.saveSession(); },
+    });
   }
 
   createFacilityRuntime() {
@@ -444,6 +465,7 @@ class WorldScene extends Phaser.Scene {
       characterSystem: this.characterSystem,
       createNpcMovementConfig: (profile) => this.createNpcRuntimeMovementConfig(profile),
       getPlayerPosition: () => this.playerCharacter?.motor?.position,
+      getSignPoint: () => this.tavernSignRuntime?.getGuestCheckPoint?.() ?? GUEST_CONFIG.points.sign,
       onPersistentMutation: (result) => {
         if (result?.status === "coin-collected") this.gameHud?.notifyCoinDelta?.(result.value);
         this.facilityRuntime?.syncKitchenVisuals?.();
@@ -507,13 +529,13 @@ class WorldScene extends Phaser.Scene {
     if (candidate.kind !== RESOURCE_INTERACTION_KIND) return { status: "ignored" };
     const nowMs = globalThis.performance?.now?.() ?? Date.now();
     if (nowMs - this.lastSuccessfulHitAtMs < this.gameplayTuning.universalHitCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
-    const definition = RESOURCE_OBJECTS.find((item) => item.id === candidate.payload.resourceId);
+    const definition = this.debrisRuntime?.getResourceDefinition?.(candidate.payload.resourceId);
     if (!definition) return { status: "unknown-resource", mutated: false };
     const profile = getResourceProfile(definition.profileId);
     const action = resourceActionForTool(profile, this.gameHud?.getSelectedInventoryItem?.()?.id);
     if (!action) return { status: "wrong-tool", mutated: false };
     const energyBefore = this.sessionState.gameplay.currentEnergy;
-    const result = hitResourceNode(this.sessionState, definition.id, {
+    const result = hitResourceDefinition(this.sessionState, definition, {
       action,
       damage: this.gameplayTuning.axeDamage,
       energyPerHit: this.gameplayTuning.energyPerHit,
@@ -586,11 +608,16 @@ class WorldScene extends Phaser.Scene {
   }
 
   createFreshSessionState() {
+    const villageLayout = this.worldLayout?.locationId === WORLD_IDS.village
+      ? this.worldLayout
+      : createWorldLayout(WORLD_IDS.village);
+    const startingLayout = loadStartingLayout(window.localStorage, STARTING_LAYOUT_DEFAULT);
+    const trainingDummyPosition = startingLayout?.furniture?.find(({ id }) => id === TRAINING_DUMMY.id)?.position;
     return createFreshGameSessionState({
-      currentWorldId: "village",
+      currentWorldId: WORLD_IDS.village,
       playerId: "player",
       initialEntityIds: NPCS.map((npc) => npc.id),
-      initialWorldItems: createMeleeStartingWorldItems(this.worldLayout),
+      initialWorldItems: createMeleeStartingWorldItems(villageLayout, [], trainingDummyPosition),
     });
   }
 
@@ -599,6 +626,22 @@ class WorldScene extends Phaser.Scene {
     if (result?.status === "error") console.warn("Session save failed", result.diagnostic);
     return result;
   }
+
+  applyColliderOverridesToLayout(layout) {
+    for (const [id, offsets] of Object.entries(this.colliderOverrides ?? {})) layout.setColliderOverride(id, offsets);
+  }
+
+  applyLocationLayout(layout) {
+    this.worldLayout = layout;
+    if (this.characterSystem) this.characterSystem.collisionEnvironment = layout;
+    this.renderWorld();
+  }
+
+  mountLocationLifecycle() { mountWorldLocation(this); }
+
+  destroyLocationLifecycle() { destroyWorldLocation(this); }
+
+  canTransitionLocation() { return canTransitionWorldLocation(this); }
 
   createMovementDebugPanel() {
     this.movementDebugPanel = new MovementDebugPanel({
@@ -924,6 +967,7 @@ class WorldScene extends Phaser.Scene {
   createMeleeRuntime() {
     this.meleeRuntime = createMeleeRuntime(this, {
       worldLayout: this.worldLayout,
+      includeTrainingDummy: this.worldLocationCoordinator.hasCapability("trainingDummy"),
       getPlayerCharacter: () => this.playerCharacter,
       getSelectedItem: () => this.frameMeleeItem,
       getControllerMoveDirection: () => this.getControllerMoveDirection(),
@@ -1059,6 +1103,8 @@ class WorldScene extends Phaser.Scene {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const coordinated = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint);
     if (coordinated) return coordinated;
+    const sign = this.tavernSignRuntime?.getBuildMoveTargetAt?.(hitPoint);
+    if (sign) return sign;
     const dummy = this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint);
     if (dummy) return dummy;
     const facility = this.facilityRuntime?.getDefinitionAt?.(hitPoint);
@@ -1120,6 +1166,8 @@ class WorldScene extends Phaser.Scene {
     if (!target?.definition) return { status: "ignored" };
     const result = target.kind === "well"
       ? this.worldBuildCoordinator?.move?.(target, point)
+      : target.kind === TAVERN_SIGN_BUILD_KIND
+      ? this.tavernSignRuntime?.moveBuildTarget?.(point)
       : target.kind === "facility"
       ? this.facilityRuntime?.move?.(target.definition.id, point)
       : target.kind === "bed" ? this.debrisRuntime?.moveBed?.(target.definition.id, point)
@@ -1130,7 +1178,8 @@ class WorldScene extends Phaser.Scene {
         this.worldBuildCoordinator?.removeAt?.(result.current);
         this.worldBuildCoordinator?.restore?.(result.previous);
         this.saveSession();
-      } else if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
+      } else if (target.kind === TAVERN_SIGN_BUILD_KIND) this.tavernSignRuntime?.restoreBuildTarget?.(result.previous);
+      else if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
       else if (target.kind === "training-dummy") this.meleeRuntime?.restoreBuildTarget?.(result.previous);
       else this.debrisRuntime?.replaceBed?.(result.previous);
       this.facilityRuntime?.syncKitchenVisuals?.();
@@ -1145,16 +1194,14 @@ class WorldScene extends Phaser.Scene {
   renderBuildMovePreview(target, point) {
     this.clearBuildPreview();
     if (!target?.definition) return;
+    if (target.kind === TAVERN_SIGN_BUILD_KIND) { this.buildPreviewObjects.push(this.tavernSignRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "training-dummy") { this.buildPreviewObjects.push(this.meleeRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "well") {
-      this.addBuildPreviewImage(
-        point.x,
-        point.y,
-        FARMING_WELL_TEXTURE_KEY,
-        0,
-        8988,
-        this.worldBuildCoordinator?.isPlacementBlocked?.({ placement: "well" }, point) ? 0xff5364 : 0x7dff9a,
-      );
+      this.buildPreviewObjects.push(createWellPresentation(this, point, {
+        depth: 8988,
+        tint: this.worldBuildCoordinator?.isPlacementBlocked?.({ placement: "well" }, point) ? 0xff5364 : 0x7dff9a,
+        alpha: 0.52,
+      }));
       return;
     }
     const visualOffset = this.assetProfiles?.[target.profileKey]?.visualOffset ?? { x: 0, y: 0 };
@@ -1168,6 +1215,7 @@ class WorldScene extends Phaser.Scene {
     this.clearBuildPreview();
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const target = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint)
+      ?? this.tavernSignRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
       ?? this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
@@ -1280,14 +1328,11 @@ class WorldScene extends Phaser.Scene {
     }
     if (item.placement === "well") {
       for (const point of uniquePoints) {
-        this.addBuildPreviewImage(
-          point.x,
-          point.y,
-          item.textureKey,
-          item.frame,
-          8988,
-          this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null,
-        );
+        this.buildPreviewObjects.push(createWellPresentation(this, point, {
+          depth: 8988,
+          tint: this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null,
+          alpha: 0.52,
+        }));
       }
       return;
     }
@@ -1295,18 +1340,12 @@ class WorldScene extends Phaser.Scene {
       if (item.placement === "tree") {
         const visualOffset = this.assetProfiles?.[`resource:${item.resourceProfileId}`]?.visualOffset ?? { x: 0, y: 0 };
         const tint = this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null;
-        for (let row = 0; row < 4; row += 1) {
-          for (let column = 0; column < 3; column += 1) {
-            this.addBuildPreviewImage(
-              point.x + column * TILE_SIZE + visualOffset.x,
-              point.y + row * TILE_SIZE + visualOffset.y,
-              item.textureKey,
-              row * 9 + column,
-              8988,
-              tint,
-            );
-          }
-        }
+        const graphics = this.add.graphics()
+          .setPosition(point.x + visualOffset.x, point.y + visualOffset.y)
+          .setDepth(8988)
+          .setAlpha(0.52);
+        drawResourceVisual(graphics, getResourceProfile(item.resourceProfileId), 0, { colorOverride: tint });
+        this.buildPreviewObjects.push(graphics);
       } else if (item.textureKey) {
         this.addBuildPreviewImage(point.x, point.y, item.textureKey, item.frame);
       }
@@ -1497,24 +1536,6 @@ class WorldScene extends Phaser.Scene {
     let colliderGroup = null;
     if (item.placement === "tree") {
       const profileKey = `resource:${item.resourceProfileId}`;
-      const profile = this.assetProfiles?.[profileKey];
-      const visualOffset = profile?.visualOffset ?? { x: 0, y: 0 };
-      const depth = assetDepthFromPivot(
-        point,
-        profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
-        500,
-        id,
-      );
-      for (let row = 0; row < 4; row += 1) {
-        for (let column = 0; column < 3; column += 1) {
-          sprites.push(this.add.image(
-            point.x + column * TILE_SIZE + visualOffset.x,
-            point.y + row * TILE_SIZE + visualOffset.y,
-            item.textureKey,
-            row * 9 + column,
-          ).setOrigin(0).setDepth(depth));
-        }
-      }
       bounds = { left: point.x, right: point.x + 3 * TILE_SIZE, top: point.y, bottom: point.y + 4 * TILE_SIZE };
       collider = { left: point.x + TILE_SIZE, right: point.x + 2 * TILE_SIZE, top: point.y + 3 * TILE_SIZE, bottom: point.y + 4 * TILE_SIZE };
       colliderGroup = profileKey;
@@ -2245,25 +2266,7 @@ class WorldScene extends Phaser.Scene {
       this.buildFloorCells.set(this.buildCellKey(restored.point), restored.id);
       return true;
     }
-    if (restored.kind === "tree") {
-      for (let row = 0; row < 4; row += 1) {
-        for (let column = 0; column < 3; column += 1) {
-          restored.sprites.push(this.add.image(
-            restored.point.x + column * TILE_SIZE,
-            restored.point.y + row * TILE_SIZE,
-            restored.item.textureKey,
-            row * 9 + column,
-          ).setOrigin(0).setDepth(assetDepthFromPivot(
-            restored.point,
-            this.assetProfiles?.[`resource:${restored.item.resourceProfileId}`]?.snapAnchorOffset
-              ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
-            500,
-            restored.id,
-          )));
-        }
-      }
-      return true;
-    }
+    if (restored.kind === "tree") return true;
     restored.sprites = [this.add.image(
       restored.point.x,
       restored.point.y,
@@ -2469,40 +2472,12 @@ class WorldScene extends Phaser.Scene {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
-    this.buildMode?.destroy();
-    this.buildMode = null;
-    this.worldBuildCoordinator?.destroy?.();
-    this.worldBuildCoordinator = null;
-    for (const object of this.buildPlacedObjects?.values?.() ?? []) {
-      for (const sprite of object.sprites) sprite.destroy();
-      if (object.collider) this.worldLayout?.clearWorldObjectCollider?.(object.id);
-    }
-    this.buildPlacedObjects?.clear?.();
-    for (const sprite of this.buildSurfaceVisuals?.values?.() ?? []) sprite.destroy();
-    this.buildSurfaceVisuals?.clear?.();
-    for (const sprites of this.buildWallJunctions?.values?.() ?? []) for (const sprite of sprites) sprite.destroy();
-    this.buildWallJunctions?.clear?.();
+    this.destroyLocationLifecycle();
+    this.worldLocationCoordinator?.destroy?.();
+    this.worldLocationCoordinator = null;
     this.cameraRuntime?.destroy();
     this.cameraRuntime = null;
-    this.debrisRuntime?.destroy();
-    this.debrisRuntime = null;
-    this.tavernServiceRuntime?.destroy();
-    this.tavernServiceRuntime = null;
-    this.guestRuntime = null;
-    this.coinRuntime = null;
-    this.facilityRuntime?.destroy();
-    this.facilityRuntime = null;
-    this.tavernSignRuntime?.destroy();
-    this.tavernSignRuntime = null;
-    this.cookingRuntime?.destroy();
-    this.cookingRuntime = null;
-    this.farmingRuntime?.destroy();
-    this.farmingRuntime = null;
-    this.meleeRuntime?.destroy();
-    this.meleeRuntime = null;
     this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
-    this.merchantRuntime?.destroy();
-    this.merchantRuntime = null;
     this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
     this.interactionHud?.destroy();
@@ -2649,6 +2624,7 @@ class WorldScene extends Phaser.Scene {
       this.meleeRuntime?.afterCharacterUpdate?.(substepMs);
       worldDeltaMs -= substepMs;
     }
+    this.worldLocationCoordinator?.update?.();
     this.syncFacilityPresentationPose();
     this.cameraRuntime?.update({
       presentationPosition: this.getPlayerCameraPosition(),
@@ -2740,6 +2716,7 @@ class WorldScene extends Phaser.Scene {
     const resourceKind = resourceActive ? getResourceProfile(this.activeResourceProfileId).kind : null;
     const playerPosition = player?.position;
     const npcNearby = Boolean(playerPosition && NPCS.some((npc) => {
+      if (!this.characterSystem?.has?.(npc.id)) return false;
       const position = this.characterSystem?.getSnapshot?.(npc.id)?.position;
       return position && Math.hypot(position.x - playerPosition.x, position.y - playerPosition.y) <= this.gameplayTuning.needs.dialogue.radius;
     }));

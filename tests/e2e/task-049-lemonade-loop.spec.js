@@ -56,7 +56,7 @@ function combatQuantity(session, itemId) {
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
-test("fresh Task 049 world has four tools, fixed kitchen/well and three trees", async ({ page }, testInfo) => {
+test("fresh Task 049 world has four tools, fixed kitchen/well and two trees", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
@@ -75,7 +75,7 @@ test("fresh Task 049 world has four tools, fixed kitchen/well and three trees", 
   });
   const debris = await bridge(page, "getDebrisState");
   expect(debris.definitions.filter(({ profileId }) => profileId === "tree-planted")).toHaveLength(0);
-  await expect.poll(async () => (await bridge(page, "getDebrisState")).plantedTrees.length).toBe(3);
+  await expect.poll(async () => (await bridge(page, "getDebrisState")).plantedTrees.length).toBe(2);
   expect((await bridge(page, "getDebrisState")).plantedTrees.every(({ profileId }) => profileId === "tree-planted")).toBe(true);
   const facilities = await bridge(page, "getFacilityState");
   expect(facilities.definitions.map(({ facilityType }) => facilityType)).toEqual(expect.arrayContaining([

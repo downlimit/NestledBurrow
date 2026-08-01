@@ -33,7 +33,7 @@ class DisplayStub {
   setInteractive() { this.interactive = true; return this; }
   disableInteractive() { this.interactive = false; return this; }
   on(type, listener) { this.listeners.set(type, listener); return this; }
-  emit(type, event) { this.listeners.get(type)?.(event); }
+  emit(type, ...args) { this.listeners.get(type)?.(...args); }
   destroy() { this.destroyed = true; }
 }
 
@@ -341,8 +341,13 @@ assert.equal(pathEntry.hit.interactive, false);
 assert.equal(modeChanges.at(-1), false, "leaving build mode restores the ordinary UI lifecycle");
 assert.equal(runtime.openButton.visible, true);
 assert.equal(runtime.closeButton.visible, false);
-runtime.openButtonHit.emit("pointerdown");
+let openerPropagationStopped = false;
+const openerPointer = { id: 91, x: 10, y: 160 };
+runtime.openButtonHit.emit("pointerdown", openerPointer, 0, 0, { stopPropagation() { openerPropagationStopped = true; } });
+scene.input.emit("pointerdown", openerPointer);
+scene.input.emit("pointerup", openerPointer);
 assert.equal(runtime.isActive(), true, "the minimal opener activates build mode without Tab");
+assert.equal(openerPropagationStopped, true, "the opener pointer does not leak into the newly opened catalog");
 assert.equal(runtime.getState().selectedId, null, "reopening the build menu clears the previous catalog selection");
 runtime.closeButtonHit.emit("pointerdown");
 assert.equal(runtime.isActive(), false, "the compact close button dismisses build mode");

@@ -7,6 +7,9 @@ import { FACILITIES, FACILITY_ASSETS, PLATED_DISH_ASSET, preloadFacilityAssets }
 import { createFacilityRuntime } from "../src/facilityRuntime.js";
 import { createNewGameInventory } from "../src/inventoryDomain.js";
 import { DEFAULT_SERVING_TABLE_ID } from "../src/cookingDomain.js";
+import { pixelAlignedWorldPoint } from "../src/buildWorldGeometry.js";
+
+assert.deepEqual(pixelAlignedWorldPoint({ x: 392, y: 372.5 }), { x: 392, y: 373 }, "half-pixel authored coordinates snap only at the visual boundary");
 
 assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, footprint.width / 16, footprint.height / 16]), [
   ["shower", 2, 2],
@@ -60,8 +63,8 @@ preloadFacilityAssets({ load: { image(key, path) { preloaded.push([key, path]); 
 assert(preloaded.some(([key, path]) => key === BED_ASSET.key && path === `/NestledBurrow/${BED_ASSET.path}`), "the uploaded bed sprite is preloaded with the facility sprite set");
 
 const facilitySource = readFileSync("src/facilityRuntime.js", "utf8");
-assert(!facilitySource.includes("drawFacility"));
-assert(facilitySource.includes("scene.add.image"));
+assert(facilitySource.includes("drawFacility(graphics, facility.facilityType)"), "runtime and build previews share the facility presentation adapter");
+assert(facilitySource.includes("pixelAlignedWorldPoint"), "facility graphics and serving dishes use the shared pixel-aligned render position");
 const previewSource = readFileSync("src/facilityPreviewVisuals.js", "utf8");
 assert(previewSource.includes("bindSpriteVisual"));
 assert(!previewSource.includes("fillRect"));
@@ -69,11 +72,15 @@ assert(!previewSource.includes("fillEllipse"));
 assert(!previewSource.includes("fillCircle"));
 const debrisSource = readFileSync("src/debrisRuntime.js", "utf8");
 assert(debrisSource.includes("bindSpriteVisual(graphics, BED_ASSET"));
+assert(debrisSource.includes("pixelAlignedWorldPoint"), "resource graphics, including large stones and logs, use the shared pixel-aligned render position");
 assert(!debrisSource.includes("0x5c3a2a"));
 assert(!debrisSource.includes("0x315c8a"));
 
 const colliders = new Map(); const images = [];
-const scene = { add: { image(x, y, key, frame = 0) { const image = { x, y, key, frame, visible: true, setOrigin() { return this; }, setPosition(nextX, nextY) { this.x = nextX; this.y = nextY; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, setTexture(nextKey, nextFrame = 0) { this.key = nextKey; this.frame = nextFrame; return this; }, setFrame(nextFrame) { this.frame = nextFrame; return this; }, destroy() { this.destroyed = true; } }; images.push(image); return image; } } };
+const scene = { add: {
+  graphics() { return { scene, x: 0, y: 0, depth: 0, visible: true, alpha: 1, scaleX: 1, scaleY: 1, setPosition(x, y) { this.x = x; this.y = y; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, setScale(x, y = x) { this.scaleX = x; this.scaleY = y; return this; }, setAlpha(value) { this.alpha = value; return this; }, destroy() { this.destroyed = true; return this; } }; },
+  image(x, y, key, frame = 0) { const image = { x, y, key, frame, visible: true, setOrigin() { return this; }, setPosition(nextX, nextY) { this.x = nextX; this.y = nextY; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, setScale() { return this; }, setAlpha() { return this; }, setScrollFactor() { return this; }, setTexture(nextKey, nextFrame = 0) { this.key = nextKey; this.frame = nextFrame; return this; }, setFrame(nextFrame) { this.frame = nextFrame; return this; }, destroy() { this.destroyed = true; } }; images.push(image); return image; },
+} };
 let blockFacilityPlacement = false;
 const worldLayout = { getEffectiveCollider(bounds) { return bounds; }, isBlockedBox() { return blockFacilityPlacement; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
 const kitchen = {

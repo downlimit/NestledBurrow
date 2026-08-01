@@ -17,8 +17,6 @@ All needs use `0..100` (higher is better) and HUD order `N/E/S/T/L/D`:
 | L | lustre | cleanliness, comfort, presentability |
 | D | dialogue | meaningful social fulfilment |
 
-High values provide normal function and safety, not stacked bonuses.
-
 ## Energy day target
 
 Rates are points per game hour; one game hour is `60` real seconds.
@@ -117,7 +115,7 @@ Friendly proximity pauses D loss. Meaningful conversation restores `15..30 D`; s
 
 ## Current baseline
 
-Movement, running energy, sleep/wake, continuous time and all six needs exist. Current tuning predates this target.
+Movement, running energy, sleep/wake, continuous time and all six needs exist.
 
 ## Evidence
 

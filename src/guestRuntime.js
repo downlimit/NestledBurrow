@@ -27,6 +27,7 @@ export function createGuestRuntime({
   createGuest,
   removeGuest,
   getTavernOpen,
+  getSignPoint = () => config.points.sign,
   getServicePoint,
   getSeatPoint,
   reserveSeat = () => null,
@@ -40,8 +41,8 @@ export function createGuestRuntime({
   randomSource = Math.random,
   createFeedback = () => ({ set: () => {}, update: () => {}, destroy: () => {} }),
 }) {
-  if (typeof getServicePoint !== "function" || typeof getSeatPoint !== "function") {
-    throw new Error("Guest runtime requires live service and seat point resolvers");
+  if (typeof getSignPoint !== "function" || typeof getServicePoint !== "function" || typeof getSeatPoint !== "function") {
+    throw new Error("Guest runtime requires live sign, service and seat point resolvers");
   }
   const visits = new Map();
   let destroyed = false;
@@ -100,7 +101,7 @@ export function createGuestRuntime({
       blockedMs: 0,
       lastWaypointDistance: Number.POSITIVE_INFINITY,
       replans: 0,
-      target: config.points.sign,
+      target: getSignPoint(),
       signDecision: null,
       itemId: reservation?.itemId ?? null,
       servingTableId: reservation?.servingTableId ?? null,
@@ -118,7 +119,7 @@ export function createGuestRuntime({
       diningTableId,
     });
     feedback.set("arriving");
-    if (!planTo(visit, config.points.sign)) {
+    if (!planTo(visit, getSignPoint())) {
       cancelVisit(visit);
       return false;
     }
@@ -365,7 +366,8 @@ export function createGuestRuntime({
   function syncMovingFacilityTarget(visit) {
     if (!visit.path) return;
     let facilityPoint = null;
-    if (visit.state === GUEST_STATES.approachingService
+    if (visit.state === GUEST_STATES.approachingSign) facilityPoint = getSignPoint();
+    else if (visit.state === GUEST_STATES.approachingService
       && !samePoint(visit.target, config.points.insideDoor)) facilityPoint = getServicePoint(visit.servingTableId);
     else if (visit.state === GUEST_STATES.carryingToSeat) facilityPoint = getSeatPoint(visit.diningTableId);
     if (facilityPoint && !samePoint(facilityPoint, visit.target)) planTo(visit, facilityPoint);
@@ -401,7 +403,7 @@ export function createGuestRuntime({
   }
 
   function targetForState(visit) {
-    if (visit.state === GUEST_STATES.approachingSign) return config.points.sign;
+    if (visit.state === GUEST_STATES.approachingSign) return getSignPoint();
     if (visit.state === GUEST_STATES.entering) return config.points.outsideDoor;
     if (visit.state === GUEST_STATES.approachingService) return getServicePoint(visit.servingTableId);
     if (visit.state === GUEST_STATES.carryingToSeat) return getSeatPoint(visit.diningTableId);

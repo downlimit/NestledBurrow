@@ -1,5 +1,6 @@
 import { TILE_SIZE, TREES_TEXTURE_KEY } from "./worldConfig.js";
 import { WALL_COLLIDER_GROUPS, wallColliderGroup } from "./buildWorldGeometry.js";
+import { TAVERN_SIGN_BUILD_KIND } from "./guestConfig.js";
 
 export const STARTING_LAYOUT_STORAGE_KEY = "nestledBurrow.startingLayout";
 export const STARTING_LAYOUT_VERSION = 1;
@@ -9,6 +10,7 @@ const TREE_ITEM = Object.freeze({
   id: "tree",
   placement: "tree",
   objectType: "plant",
+  worldId: "village",
   resourceProfileId: "tree-planted",
   labelKey: "hud:buildMode.assets.tree",
   textureKey: TREES_TEXTURE_KEY,
@@ -16,8 +18,7 @@ const TREE_ITEM = Object.freeze({
 });
 
 const TREE_POINTS = Object.freeze([
-  [48, 304], [128, 304], [224, 304],
-  [736, 304], [832, 304], [912, 304],
+  [736, 304], [912, 304],
 ]);
 
 // Keep fallback fixtures in this stable owner. startingLayoutDefault.js is
@@ -196,7 +197,10 @@ export function captureStartingLayout(scene) {
     removedCanonicalWalls: canonicalWallIds.filter((id) => !scene.wallSprites.has(id)),
     buildObjects,
     facilities,
-    furniture: scene.meleeRuntime?.getStartingLayoutFurniture?.() ?? [],
+    furniture: [
+      ...(scene.meleeRuntime?.getStartingLayoutFurniture?.() ?? []),
+      ...(scene.tavernSignRuntime?.getStartingLayoutFurniture?.() ?? []),
+    ],
     beds: scene.debrisRuntime?.getBedDefinitions?.() ?? [],
   });
 }
@@ -320,10 +324,16 @@ export function applyStartingLayout(scene, value) {
   scene.nextBuildObjectId = Math.max(Number(scene.nextBuildObjectId) || 0, layout.nextBuildObjectId);
 
   restoreFacilities(scene, layout.facilities);
-  const unsupportedFurniture = layout.furniture.filter((definition) => definition.kind !== "training-dummy");
+  const supportedFurnitureKinds = new Set(["training-dummy", TAVERN_SIGN_BUILD_KIND]);
+  const unsupportedFurniture = layout.furniture.filter((definition) => !supportedFurnitureKinds.has(definition.kind));
   if (unsupportedFurniture.length) throw new Error(`Unsupported starting furniture ${unsupportedFurniture[0].id}`);
-  if (layout.furniture.length && !scene.meleeRuntime?.restoreStartingLayoutFurniture?.(layout.furniture)) {
+  const meleeFurniture = layout.furniture.filter(({ kind }) => kind === "training-dummy");
+  if (meleeFurniture.length && !scene.meleeRuntime?.restoreStartingLayoutFurniture?.(meleeFurniture)) {
     throw new Error("Failed to restore starting furniture");
+  }
+  const tavernSignFurniture = layout.furniture.filter(({ kind }) => kind === TAVERN_SIGN_BUILD_KIND);
+  if (tavernSignFurniture.length && !scene.tavernSignRuntime?.restoreStartingLayoutFurniture?.(tavernSignFurniture)) {
+    throw new Error("Failed to restore starting tavern sign");
   }
   restoreBeds(scene, layout.beds);
   scene.facilityRuntime?.syncKitchenVisuals?.();

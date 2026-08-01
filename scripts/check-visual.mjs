@@ -134,6 +134,8 @@ assert(/Phaser\.Scale\.Events\.RESIZE/.test(mainSource), "zoom is recalculated a
 assert(/getMaxZoom\(\)/.test(mainSource), "integer zoom comes from Phaser max zoom");
 assert(/new CameraFollowRuntime\(this,/.test(mainSource), "scene composes the camera follow runtime");
 assert(/startFollow\(this\.followTarget, true, 1, 1\)/.test(cameraFollowSource), "camera follow uses a rounded target");
+assert(/cameras\.main\.roundPixels\s*=\s*true/.test(cameraFollowSource), "active camera rounds its scroll for every world visual");
+assert(/followTarget\.setPosition\(Math\.round\(this\.state\.target\.x\), Math\.round\(this\.state\.target\.y\)\)/.test(cameraFollowSource), "camera target is quantized before rendering");
 assert(!/scroll[XY]\s*=\s*Math\.round/.test(mainSource), "camera follow is not overwritten manually");
 assert(/pixelArt:\s*true/.test(mainSource));
 assert(/antialias:\s*false/.test(mainSource));

@@ -69,7 +69,7 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   await boot(page);
   const definitions = (await bridge(page, "getDebrisState")).definitions;
   expect(new Set(definitions.map((item) => item.profileId))).toEqual(new Set(["log-small", "log-large", "stone-small", "stone-large", "ruby-node"]));
-  expect(definitions.filter((item) => item.profileId === "log-small").length).toBeGreaterThanOrEqual(8);
+  expect(definitions.filter((item) => item.profileId === "log-small")).toHaveLength(2);
   await page.locator(".balance-debug-toggle").click({ force: true });
   await page.locator('input[data-field="axeDamage"]').fill("99");
   await page.locator('input[data-field="axeDamage"]').dispatchEvent("input");
@@ -125,7 +125,7 @@ test("holding Space repeats resource work when each cooldown ends", async ({ pag
 
 test("resource hit feedback returns to its placement-grid anchor", async ({ page }) => {
   await boot(page);
-  const id = "yard-log-03";
+  const id = "yard-log-02";
   const definition = (await bridge(page, "getDebrisState")).definitions.find((item) => item.id === id);
   const expected = { x: definition.cell.x * 8, y: definition.cell.y * 8 };
   await interact(page, id);

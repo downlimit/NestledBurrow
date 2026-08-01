@@ -2,6 +2,19 @@ import { FARMING_INTERACTION_KINDS, FARMING_WELL_TEXTURE_KEY, WELL_PROFILE } fro
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { TILE_SIZE } from "./worldConfig.js";
 
+export function createWellPresentation(scene, point, {
+  depth = 0,
+  tint = null,
+  alpha = 1,
+} = {}) {
+  const visual = scene.add.image(point.x, point.y, FARMING_WELL_TEXTURE_KEY)
+    .setOrigin(0)
+    .setDepth(depth)
+    .setAlpha(alpha);
+  if (tint !== null) visual.setTint(tint);
+  return visual;
+}
+
 export function createWorldBuildCoordinator(scene, {
   farmState,
   worldLayout,
@@ -41,9 +54,9 @@ export function createWorldBuildCoordinator(scene, {
 
   function createWellVisual(well) {
     const point = { x: well.x, y: well.y };
-    const visual = scene.add.image(point.x, point.y, FARMING_WELL_TEXTURE_KEY)
-      .setOrigin(0)
-      .setDepth(assetDepthFromPivot(point, WELL_PROFILE.depthAnchorOffset, 500, well.id));
+    const visual = createWellPresentation(scene, point, {
+      depth: assetDepthFromPivot(point, WELL_PROFILE.depthAnchorOffset, 500, well.id),
+    });
     wellVisuals.set(well.id, visual);
     worldLayout.setWorldObjectCollider(well.id, collisionAt(point), "farming:well", {
       depthAnchor: { x: point.x + WELL_PROFILE.depthAnchorOffset.x, y: point.y + WELL_PROFILE.depthAnchorOffset.y },

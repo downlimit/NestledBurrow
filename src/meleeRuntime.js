@@ -39,6 +39,7 @@ export const MELEE_HIT_SOUND_STAGGER_MS = 50;
 
 export function createMeleeRuntime(scene, {
   worldLayout,
+  includeTrainingDummy = true,
   getPlayerCharacter = () => scene.playerCharacter ?? null,
   getSelectedItem = () => null,
   getControllerMoveDirection = () => ({ x: 0, y: 0 }),
@@ -55,8 +56,8 @@ export function createMeleeRuntime(scene, {
     .setScale(HELD_WEAPON_SCALE)
     .setVisible(false);
   const debugGraphics = scene.add.graphics().setVisible(Boolean(debugEnabled));
-  const trainingDummy = createTrainingDummy(scene, worldLayout);
-  const dummySprite = trainingDummy.sprite;
+  const trainingDummy = includeTrainingDummy ? createTrainingDummy(scene, worldLayout) : null;
+  const dummySprite = trainingDummy?.sprite ?? null;
   const hitTargetIds = new Set();
   const activeTrails = new Set();
   const activeKnockbacks = new Set();
@@ -325,8 +326,11 @@ export function createMeleeRuntime(scene, {
   }
 
   function trainingDummyTarget() {
+    if (!trainingDummy) return null;
     return {
       id: TRAINING_DUMMY.id,
+      position: { ...trainingDummy.position },
+      home: { ...trainingDummy.home },
       combatAnchor: {
         x: trainingDummy.position.x + TRAINING_DUMMY.combatAnchorOffset.x,
         y: trainingDummy.position.y + TRAINING_DUMMY.combatAnchorOffset.y,
@@ -397,7 +401,7 @@ export function createMeleeRuntime(scene, {
   }
 
   function updateDummyReturn(deltaMs) {
-    if (activeKnockbacks.size || runtimeElapsedMs - trainingDummy.lastHitAtMs < TRAINING_DUMMY.returnDelayMs) return;
+    if (!trainingDummy || activeKnockbacks.size || runtimeElapsedMs - trainingDummy.lastHitAtMs < TRAINING_DUMMY.returnDelayMs) return;
     const homeDistance = Math.hypot(trainingDummy.home.x - trainingDummy.position.x, trainingDummy.home.y - trainingDummy.position.y);
     if (homeDistance <= 0.1) { trainingDummy.returnMotion = null; return; }
     if (!trainingDummy.returnMotion) trainingDummy.returnMotion = planDummyReturn();
@@ -492,6 +496,7 @@ export function createMeleeRuntime(scene, {
   }
 
   function getBuildMoveTargetAt(point) {
+    if (!trainingDummy) return null;
     const position = trainingDummy.position;
     const width = TRAINING_DUMMY.asset.width;
     const height = TRAINING_DUMMY.asset.height;
@@ -500,6 +505,7 @@ export function createMeleeRuntime(scene, {
   }
 
   function moveBuildTarget(point) {
+    if (!trainingDummy) return null;
     const previous = { ...trainingDummy.home };
     const next = { x: Number(point.x), y: Number(point.y) };
     if (isDummyPlacementBlocked(next)) return null;
@@ -511,6 +517,7 @@ export function createMeleeRuntime(scene, {
   }
 
   function getStartingLayoutFurniture() {
+    if (!trainingDummy) return [];
     return [{
       id: TRAINING_DUMMY.id,
       kind: "training-dummy",
@@ -519,6 +526,7 @@ export function createMeleeRuntime(scene, {
   }
 
   function restoreStartingLayoutFurniture(definitions) {
+    if (!trainingDummy) return false;
     const definition = definitions?.find?.((candidate) => candidate.id === TRAINING_DUMMY.id);
     if (!definition || definition.kind !== "training-dummy") return false;
     const point = { x: Number(definition.position?.x), y: Number(definition.position?.y) };
@@ -557,8 +565,8 @@ export function createMeleeRuntime(scene, {
     moveBuildTarget,
     getStartingLayoutFurniture,
     restoreStartingLayoutFurniture,
-    restoreBuildTarget(point) { trainingDummy.home = { ...point }; setDummyPosition(point); },
-    renderBuildPreview(point) { return scene.add.image(point.x, point.y, TRAINING_DUMMY.asset.textureKey).setOrigin(0).setDepth(8988).setTint(isDummyPlacementBlocked(point) ? 0xff5364 : 0x7dff9a).setAlpha(0.58); },
+    restoreBuildTarget(point) { if (trainingDummy) { trainingDummy.home = { ...point }; setDummyPosition(point); } },
+    renderBuildPreview(point) { return trainingDummy ? scene.add.image(point.x, point.y, TRAINING_DUMMY.asset.textureKey).setOrigin(0).setDepth(8988).setTint(isDummyPlacementBlocked(point) ? 0xff5364 : 0x7dff9a).setAlpha(0.58) : null; },
     getState: () => ({
       ...state,
       direction: { ...state.direction },
@@ -579,7 +587,7 @@ export function createMeleeRuntime(scene, {
         const motor = getPlayerCharacter()?.motor;
         if (motor) motor.movementConfig.maxSpeed = savedMovementMaxSpeed;
       }
-      worldLayout?.clearWorldObjectCollider?.(TRAINING_DUMMY.id);
+      if (trainingDummy) worldLayout?.clearWorldObjectCollider?.(TRAINING_DUMMY.id);
       scene.input.off("pointerdown", onPointerDown);
       heldImage.destroy();
       for (const trail of activeTrails) trail.destroy();
@@ -589,8 +597,8 @@ export function createMeleeRuntime(scene, {
       debugGraphics.destroy();
       dummyHitTween?.stop?.();
       dummyFlashTimer?.remove?.();
-      trainingDummy.flashSprite.destroy();
-      dummySprite.destroy();
+      trainingDummy?.flashSprite.destroy();
+      dummySprite?.destroy();
       damageNumbers.destroy();
     },
   };
