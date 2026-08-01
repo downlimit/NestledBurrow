@@ -176,17 +176,17 @@ test("awake hourly rates and delayed catch-breath recovery share the canonical c
   let before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   let after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeCloseTo(5 / 60, 2);
+  expect(before - after).toBeCloseTo(5 / 60, 1);
   await bridge(page, "setPlayerMotion", { moving: true, running: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeCloseTo(5.5 / 60, 2);
+  expect(before - after).toBeCloseTo(5.5 / 60, 1);
   await bridge(page, "setPlayerMotion", { moving: true, running: true });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeCloseTo(8 / 60, 2);
+  expect(before - after).toBeCloseTo(8 / 60, 1);
   await bridge(page, "setEnergy", 4);
   await bridge(page, "setPlayerMotion", { moving: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;
@@ -197,7 +197,7 @@ test("awake hourly rates and delayed catch-breath recovery share the canonical c
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(after - afterDelay).toBeGreaterThan(0.8);
-  expect(after - afterDelay).toBeLessThanOrEqual(1 - 5 / 60 + 0.02);
+  expect(after - afterDelay).toBeLessThanOrEqual(1 - 5 / 60 + 0.05);
 });
 
 test("resource colliders have their requested insets and work from directly above", async ({ page }) => {

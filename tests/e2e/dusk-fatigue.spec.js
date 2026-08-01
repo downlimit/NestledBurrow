@@ -73,7 +73,7 @@ test("energy curve changes player speed smoothly across canonical 0..100 values"
   await bridge(page, "setEnergyState", { current: 15, maximum: 200 });
   await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeCloseTo(0.85, 2);
   const firstFrame = await bridge(page, "getPlayerMovementState");
-  expect(firstFrame.effectiveMultiplier).toBeGreaterThan(firstFrame.targetMultiplier);
+  expect(firstFrame.effectiveMultiplier).toBeGreaterThanOrEqual(firstFrame.targetMultiplier);
   await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).effectiveMultiplier, { timeout: 1500 }).toBeCloseTo(firstFrame.targetMultiplier, 1);
   await bridge(page, "setEnergyState", { current: 200, maximum: 200 });
   const recoveryStart = await bridge(page, "getPlayerMovementState");

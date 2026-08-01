@@ -148,10 +148,16 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(false);
   await bridge(page, "interact");
   expect((await bridge(page, "getSession")).gameplay.resourceNodes["fallen-log-01"].progress).toBe(0);
+  const [soilCell] = (await bridge(page, "getFarmingState")).farm.soilCells;
   await bridge(page, "selectInventorySlot", 0);
+  await bridge(page, "placePlayerAt", { x: soilCell.x - 8, y: soilCell.y + 12, facing: { x: 1, y: 0 } });
+  await page.keyboard.down("KeyD");
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual({ x: soilCell.x, y: soilCell.y });
+  await page.keyboard.up("KeyD");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({ kind: "farm-axe-cell" });
   await bridge(page, "interact");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(0);
+  await placeNear(page, "fallen-log-01");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("fallen-log-01");
   for (let hitCount = 1; hitCount <= 7; hitCount += 1) {
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
@@ -169,7 +175,8 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   }).toMatchObject({ maximumEnergy: 100, wood: 1, node: { cleared: true, progress: 1 } });
   const clearedSession = await bridge(page, "getSession");
   expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
-  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(97);
+  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(98);
+  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(98.6);
   await expect.poll(async () => (await bridge(page, "getDebrisState"))?.present).toBe(false);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
   await page.reload();
@@ -224,5 +231,6 @@ test("mobile touch clears a resource through prompt hit area", async ({ page }, 
   }).toMatchObject({ wood: 1, node: { cleared: true } });
   const clearedSession = await bridge(page, "getSession");
   expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
-  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(97);
+  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(98);
+  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(98.6);
 });

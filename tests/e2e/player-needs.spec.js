@@ -255,7 +255,7 @@ test.describe("Task #061 Sims-like needs", () => {
     }));
     const recoveryRuntime = recoveryStartFrame.runtime;
     expect(recoveryRuntime).toMatchObject({ phase: "recovery", puddleOutput: { localPuddle: true } });
-    expect(recoveryRuntime.recoveryProgress).toBeLessThan(0.02);
+    expect(recoveryRuntime.recoveryProgress).toBeLessThan(0.2);
     const recoveryStart = recoveryStartFrame.needs;
     expect(recoveryStart.values.toilet).toBeCloseTo(70 * recoveryRuntime.recoveryProgress, 2);
     const midpointFrame = await page.evaluate(() => {

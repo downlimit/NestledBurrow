@@ -216,7 +216,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.type).toBe("potato");
 
   await bridge(page, "selectInventorySlot", 3);
-  await bridge(page, "placePlayerAt", { x: 430, y: 504, facing: { x: 1, y: 0 } });
+  await placeNear(page, "farm-well-1");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-refill-water-bucket");
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.waterBucket.currentWater).toBe(8);

@@ -2519,14 +2519,14 @@ class WorldScene extends Phaser.Scene {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
+    this.interactionRuntime?.destroy();
+    this.interactionRuntime = null;
     this.destroyLocationLifecycle();
     this.worldLocationCoordinator?.destroy?.();
     this.worldLocationCoordinator = null;
     this.cameraRuntime?.destroy();
     this.cameraRuntime = null;
     this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
-    this.interactionRuntime?.destroy();
-    this.interactionRuntime = null;
     this.interactionHud?.destroy();
     this.interactionHud = null;
     this.movementDebugPanel?.destroy();
