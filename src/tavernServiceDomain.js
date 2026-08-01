@@ -58,12 +58,21 @@ export function normalizeTavernServiceState(value = {}) {
       stateElapsedMs: nonNegativeNumber(raw.stateElapsedMs, 0, `Guest ${id} elapsed time`),
       position: { x, y },
       itemId: raw.itemId === "lemonade" || raw.itemId === "fried-potato-dish" ? raw.itemId : null,
+      servingTableId: furnitureId(raw.servingTableId),
+      diningTableId: furnitureId(raw.diningTableId),
       reservationActive: Boolean(raw.reservationActive),
       mealCompleted: Boolean(raw.mealCompleted),
       paid: Boolean(raw.paid),
     });
   }
   return { nextGuestId, spawnRemainingMs, guests };
+}
+
+function furnitureId(value) {
+  if (value === undefined || value === null) return null;
+  const id = String(value);
+  if (!id || ["__proto__", "constructor", "prototype"].includes(id)) return null;
+  return id;
 }
 
 function randomUnit(randomSource) {

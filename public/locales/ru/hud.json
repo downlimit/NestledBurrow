@@ -92,7 +92,7 @@
     "serveItem": "Выставить товар",
     "takeItem": "Забрать товар",
     "servingTableDifferentItem": "На столе другой товар",
-    "servingTableFull": "На столе уже 4 порции",
+    "servingTableFull": "На столе уже есть порция",
     "servingTableEmpty": "Сервировочный стол пуст",
     "repairStove": "Починить: 10 дерева, 8 камня, 10 монет",
     "repairMissing": "Не хватает: {categories}",

@@ -10,8 +10,9 @@ import {
 } from "./inventoryDomain.js";
 import { DOOR_LEFT, DOOR_Y, TILE_SIZE } from "./worldConfig.js";
 import { STARTER_WELL, WATER_BUCKET_CAPACITY } from "./farmingConfig.js";
+import { DEFAULT_SERVING_TABLE_ID } from "./cookingDomain.js";
 
-export const SAVE_SCHEMA_VERSION = 11;
+export const SAVE_SCHEMA_VERSION = 12;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -56,6 +57,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 8) envelope = migrateV8Envelope(envelope);
   if (envelope.schemaVersion === 9) envelope = migrateV9Envelope(envelope);
   if (envelope.schemaVersion === 10) envelope = migrateV10Envelope(envelope);
+  if (envelope.schemaVersion === 11) envelope = migrateV11Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -79,6 +81,7 @@ const migrationRegistry = new Map([
   [8, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [9, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [10, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [11, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -266,6 +269,47 @@ function migrateV10Envelope(envelope) {
   const state = cloneJsonSafe(envelope.state ?? {});
   const gameplay = state.gameplay ?? {};
   gameplay.combatLoadout = createEmptyCombatLoadout();
+  state.gameplay = gameplay;
+  state.version = 11;
+  return { schemaVersion: 11, state };
+}
+
+function migrateV11Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const kitchen = gameplay.kitchen ?? {};
+  const legacyStock = isPlainObject(kitchen.servingTable) ? kitchen.servingTable : {};
+  const itemId = legacyStock.itemId === "lemonade" || legacyStock.itemId === "fried-potato-dish"
+    ? legacyStock.itemId
+    : null;
+  const legacyQuantity = itemId ? safeLegacyQuantity(legacyStock.quantity) : 0;
+  const keptQuantity = Math.min(1, legacyQuantity);
+  const keptReservations = Array.isArray(legacyStock.reservations)
+    ? legacyStock.reservations.filter((reservation) => reservation?.itemId === itemId).slice(0, keptQuantity)
+    : [];
+  kitchen.servingTables = {
+    [DEFAULT_SERVING_TABLE_ID]: {
+      itemId: keptQuantity ? itemId : null,
+      quantity: keptQuantity,
+      reservations: keptReservations,
+    },
+  };
+  delete kitchen.servingTable;
+  gameplay.kitchen = kitchen;
+  const overflow = legacyQuantity - keptQuantity;
+  if (overflow > 0) {
+    gameplay.inventory ??= createInventoryFromLegacyCounters();
+    gameplay.worldItems ??= [];
+    const returned = addInventoryItemUpTo(gameplay.inventory, createInventoryItem(itemId, overflow));
+    const remaining = overflow - (returned.accepted ?? 0);
+    if (remaining > 0) dropLegacyItem(gameplay, createInventoryItem(itemId, remaining));
+  }
+  const keptGuestIds = new Set(keptReservations.map((reservation) => String(reservation.guestId ?? "")));
+  for (const guest of gameplay.tavernService?.guests ?? []) {
+    guest.reservationActive = Boolean(guest.reservationActive && keptGuestIds.has(guest.id));
+    guest.servingTableId = guest.reservationActive ? DEFAULT_SERVING_TABLE_ID : null;
+    guest.diningTableId = null;
+  }
   state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };

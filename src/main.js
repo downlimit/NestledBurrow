@@ -428,6 +428,7 @@ class WorldScene extends Phaser.Scene {
       worldLayout: this.worldLayout,
       getKitchenState: () => this.sessionState?.gameplay?.kitchen, getInventoryState: () => this.sessionState?.gameplay?.inventory,
       getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
+      isFacilityReserved: (facilityId) => this.tavernServiceRuntime?.guestRuntime?.isDiningTableReserved?.(facilityId) ?? false,
     });
   }
 

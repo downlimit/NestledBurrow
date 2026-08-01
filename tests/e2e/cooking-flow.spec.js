@@ -42,7 +42,7 @@ test("potatoes move through preparation, frying and the persistent serving table
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toEqual({
     starterLemons: 6,
     stoveRepaired: false,
-    servingTable: { itemId: null, quantity: 0, reservations: [] },
+    servingTables: { "home-serving-table-01": { itemId: null, quantity: 0, reservations: [] } },
   });
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots.find((item) => item?.id === "potato")?.quantity).toBe(3);
 
@@ -76,7 +76,7 @@ test("potatoes move through preparation, frying and the persistent serving table
   await bridge(page, "selectInventorySlot", dishSlot);
   await interact(page, "home-serving-table-01");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
-    servingTable: { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
+    servingTables: { "home-serving-table-01": { itemId: "fried-potato-dish", quantity: 1, reservations: [] } },
   });
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("dish-serve");
 
@@ -85,13 +85,13 @@ test("potatoes move through preparation, frying and the persistent serving table
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toEqual({
     starterLemons: 6,
     stoveRepaired: true,
-    servingTable: { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
+    servingTables: { "home-serving-table-01": { itemId: "fried-potato-dish", quantity: 1, reservations: [] } },
   });
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots.find((item) => item?.id === "potato")?.quantity).toBe(2);
 
   await interact(page, "home-serving-table-01");
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen).toMatchObject({
-    servingTable: { itemId: null, quantity: 0, reservations: [] },
+    servingTables: { "home-serving-table-01": { itemId: null, quantity: 0, reservations: [] } },
   });
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.slots
     .find((item) => item?.id === "fried-potato-dish")?.quantity).toBe(1);

@@ -8,6 +8,7 @@ import {
   craftLemonade,
   createCookingStep,
   DEFAULT_KITCHEN_STATE,
+  DEFAULT_SERVING_TABLE_ID,
   getComboBonus,
   interactServingTable,
   normalizeKitchenState,
@@ -33,7 +34,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const fresh = createFreshGameSessionState();
 assert.deepEqual(fresh.gameplay.kitchen, DEFAULT_KITCHEN_STATE);
 assert.equal(fresh.version, SESSION_STATE_VERSION);
-assert.equal(SAVE_SCHEMA_VERSION, 11);
+assert.equal(SAVE_SCHEMA_VERSION, 12);
 assert.equal(getInventoryQuantity(fresh.gameplay.inventory, "potato"), 0);
 assert.equal(fresh.gameplay.kitchen.starterLemons, 6);
 assert.equal(fresh.gameplay.kitchen.stoveRepaired, false);
@@ -45,9 +46,9 @@ assert.throws(
 assert.throws(
   () => normalizeKitchenState({
     ...clone(DEFAULT_KITCHEN_STATE),
-    servingTable: { itemId: "lemonade", quantity: SERVING_TABLE_CAPACITY + 1, reservations: [] },
+    servingTables: { [DEFAULT_SERVING_TABLE_ID]: { itemId: "lemonade", quantity: SERVING_TABLE_CAPACITY + 1, reservations: [] } },
   }),
-  /0\.\.4/,
+  /0\.\.1/,
 );
 assert.deepEqual([1, 2, 3, 4, 5, 9].map((combo) => getComboBonus(combo)), [3, 6, 18, 32, 64, 64]);
 
@@ -84,18 +85,22 @@ assert.equal(getInventoryQuantity(sackInventory, "lemon"), 6);
 assert.equal(kitchen.starterLemons, 0);
 assert.equal(takeStarterLemons(kitchen, sackInventory).status, "lemon-sack-empty");
 
-assert.equal(interactServingTable(kitchen, inventory, "lemonade").status, "item-served");
-assert.deepEqual(kitchen.servingTable, { itemId: "lemonade", quantity: 1, reservations: [] });
-assert.deepEqual(reserveServingItem(kitchen, "guest-1"), { guestId: "guest-1", itemId: "lemonade" });
-assert.equal(interactServingTable(kitchen, inventory, null).status, "all-reserved");
-assert.deepEqual(consumeServingReservation(kitchen, "guest-1"), { itemId: "lemonade", quantity: 0 });
-assert.deepEqual(kitchen.servingTable, { itemId: null, quantity: 0, reservations: [] });
+assert.equal(interactServingTable(kitchen, inventory, DEFAULT_SERVING_TABLE_ID, "lemonade").status, "item-served");
+assert.deepEqual(kitchen.servingTables[DEFAULT_SERVING_TABLE_ID], { itemId: "lemonade", quantity: 1, reservations: [] });
+assert.deepEqual(reserveServingItem(kitchen, "guest-1"), {
+  guestId: "guest-1", itemId: "lemonade", servingTableId: DEFAULT_SERVING_TABLE_ID,
+});
+assert.equal(interactServingTable(kitchen, inventory, DEFAULT_SERVING_TABLE_ID, null).status, "all-reserved");
+assert.deepEqual(consumeServingReservation(kitchen, "guest-1"), {
+  itemId: "lemonade", quantity: 0, servingTableId: DEFAULT_SERVING_TABLE_ID,
+});
+assert.deepEqual(kitchen.servingTables[DEFAULT_SERVING_TABLE_ID], { itemId: null, quantity: 0, reservations: [] });
 
 addInventoryItem(inventory, createInventoryItem("fried-potato-dish", 1));
-assert.equal(interactServingTable(kitchen, inventory, "fried-potato-dish").status, "item-served");
+assert.equal(interactServingTable(kitchen, inventory, DEFAULT_SERVING_TABLE_ID, "fried-potato-dish").status, "item-served");
 assert(reserveServingItem(kitchen, "guest-2"));
 assert.equal(releaseServingReservation(kitchen, "guest-2"), true);
-assert.equal(interactServingTable(kitchen, inventory, null).status, "item-taken");
+assert.equal(interactServingTable(kitchen, inventory, DEFAULT_SERVING_TABLE_ID, null).status, "item-taken");
 
 const repairGameplay = createFreshGameSessionState().gameplay;
 assert.equal(repairStove(repairGameplay).status, "repair-missing");

@@ -32,7 +32,7 @@ export function createKitchenInteractionRuntime({
     } else if (facility.facilityType === "lemon-sack") {
       result = takeStarterLemons(kitchen, inventory);
     } else if (facility.facilityType === "serving-table") {
-      result = interactServingTable(kitchen, inventory, getSelectedItem()?.id ?? null);
+      result = interactServingTable(kitchen, inventory, facility.id, getSelectedItem()?.id ?? null);
     } else {
       return { status: "ignored", mutated: false };
     }

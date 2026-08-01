@@ -4,6 +4,7 @@ import { getCharacterVisualProfile } from "./characterVisualProfiles.js";
 import { createCoinRuntime } from "./coinRuntime.js";
 import {
   consumeServingReservation,
+  getAvailableServingPortions,
   releaseServingReservation,
   reserveServingItem,
 } from "./cookingDomain.js";
@@ -25,6 +26,42 @@ export function createTavernServiceRuntime(scene, {
 } = {}) {
   const actorProfile = getActorProfile(GUEST_CONFIG.profileId);
   const visualProfile = getCharacterVisualProfile(GUEST_CONFIG.visualProfileId);
+  const diningTableByGuest = new Map();
+  const guestByDiningTable = new Map();
+
+  const definitionsByType = (facilityType) => facilityRuntime?.getDefinitions?.()
+    ?.filter((facility) => facility.facilityType === facilityType) ?? [];
+  const servingTableIds = () => definitionsByType("serving-table").map(({ id }) => id);
+  const getServicePoint = (servingTableId) => facilityRuntime?.getDefinition?.(servingTableId)?.usePosition
+    ?? definitionsByType("serving-table")[0]?.usePosition
+    ?? GUEST_CONFIG.points.insideDoor;
+  const getSeatPoint = (diningTableId) => facilityRuntime?.getDefinition?.(diningTableId)?.usePosition ?? null;
+  const reserveSeat = (guestId, preferredDiningTableId = null) => {
+    const existing = diningTableByGuest.get(guestId);
+    if (existing && getSeatPoint(existing)) return { diningTableId: existing };
+    if (existing) {
+      diningTableByGuest.delete(guestId);
+      guestByDiningTable.delete(existing);
+    }
+    const activeId = facilityRuntime?.getActiveId?.() ?? null;
+    const candidates = definitionsByType("table");
+    const preferred = candidates.find(({ id }) => id === preferredDiningTableId);
+    const selected = [preferred, ...candidates].find((facility, index, values) => facility
+      && values.findIndex((candidate) => candidate?.id === facility.id) === index
+      && facility.id !== activeId
+      && !guestByDiningTable.has(facility.id));
+    if (!selected) return null;
+    diningTableByGuest.set(guestId, selected.id);
+    guestByDiningTable.set(selected.id, guestId);
+    return { diningTableId: selected.id };
+  };
+  const releaseSeat = (guestId, diningTableId = null) => {
+    const tableId = diningTableByGuest.get(guestId) ?? diningTableId;
+    if (!tableId || guestByDiningTable.get(tableId) !== guestId) return false;
+    diningTableByGuest.delete(guestId);
+    guestByDiningTable.delete(tableId);
+    return true;
+  };
   const coinRuntime = createCoinRuntime(scene, {
     getPlayerPosition,
     onCollect: ({ value }) => {
@@ -51,18 +88,26 @@ export function createTavernServiceRuntime(scene, {
     },
     removeGuest: (id) => characterSystem.remove(id),
     getTavernOpen: () => sessionState.gameplay.tavernOpen,
-    getServicePoint: () => facilityRuntime?.getDefinitionByType?.("serving-table")?.usePosition
-      ?? GUEST_CONFIG.points.insideDoor,
-    getSeatPoint: () => facilityRuntime?.getDefinitionByType?.("table")?.usePosition
-      ?? facilityRuntime?.getDefinitionByType?.("serving-table")?.usePosition
-      ?? GUEST_CONFIG.points.insideDoor,
-    getAvailablePortions: () => {
-      const stock = sessionState.gameplay.kitchen.servingTable;
-      return Math.max(0, stock.quantity - stock.reservations.length);
-    },
-    reserveItem: (guestId) => reserveServingItem(sessionState.gameplay.kitchen, guestId),
-    releaseReservation: (guestId) => releaseServingReservation(sessionState.gameplay.kitchen, guestId),
-    consumeReservation: (guestId) => consumeServingReservation(sessionState.gameplay.kitchen, guestId),
+    getServicePoint,
+    getSeatPoint,
+    reserveSeat,
+    releaseSeat,
+    getAvailablePortions: () => getAvailableServingPortions(sessionState.gameplay.kitchen, servingTableIds()),
+    reserveItem: (guestId, { excludedServingTableIds = [] } = {}) => reserveServingItem(
+      sessionState.gameplay.kitchen,
+      guestId,
+      servingTableIds().filter((tableId) => !excludedServingTableIds.includes(tableId)),
+    ),
+    releaseReservation: (guestId, servingTableId) => releaseServingReservation(
+      sessionState.gameplay.kitchen,
+      guestId,
+      servingTableId,
+    ),
+    consumeReservation: (guestId, servingTableId) => consumeServingReservation(
+      sessionState.gameplay.kitchen,
+      guestId,
+      servingTableId,
+    ),
     onReservationChange: () => {
       facilityRuntime?.syncKitchenVisuals?.();
       scene.interactionRuntime?.refresh?.();
@@ -107,6 +152,7 @@ export function createTavernServiceRuntime(scene, {
     getState: () => ({
       guests: guestRuntime.getState(),
       coins: coinRuntime.getState(),
+      diningReservations: Object.fromEntries(diningTableByGuest),
     }),
     destroy() {
       guestRuntime.destroy();

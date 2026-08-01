@@ -5,6 +5,7 @@ import { FACILITIES } from "./facilityConfig.js";
 import { TAVERN_SIGN } from "./guestConfig.js";
 import { DEFAULT_RESOURCE_ID, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { addInventoryItem, createInventoryItem, routePickedInventoryItem } from "./inventoryDomain.js";
+import { DEFAULT_SERVING_TABLE_ID } from "./cookingDomain.js";
 
 export function installWorldE2EBridge(scene) {
   if (!import.meta.env.VITE_E2E) return null;
@@ -100,6 +101,7 @@ export function installWorldE2EBridge(scene) {
       definitions: scene.facilityRuntime?.getDefinitions?.() ?? FACILITIES,
       activeId: scene.facilityRuntime?.getActiveId?.() ?? null,
       visuals: scene.facilityRuntime?.getVisualStates?.() ?? {},
+      servingTableVisuals: scene.facilityRuntime?.getServingTableVisualStates?.() ?? {},
     }),
     getCookingState: () => scene.cookingRuntime?.getState?.() ?? null,
     getTavernState: () => ({
@@ -109,20 +111,25 @@ export function installWorldE2EBridge(scene) {
       service: scene.tavernServiceRuntime?.getState?.(),
     }),
     getCoinState: () => scene.coinRuntime?.getState?.() ?? [],
+    addFacility: ({ facilityType, x, y } = {}) => {
+      const facility = scene.facilityRuntime?.add?.(facilityType, { x: Number(x), y: Number(y) }) ?? null;
+      scene.interactionRuntime?.refresh?.();
+      return facility;
+    },
     forceGuestSpawn: () => scene.tavernServiceRuntime?.guestRuntime?.forceSpawn?.(),
     setGuestRandomValue: (value) => scene.tavernServiceRuntime?.guestRuntime?.setRandomSource?.(() => Number(value)),
     setServingDish: (present) => {
-      scene.sessionState.gameplay.kitchen.servingTable = {
+      scene.sessionState.gameplay.kitchen.servingTables[DEFAULT_SERVING_TABLE_ID] = {
         itemId: present ? "fried-potato-dish" : null,
         quantity: present ? 1 : 0,
         reservations: [],
       };
       scene.facilityRuntime?.syncKitchenVisuals?.();
     },
-    setServingStock: ({ itemId = null, quantity = 0 } = {}) => {
-      scene.sessionState.gameplay.kitchen.servingTable = {
+    setServingStock: ({ itemId = null, quantity = 0, servingTableId = DEFAULT_SERVING_TABLE_ID } = {}) => {
+      scene.sessionState.gameplay.kitchen.servingTables[servingTableId] = {
         itemId: quantity > 0 ? itemId : null,
-        quantity: Math.max(0, Math.min(4, Math.floor(Number(quantity) || 0))),
+        quantity: Math.max(0, Math.min(1, Math.floor(Number(quantity) || 0))),
         reservations: [],
       };
       scene.facilityRuntime?.syncKitchenVisuals?.();

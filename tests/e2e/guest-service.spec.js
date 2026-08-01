@@ -45,7 +45,9 @@ test("open guest reserves, eats and consumes the served dish", async ({ page }) 
   const guestId = await bridge(page, "forceGuestSpawn");
   await expect.poll(async () => (await bridge(page, "getTavernState")).guest.reservedDish, { timeout: 25_000 }).toBe(true);
   await expect.poll(async () => (await bridge(page, "getTavernState")).guest.state, { timeout: 25_000 }).toBe("eating");
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.kitchen.servingTable.quantity, { timeout: 10_000 }).toBe(0);
+  await expect.poll(async () => (
+    await bridge(page, "getSession")
+  ).gameplay.kitchen.servingTables["home-serving-table-01"].quantity, { timeout: 10_000 }).toBe(0);
   await expect.poll(async () => (await bridge(page, "getCoinState"))[0]?.landed, { timeout: 10_000 }).toBe(true);
   const coinsBeforeCollection = (await bridge(page, "getSession")).gameplay.coins;
   const [coin] = await bridge(page, "getCoinState");

@@ -17,16 +17,21 @@ export const COOKING_STEP_TYPES = Object.freeze({
 });
 
 export const SELLABLE_ITEM_IDS = Object.freeze(["lemonade", "fried-potato-dish"]);
-export const SERVING_TABLE_CAPACITY = 4;
+export const SERVING_TABLE_CAPACITY = 1;
+export const DEFAULT_SERVING_TABLE_ID = "home-serving-table-01";
 export const STOVE_REPAIR_COST = Object.freeze({ wood: 10, stone: 8, coins: 10 });
+
+const EMPTY_SERVING_TABLE_STOCK = Object.freeze({
+  itemId: null,
+  quantity: 0,
+  reservations: Object.freeze([]),
+});
 
 export const DEFAULT_KITCHEN_STATE = Object.freeze({
   starterLemons: 6,
   stoveRepaired: false,
-  servingTable: Object.freeze({
-    itemId: null,
-    quantity: 0,
-    reservations: Object.freeze([]),
+  servingTables: Object.freeze({
+    [DEFAULT_SERVING_TABLE_ID]: EMPTY_SERVING_TABLE_STOCK,
   }),
 });
 
@@ -80,13 +85,43 @@ function normalizeServingTable(value = {}) {
   return { itemId, quantity, reservations };
 }
 
+function normalizeServingTables(value) {
+  assertPlainRecord(value, "Serving tables");
+  const servingTables = {};
+  for (const [tableId, stock] of Object.entries(value)) {
+    if (!tableId || ["__proto__", "constructor", "prototype"].includes(tableId)) {
+      throw new Error(`Invalid serving table ID: ${tableId}`);
+    }
+    servingTables[tableId] = normalizeServingTable(stock);
+  }
+  return servingTables;
+}
+
 export function normalizeKitchenState(value = {}) {
   assertPlainRecord(value, "Kitchen state");
+  const servingTables = value.servingTables
+    ?? (value.servingTable ? { [DEFAULT_SERVING_TABLE_ID]: value.servingTable } : DEFAULT_KITCHEN_STATE.servingTables);
   return {
     starterLemons: normalizeNonNegativeInteger(value.starterLemons, DEFAULT_KITCHEN_STATE.starterLemons, "Starter lemons"),
     stoveRepaired: Boolean(value.stoveRepaired),
-    servingTable: normalizeServingTable(value.servingTable ?? DEFAULT_KITCHEN_STATE.servingTable),
+    servingTables: normalizeServingTables(servingTables),
   };
+}
+
+export function getServingTableStock(kitchen, servingTableId = DEFAULT_SERVING_TABLE_ID, { create = false } = {}) {
+  if (!kitchen?.servingTables) return create ? null : EMPTY_SERVING_TABLE_STOCK;
+  if (!kitchen.servingTables[servingTableId] && create) {
+    kitchen.servingTables[servingTableId] = { itemId: null, quantity: 0, reservations: [] };
+  }
+  return kitchen.servingTables[servingTableId] ?? EMPTY_SERVING_TABLE_STOCK;
+}
+
+export function getAvailableServingPortions(kitchen, servingTableIds = null) {
+  const ids = servingTableIds ?? Object.keys(kitchen?.servingTables ?? {});
+  return ids.reduce((total, tableId) => {
+    const stock = getServingTableStock(kitchen, tableId);
+    return total + Math.max(0, stock.quantity - stock.reservations.length);
+  }, 0);
 }
 
 export function getComboBonus(combo, config = COOKING_MINIGAME_CONFIG) {
@@ -209,8 +244,8 @@ export function takeStarterLemons(kitchen, inventory) {
   };
 }
 
-export function interactServingTable(kitchen, inventory, selectedItemId) {
-  const stock = kitchen.servingTable;
+export function interactServingTable(kitchen, inventory, servingTableId, selectedItemId) {
+  const stock = getServingTableStock(kitchen, servingTableId, { create: true });
   if (SELLABLE_ITEM_IDS.includes(selectedItemId)) {
     if (stock.itemId && stock.itemId !== selectedItemId) {
       return { status: "different-item", messageKey: "hud:interaction.servingTableDifferentItem", mutated: false };
@@ -222,7 +257,7 @@ export function interactServingTable(kitchen, inventory, selectedItemId) {
     if (!taken.mutated) return { status: "no-sellable-item", mutated: false };
     stock.itemId = selectedItemId;
     stock.quantity += 1;
-    return { status: "item-served", mutated: true, itemId: selectedItemId, inventory: taken };
+    return { status: "item-served", mutated: true, itemId: selectedItemId, servingTableId, inventory: taken };
   }
   if (!stock.itemId || stock.quantity <= stock.reservations.length) {
     return { status: stock.quantity ? "all-reserved" : "serving-table-empty", mutated: false };
@@ -233,35 +268,53 @@ export function interactServingTable(kitchen, inventory, selectedItemId) {
   stock.quantity -= 1;
   const itemId = stock.itemId;
   if (stock.quantity === 0) stock.itemId = null;
-  return { status: "item-taken", mutated: true, itemId, inventory: inventoryResult };
+  return { status: "item-taken", mutated: true, itemId, servingTableId, inventory: inventoryResult };
 }
 
-export function reserveServingItem(kitchen, guestId) {
-  const stock = kitchen.servingTable;
-  if (!stock.itemId || stock.quantity <= stock.reservations.length) return null;
-  if (stock.reservations.some((reservation) => reservation.guestId === guestId)) return null;
-  const reservation = { guestId, itemId: stock.itemId };
-  stock.reservations.push(reservation);
-  return { ...reservation };
+export function reserveServingItem(kitchen, guestId, servingTableIds = null) {
+  const ids = servingTableIds ?? Object.keys(kitchen?.servingTables ?? {});
+  if (findServingReservation(kitchen, guestId)) return null;
+  for (const servingTableId of ids) {
+    const stock = getServingTableStock(kitchen, servingTableId);
+    if (!stock.itemId || stock.quantity <= stock.reservations.length) continue;
+    const reservation = { guestId, itemId: stock.itemId };
+    stock.reservations.push(reservation);
+    return { ...reservation, servingTableId };
+  }
+  return null;
 }
 
-export function releaseServingReservation(kitchen, guestId) {
-  const reservations = kitchen.servingTable.reservations;
+export function releaseServingReservation(kitchen, guestId, servingTableId = null) {
+  const match = findServingReservation(kitchen, guestId, servingTableId);
+  if (!match) return false;
+  const { reservations } = match.stock;
   const index = reservations.findIndex((reservation) => reservation.guestId === guestId);
-  if (index < 0) return false;
   reservations.splice(index, 1);
   return true;
 }
 
-export function consumeServingReservation(kitchen, guestId) {
-  const stock = kitchen.servingTable;
+export function consumeServingReservation(kitchen, guestId, servingTableId = null) {
+  const match = findServingReservation(kitchen, guestId, servingTableId);
+  if (!match) return null;
+  const { stock } = match;
   const index = stock.reservations.findIndex((reservation) => reservation.guestId === guestId);
   if (index < 0 || stock.quantity <= 0) return null;
   const [reservation] = stock.reservations.splice(index, 1);
   if (reservation.itemId !== stock.itemId) return null;
   stock.quantity -= 1;
   if (stock.quantity === 0) stock.itemId = null;
-  return { itemId: reservation.itemId, quantity: stock.quantity };
+  return { itemId: reservation.itemId, quantity: stock.quantity, servingTableId: match.servingTableId };
+}
+
+function findServingReservation(kitchen, guestId, servingTableId = null) {
+  const ids = servingTableId ? [servingTableId] : Object.keys(kitchen?.servingTables ?? {});
+  for (const candidateId of ids) {
+    const stock = getServingTableStock(kitchen, candidateId);
+    if (stock.reservations.some((reservation) => reservation.guestId === guestId)) {
+      return { servingTableId: candidateId, stock };
+    }
+  }
+  return null;
 }
 
 export function repairStove(gameplay) {
@@ -286,7 +339,7 @@ export function repairStove(gameplay) {
   return { status: "stove-repaired", mutated: true, cost: STOVE_REPAIR_COST };
 }
 
-export function getKitchenFacilityPrompt(facilityType, kitchen, inventory, selectedItemId = null) {
+export function getKitchenFacilityPrompt(facilityType, kitchen, inventory, selectedItemId = null, facilityId = null) {
   if (facilityType === "cutting-table") {
     return getInventoryQuantity(inventory, "potato") >= 1
       ? "hud:interaction.startPreparation"
@@ -303,7 +356,7 @@ export function getKitchenFacilityPrompt(facilityType, kitchen, inventory, selec
     return kitchen.starterLemons > 0 ? "hud:interaction.takeLemons" : "hud:interaction.lemonSackEmpty";
   }
   if (facilityType === "serving-table") {
-    const stock = kitchen.servingTable;
+    const stock = getServingTableStock(kitchen, facilityId ?? DEFAULT_SERVING_TABLE_ID);
     if (SELLABLE_ITEM_IDS.includes(selectedItemId)) {
       if (stock.itemId && stock.itemId !== selectedItemId) return "hud:interaction.servingTableDifferentItem";
       return stock.quantity >= SERVING_TABLE_CAPACITY

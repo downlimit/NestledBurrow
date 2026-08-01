@@ -19,7 +19,7 @@ import {
   resetInventory,
 } from "./inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 11;
+export const SESSION_STATE_VERSION = 12;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -159,11 +159,14 @@ function normalizeGameplayState(value = {}) {
   });
   const kitchen = normalizeKitchenState(value.kitchen ?? {});
   const tavernService = normalizeTavernServiceState(value.tavernService ?? {});
-  const resumableReservations = new Set(tavernService.guests
+  const resumableReservations = new Map(tavernService.guests
     .filter((guest) => guest.reservationActive)
-    .map((guest) => guest.id));
-  kitchen.servingTable.reservations = kitchen.servingTable.reservations
-    .filter((reservation) => resumableReservations.has(reservation.guestId));
+    .map((guest) => [guest.id, guest.servingTableId]));
+  for (const [servingTableId, stock] of Object.entries(kitchen.servingTables)) {
+    stock.reservations = stock.reservations.filter((reservation) => (
+      resumableReservations.get(reservation.guestId) === servingTableId
+    ));
+  }
   return attachLegacyResourceGetters({
     currentEnergy,
     maximumEnergy,

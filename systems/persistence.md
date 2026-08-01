@@ -26,6 +26,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 - schema v9 migrates once to v10: watering can becomes the water bucket, missing tools are inserted without duplicates, legacy prepared/cooked outputs become inventory or deterministic kitchen-adjacent world items, and the serving boolean becomes typed stock;
 - schema v10 preserves active guest IDs and matching reservations; orphan reservations are discarded;
 - schema v10 migrates once to v11 by adding an empty ten-slot combat loadout; later drag swaps persist the single physical item owner across peaceful and combat slots;
+- schema v11 migrates once to v12 by moving one legacy serving portion under the canonical table ID and returning overflow portions to inventory or the world; guest snapshots persist serving and dining table assignments;
 - the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
 - dropped items persist only stable ID, item payload and logical position;
 - selected slot, in-flight drag state, throw arc, gain feedback and fade timers are not persisted;
@@ -33,7 +34,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v11 save/reload and migrations work. Peaceful inventory, combat loadout, dropped items, farm water/crops, kitchen stock/repair and active service snapshots survive reload. Authoring backups survive page reload and `NEW GAME`.
+Schema v12 save/reload and migrations work. Peaceful inventory, combat loadout, dropped items, farm water/crops, per-table kitchen stock/repair and active table-routed service snapshots survive reload. Authoring backups survive page reload and `NEW GAME`.
 
 ## Not yet
 

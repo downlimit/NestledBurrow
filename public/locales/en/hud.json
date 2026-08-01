@@ -92,7 +92,7 @@
     "serveItem": "Stock serving table",
     "takeItem": "Take item back",
     "servingTableDifferentItem": "A different item is on the table",
-    "servingTableFull": "The table already has 4 portions",
+    "servingTableFull": "The table already has a portion",
     "servingTableEmpty": "The serving table is empty",
     "repairStove": "Repair: 10 wood, 8 stone, 10 coins",
     "repairMissing": "Missing: {categories}",
