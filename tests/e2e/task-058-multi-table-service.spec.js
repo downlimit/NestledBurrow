@@ -1,0 +1,94 @@
+import { expect, test } from "@playwright/test";
+
+test.setTimeout(60_000);
+
+async function bridge(page, method, argument) {
+  return page.evaluate(
+    ({ method, argument }) => window.__NESTLED_BURROW_E2E__?.[method]?.(argument),
+    { method, argument },
+  );
+}
+
+async function bootFresh(page) {
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.goto("./?movementDebug=1");
+  await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
+}
+
+async function placeNear(page, entityId) {
+  await expect.poll(async () => {
+    await bridge(page, "placePlayerNear", entityId);
+    return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
+  }).toBe(entityId);
+}
+
+async function addAtOpenPoint(page, facilityType, occupied = []) {
+  const candidates = [
+    [640, 416], [704, 416], [768, 416], [640, 448], [704, 448], [768, 448],
+    [640, 480], [704, 480], [768, 480], [608, 512], [672, 512], [736, 512],
+  ];
+  for (const [x, y] of candidates) {
+    if (occupied.some((point) => point.x === x && point.y === y)) continue;
+    const facility = await bridge(page, "addFacility", { facilityType, x, y });
+    if (facility) return { facility, point: { x, y } };
+  }
+  throw new Error(`No open test placement for ${facilityType}`);
+}
+
+test("the approached serving table owns the placed food", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves exact furniture targeting once");
+  await bootFresh(page);
+  const { facility: second } = await addAtOpenPoint(page, "serving-table");
+  await bridge(page, "addInventoryItem", { itemId: "lemonade", quantity: 2 });
+  const session = await bridge(page, "getSession");
+  const slot = session.gameplay.inventory.slots.findIndex((item) => item?.id === "lemonade");
+  await bridge(page, "selectInventorySlot", slot);
+  await placeNear(page, second.id);
+  await bridge(page, "interact");
+  await bridge(page, "interact");
+
+  const kitchen = (await bridge(page, "getSession")).gameplay.kitchen;
+  expect(kitchen.servingTables["home-serving-table-01"]).toEqual({ itemId: null, quantity: 0, reservations: [] });
+  expect(kitchen.servingTables[second.id]).toEqual({ itemId: "lemonade", quantity: 1, reservations: [] });
+  const remainingLemonade = (await bridge(page, "getSession")).gameplay.inventory.slots
+    .filter((item) => item?.id === "lemonade")
+    .reduce((total, item) => total + item.quantity, 0);
+  expect(remainingLemonade).toBe(1);
+  const visuals = (await bridge(page, "getFacilityState")).servingTableVisuals;
+  expect(visuals["home-serving-table-01"].visible).toBe(false);
+  expect(visuals[second.id].visible).toBe(true);
+});
+
+test("two dine-in guests reserve distinct serving and dining tables", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves multi-guest table routing once");
+  await bootFresh(page);
+  const serving = await addAtOpenPoint(page, "serving-table");
+  const dining = await addAtOpenPoint(page, "table", [serving.point]);
+  await bridge(page, "setServingStock", { itemId: "fried-potato-dish", quantity: 1 });
+  await bridge(page, "setServingStock", {
+    itemId: "fried-potato-dish",
+    quantity: 1,
+    servingTableId: serving.facility.id,
+  });
+  await placeNear(page, "tavern-open-sign");
+  await bridge(page, "interact");
+  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
+  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-2");
+
+  await expect.poll(async () => {
+    const guests = (await bridge(page, "getTavernState")).guest.guests;
+    return {
+      count: guests.length,
+      serving: new Set(guests.map(({ servingTableId }) => servingTableId)).size,
+      dining: new Set(guests.map(({ diningTableId }) => diningTableId)).size,
+    };
+  }).toEqual({ count: 2, serving: 2, dining: 2 });
+
+  await expect.poll(async () => (await bridge(page, "getCoinState")).length, { timeout: 45_000 }).toBe(2);
+  const coins = await bridge(page, "getCoinState");
+  expect(coins.map(({ value }) => value)).toEqual([4, 4]);
+  expect(dining.facility.facilityType).toBe("table");
+});

@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import {
   COOKING_STEP_TYPES,
+  DEFAULT_SERVING_TABLE_ID,
   SERVING_TABLE_CAPACITY,
   STOVE_REPAIR_COST,
   completeCookingStep,
@@ -64,8 +65,8 @@ import {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-assert.equal(SESSION_STATE_VERSION, 11);
-assert.equal(SAVE_SCHEMA_VERSION, 11);
+assert.equal(SESSION_STATE_VERSION, 12);
+assert.equal(SAVE_SCHEMA_VERSION, 12);
 assert.deepEqual(INVENTORY_TOOL_IDS, ["axe", "pickaxe", "hoe", "water-bucket", "sword", "battle-axe"]);
 for (const id of ["pickaxe", "water-bucket", "lemon-seed", "lemon", "sliced-potato", "lemonade", "fried-potato-dish"]) {
   assert(INVENTORY_ITEM_IDS.includes(id), `inventory contains ${id}`);
@@ -151,19 +152,26 @@ assert.equal(getInventoryQuantity(potatoState.gameplay.inventory, "fried-potato-
 const stockState = createFreshGameSessionState();
 addInventoryItem(stockState.gameplay.inventory, createInventoryItem("lemonade", SERVING_TABLE_CAPACITY + 1));
 for (let index = 0; index < SERVING_TABLE_CAPACITY; index += 1) {
-  assert.equal(interactServingTable(stockState.gameplay.kitchen, stockState.gameplay.inventory, "lemonade").status, "item-served");
+  assert.equal(interactServingTable(stockState.gameplay.kitchen, stockState.gameplay.inventory, DEFAULT_SERVING_TABLE_ID, "lemonade").status, "item-served");
 }
-assert.equal(interactServingTable(stockState.gameplay.kitchen, stockState.gameplay.inventory, "lemonade").status, "serving-table-full");
+assert.equal(interactServingTable(stockState.gameplay.kitchen, stockState.gameplay.inventory, DEFAULT_SERVING_TABLE_ID, "lemonade").status, "serving-table-full");
 addInventoryItem(stockState.gameplay.inventory, createInventoryItem("fried-potato-dish", 1));
-assert.equal(interactServingTable(stockState.gameplay.kitchen, stockState.gameplay.inventory, "fried-potato-dish").status, "different-item");
+assert.equal(interactServingTable(stockState.gameplay.kitchen, stockState.gameplay.inventory, DEFAULT_SERVING_TABLE_ID, "fried-potato-dish").status, "different-item");
 const firstReservation = reserveServingItem(stockState.gameplay.kitchen, "tavern-guest-1");
 const secondReservation = reserveServingItem(stockState.gameplay.kitchen, "tavern-guest-2");
 assert.equal(firstReservation.itemId, "lemonade");
-assert.equal(secondReservation.itemId, "lemonade");
-assert.equal(consumeServingReservation(stockState.gameplay.kitchen, "tavern-guest-1").quantity, 3);
+assert.equal(secondReservation, null);
+assert.equal(consumeServingReservation(stockState.gameplay.kitchen, "tavern-guest-1").quantity, 0);
+assert.equal(interactServingTable(
+  stockState.gameplay.kitchen,
+  stockState.gameplay.inventory,
+  DEFAULT_SERVING_TABLE_ID,
+  "lemonade",
+).status, "item-served");
+assert(reserveServingItem(stockState.gameplay.kitchen, "tavern-guest-2"));
 assert.equal(releaseServingReservation(stockState.gameplay.kitchen, "tavern-guest-2"), true);
-assert.equal(stockState.gameplay.kitchen.servingTable.quantity, 3);
-assert.equal(stockState.gameplay.kitchen.servingTable.reservations.length, 0);
+assert.equal(stockState.gameplay.kitchen.servingTables[DEFAULT_SERVING_TABLE_ID].quantity, 1);
+assert.equal(stockState.gameplay.kitchen.servingTables[DEFAULT_SERVING_TABLE_ID].reservations.length, 0);
 
 const repairState = createFreshGameSessionState();
 addInventoryItem(repairState.gameplay.inventory, createInventoryItem("wood", STOVE_REPAIR_COST.wood));
@@ -250,10 +258,8 @@ assert.equal(new Set(migrated.state.gameplay.inventory.slots.filter((item) => it
 assert.equal(migrated.state.gameplay.farm.waterBucket.currentWater, 6);
 assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "sliced-potato"), 2);
 assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "fried-potato-dish"), 1);
-assert.deepEqual(migrated.state.gameplay.kitchen.servingTable, {
-  itemId: "fried-potato-dish",
-  quantity: 1,
-  reservations: [],
+assert.deepEqual(migrated.state.gameplay.kitchen.servingTables, {
+  [DEFAULT_SERVING_TABLE_ID]: { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
 });
 
 const manifest = JSON.parse(readFileSync("public/assets/project/lemonade/NestledBurrow_Lemonade.manifest.json", "utf8"));

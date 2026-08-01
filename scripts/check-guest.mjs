@@ -5,6 +5,7 @@ import { CharacterSystem } from "../src/characterSystem.js";
 import { createCoinRuntime } from "../src/coinRuntime.js";
 import {
   consumeServingReservation,
+  getAvailableServingPortions,
   normalizeKitchenState,
   releaseServingReservation,
   reserveServingItem,
@@ -74,7 +75,7 @@ const legacy = createFreshGameSessionState();
 legacy.version = 4;
 delete legacy.gameplay.tavernOpen;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 4, state: legacy }));
-assert.equal(SAVE_SCHEMA_VERSION, 11);
+assert.equal(SAVE_SCHEMA_VERSION, 12);
 assert.equal(migrated.status, "loaded");
 assert.equal(migrated.state.gameplay.tavernOpen, false);
 assert.equal(migrated.state.gameplay.coins, 0);
@@ -112,9 +113,19 @@ function scenario({
   isBlockedBox = () => false,
   servicePoint = { x: 72, y: 46 },
   seatPoint = { x: 120, y: 78 },
+  servingTables = null,
+  servicePoints = null,
+  seatPoints = null,
 }) {
+  const tableStocks = servingTables ?? {
+    "serving-1": { itemId, quantity, reservations: [] },
+  };
+  const resolvedServicePoints = servicePoints ?? Object.fromEntries(
+    Object.keys(tableStocks).map((tableId) => [tableId, servicePoint]),
+  );
+  const resolvedSeatPoints = seatPoints ?? { "dining-1": seatPoint };
   const kitchen = normalizeKitchenState({
-    servingTable: { itemId, quantity, reservations: [] },
+    servingTables: tableStocks,
   });
   const serviceState = { spawnRemainingMs: 8_000, nextGuestId: 0, guests: [] };
   const actors = new Map();
@@ -123,6 +134,8 @@ function scenario({
   const feedback = [];
   const states = [];
   const paymentStates = [];
+  const seatsByGuest = new Map();
+  const guestsBySeat = new Map();
   const runtime = createGuestRuntime({
     config: runtimeConfig,
     serviceState,
@@ -141,12 +154,34 @@ function scenario({
     },
     removeGuest(id) { controllers.delete(id); return actors.delete(id); },
     getTavernOpen: () => open,
-    getServicePoint: () => servicePoint,
-    getSeatPoint: () => seatPoint,
-    getAvailablePortions: () => kitchen.servingTable.quantity - kitchen.servingTable.reservations.length,
-    reserveItem: (guestId) => reserveServingItem(kitchen, guestId),
-    releaseReservation: (guestId) => releaseServingReservation(kitchen, guestId),
-    consumeReservation: (guestId) => consumeServingReservation(kitchen, guestId),
+    getServicePoint: (tableId) => resolvedServicePoints[tableId] ?? servicePoint,
+    getSeatPoint: (tableId) => resolvedSeatPoints[tableId] ?? null,
+    reserveSeat: (guestId, preferredId = null) => {
+      const existing = seatsByGuest.get(guestId);
+      if (existing) return { diningTableId: existing };
+      const tableId = [preferredId, ...Object.keys(resolvedSeatPoints)]
+        .find((candidate, index, candidates) => candidate
+          && candidates.indexOf(candidate) === index
+          && !guestsBySeat.has(candidate)
+          && resolvedSeatPoints[candidate]);
+      if (!tableId) return null;
+      seatsByGuest.set(guestId, tableId);
+      guestsBySeat.set(tableId, guestId);
+      return { diningTableId: tableId };
+    },
+    releaseSeat: (guestId) => {
+      const tableId = seatsByGuest.get(guestId);
+      seatsByGuest.delete(guestId);
+      return tableId ? guestsBySeat.delete(tableId) : false;
+    },
+    getAvailablePortions: () => getAvailableServingPortions(kitchen, Object.keys(resolvedServicePoints)),
+    reserveItem: (guestId, { excludedServingTableIds = [] } = {}) => reserveServingItem(
+      kitchen,
+      guestId,
+      Object.keys(resolvedServicePoints).filter((tableId) => !excludedServingTableIds.includes(tableId)),
+    ),
+    releaseReservation: (guestId, tableId) => releaseServingReservation(kitchen, guestId, tableId),
+    consumeReservation: (guestId, tableId) => consumeServingReservation(kitchen, guestId, tableId),
     onPurchaseComplete: (purchase) => payments.push(purchase),
     randomSource: () => 0,
     createFeedback: () => ({ set: (state) => feedback.push(state), update() {}, destroy() {} }),
@@ -167,7 +202,7 @@ function scenario({
   function finish(limit = 1200) {
     for (let index = 0; index < limit && runtime.getState().active; index += 1) tick();
   }
-  return { kitchen, serviceState, runtime, payments, paymentStates, feedback, states, tick, finish };
+  return { kitchen, serviceState, runtime, payments, paymentStates, feedback, states, seatsByGuest, tick, finish };
 }
 
 const closed = scenario({ open: false, itemId: "lemonade" });
@@ -175,8 +210,8 @@ assert.equal(closed.runtime.forceSpawn(), "tavern-guest-1");
 closed.finish();
 assert(closed.states.includes(GUEST_STATES.checkingSign));
 assert.equal(closed.states.includes(GUEST_STATES.entering), false);
-assert.equal(closed.kitchen.servingTable.quantity, 1);
-assert.deepEqual(closed.kitchen.servingTable.reservations, []);
+assert.equal(closed.kitchen.servingTables["serving-1"].quantity, 1);
+assert.deepEqual(closed.kitchen.servingTables["serving-1"].reservations, []);
 
 const takeout = scenario({ open: true, itemId: "lemonade" });
 assert.equal(takeout.runtime.forceSpawn(), "tavern-guest-1");
@@ -205,12 +240,64 @@ assert.equal(blockedDoorTarget.states.includes(GUEST_STATES.entering), false, "g
 assert(blockedDoorTarget.states.includes(GUEST_STATES.approachingService), "guest walks directly from the sign to the outdoor service point");
 assert(blockedDoorTarget.states.includes(GUEST_STATES.eating), "guest continues service while the unused door target is obstructed");
 
-const multi = scenario({ open: true, itemId: "lemonade", quantity: 2 });
+const multi = scenario({
+  open: true,
+  servingTables: {
+    "serving-1": { itemId: "lemonade", quantity: 1, reservations: [] },
+    "serving-2": { itemId: "lemonade", quantity: 1, reservations: [] },
+  },
+  servicePoints: {
+    "serving-1": { x: 72, y: 46 },
+    "serving-2": { x: 88, y: 46 },
+  },
+});
 assert.equal(multi.runtime.forceSpawn(), "tavern-guest-1");
 assert.equal(multi.runtime.forceSpawn(), "tavern-guest-2");
 assert.equal(multi.runtime.getState().activeCount, 2);
 assert.deepEqual(multi.runtime.getState().guests.map(({ id }) => id), ["tavern-guest-1", "tavern-guest-2"]);
-assert.equal(multi.kitchen.servingTable.reservations.length, 2);
+assert.equal(multi.kitchen.servingTables["serving-1"].reservations.length, 1);
+assert.equal(multi.kitchen.servingTables["serving-2"].reservations.length, 1);
+
+const multiTable = scenario({
+  open: true,
+  servingTables: {
+    "serving-left": { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
+    "serving-right": { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
+  },
+  servicePoints: {
+    "serving-left": { x: 56, y: 46 },
+    "serving-right": { x: 88, y: 46 },
+  },
+  seatPoints: {
+    "dining-left": { x: 104, y: 78 },
+    "dining-right": { x: 136, y: 78 },
+  },
+});
+assert.equal(multiTable.runtime.forceSpawn(), "tavern-guest-1");
+assert.equal(multiTable.runtime.forceSpawn(), "tavern-guest-2");
+const assigned = multiTable.runtime.getState().guests;
+assert.deepEqual(assigned.map(({ servingTableId }) => servingTableId), ["serving-left", "serving-right"]);
+assert.deepEqual(assigned.map(({ diningTableId }) => diningTableId), ["dining-left", "dining-right"]);
+multiTable.finish();
+assert.equal(multiTable.payments.length, 2, "two guests finish service through distinct serving and dining slots");
+
+const takeoutWithBusyDining = scenario({
+  open: true,
+  servingTables: {
+    "serving-meal": { itemId: "fried-potato-dish", quantity: 1, reservations: [] },
+    "serving-takeout": { itemId: "lemonade", quantity: 1, reservations: [] },
+  },
+  servicePoints: {
+    "serving-meal": { x: 56, y: 46 },
+    "serving-takeout": { x: 88, y: 46 },
+  },
+  seatPoints: {},
+});
+assert.equal(takeoutWithBusyDining.runtime.forceSpawn(), "tavern-guest-1");
+const busyDiningGuest = takeoutWithBusyDining.runtime.getState().guests[0];
+assert.equal(busyDiningGuest.itemId, "lemonade");
+assert.equal(busyDiningGuest.servingTableId, "serving-takeout");
+assert.equal(busyDiningGuest.diningTableId, null);
 
 let playerPosition = { x: 0, y: 0 };
 let collectedValue = 0;

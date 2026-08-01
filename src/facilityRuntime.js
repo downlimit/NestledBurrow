@@ -4,7 +4,7 @@ import {
   PLATED_DISH_ASSET,
 } from "./facilityConfig.js";
 import { TILE_SIZE } from "./worldConfig.js";
-import { getKitchenFacilityPrompt } from "./cookingDomain.js";
+import { getKitchenFacilityPrompt, getServingTableStock } from "./cookingDomain.js";
 import { clearCurrentWorldScene, setCurrentWorldScene } from "./worldSceneRegistry.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import {
@@ -18,6 +18,7 @@ export function createFacilityRuntime(scene, {
   getKitchenState = () => null,
   getInventoryState = () => null,
   getSelectedItem = () => null,
+  isFacilityReserved = () => false,
 }) {
   setCurrentWorldScene(scene);
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
@@ -25,7 +26,7 @@ export function createFacilityRuntime(scene, {
   let activeFacilityId = null;
   let destroyed = false;
   let editorId = 0;
-  let platedDishVisual = null;
+  const platedDishVisuals = new Map();
 
   function trackEditorId(id) {
     const match = /^editor-.+-(\d+)$/.exec(id);
@@ -53,6 +54,21 @@ export function createFacilityRuntime(scene, {
     return true;
   }
 
+  function createServingTableVisual(facility) {
+    if (facility.facilityType !== "serving-table" || platedDishVisuals.has(facility.id)) return;
+    const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
+      ?? { x: facility.visual.width / 2, y: facility.visual.height };
+    const dish = scene.add.image(
+      facility.footprint.x + facility.footprint.width / 2 + offset.x,
+      facility.footprint.y + 5 + offset.y,
+      PLATED_DISH_ASSET.key,
+    ).setOrigin(0.5, 0.5)
+      .setDepth(assetDepthFromPivot(facility.visual, pivotOffset, 501, `${facility.id}:dish`))
+      .setVisible(false);
+    platedDishVisuals.set(facility.id, dish);
+  }
+
   function add(facilityType, point) {
     const tile = {
       x: Math.floor(point.x / TILE_SIZE),
@@ -67,6 +83,8 @@ export function createFacilityRuntime(scene, {
     }), point);
     if (!createVisual(definition)) return null;
     definitions.set(definition.id, definition);
+    createServingTableVisual(definition);
+    syncKitchenVisuals();
     return definition;
   }
 
@@ -76,6 +94,8 @@ export function createFacilityRuntime(scene, {
     if (activeFacilityId === id) activeFacilityId = null;
     visuals.get(id)?.destroy();
     visuals.delete(id);
+    platedDishVisuals.get(id)?.destroy?.();
+    platedDishVisuals.delete(id);
     definitions.delete(id);
     worldLayout.clearWorldObjectCollider(id);
     return true;
@@ -96,6 +116,7 @@ export function createFacilityRuntime(scene, {
     if (!definition || definitions.has(definition.id) || !createVisual(definition, { validateFootprint })) return false;
     definitions.set(definition.id, definition);
     trackEditorId(definition.id);
+    createServingTableVisual(definition);
     return true;
   }
 
@@ -106,6 +127,8 @@ export function createFacilityRuntime(scene, {
       if (activeFacilityId === previous.id) activeFacilityId = null;
       visuals.get(previous.id)?.destroy();
       visuals.delete(previous.id);
+      platedDishVisuals.get(previous.id)?.destroy?.();
+      platedDishVisuals.delete(previous.id);
       definitions.delete(previous.id);
       worldLayout.clearWorldObjectCollider(previous.id);
     }
@@ -160,16 +183,7 @@ export function createFacilityRuntime(scene, {
       throw new Error(`Facility ${facility.id} use position must remain walkable`);
     }
   }
-  const servingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
-  if (servingTable) {
-    const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
-    const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset ?? { x: servingTable.visual.width / 2, y: servingTable.visual.height };
-    platedDishVisual = scene.add.image(
-      servingTable.footprint.x + servingTable.footprint.width / 2 + offset.x,
-      servingTable.footprint.y + 5 + offset.y,
-      PLATED_DISH_ASSET.key,
-    ).setOrigin(0.5, 0.5).setDepth(assetDepthFromPivot(servingTable.visual, pivotOffset, 501, `${servingTable.id}:dish`)).setVisible(false);
-  }
+  for (const facility of definitions.values()) createServingTableVisual(facility);
 
   function syncKitchenVisuals() {
     const kitchen = getKitchenState();
@@ -187,17 +201,28 @@ export function createFacilityRuntime(scene, {
       visuals.delete(sack.id);
       worldLayout.clearWorldObjectCollider(sack.id);
     }
-    const currentServingTable = [...definitions.values()].find((facility) => facility.facilityType === "serving-table");
     const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
-    const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
-      ?? (currentServingTable ? { x: currentServingTable.visual.width / 2, y: currentServingTable.visual.height } : { x: 0, y: 0 });
-    if (currentServingTable) platedDishVisual
-      ?.setPosition?.(currentServingTable.footprint.x + currentServingTable.footprint.width / 2 + offset.x, currentServingTable.footprint.y + 5 + offset.y)
-      ?.setDepth?.(assetDepthFromPivot(currentServingTable.visual, pivotOffset, 501, `${currentServingTable.id}:dish`));
-    const stock = kitchen?.servingTable;
-    if (stock?.itemId === "lemonade") platedDishVisual?.setTexture?.(LEMONADE_TEXTURE_KEY, LEMONADE_FRAMES.lemonade);
-    else platedDishVisual?.setTexture?.(PLATED_DISH_ASSET.key, 0);
-    platedDishVisual?.setVisible?.(Boolean(stock?.itemId && stock.quantity > 0));
+    const servingTables = [...definitions.values()].filter((facility) => facility.facilityType === "serving-table");
+    const servingTableIds = new Set(servingTables.map(({ id }) => id));
+    for (const [tableId, dish] of platedDishVisuals) {
+      if (servingTableIds.has(tableId)) continue;
+      dish.destroy?.();
+      platedDishVisuals.delete(tableId);
+    }
+    for (const servingTable of servingTables) {
+      createServingTableVisual(servingTable);
+      const dish = platedDishVisuals.get(servingTable.id);
+      const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
+        ?? { x: servingTable.visual.width / 2, y: servingTable.visual.height };
+      dish?.setPosition?.(
+        servingTable.footprint.x + servingTable.footprint.width / 2 + offset.x,
+        servingTable.footprint.y + 5 + offset.y,
+      )?.setDepth?.(assetDepthFromPivot(servingTable.visual, pivotOffset, 501, `${servingTable.id}:dish`));
+      const stock = getServingTableStock(kitchen, servingTable.id);
+      if (stock.itemId === "lemonade") dish?.setTexture?.(LEMONADE_TEXTURE_KEY, LEMONADE_FRAMES.lemonade);
+      else dish?.setTexture?.(PLATED_DISH_ASSET.key, 0);
+      dish?.setVisible?.(Boolean(stock.itemId && stock.quantity > 0));
+    }
   }
   syncKitchenVisuals();
 
@@ -209,7 +234,9 @@ export function createFacilityRuntime(scene, {
         return [...definitions.values()]
           .filter((facility) => facility.facilityType !== "lemon-sack" || kitchen?.starterLemons > 0)
           .map((facility) => {
-            const prompt = kitchen ? getKitchenFacilityPrompt(facility.facilityType, kitchen, getInventoryState(), getSelectedItem()?.id) : null;
+            const prompt = kitchen
+              ? getKitchenFacilityPrompt(facility.facilityType, kitchen, getInventoryState(), getSelectedItem()?.id, facility.id)
+              : null;
             return prompt ? { ...facility, prompt } : facility;
           });
       }
@@ -235,6 +262,15 @@ export function createFacilityRuntime(scene, {
         } : null];
       }));
     },
+    getServingTableVisualStates() {
+      return Object.fromEntries([...platedDishVisuals].map(([tableId, visual]) => [tableId, {
+        textureKey: visual.texture?.key ?? visual.textureKey ?? null,
+        frame: visual.frame?.name ?? visual.frame?.index ?? null,
+        visible: visual.visible,
+        x: visual.x,
+        y: visual.y,
+      }]));
+    },
     getAuthoringInstances() {
       return [...definitions.values()].flatMap((facility) => {
         const visual = visuals.get(facility.id);
@@ -251,7 +287,7 @@ export function createFacilityRuntime(scene, {
       for (const facility of definitions.values()) {
         if (`facility:${facility.facilityType}` !== profileKey) continue;
         visuals.get(facility.id)?.setPosition?.(facility.visual.x + offset.x, facility.visual.y + offset.y);
-        if (facility.facilityType === "serving-table") platedDishVisual?.setPosition?.(
+        if (facility.facilityType === "serving-table") platedDishVisuals.get(facility.id)?.setPosition?.(
           facility.footprint.x + facility.footprint.width / 2 + offset.x,
           facility.footprint.y + 5 + offset.y,
         );
@@ -270,6 +306,9 @@ export function createFacilityRuntime(scene, {
     toggle(facilityId, playerMotor) {
       const facility = definitions.get(facilityId);
       if (!facility || destroyed) return { status: "unknown-facility", mutated: false };
+      if (facility.facilityType === "table" && isFacilityReserved(facilityId)) {
+        return { status: "busy", mutated: false };
+      }
       if (["cutting-table", "gas-stove", "serving-table", "juicer", "lemon-sack"].includes(facility.facilityType)) {
         return { status: "handled-by-cooking", mutated: false };
       }
@@ -317,8 +356,8 @@ export function createFacilityRuntime(scene, {
         worldLayout.clearWorldObjectCollider(id);
       }
       visuals.clear();
-      platedDishVisual?.destroy?.();
-      platedDishVisual = null;
+      for (const visual of platedDishVisuals.values()) visual.destroy?.();
+      platedDishVisuals.clear();
       definitions.clear();
     },
   };

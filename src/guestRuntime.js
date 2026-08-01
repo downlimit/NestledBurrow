@@ -29,6 +29,8 @@ export function createGuestRuntime({
   getTavernOpen,
   getServicePoint,
   getSeatPoint,
+  reserveSeat = () => null,
+  releaseSeat = () => false,
   getAvailablePortions = () => 0,
   reserveItem = () => null,
   releaseReservation = () => false,
@@ -79,7 +81,9 @@ export function createGuestRuntime({
   function spawn({ requireReservation = false } = {}) {
     if (destroyed || visits.size >= GUEST_ACTIVE_CAP) return false;
     const id = `tavern-guest-${++serviceState.nextGuestId}`;
-    const reservation = reserveItem(id);
+    const claims = reserveServiceClaims(id);
+    const reservation = claims?.reservation ?? null;
+    const diningTableId = claims?.diningTableId ?? null;
     if (requireReservation && !reservation) return false;
     const controller = config.createController();
     const character = createGuest(controller, id, config.points.spawn);
@@ -99,12 +103,20 @@ export function createGuestRuntime({
       target: config.points.sign,
       signDecision: null,
       itemId: reservation?.itemId ?? null,
+      servingTableId: reservation?.servingTableId ?? null,
+      diningTableId,
       reservationActive: Boolean(reservation),
       mealCompleted: false,
       paid: false,
     };
     visits.set(id, visit);
-    if (reservation) onReservationChange({ guestId: id, active: true, itemId: reservation.itemId });
+    if (reservation) onReservationChange({
+      guestId: id,
+      active: true,
+      itemId: reservation.itemId,
+      servingTableId: reservation.servingTableId,
+      diningTableId,
+    });
     feedback.set("arriving");
     if (!planTo(visit, config.points.sign)) {
       cancelVisit(visit);
@@ -132,10 +144,15 @@ export function createGuestRuntime({
       target: null,
       signDecision: snapshot.state === GUEST_STATES.checkingSign ? null : true,
       itemId: snapshot.itemId,
+      servingTableId: snapshot.servingTableId,
+      diningTableId: snapshot.diningTableId,
       reservationActive: snapshot.reservationActive,
       mealCompleted: snapshot.mealCompleted,
       paid: snapshot.paid,
     };
+    if (visit.itemId === "fried-potato-dish" && visit.state !== GUEST_STATES.leaving) {
+      visit.diningTableId = reserveSeat(visit.id, visit.diningTableId)?.diningTableId ?? null;
+    }
     visits.set(visit.id, visit);
     visit.feedback.set(feedbackForState(visit));
     const target = targetForState(visit);
@@ -169,6 +186,14 @@ export function createGuestRuntime({
   }
 
   function updateStationary(visit) {
+    if (visit.state === GUEST_STATES.approachingService
+      && visit.itemId === "fried-potato-dish"
+      && visit.reservationActive
+      && !visit.diningTableId) {
+      visit.diningTableId = reserveSeat(visit.id)?.diningTableId ?? null;
+      if (visit.diningTableId) arrive(visit);
+      return;
+    }
     if (visit.state === GUEST_STATES.checkingSign) {
       if (visit.signDecision === null && visit.stateElapsedMs >= config.signCheckMs) {
         visit.signDecision = getTavernOpen();
@@ -183,20 +208,33 @@ export function createGuestRuntime({
         return;
       }
       if (!visit.reservationActive) {
-        const reservation = reserveItem(visit.id);
+        const claims = reserveServiceClaims(visit.id);
+        const reservation = claims?.reservation ?? null;
         if (!reservation) {
           transition(visit, GUEST_STATES.leaving, config.points.exit);
           return;
         }
         visit.reservationActive = true;
         visit.itemId = reservation.itemId;
-        onReservationChange({ guestId: visit.id, active: true, itemId: reservation.itemId });
+        visit.servingTableId = reservation.servingTableId;
+        visit.diningTableId = claims.diningTableId;
+        onReservationChange({
+          guestId: visit.id,
+          active: true,
+          itemId: reservation.itemId,
+          servingTableId: reservation.servingTableId,
+          diningTableId: visit.diningTableId,
+        });
       }
-      transition(visit, GUEST_STATES.approachingService, getServicePoint());
+      transition(visit, GUEST_STATES.approachingService, getServicePoint(visit.servingTableId));
       return;
     }
     if (visit.state === GUEST_STATES.eating) {
-      const seatPoint = getSeatPoint();
+      const seatPoint = getSeatPoint(visit.diningTableId);
+      if (!seatPoint) {
+        cancelVisit(visit);
+        return;
+      }
       if (!visit.mealCompleted && !isNearPoint(visit.character.motor.position, seatPoint, config.arrivalRadius)) {
         transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
         return;
@@ -212,6 +250,20 @@ export function createGuestRuntime({
     }
   }
 
+  function reserveServiceClaims(guestId) {
+    const excludedServingTableIds = [];
+    while (true) {
+      const reservation = reserveItem(guestId, { excludedServingTableIds });
+      if (!reservation) return null;
+      if (reservation.itemId !== "fried-potato-dish") return { reservation, diningTableId: null };
+      const diningTableId = reserveSeat(guestId)?.diningTableId ?? null;
+      if (diningTableId) return { reservation, diningTableId };
+      releaseReservation(guestId, reservation.servingTableId);
+      if (excludedServingTableIds.includes(reservation.servingTableId)) return null;
+      excludedServingTableIds.push(reservation.servingTableId);
+    }
+  }
+
   function arrive(visit) {
     visit.path = null;
     visit.controller.stop();
@@ -223,9 +275,13 @@ export function createGuestRuntime({
     } else if (visit.state === GUEST_STATES.entering) {
       transition(visit, GUEST_STATES.approachingService, config.points.insideDoor);
     } else if (visit.state === GUEST_STATES.approachingService && samePoint(visit.target, config.points.insideDoor)) {
-      transition(visit, GUEST_STATES.approachingService, getServicePoint());
+      transition(visit, GUEST_STATES.approachingService, getServicePoint(visit.servingTableId));
     } else if (visit.state === GUEST_STATES.approachingService) {
-      const consumed = visit.reservationActive ? consumeReservation(visit.id) : null;
+      if (visit.itemId === "fried-potato-dish" && !visit.diningTableId) {
+        visit.diningTableId = reserveSeat(visit.id)?.diningTableId ?? null;
+        if (!visit.diningTableId) return;
+      }
+      const consumed = visit.reservationActive ? consumeReservation(visit.id, visit.servingTableId) : null;
       if (!consumed) {
         releaseVisitReservation(visit);
         transition(visit, GUEST_STATES.leaving, config.points.exit);
@@ -233,13 +289,25 @@ export function createGuestRuntime({
       }
       visit.reservationActive = false;
       visit.itemId = consumed.itemId;
-      onReservationChange({ guestId: visit.id, active: false, itemId: consumed.itemId, consumed: true });
+      onReservationChange({
+        guestId: visit.id,
+        active: false,
+        itemId: consumed.itemId,
+        servingTableId: consumed.servingTableId,
+        diningTableId: visit.diningTableId,
+        consumed: true,
+      });
       if (visit.itemId === "lemonade") {
         visit.feedback.set("carrying-lemonade");
         completePurchase(visit, 2);
         transition(visit, GUEST_STATES.leaving, config.points.exit, { preserveFeedback: true });
       } else {
-        transition(visit, GUEST_STATES.carryingToSeat, getSeatPoint());
+        const seatPoint = getSeatPoint(visit.diningTableId);
+        if (!seatPoint) {
+          cancelVisit(visit);
+          return;
+        }
+        transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
       }
     } else if (visit.state === GUEST_STATES.carryingToSeat) {
       visit.state = GUEST_STATES.eating;
@@ -298,16 +366,22 @@ export function createGuestRuntime({
     if (!visit.path) return;
     let facilityPoint = null;
     if (visit.state === GUEST_STATES.approachingService
-      && !samePoint(visit.target, config.points.insideDoor)) facilityPoint = getServicePoint();
-    else if (visit.state === GUEST_STATES.carryingToSeat) facilityPoint = getSeatPoint();
+      && !samePoint(visit.target, config.points.insideDoor)) facilityPoint = getServicePoint(visit.servingTableId);
+    else if (visit.state === GUEST_STATES.carryingToSeat) facilityPoint = getSeatPoint(visit.diningTableId);
     if (facilityPoint && !samePoint(facilityPoint, visit.target)) planTo(visit, facilityPoint);
   }
 
   function releaseVisitReservation(visit) {
     if (!visit.reservationActive) return false;
-    const released = releaseReservation(visit.id);
+    const released = releaseReservation(visit.id, visit.servingTableId);
     visit.reservationActive = false;
-    if (released) onReservationChange({ guestId: visit.id, active: false, itemId: visit.itemId });
+    if (released) onReservationChange({
+      guestId: visit.id,
+      active: false,
+      itemId: visit.itemId,
+      servingTableId: visit.servingTableId,
+      diningTableId: visit.diningTableId,
+    });
     return released;
   }
 
@@ -320,6 +394,7 @@ export function createGuestRuntime({
     if (!visits.has(visit.id)) return;
     visit.state = GUEST_STATES.finished;
     visit.feedback.destroy();
+    releaseSeat(visit.id, visit.diningTableId);
     removeGuest(visit.character.id);
     visits.delete(visit.id);
     syncPersistedState();
@@ -328,8 +403,8 @@ export function createGuestRuntime({
   function targetForState(visit) {
     if (visit.state === GUEST_STATES.approachingSign) return config.points.sign;
     if (visit.state === GUEST_STATES.entering) return config.points.outsideDoor;
-    if (visit.state === GUEST_STATES.approachingService) return getServicePoint();
-    if (visit.state === GUEST_STATES.carryingToSeat) return getSeatPoint();
+    if (visit.state === GUEST_STATES.approachingService) return getServicePoint(visit.servingTableId);
+    if (visit.state === GUEST_STATES.carryingToSeat) return getSeatPoint(visit.diningTableId);
     if (visit.state === GUEST_STATES.leaving) return config.points.exit;
     return null;
   }
@@ -349,6 +424,8 @@ export function createGuestRuntime({
       stateElapsedMs: visit.stateElapsedMs,
       position: { ...visit.character.motor.position },
       itemId: visit.itemId,
+      servingTableId: visit.servingTableId,
+      diningTableId: visit.diningTableId,
       reservationActive: visit.reservationActive,
       mealCompleted: visit.mealCompleted,
       paid: visit.paid,
@@ -359,12 +436,15 @@ export function createGuestRuntime({
     update,
     forceSpawn: () => spawn({ requireReservation: false }),
     isDishReserved: () => [...visits.values()].some((visit) => visit.reservationActive),
+    isDiningTableReserved: (tableId) => [...visits.values()].some((visit) => visit.diningTableId === tableId),
     getState: () => {
       const guests = [...visits.values()].map((visit) => ({
         id: visit.id,
         state: visit.state,
         reservedDish: visit.reservationActive,
         itemId: visit.itemId,
+        servingTableId: visit.servingTableId,
+        diningTableId: visit.diningTableId,
         position: { ...visit.character.motor.position },
         replans: visit.replans,
         paid: visit.paid,

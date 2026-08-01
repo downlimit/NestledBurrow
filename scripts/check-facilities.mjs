@@ -6,6 +6,7 @@ import { BED_ASSET, BED_OBJECT } from "../src/debrisConfig.js";
 import { FACILITIES, FACILITY_ASSETS, PLATED_DISH_ASSET, preloadFacilityAssets } from "../src/facilityConfig.js";
 import { createFacilityRuntime } from "../src/facilityRuntime.js";
 import { createNewGameInventory } from "../src/inventoryDomain.js";
+import { DEFAULT_SERVING_TABLE_ID } from "../src/cookingDomain.js";
 
 assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, footprint.width / 16, footprint.height / 16]), [
   ["shower", 2, 2],
@@ -75,9 +76,19 @@ const colliders = new Map(); const images = [];
 const scene = { add: { image(x, y, key, frame = 0) { const image = { x, y, key, frame, visible: true, setOrigin() { return this; }, setPosition(nextX, nextY) { this.x = nextX; this.y = nextY; return this; }, setDepth(value) { this.depth = value; return this; }, setVisible(value) { this.visible = value; return this; }, setTexture(nextKey, nextFrame = 0) { this.key = nextKey; this.frame = nextFrame; return this; }, setFrame(nextFrame) { this.frame = nextFrame; return this; }, destroy() { this.destroyed = true; } }; images.push(image); return image; } } };
 let blockFacilityPlacement = false;
 const worldLayout = { getEffectiveCollider(bounds) { return bounds; }, isBlockedBox() { return blockFacilityPlacement; }, setWorldObjectCollider(id, bounds) { colliders.set(id, bounds); }, clearWorldObjectCollider(id) { colliders.delete(id); } };
-const kitchen = { starterLemons: 6, stoveRepaired: false, servingTable: { itemId: null, quantity: 0, reservations: [] } };
+const kitchen = {
+  starterLemons: 6,
+  stoveRepaired: false,
+  servingTables: { [DEFAULT_SERVING_TABLE_ID]: { itemId: null, quantity: 0, reservations: [] } },
+};
 const inventory = createNewGameInventory();
-const runtime = createFacilityRuntime(scene, { worldLayout, getKitchenState: () => kitchen, getInventoryState: () => inventory });
+let reservedDiningTableId = null;
+const runtime = createFacilityRuntime(scene, {
+  worldLayout,
+  getKitchenState: () => kitchen,
+  getInventoryState: () => inventory,
+  isFacilityReserved: (facilityId) => facilityId === reservedDiningTableId,
+});
 assert.equal(images.length, 9); assert.deepEqual([...colliders.values()].map((bounds) => [(bounds.right - bounds.left) / 16, (bounds.bottom - bounds.top) / 16]), [[2, 2], [1, 1], [3, 1], [2, 1], [1, 2], [2, 1], [1, 1], [1, 1]]);
 const motor = { position: null, movement: { velocity: { x: 3, y: -2 } } };
 for (const facility of FACILITIES.filter((candidate) => candidate.editable !== false)) {
@@ -86,6 +97,10 @@ for (const facility of FACILITIES.filter((candidate) => candidate.editable !== f
   assert.deepEqual(motor.position, { x: 123, y: 456 }, `${facility.facilityType} interaction never moves the player motor`);
   assert.equal(runtime.toggle(facility.id, motor).status, "stopped");
 }
+const diningTable = runtime.getDefinitions().find((facility) => facility.facilityType === "table");
+reservedDiningTableId = diningTable.id;
+assert.equal(runtime.toggle(diningTable.id, motor).status, "busy", "a player cannot occupy a guest-reserved dining table");
+reservedDiningTableId = null;
 assert.equal(runtime.getInteractionDefinitions().find((facility) => facility.facilityType === "cutting-table").prompt, "hud:interaction.noRawPotatoes");
 assert.equal(runtime.getInteractionDefinitions().find((facility) => facility.facilityType === "gas-stove").prompt, "hud:interaction.repairStove");
 const lemonSack = FACILITIES.find((facility) => facility.facilityType === "lemon-sack");
@@ -112,10 +127,22 @@ assert.equal(runtime.replace(movedCuttingTable.previous), true, "fixed kitchen f
 const servingTable = runtime.getDefinitions().find((facility) => facility.facilityType === "serving-table");
 const movedServingTable = runtime.move(servingTable.id, { x: 672, y: 320 });
 assert(movedServingTable, "serving table can move");
-assert.equal(images.find((image) => image.key === PLATED_DISH_ASSET.key).x, 688, "served dish follows a moved serving table");
+assert.equal(runtime.getServingTableVisualStates()[servingTable.id].x, 688, "served dish follows a moved serving table");
 assert.equal(runtime.replace(movedServingTable.previous), true);
-kitchen.servingTable = { itemId: "fried-potato-dish", quantity: 1, reservations: [] };
+kitchen.servingTables[servingTable.id] = { itemId: "fried-potato-dish", quantity: 1, reservations: [] };
 runtime.syncKitchenVisuals();
-assert.equal(images.find((image) => image.key === PLATED_DISH_ASSET.key).visible, true, "serving table dish visibility follows persistent state");
+assert.equal(runtime.getServingTableVisualStates()[servingTable.id].visible, true, "serving table dish visibility follows persistent state");
+const secondServingTable = runtime.add("serving-table", { x: 800, y: 320 });
+assert(secondServingTable, "a second serving table can be placed");
+kitchen.servingTables[secondServingTable.id] = { itemId: "lemonade", quantity: 1, reservations: [] };
+runtime.syncKitchenVisuals();
+const dishVisuals = runtime.getServingTableVisualStates();
+assert.equal(dishVisuals[servingTable.id].visible, true);
+assert.equal(dishVisuals[secondServingTable.id].visible, true);
+assert.notDeepEqual(
+  [dishVisuals[servingTable.id].x, dishVisuals[servingTable.id].y],
+  [dishVisuals[secondServingTable.id].x, dishVisuals[secondServingTable.id].y],
+  "each serving table owns its own dish visual",
+);
 runtime.destroy(); runtime.destroy(); assert.equal(colliders.size, 0); assert(images.every((image) => image.destroyed));
-console.log("facility checks passed: canonical furniture sprites, footprints, interaction and teardown");
+console.log("facility checks passed: canonical furniture sprites, independent serving visuals, interaction and teardown");

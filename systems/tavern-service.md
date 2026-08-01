@@ -26,16 +26,17 @@ lemon + bucket water → juicer → serving table → takeout guest → 2 coins
 
 ## Invariants
 
-- kitchen stock is JSON-safe: one item type, quantity `0..4`, and stable guest reservations;
+- kitchen stock is JSON-safe and owned by stable serving-table ID: each table holds zero or one portion and its stable guest reservation;
 - recipes consume inputs and publish outputs atomically through inventory operations;
-- facility positions are read live, so moved furniture changes service targets and guest paths replan;
+- facility positions are read live by reserved table ID, so moved furniture changes only its assigned guest path;
 - sign, stock reservation and service lifecycle cannot contradict each other;
 - guests use persisted stable IDs, arrive in waves of one or two every three to eight seconds, never exceed six active visits, and spawn only against unreserved stock;
+- dine-in guests reserve distinct dining-table IDs before consuming a dish; a table currently used by the player is excluded from new seat assignments, and the player cannot start using a guest-reserved table;
 - lemonade is takeout worth two coins; a fried potato dish is dine-in worth four.
 
 ## Current baseline
 
-Potato preparation/frying and lemon juicing feed real inventory items into a capacity-four serving table. A finite six-lemon starter sack, persistent stove repair, random multi-guest service, lemonade takeout, potato dine-in and value-bearing coin rewards work end-to-end.
+Potato preparation/frying and lemon juicing feed real inventory items into independently stocked single-portion serving tables. A finite six-lemon starter sack, persistent stove repair, table-routed multi-guest service, lemonade takeout, conflict-free potato dine-in and value-bearing coin rewards work end-to-end.
 
 ## Not yet
 
@@ -43,4 +44,4 @@ Recipe book, broader ingredient variety, storage, guest preferences, configurabl
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`; focused Task #049 Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`; focused Task #058 Browser E2E.
