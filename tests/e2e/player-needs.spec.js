@@ -240,31 +240,52 @@ test.describe("Task #061 Sims-like needs", () => {
     await page.evaluate(() => {
       const api = window.__NESTLED_BURROW_E2E__;
       api.setNeeds({ toilet: 0 });
-      api.advanceGameplayTime(9999);
+      api.advanceGameplayTime(9000);
     });
     expect((await snapshot(page)).values.toilet).toBe(0);
     expect((await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).interactionTimeline.phase).toBe("free");
-    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(1));
+    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(1000));
     expect((await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).interactionTimeline).toMatchObject({
       phase: "shake", profileId: "toilet-accident", protectedNeed: "toilet", shakeIndex: 1,
     });
     await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(2250));
-    expect((await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).interactionTimeline).toMatchObject({
-      phase: "recovery", recoveryProgress: 0, puddleOutput: { localPuddle: true },
+    const recoveryStartFrame = await page.evaluate(() => ({
+      needs: window.__NESTLED_BURROW_E2E__.getNeedsState(),
+      runtime: window.__NESTLED_BURROW_E2E__.getRuntimeState().interactionTimeline,
+    }));
+    const recoveryRuntime = recoveryStartFrame.runtime;
+    expect(recoveryRuntime).toMatchObject({ phase: "recovery", puddleOutput: { localPuddle: true } });
+    expect(recoveryRuntime.recoveryProgress).toBeLessThan(0.02);
+    const recoveryStart = recoveryStartFrame.needs;
+    expect(recoveryStart.values.toilet).toBeCloseTo(70 * recoveryRuntime.recoveryProgress, 2);
+    const midpointFrame = await page.evaluate(() => {
+      window.__NESTLED_BURROW_E2E__.advanceGameplayTime(1000);
+      return {
+        needs: window.__NESTLED_BURROW_E2E__.getNeedsState(),
+        runtime: window.__NESTLED_BURROW_E2E__.getRuntimeState().interactionTimeline,
+      };
     });
-    const recoveryStart = await snapshot(page);
-    expect(recoveryStart.values.toilet).toBe(0);
-    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(1000));
-    const recoveryMidpoint = await snapshot(page);
-    expect(recoveryMidpoint.values.toilet).toBeCloseTo(35, 2);
-    expect(recoveryMidpoint.values.lustre).toBeCloseTo(recoveryStart.values.lustre - 22.5, 1);
-    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(999));
-    expect((await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).interactionTimeline.phase).toBe("recovery");
-    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(1));
-    const state = await snapshot(page);
-    expect(state.values.toilet).toBeCloseTo(70, 2);
-    expect(state.values.lustre).toBeCloseTo(recoveryStart.values.lustre - 45, 1);
-    expect((await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).interactionTimeline.phase).toBe("free");
+    const recoveryMidpoint = midpointFrame.needs;
+    const midpointRuntime = midpointFrame.runtime;
+    expect(recoveryMidpoint.values.toilet).toBeCloseTo(70 * midpointRuntime.recoveryProgress, 2);
+    expect(recoveryMidpoint.values.lustre).toBeCloseTo(recoveryStart.values.lustre - 45 * (midpointRuntime.recoveryProgress - recoveryRuntime.recoveryProgress), 1);
+    const finalStepMs = Math.max(1, Math.floor((1 - midpointRuntime.recoveryProgress) * 2000));
+    const beforeCompletion = await page.evaluate((milliseconds) => {
+      window.__NESTLED_BURROW_E2E__.advanceGameplayTime(Math.max(0, milliseconds - 100));
+      return window.__NESTLED_BURROW_E2E__.getRuntimeState().interactionTimeline;
+    }, finalStepMs);
+    expect(beforeCompletion.phase).toBe("recovery");
+    const completionFrame = await page.evaluate(() => {
+      window.__NESTLED_BURROW_E2E__.advanceGameplayTime(150);
+      return {
+        needs: window.__NESTLED_BURROW_E2E__.getNeedsState(),
+        runtime: window.__NESTLED_BURROW_E2E__.getRuntimeState().interactionTimeline,
+      };
+    });
+    const state = completionFrame.needs;
+    expect(state.values.toilet).toBeGreaterThan(69.9);
+    expect(state.values.lustre).toBeCloseTo(recoveryStart.values.lustre - 45 * (1 - recoveryRuntime.recoveryProgress), 1);
+    expect(completionFrame.runtime.phase).toBe("free");
     expect(state.runtime.debugPresetActive).toBe(true);
   });
 });

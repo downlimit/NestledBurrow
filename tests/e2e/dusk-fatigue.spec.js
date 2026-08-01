@@ -64,14 +64,14 @@ test("multiply overlay follows exact dusk and dawn phases while HUD stays above 
   expect((await bridge(page, "getHudState")).resources.clockText).toMatch(/^7:\d{2} AM$/u);
 });
 
-test("energy curve changes player speed smoothly and uses maximum energy", async ({ page }) => {
+test("energy curve changes player speed smoothly across canonical 0..100 values", async ({ page }) => {
   await boot(page);
   await bridge(page, "setEnergyState", { current: 25, maximum: 100 });
-  await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeGreaterThan(0.98);
+  await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeCloseTo(0.95, 2);
   await bridge(page, "setEnergyState", { current: 13, maximum: 100 });
-  await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeCloseTo(0.8125, 1);
-  await bridge(page, "setEnergyState", { current: 10, maximum: 200 });
-  await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeCloseTo(0.4791667, 1);
+  await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeCloseTo(0.83, 2);
+  await bridge(page, "setEnergyState", { current: 15, maximum: 200 });
+  await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).targetMultiplier).toBeCloseTo(0.85, 2);
   const firstFrame = await bridge(page, "getPlayerMovementState");
   expect(firstFrame.effectiveMultiplier).toBeGreaterThan(firstFrame.targetMultiplier);
   await expect.poll(async () => (await bridge(page, "getPlayerMovementState")).effectiveMultiplier, { timeout: 1500 }).toBeCloseTo(firstFrame.targetMultiplier, 1);
@@ -93,11 +93,11 @@ test("successful low-energy hits shake the whole energy bar and dispatch distinc
   await expect.poll(() => bridge(page, "getAudioEffectState")).toMatchObject({ lastEffectType: "wood-hit" });
   await captureEvidence(page, testInfo, "low-energy-resources");
 
-  await bridge(page, "setEnergy", 15.25);
+  await bridge(page, "setEnergy", 15.1);
   const exactThreshold = await bridge(page, "getHudState");
   await hit(page, "yard-log-02");
   const afterThresholdHit = await bridge(page, "getResourceState");
-  expect(afterThresholdHit.currentEnergy).toBeLessThan(15.25);
+  expect(afterThresholdHit.currentEnergy).toBeLessThan(15);
   expect(afterThresholdHit.currentEnergy).toBeGreaterThan(14.5);
   expect((await bridge(page, "getHudState")).resources.energyShakeCount).toBe(exactThreshold.resources.energyShakeCount + 1);
 

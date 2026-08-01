@@ -2661,7 +2661,6 @@ class WorldScene extends Phaser.Scene {
       worldDeltaMs -= substepMs;
     }
     this.worldLocationCoordinator?.update?.();
-    this.syncFacilityPresentationPose();
     this.cameraRuntime?.update({
       presentationPosition: this.getPlayerCameraPosition(),
       speed: this.playerCharacter?.speed ?? 0,
