@@ -36,35 +36,30 @@
         <div id="buffs" class="buffs"></div>
       </div>
       <div class="section">
-        <h3>Бинго забега <span id="bingoScore" class="tag"></span></h3>
+        <h3>Цель макета <span id="bingoScore" class="tag"></span></h3>
         <div id="bingos"></div>
       </div>
       <div class="section">
         <details>
           <summary>Что проверяет макет</summary>
           <ul>
-            <li>Все шесть шкал всегда активны.</li>
-            <li>Импульс даётся только при пересечении порога внутри забега.</li>
-            <li>Один ресурс можно конвертировать в другой через действия.</li>
-            <li>План меняют конкретные события: дождь, завал, путник, звериное гнездо и находки.</li>
-            <li>Стэки занимают 10 мирных и 6 боевых numbered-ячеек; инструменты конкурируют с добычей.</li>
-            <li>Четыре action-ячейки принимают только оружие; оружие в обычной ячейке хранится, но не используется.</li>
+            <li>Все шесть шкал всегда активны в порядке N/E/S/T/L/D.</li>
+            <li>События меняют реальные объекты, обязательства и маршруты.</li>
+            <li>Потребности меняют ценность решений, а не заменяют игру штрафами.</li>
+            <li>Стэки занимают 10 мирных и 6 боевых numbered-ячеек.</li>
+            <li>Четыре action-ячейки предназначены только для активного оружия.</li>
             <li>NPC-сегмент является отдельной веткой; только там можно присоединить остров.</li>
-            <li>Промежуточные площадки сохраняют ремонт между забегами.</li>
+            <li>Транспортные площадки сохраняют ремонт между забегами.</li>
           </ul>
         </details>
       </div>
     </aside>
 
     <main class="panel">
+      <div class="section"><div id="routeStrip" class="route-strip"></div></div>
+      <div class="section"><div id="arena"></div></div>
       <div class="section">
-        <div id="routeStrip" class="route-strip"></div>
-      </div>
-      <div class="section">
-        <div id="arena"></div>
-      </div>
-      <div class="section">
-        <h3>Походные действия и крафт</h3>
+        <h3>Походные действия</h3>
         <div id="fieldActions" class="action-grid"></div>
       </div>
     </main>
@@ -85,23 +80,19 @@
         <p id="segmentHint" class="subtitle" style="margin-top:7px"></p>
         <div id="map" class="map"></div>
       </div>
-      <div id="segmentChoiceSection" class="section" style="display:none">
-        <h3>Следующая ветвь Атолла</h3>
-        <div id="segmentChoices" class="segment-choice"></div>
-      </div>
+      <div id="segmentChoiceSection" class="section" style="display:none"><div id="segmentChoices"></div></div>
       <div class="section">
         <h3>Лаборатория баланса</h3>
         <div class="action-grid">
-          <button id="stressNeedsBtn">Снизить все шкалы на 18<small>Проверка одновременного давления.</small></button>
-          <button id="randomEventBtn">Вызвать странность<small>Ручной тест событийной химии.</small></button>
-          <button id="grantKitBtn">Выдать походный набор<small>Немного волокна, трав и ягод; вода идёт в ведро.</small></button>
-          <button id="revealBtn">Разведать карту<small>Открывает скрытые узлы текущего сегмента.</small></button>
-          <button id="resetGatesBtn" class="danger">Сбросить ремонт площадок<small>Очищает постоянный прогресс этого макета.</small></button>
+          <button id="stressNeedsBtn">Снизить все шкалы на 18<small>Проверить одновременное давление.</small></button>
+          <button id="randomEventBtn">Заменить событие<small>Сгенерировать другую ситуацию на текущей арене.</small></button>
+          <button id="grantKitBtn">Выдать походный набор<small>Ресурсы для быстрого теста ремонта и решений.</small></button>
+          <button id="revealBtn">Разведать арену<small>Потратить энергию ради новизны и информации.</small></button>
+          <button id="resetGatesBtn" class="danger">Сбросить ремонт площадок<small>Очистить постоянный прогресс макета.</small></button>
         </div>
       </div>
     </aside>
   </div>
-
 </div>
 
 <div id="modal" class="modal">
@@ -109,22 +100,10 @@
     <h2 id="modalTitle">Забег завершён</h2>
     <p id="modalText" class="arena-copy"></p>
     <div id="modalSummary" class="summary-grid"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-      <button id="modalClose">Продолжить смотреть</button>
-      <button id="modalNew" class="primary">Новый Атолл</button>
-    </div>
+    <button id="modalClose">Закрыть</button>
+    <button id="modalNew" class="primary">Новый Атолл</button>
   </div>
 </div>
-
-<script src="app-part-01.js"></script>
-<script src="app-part-02.js"></script>
-<script src="app-part-03.js"></script>
-<script src="app-part-04.js"></script>
-<script src="app-part-05.js"></script>
-<script src="app-part-06.js"></script>
-<script src="app-part-07.js"></script>
-<script src="app-part-08.js"></script>
-<script src="app-part-09.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
