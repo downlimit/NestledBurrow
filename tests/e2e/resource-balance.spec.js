@@ -187,19 +187,20 @@ test("awake hourly rates and delayed catch-breath recovery share the canonical c
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(before - after).toBeCloseTo(8 / 60, 1);
-  await bridge(page, "setEnergy", 4);
-  await bridge(page, "setPlayerMotion", { moving: true, running: false });
-  await bridge(page, "advanceGameplayTime", 1);
-  await bridge(page, "setPlayerMotion", { moving: false });
-  before = (await bridge(page, "getResourceState")).currentEnergy;
-  await bridge(page, "advanceGameplayTime", 3000);
-  const afterDelay = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - afterDelay).toBeGreaterThan(0.18);
-  expect(before - afterDelay).toBeLessThanOrEqual(15 / 60 + 0.01);
-  await bridge(page, "advanceGameplayTime", 1000);
-  after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(after - afterDelay).toBeGreaterThan(0.8);
-  expect(after - afterDelay).toBeLessThanOrEqual(1 - 5 / 60 + 0.05);
+  const catchBreath = await page.evaluate(() => {
+    const api = window.__NESTLED_BURROW_E2E__;
+    api.setEnergy(4);
+    api.setPlayerMotion({ moving: true, running: false });
+    api.advanceGameplayTime(1);
+    api.setPlayerMotion({ moving: false });
+    const beforeDelay = api.getResourceState().currentEnergy;
+    api.advanceGameplayTime(3000);
+    const afterDelay = api.getResourceState().currentEnergy;
+    api.advanceGameplayTime(1000);
+    return { beforeDelay, afterDelay, afterRecovery: api.getResourceState().currentEnergy };
+  });
+  expect(catchBreath.beforeDelay - catchBreath.afterDelay).toBeCloseTo(15 / 60, 6);
+  expect(catchBreath.afterRecovery - catchBreath.afterDelay).toBeCloseTo(1 - 5 / 60, 6);
 });
 
 test("resource colliders have their requested insets and work from directly above", async ({ page }) => {

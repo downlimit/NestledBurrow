@@ -48,13 +48,13 @@ async function faceFarmCell(page) {
     facing: { x: 1, y: 0 },
   });
   const selectedItem = (await bridge(page, "getFarmingState")).selectedItem;
-  await page.keyboard.down("KeyD");
   if (["hoe", "axe", "water-bucket"].includes(selectedItem)) {
+    await page.keyboard.down("KeyD");
     await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 1, y: 0 });
+    await page.keyboard.up("KeyD");
   } else {
     await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
   }
-  await page.keyboard.up("KeyD");
 }
 
 function inventoryQuantity(session, itemId) {

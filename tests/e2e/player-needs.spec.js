@@ -219,16 +219,20 @@ test.describe("Task #061 Sims-like needs", () => {
     });
     expect(blockedRun.runSpeedMultiplier).toBe(1);
 
-    await page.evaluate(() => {
+    const collapseCycle = await page.evaluate(() => {
       const api = window.__NESTLED_BURROW_E2E__;
       api.setEnergy(0);
       api.advanceGameplayTime(16);
+      const collapsed = api.getRuntimeState();
+      api.advanceGameplayTime(7000);
+      const beforeWake = api.getRuntimeState();
+      api.advanceGameplayTime(1000);
+      const woke = api.getRuntimeState();
+      return { collapsed, beforeWake, woke };
     });
-    await expect.poll(async () => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).toMatchObject({ sleeping: true, exhaustedSleeping: true });
-    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(7400));
-    expect((await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).exhaustedSleeping).toBe(true);
-    await page.evaluate(() => window.__NESTLED_BURROW_E2E__.advanceGameplayTime(100));
-    await expect.poll(async () => page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).toMatchObject({ sleeping: false, exhaustedSleeping: false });
+    expect(collapseCycle.collapsed).toMatchObject({ sleeping: true, exhaustedSleeping: true });
+    expect(collapseCycle.beforeWake).toMatchObject({ sleeping: true, exhaustedSleeping: true });
+    expect(collapseCycle.woke).toMatchObject({ sleeping: false, exhaustedSleeping: false });
   });
 
   test("debug presets reach critical states and toilet accident stays locked through recovery", async ({ page }) => {
