@@ -103,6 +103,15 @@ export function installWorldE2EBridge(scene) {
     },
     getBuildModeState: () => scene.buildMode?.getState?.() ?? null,
     toggleBuildMode: () => scene.buildMode?.toggle?.(),
+    moveTavernSign: ({ x, y }) => {
+      const state = scene.tavernSignRuntime?.getState?.();
+      const target = state ? scene.tavernSignRuntime?.getBuildMoveTargetAt?.(state.position) : null;
+      if (!target) return { status: "ignored" };
+      scene.beginBuildAction?.();
+      const result = scene.applyBuildMove?.(target, { x: Number(x), y: Number(y) });
+      scene.endBuildAction?.();
+      return result;
+    },
     getHudState: () => ({
       newGameConfirming: scene.gameHud?.isConfirming?.() ?? false,
       resources: scene.gameHud?.getResourceState?.(),
@@ -117,6 +126,7 @@ export function installWorldE2EBridge(scene) {
       lastEffectType: scene.audioRuntime?.lastEffectType ?? null,
       playCount: scene.audioRuntime?.effectPlayCount ?? 0,
     }),
+    getMeleeState: () => scene.meleeRuntime?.getState?.() ?? null,
     interact: () => {
       scene.frameActions = Object.freeze({ interact: true, primary: false, secondary: false });
       scene.interactionRuntime?.update({ actions: scene.frameActions });
@@ -265,11 +275,11 @@ export function installWorldE2EBridge(scene) {
 }
 
 function placePlayerNear(scene, entityId) {
-  const resource = RESOURCE_OBJECTS.find((item) => item.id === entityId);
+  const resource = scene.debrisRuntime?.getResourceDefinitions?.().find((item) => item.id === entityId);
   const facility = scene.facilityRuntime?.getDefinition?.(entityId);
   const bed = scene.debrisRuntime?.getBedDefinition?.(entityId);
   const well = scene.worldBuildCoordinator?.getWellState?.().find((item) => item.id === entityId);
-  const sign = entityId === TAVERN_SIGN.id ? { position: TAVERN_SIGN.interactionPosition } : null;
+  const sign = entityId === TAVERN_SIGN.id ? { position: scene.tavernSignRuntime?.getState?.().interactionPosition } : null;
   const target = resource
     ? { position: resource.position }
     : bed ? { position: bed.position }

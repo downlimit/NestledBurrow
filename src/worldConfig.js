@@ -38,14 +38,24 @@ export const OUTDOOR_FRAMES = Object.freeze({
   pathMiddle: Object.freeze([15, 16, 17]),
   pathBottom: Object.freeze([27, 28, 29]),
   islandCliff: Object.freeze({
-    topLeft: 24,
-    top: 25,
-    topRight: 27,
-    left: 36,
-    right: 39,
+    topLeft: 36,
+    top: 37,
+    topRight: 38,
+    left: 48,
+    right: 50,
     bottomLeft: 60,
     bottom: 61,
-    bottomRight: 63,
+    bottomRight: 62,
+  }),
+  islandInnerCorner: Object.freeze({
+    topLeft: 78,
+    topRight: 77,
+    bottomLeft: 42,
+    bottomRight: 41,
+  }),
+  transport: Object.freeze({
+    entranceLeft: 22,
+    entranceRight: 23,
   }),
 });
 
@@ -76,8 +86,6 @@ export const HOUSE_FRAMES = Object.freeze({
   transport: Object.freeze({
     topLeft: 0,
     topRight: 2,
-    pillarLeft: 12,
-    pillarRight: 14,
   }),
 });
 

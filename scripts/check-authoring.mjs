@@ -178,7 +178,8 @@ assert.equal(captureStartingLayout(captureScene(true)).buildObjects.length, 0, "
 const layoutModule = createStartingLayoutModuleSource(activeLayout);
 assert(layoutModule.includes('"kind": "plant"'));
 const canonicalLayout = normalizeStartingLayout(STARTING_LAYOUT_DEFAULT);
-assert.equal(canonicalLayout.buildObjects.length, 157, "the recovered browser-authored topology is canonical");
+assert.equal(canonicalLayout.buildObjects.length, 156, "the recovered browser-authored topology is canonical");
+assert.equal(canonicalLayout.buildObjects.filter(({ item }) => item.resourceProfileId === "tree-planted").length, 2, "the canonical yard contains exactly two trees");
 assert.deepEqual(canonicalLayout.facilities.map((facility) => facility.id), [
   "editor-table-3",
   "editor-toilet-2",
@@ -189,11 +190,18 @@ assert.deepEqual(canonicalLayout.facilities.map((facility) => facility.id), [
   "home-serving-table-01",
   "home-shower-01",
 ], "the latest canonical save removes the extra home table");
-assert.deepEqual(canonicalLayout.furniture, [{
-  id: "training-dummy-01",
-  kind: "training-dummy",
-  position: { x: 584, y: 480 },
-}], "the training dummy position is part of the recovered canonical furniture layout");
+assert.deepEqual(canonicalLayout.furniture, [
+  {
+    id: "tavern-open-sign",
+    kind: "tavern-sign",
+    position: { x: 456, y: 472 },
+  },
+  {
+    id: "training-dummy-01",
+    kind: "training-dummy",
+    position: { x: 584, y: 480 },
+  },
+], "the tavern sign and training dummy positions are part of the recovered canonical furniture layout");
 assert.equal(canonicalLayout.facilities.some((facility) => (
   facility.footprint.x <= -10000 || facility.footprint.y <= -10000
 )), false, "temporary facility staging coordinates never enter the canonical layout");

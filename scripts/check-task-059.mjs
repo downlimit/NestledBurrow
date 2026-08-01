@@ -10,12 +10,18 @@ import {
 } from "../src/worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "../src/worldLocationCoordinator.js";
 import { getResourceObjectsForWorld, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
-import { TILE_SIZE } from "../src/worldConfig.js";
+import { OUTDOOR_FRAMES, TILE_SIZE } from "../src/worldConfig.js";
 import { createPlantedTreeDefinition } from "../src/editorAuthoringRuntime.js";
 import { getResourceProfile } from "../src/resourceDomain.js";
+import STARTING_LAYOUT_DEFAULT from "../src/startingLayoutDefault.js";
+import { STOVE_REPAIR_COST } from "../src/cookingDomain.js";
 
 assert.deepEqual([...WORLD_LOCATION_IDS].sort(), [WORLD_IDS.nest, WORLD_IDS.village], "only village and nest are registered");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.id, "village", "the existing village ID remains canonical");
+assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.meleeWeapons, true, "village retains the shared weapon runtime");
+assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.trainingDummy, true, "the training dummy remains village-owned");
+assert.equal(WORLD_LOCATION_DEFINITIONS.nest.capabilities.meleeWeapons, true, "Nest retains the shared weapon runtime");
+assert.equal(WORLD_LOCATION_DEFINITIONS.nest.capabilities.trainingDummy, false, "Nest excludes the village training dummy");
 assert.deepEqual(
   [WORLD_LOCATION_DEFINITIONS.nest.columns, WORLD_LOCATION_DEFINITIONS.nest.rows],
   [22, 16],
@@ -25,6 +31,21 @@ assert.deepEqual(
   [TRANSPORT_PROFILE.footprint.widthTiles, TRANSPORT_PROFILE.footprint.heightTiles],
   [2, 2],
   "the shared transport profile has an exact 2x2 footprint",
+);
+assert.deepEqual(
+  TRANSPORT_PROFILE.visuals.map(({ x, y, crop }) => [x, y, crop ?? null]),
+  [[0, 0, null], [1, 0, null], [0, 1, null], [1, 1, null]],
+  "the transport visual occupies a clean uncropped 2x2 grid",
+);
+assert.deepEqual(
+  OUTDOOR_FRAMES.islandCliff,
+  { topLeft: 36, top: 37, topRight: 38, left: 48, right: 50, bottomLeft: 60, bottom: 61, bottomRight: 62 },
+  "the island edge uses the contiguous Basic Village cliff nine-slice",
+);
+assert.deepEqual(
+  OUTDOOR_FRAMES.islandInnerCorner,
+  { topLeft: 78, topRight: 77, bottomLeft: 42, bottomRight: 41 },
+  "the island steps use the four Basic Village inner cliff corners",
 );
 
 const transitionPairs = Object.values(WORLD_LOCATION_DEFINITIONS).flatMap(({ id, transports }) => (
@@ -41,6 +62,28 @@ assert.equal(nestResources.filter(({ profileId }) => profileId === "tree-planted
 assert.equal(nestResources.filter(({ profileId }) => profileId === "stone-large").length, 1, "Nest contains one large stone");
 assert.equal(nestResources.filter(({ profileId }) => profileId === "stone-small").length, 2, "Nest contains two small stones");
 assert.equal(new Set(RESOURCE_OBJECTS.map(({ id }) => id)).size, RESOURCE_OBJECTS.length, "resource IDs are globally unique");
+const villageTrees = STARTING_LAYOUT_DEFAULT.buildObjects.filter(({ item }) => item.resourceProfileId === "tree-planted");
+const villageMaterialCounts = Object.fromEntries(["log-small", "log-large", "stone-small", "stone-large"].map((profileId) => [
+  profileId,
+  villageResources.filter((definition) => definition.profileId === profileId).length,
+]));
+assert.deepEqual(villageMaterialCounts, {
+  "log-small": 2,
+  "log-large": 1,
+  "stone-small": 3,
+  "stone-large": 3,
+}, "the Burrow yard has the requested mix of sticks, logs, stones and rocks");
+assert.equal(villageTrees.length, 2, "the Burrow yard has exactly two planted trees");
+const villageMaterialYield = [...villageResources, ...villageTrees.map(({ id, item }) => ({ id, profileId: item.resourceProfileId }))]
+  .reduce((total, definition) => {
+    const { reward } = getResourceProfile(definition.profileId);
+    if (reward.resource === "wood" || reward.resource === "stone") total[reward.resource] += reward.amount;
+    return total;
+  }, { wood: 0, stone: 0 });
+assert.deepEqual(villageMaterialYield, {
+  wood: STOVE_REPAIR_COST.wood * 1.5,
+  stone: STOVE_REPAIR_COST.stone * 1.5,
+}, "the Burrow yard yields exactly one and a half stove material costs");
 assert.equal(createPlantedTreeDefinition({
   id: "task-059-village-tree",
   item: { resourceProfileId: "tree-planted" },
@@ -64,6 +107,12 @@ for (const worldId of WORLD_LOCATION_IDS) {
     assert(destinationTransport, `${transition.id} resolves its destination transport`);
     assert.equal(contains(destinationTransport.triggerBounds, destinationTransport.safeSpawn), false, `${destinationTransport.id} spawn is outside its trigger`);
     assert.equal(collides(destinationTransport.safeSpawn, destination, 8, 5), false, `${destinationTransport.id} spawn is collision-safe`);
+    const triggerCenter = center(destinationTransport.triggerBounds);
+    const direction = Math.sign(triggerCenter.y - destinationTransport.safeSpawn.y);
+    for (let y = destinationTransport.safeSpawn.y; y !== triggerCenter.y; y += direction) {
+      assert.equal(collides({ x: triggerCenter.x, y }, destination, 8, 5), false, `${destinationTransport.id} is reachable from its safe spawn`);
+    }
+    assert.equal(collides(triggerCenter, destination, 8, 5), false, `${destinationTransport.id} trigger is physically enterable`);
   }
 }
 
@@ -74,6 +123,11 @@ for (const [x, y] of [[0, 0], [21, 0], [0, 15], [21, 15]]) {
 }
 assert.equal(collides({ x: 2, y: 2 }, nestLayout, 8, 5), true, "diagonal escape through a Nest corner is blocked");
 assert.equal(nestLayout.groundTiles.filter(({ terrain }) => terrain === "dead-end").length, NEST_ISLAND_MODEL.deadEndTiles.length, "the northern stone dead end is deterministic");
+assert.deepEqual(
+  [...new Set(nestLayout.groundTiles.filter(({ terrain }) => terrain === "cliff-inner").map(({ frame }) => frame))].sort((a, b) => a - b),
+  Object.values(OUTDOOR_FRAMES.islandInnerCorner).sort((a, b) => a - b),
+  "all four stepped island corners are rendered from the semantic mask",
+);
 const mainPassage = { left: 9 * TILE_SIZE, top: 6 * TILE_SIZE, right: 13 * TILE_SIZE, bottom: 13 * TILE_SIZE };
 const nestResourceBounds = [];
 for (const definition of nestResources) {
@@ -118,7 +172,7 @@ player.motor.position = center(activeLayout.transitions[0].triggerBounds);
 assert.equal(coordinator.update().worldId, WORLD_IDS.village, "the southern Nest transport returns to village");
 assert.equal(saveCount, 2, "return transition persists once without duplicate work");
 
-console.log("Task #059 checks passed: registry, 22x16 Nest, paired 2x2 transports, safe spawns, resources, island collision and transition lock");
+console.log("Task #059 checks passed: registry, 22x16 Nest, paired reachable 2x2 transports, safe spawns, resources, island collision and transition lock");
 
 function createPreparedLayout(worldId) {
   const state = { currentWorldId: worldId };

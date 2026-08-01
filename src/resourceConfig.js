@@ -34,12 +34,10 @@ export const DEFAULT_GAMEPLAY_TUNING = Object.freeze({
 });
 
 const villageDescriptors = [
-  ["fallen-log-01", "log-small", 12, 30], ["yard-log-02", "log-small", 15, 31], ["yard-log-03", "log-small", 18, 29], ["yard-log-04", "log-large", 21, 30],
-  ["yard-log-05", "log-small", 25, 32], ["yard-log-06", "log-small", 29, 30], ["yard-log-07", "log-small", 33, 32], ["yard-log-08", "log-small", 35, 36],
-  ["yard-log-09", "log-small", 98, 30], ["yard-log-10", "log-small", 102, 34], ["yard-log-11", "log-large", 107, 28], ["yard-log-12", "log-small", 112, 34],
-  ["yard-stone-01", "stone-large", 91, 55], ["yard-stone-02", "stone-small", 95, 55], ["yard-stone-03", "stone-small", 91, 59], ["yard-stone-04", "stone-small", 97, 60],
-  ["yard-stone-05", "stone-small", 88, 62], ["yard-stone-06", "stone-small", 102, 56], ["yard-stone-07", "stone-large", 15, 70], ["yard-stone-08", "stone-small", 19, 69],
-  ["yard-stone-09", "stone-small", 14, 74], ["yard-stone-10", "stone-small", 23, 73], ["yard-ruby-01", "ruby-node", 36, 70], ["yard-ruby-02", "ruby-node", 90, 70],
+  ["fallen-log-01", "log-small", 12, 30], ["yard-log-02", "log-small", 15, 31], ["yard-log-04", "log-large", 21, 30],
+  ["yard-stone-01", "stone-large", 91, 55], ["yard-stone-02", "stone-small", 95, 55], ["yard-stone-03", "stone-small", 91, 59], ["yard-stone-04", "stone-large", 97, 60],
+  ["yard-stone-07", "stone-large", 15, 70], ["yard-stone-08", "stone-small", 19, 69],
+  ["yard-ruby-01", "ruby-node", 36, 70], ["yard-ruby-02", "ruby-node", 90, 70],
 ];
 
 const nestDescriptors = [

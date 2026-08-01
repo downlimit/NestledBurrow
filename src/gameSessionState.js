@@ -324,8 +324,13 @@ export function hitResourceNode(state, resourceId, { action, damage = 1, energyP
   assertSafeId(resourceId, "Resource ID");
   const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
   if (!definition) return { status: "unknown-resource", mutated: false };
+  return hitResourceDefinition(state, definition, { action, damage, energyPerHit, tuning });
+}
+
+export function hitResourceDefinition(state, definition, { action, damage = 1, energyPerHit = 1, tuning = {} } = {}) {
+  assertSafeId(definition?.id, "Resource ID");
   const profile = getResourceProfile(definition.profileId);
-  const node = state.gameplay.resourceNodes[resourceId];
+  const node = state.gameplay.resourceNodes[definition.id];
   if (!node || node.cleared) return { status: "already-cleared", mutated: false };
   const cost = normalizeNonNegativeNumber(energyPerHit, 0, "Resource hit energy cost");
   if (state.gameplay.currentEnergy < cost) return { status: "insufficient-energy", mutated: false };

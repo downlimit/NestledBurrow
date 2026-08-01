@@ -95,7 +95,7 @@ for (const [profileId, tools] of Object.entries(matrix)) {
   for (const [toolId, action] of Object.entries(tools)) assert.equal(resourceActionForTool(profile, toolId), action);
 }
 assert.equal(RESOURCE_OBJECTS.some((definition) => definition.id.startsWith("starter-tree-")), false);
-assert.equal(STARTER_TREE_OBJECTS.length, 6);
+assert.equal(STARTER_TREE_OBJECTS.length, 2);
 assert(STARTER_TREE_OBJECTS.every((tree) => tree.kind === "plant"
   && tree.item.resourceProfileId === "tree-planted"
   && tree.colliderGroup === "resource:tree-planted"));

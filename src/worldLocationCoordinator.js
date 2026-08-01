@@ -185,7 +185,7 @@ export function applyTransportProfile(layout, definition) {
         id: `${placement.id}:visual:${transportTiles.length}`,
         worldX: left + part.x * TILE_SIZE,
         worldY: top + part.y * TILE_SIZE,
-        textureKey: TRANSPORT_PROFILE.textureKey,
+        textureKey: part.textureKey ?? TRANSPORT_PROFILE.textureKey,
         frame: part.frame,
         crop: part.crop ? { ...part.crop } : null,
         depth: 560 + top + TRANSPORT_PROFILE.footprint.height,

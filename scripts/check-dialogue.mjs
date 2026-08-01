@@ -32,7 +32,7 @@ const presenter = {
 const interactions = [];
 const runtime = createInteractionRuntime({
   sessionState: createFreshGameSessionState(),
-  characterSystem: { getSnapshot(id) { return snapshots.get(id); } },
+  characterSystem: { has(id) { return snapshots.has(id); }, getSnapshot(id) { return snapshots.get(id); } },
   interactionDefinitions: INTERACTION_DEFINITIONS,
   getDialogueDefinition,
   runWorldObjectInteraction(candidate) {
@@ -49,7 +49,7 @@ assert.equal(interactions.length, 1, "merchant interaction is routed through the
 
 const wakeRuntime = createInteractionRuntime({
   sessionState: createFreshGameSessionState(),
-  characterSystem: { getSnapshot(id) { return snapshots.get(id); } },
+  characterSystem: { has(id) { return snapshots.has(id); }, getSnapshot(id) { return snapshots.get(id); } },
   interactionDefinitions: [],
   getStaticInteractionDefinitions: () => [{
     id: "wake", entityId: "wake", roomId: "world", kind: "wake-exhausted",

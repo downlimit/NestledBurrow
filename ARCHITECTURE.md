@@ -17,6 +17,7 @@
 - HUD, camera, audio и build UI имеют lifecycle owners;
 - interaction selection остаётся детерминированным контрактом.
 - `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle.
+- Повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены.
 
 ## `src/main.js` — только composition root
 

@@ -7,6 +7,8 @@ const MIRRORED_METHODS = Object.freeze([
   "setVisible",
   "setScale",
   "setAlpha",
+  "setTexture",
+  "setFrame",
 ]);
 
 export function bindSpriteVisual(graphics, asset, tint = null) {

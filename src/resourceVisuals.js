@@ -1,3 +1,6 @@
+import { bindCompositeSpriteVisual } from "./facilityPreviewVisuals.js";
+import { TILE_SIZE, TREE_FRAMES, TREES_TEXTURE_KEY } from "./worldConfig.js";
+
 export function drawLog(graphics, progress = 0, size = "small", options = {}) {
   const color = (value) => options.colorOverride ?? value;
   const scale = size === "large" ? 1.5 : 1;
@@ -35,9 +38,21 @@ export function drawStone(graphics, progress = 0, size = "small", options = {}) 
   for (let index = 0; index < damage; index += 1) graphics.fillRect(5 + index * 2, 7 + (index % 2), 1, 3);
 }
 
-export function drawResource(graphics, profile, progress = 0, options = {}) {
+export function drawResourceVisual(graphics, profile, progress = 0, options = {}) {
+  if (profile.visual === "tree") {
+    if (!graphics.spriteContainer) {
+      bindCompositeSpriteVisual(
+        graphics,
+        { key: TREES_TEXTURE_KEY, frames: TREE_FRAMES.planted, columns: 3, frameWidth: TILE_SIZE, frameHeight: TILE_SIZE },
+        options.colorOverride ?? null,
+      );
+    }
+    return graphics;
+  }
   if (profile.visual === "log") return drawLog(graphics, progress, profile.size, options);
   if (profile.visual === "stone") return drawStone(graphics, progress, profile.size, options);
   if (profile.visual === "ruby") return drawRuby(graphics, progress, options);
   throw new Error(`Unknown resource visual: ${String(profile.visual)}`);
 }
+
+export const drawResource = drawResourceVisual;

@@ -10,6 +10,7 @@ import {
   getMeleeWeaponProfile,
   MELEE_COMBAT_ACTION_IDS,
   MELEE_DEBUG_ENABLED,
+  MELEE_STARTER_ITEM_OFFSETS,
   MELEE_SWING_DIRECTIONS,
   MELEE_TURN_MODES,
   preloadMeleeAssets,
@@ -173,8 +174,17 @@ const layout = {
 const starters = createMeleeStartingWorldItems(layout);
 assert.deepEqual(starters.map((item) => item.item.id), ["sword", "battle-axe"]);
 assert(starters.every((item) => item.item.kind === "tool" && item.item.quantity === 1));
-assert(starters[0].x < layout.spawn.x && starters[1].x > layout.spawn.x);
-assert.deepEqual(findTrainingDummyPoint(layout), { x: 144, y: 50 }, "training dummy stands beside the spawn with its feet aligned to the player");
+const dummyPoint = findTrainingDummyPoint(layout);
+assert.deepEqual(dummyPoint, { x: 144, y: 50 }, "training dummy stands beside the spawn with its feet aligned to the player");
+assert.deepEqual(starters.map(({ x, y }) => ({ x, y })), [
+  { x: dummyPoint.x + MELEE_STARTER_ITEM_OFFSETS.sword.x, y: dummyPoint.y + MELEE_STARTER_ITEM_OFFSETS.sword.y },
+  { x: dummyPoint.x + MELEE_STARTER_ITEM_OFFSETS["battle-axe"].x, y: dummyPoint.y + MELEE_STARTER_ITEM_OFFSETS["battle-axe"].y },
+], "starter sword and battle axe lie on either side of the training dummy");
+const authoredDummy = { x: 152, y: 104 };
+assert.deepEqual(createMeleeStartingWorldItems(layout, [], authoredDummy).map(({ x, y }) => ({ x, y })), [
+  { x: authoredDummy.x + MELEE_STARTER_ITEM_OFFSETS.sword.x, y: authoredDummy.y + MELEE_STARTER_ITEM_OFFSETS.sword.y },
+  { x: authoredDummy.x + MELEE_STARTER_ITEM_OFFSETS["battle-axe"].x, y: authoredDummy.y + MELEE_STARTER_ITEM_OFFSETS["battle-axe"].y },
+], "authored dummy placement is the single source for starter weapon positions");
 const blockedPreferred = findNearestFreeWorldItemPoint({
   ...layout,
   getBlockingColliders: (box) => box.left < 83 && box.right > 81 ? [{ id: "blocked" }] : [],

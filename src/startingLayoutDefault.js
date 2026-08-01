@@ -4532,37 +4532,6 @@ export default {
       "colliderGroup": "resource:tree-planted"
     },
     {
-      "id": "starter-tree-05",
-      "kind": "plant",
-      "item": {
-        "id": "tree",
-        "placement": "tree",
-        "objectType": "plant",
-        "resourceProfileId": "tree-planted",
-        "labelKey": "hud:buildMode.assets.tree",
-        "textureKey": "basic-village-trees",
-        "frame": 0
-      },
-      "point": {
-        "x": 832,
-        "y": 304
-      },
-      "bounds": {
-        "left": 832,
-        "right": 880,
-        "top": 304,
-        "bottom": 368
-      },
-      "collider": true,
-      "colliderBounds": {
-        "left": 848,
-        "right": 864,
-        "top": 352,
-        "bottom": 368
-      },
-      "colliderGroup": "resource:tree-planted"
-    },
-    {
       "id": "starter-tree-06",
       "kind": "plant",
       "item": {
@@ -4949,6 +4918,14 @@ export default {
       "position": {
         "x": 584,
         "y": 480
+      }
+    },
+    {
+      "id": "tavern-open-sign",
+      "kind": "tavern-sign",
+      "position": {
+        "x": 456,
+        "y": 472
       }
     }
   ],

@@ -4,12 +4,12 @@ export function mountWorldLocation(scene) {
     scene.createMerchantRuntime();
   }
   scene.createDebrisRuntime();
+  if (scene.worldLocationCoordinator.hasCapability("meleeWeapons")) scene.createMeleeRuntime();
   if (scene.worldLocationCoordinator.hasCapability("facilities")) {
     scene.createFacilityRuntime();
     scene.createTavernRuntime();
     scene.createFarmingRuntime();
     scene.createCookingRuntime();
-    scene.createMeleeRuntime();
   }
   if (scene.worldLocationCoordinator.hasCapability("buildMode")) {
     scene.createMovementDebugPanel();

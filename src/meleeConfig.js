@@ -105,6 +105,10 @@ export const TRAINING_DUMMY = Object.freeze({
 });
 
 export const MELEE_DEBUG_ENABLED = false;
+export const MELEE_STARTER_ITEM_OFFSETS = Object.freeze({
+  sword: Object.freeze({ x: -8, y: 24 }),
+  "battle-axe": Object.freeze({ x: 24, y: 24 }),
+});
 
 export function getMeleeWeaponProfile(itemId) {
   return MELEE_WEAPON_PROFILES[itemId] ?? null;
@@ -129,12 +133,14 @@ export function preloadMeleeAssets(scene) {
   }
 }
 
-export function createMeleeStartingWorldItems(worldLayout, existingWorldItems = []) {
+export function createMeleeStartingWorldItems(worldLayout, existingWorldItems = [], trainingDummyPosition = null) {
   const occupied = [...existingWorldItems];
-  const spawn = worldLayout?.spawn ?? { x: (DOOR_LEFT + 1.5) * TILE_SIZE, y: (DOOR_Y - 3) * TILE_SIZE };
+  const dummy = Number.isFinite(trainingDummyPosition?.x) && Number.isFinite(trainingDummyPosition?.y)
+    ? { x: Number(trainingDummyPosition.x), y: Number(trainingDummyPosition.y) }
+    : findTrainingDummyPoint(worldLayout);
   const definitions = [
-    { id: "starter-melee-sword", itemId: "sword", preferred: { x: spawn.x - 18, y: spawn.y } },
-    { id: "starter-melee-battle-axe", itemId: "battle-axe", preferred: { x: spawn.x + 18, y: spawn.y } },
+    { id: "starter-melee-sword", itemId: "sword", preferred: offsetPoint(dummy, MELEE_STARTER_ITEM_OFFSETS.sword) },
+    { id: "starter-melee-battle-axe", itemId: "battle-axe", preferred: offsetPoint(dummy, MELEE_STARTER_ITEM_OFFSETS["battle-axe"]) },
   ];
   return definitions.map((definition) => {
     const point = findNearestFreeWorldItemPoint(worldLayout, definition.preferred, occupied);
@@ -147,6 +153,10 @@ export function createMeleeStartingWorldItems(worldLayout, existingWorldItems = 
     occupied.push(worldItem);
     return worldItem;
   });
+}
+
+function offsetPoint(point, offset) {
+  return { x: point.x + offset.x, y: point.y + offset.y };
 }
 
 export function findTrainingDummyPoint(worldLayout, searchLimit = 96) {

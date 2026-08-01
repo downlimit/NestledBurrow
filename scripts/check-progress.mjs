@@ -40,7 +40,7 @@ function clone(value) {
 const session = createFreshGameSessionState();
 assert.deepEqual(session.gameplay.needs, { novelty: 100, satiety: 100, toilet: 100, lustre: 100, dialogue: 100 }, "fresh state starts every persisted need at 100");
 assert.equal(Object.keys(session.gameplay.resourceNodes).length, RESOURCE_OBJECTS.length, "fresh state has every resource node");
-assert(RESOURCE_OBJECTS.filter((item) => item.profileId === "log-small").length >= 8, "balance route has at least eight small logs");
+assert.equal(RESOURCE_OBJECTS.filter((item) => item.worldId === "village" && item.profileId === "log-small").length, 2, "village starts with exactly two small logs");
 assert.equal(new Set(RESOURCE_OBJECTS.map((item) => item.id)).size, RESOURCE_OBJECTS.length, "resource IDs are unique");
 assert(Object.values(session.gameplay.resourceNodes).every((item) => item.progress === 0 && item.cleared === false), "fresh resources start at zero progress");
 assert.equal(session.gameplay.stone, 0, "fresh stone counter starts at zero");

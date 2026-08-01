@@ -32,7 +32,7 @@ import { WORLD_IDS } from "./worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "./worldLocationCoordinator.js";
 import { canTransitionWorldLocation, destroyWorldLocation, mountWorldLocation, renderWorldLocation } from "./worldLocationLifecycle.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitResourceNode, refillEnergy, regenerateEnergy, resetBalanceRun } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitResourceDefinition, refillEnergy, regenerateEnergy, resetBalanceRun } from "./gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
@@ -74,6 +74,7 @@ import {
 import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { DEFAULT_RESOURCE_ID, getResourceObjectsForWorld, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { getResourceProfile, resourceActionForTool, resourceEffectType } from "./resourceDomain.js";
+import { drawResourceVisual } from "./resourceVisuals.js";
 import { createDebrisRuntime, drawBed } from "./debrisRuntime.js";
 import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
@@ -82,17 +83,17 @@ import { applyNeedsUpdate } from "./needsDomain.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
 import { createCookingRuntime } from "./cookingRuntime.js";
-import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_KIND } from "./guestConfig.js";
+import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_BUILD_KIND, TAVERN_SIGN_KIND } from "./guestConfig.js";
 import { createTavernSignRuntime } from "./tavernSignRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
   toPhaserFrame,
 } from "./characterVisualProfiles.js";
-import { FARMING_WELL_TEXTURE_KEY, preloadFarmingAssets, WELL_PROFILE } from "./farmingConfig.js";
+import { preloadFarmingAssets, WELL_PROFILE } from "./farmingConfig.js";
 import { createFarmingRuntime } from "./farmingRuntime.js";
 import { createMerchantRuntime } from "./merchantRuntime.js";
-import { createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
+import { createWellPresentation, createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
 import { preloadLemonadeAssets } from "./lemonadeConfig.js";
 import { createTavernServiceRuntime } from "./tavernServiceRuntime.js";
 import { createKitchenInteractionRuntime } from "./kitchenInteractionRuntime.js";
@@ -105,8 +106,11 @@ import {
   isMeleeWeaponId,
   preloadMeleeAssets,
   resolveMeleeActionItem,
+  TRAINING_DUMMY,
 } from "./meleeConfig.js";
 import { createMeleeRuntime } from "./meleeRuntime.js";
+import { loadStartingLayout } from "./startingLayout.js";
+import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
@@ -461,6 +465,7 @@ class WorldScene extends Phaser.Scene {
       characterSystem: this.characterSystem,
       createNpcMovementConfig: (profile) => this.createNpcRuntimeMovementConfig(profile),
       getPlayerPosition: () => this.playerCharacter?.motor?.position,
+      getSignPoint: () => this.tavernSignRuntime?.getGuestCheckPoint?.() ?? GUEST_CONFIG.points.sign,
       onPersistentMutation: (result) => {
         if (result?.status === "coin-collected") this.gameHud?.notifyCoinDelta?.(result.value);
         this.facilityRuntime?.syncKitchenVisuals?.();
@@ -524,13 +529,13 @@ class WorldScene extends Phaser.Scene {
     if (candidate.kind !== RESOURCE_INTERACTION_KIND) return { status: "ignored" };
     const nowMs = globalThis.performance?.now?.() ?? Date.now();
     if (nowMs - this.lastSuccessfulHitAtMs < this.gameplayTuning.universalHitCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
-    const definition = RESOURCE_OBJECTS.find((item) => item.id === candidate.payload.resourceId);
+    const definition = this.debrisRuntime?.getResourceDefinition?.(candidate.payload.resourceId);
     if (!definition) return { status: "unknown-resource", mutated: false };
     const profile = getResourceProfile(definition.profileId);
     const action = resourceActionForTool(profile, this.gameHud?.getSelectedInventoryItem?.()?.id);
     if (!action) return { status: "wrong-tool", mutated: false };
     const energyBefore = this.sessionState.gameplay.currentEnergy;
-    const result = hitResourceNode(this.sessionState, definition.id, {
+    const result = hitResourceDefinition(this.sessionState, definition, {
       action,
       damage: this.gameplayTuning.axeDamage,
       energyPerHit: this.gameplayTuning.energyPerHit,
@@ -606,11 +611,13 @@ class WorldScene extends Phaser.Scene {
     const villageLayout = this.worldLayout?.locationId === WORLD_IDS.village
       ? this.worldLayout
       : createWorldLayout(WORLD_IDS.village);
+    const startingLayout = loadStartingLayout(window.localStorage, STARTING_LAYOUT_DEFAULT);
+    const trainingDummyPosition = startingLayout?.furniture?.find(({ id }) => id === TRAINING_DUMMY.id)?.position;
     return createFreshGameSessionState({
       currentWorldId: WORLD_IDS.village,
       playerId: "player",
       initialEntityIds: NPCS.map((npc) => npc.id),
-      initialWorldItems: createMeleeStartingWorldItems(villageLayout),
+      initialWorldItems: createMeleeStartingWorldItems(villageLayout, [], trainingDummyPosition),
     });
   }
 
@@ -960,6 +967,7 @@ class WorldScene extends Phaser.Scene {
   createMeleeRuntime() {
     this.meleeRuntime = createMeleeRuntime(this, {
       worldLayout: this.worldLayout,
+      includeTrainingDummy: this.worldLocationCoordinator.hasCapability("trainingDummy"),
       getPlayerCharacter: () => this.playerCharacter,
       getSelectedItem: () => this.frameMeleeItem,
       getControllerMoveDirection: () => this.getControllerMoveDirection(),
@@ -1095,6 +1103,8 @@ class WorldScene extends Phaser.Scene {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const coordinated = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint);
     if (coordinated) return coordinated;
+    const sign = this.tavernSignRuntime?.getBuildMoveTargetAt?.(hitPoint);
+    if (sign) return sign;
     const dummy = this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint);
     if (dummy) return dummy;
     const facility = this.facilityRuntime?.getDefinitionAt?.(hitPoint);
@@ -1156,6 +1166,8 @@ class WorldScene extends Phaser.Scene {
     if (!target?.definition) return { status: "ignored" };
     const result = target.kind === "well"
       ? this.worldBuildCoordinator?.move?.(target, point)
+      : target.kind === TAVERN_SIGN_BUILD_KIND
+      ? this.tavernSignRuntime?.moveBuildTarget?.(point)
       : target.kind === "facility"
       ? this.facilityRuntime?.move?.(target.definition.id, point)
       : target.kind === "bed" ? this.debrisRuntime?.moveBed?.(target.definition.id, point)
@@ -1166,7 +1178,8 @@ class WorldScene extends Phaser.Scene {
         this.worldBuildCoordinator?.removeAt?.(result.current);
         this.worldBuildCoordinator?.restore?.(result.previous);
         this.saveSession();
-      } else if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
+      } else if (target.kind === TAVERN_SIGN_BUILD_KIND) this.tavernSignRuntime?.restoreBuildTarget?.(result.previous);
+      else if (target.kind === "facility") this.facilityRuntime?.replace?.(result.previous);
       else if (target.kind === "training-dummy") this.meleeRuntime?.restoreBuildTarget?.(result.previous);
       else this.debrisRuntime?.replaceBed?.(result.previous);
       this.facilityRuntime?.syncKitchenVisuals?.();
@@ -1181,16 +1194,14 @@ class WorldScene extends Phaser.Scene {
   renderBuildMovePreview(target, point) {
     this.clearBuildPreview();
     if (!target?.definition) return;
+    if (target.kind === TAVERN_SIGN_BUILD_KIND) { this.buildPreviewObjects.push(this.tavernSignRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "training-dummy") { this.buildPreviewObjects.push(this.meleeRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "well") {
-      this.addBuildPreviewImage(
-        point.x,
-        point.y,
-        FARMING_WELL_TEXTURE_KEY,
-        0,
-        8988,
-        this.worldBuildCoordinator?.isPlacementBlocked?.({ placement: "well" }, point) ? 0xff5364 : 0x7dff9a,
-      );
+      this.buildPreviewObjects.push(createWellPresentation(this, point, {
+        depth: 8988,
+        tint: this.worldBuildCoordinator?.isPlacementBlocked?.({ placement: "well" }, point) ? 0xff5364 : 0x7dff9a,
+        alpha: 0.52,
+      }));
       return;
     }
     const visualOffset = this.assetProfiles?.[target.profileKey]?.visualOffset ?? { x: 0, y: 0 };
@@ -1204,6 +1215,7 @@ class WorldScene extends Phaser.Scene {
     this.clearBuildPreview();
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const target = this.worldBuildCoordinator?.getMoveTargetAt?.(hitPoint)
+      ?? this.tavernSignRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.facilityRuntime?.getMoveTargetAt?.(hitPoint)
       ?? this.debrisRuntime?.getBedDemolitionTargetAt?.(hitPoint);
@@ -1316,14 +1328,11 @@ class WorldScene extends Phaser.Scene {
     }
     if (item.placement === "well") {
       for (const point of uniquePoints) {
-        this.addBuildPreviewImage(
-          point.x,
-          point.y,
-          item.textureKey,
-          item.frame,
-          8988,
-          this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null,
-        );
+        this.buildPreviewObjects.push(createWellPresentation(this, point, {
+          depth: 8988,
+          tint: this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null,
+          alpha: 0.52,
+        }));
       }
       return;
     }
@@ -1331,18 +1340,12 @@ class WorldScene extends Phaser.Scene {
       if (item.placement === "tree") {
         const visualOffset = this.assetProfiles?.[`resource:${item.resourceProfileId}`]?.visualOffset ?? { x: 0, y: 0 };
         const tint = this.isBuildObjectPlacementBlocked(item, point) ? 0xff5364 : null;
-        for (let row = 0; row < 4; row += 1) {
-          for (let column = 0; column < 3; column += 1) {
-            this.addBuildPreviewImage(
-              point.x + column * TILE_SIZE + visualOffset.x,
-              point.y + row * TILE_SIZE + visualOffset.y,
-              item.textureKey,
-              row * 9 + column,
-              8988,
-              tint,
-            );
-          }
-        }
+        const graphics = this.add.graphics()
+          .setPosition(point.x + visualOffset.x, point.y + visualOffset.y)
+          .setDepth(8988)
+          .setAlpha(0.52);
+        drawResourceVisual(graphics, getResourceProfile(item.resourceProfileId), 0, { colorOverride: tint });
+        this.buildPreviewObjects.push(graphics);
       } else if (item.textureKey) {
         this.addBuildPreviewImage(point.x, point.y, item.textureKey, item.frame);
       }
@@ -1533,24 +1536,6 @@ class WorldScene extends Phaser.Scene {
     let colliderGroup = null;
     if (item.placement === "tree") {
       const profileKey = `resource:${item.resourceProfileId}`;
-      const profile = this.assetProfiles?.[profileKey];
-      const visualOffset = profile?.visualOffset ?? { x: 0, y: 0 };
-      const depth = assetDepthFromPivot(
-        point,
-        profile?.snapAnchorOffset ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
-        500,
-        id,
-      );
-      for (let row = 0; row < 4; row += 1) {
-        for (let column = 0; column < 3; column += 1) {
-          sprites.push(this.add.image(
-            point.x + column * TILE_SIZE + visualOffset.x,
-            point.y + row * TILE_SIZE + visualOffset.y,
-            item.textureKey,
-            row * 9 + column,
-          ).setOrigin(0).setDepth(depth));
-        }
-      }
       bounds = { left: point.x, right: point.x + 3 * TILE_SIZE, top: point.y, bottom: point.y + 4 * TILE_SIZE };
       collider = { left: point.x + TILE_SIZE, right: point.x + 2 * TILE_SIZE, top: point.y + 3 * TILE_SIZE, bottom: point.y + 4 * TILE_SIZE };
       colliderGroup = profileKey;
@@ -2281,25 +2266,7 @@ class WorldScene extends Phaser.Scene {
       this.buildFloorCells.set(this.buildCellKey(restored.point), restored.id);
       return true;
     }
-    if (restored.kind === "tree") {
-      for (let row = 0; row < 4; row += 1) {
-        for (let column = 0; column < 3; column += 1) {
-          restored.sprites.push(this.add.image(
-            restored.point.x + column * TILE_SIZE,
-            restored.point.y + row * TILE_SIZE,
-            restored.item.textureKey,
-            row * 9 + column,
-          ).setOrigin(0).setDepth(assetDepthFromPivot(
-            restored.point,
-            this.assetProfiles?.[`resource:${restored.item.resourceProfileId}`]?.snapAnchorOffset
-              ?? { x: TILE_SIZE * 1.5, y: TILE_SIZE * 4 },
-            500,
-            restored.id,
-          )));
-        }
-      }
-      return true;
-    }
+    if (restored.kind === "tree") return true;
     restored.sprites = [this.add.image(
       restored.point.x,
       restored.point.y,
@@ -2463,7 +2430,9 @@ class WorldScene extends Phaser.Scene {
   startNewGame() {
     const result = this.sessionPersistence?.clear();
     if (result?.status === "error") console.warn("Session reset failed", result.diagnostic);
-    this.scene.restart();
+    const reload = globalThis.location?.reload;
+    if (typeof reload === "function") reload.call(globalThis.location);
+    else this.scene.restart();
   }
 
   installE2EBridge() { installWorldE2EBridge(this); }

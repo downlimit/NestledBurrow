@@ -12,9 +12,11 @@ import {
 } from "../src/cookingDomain.js";
 import { createGuestController } from "../src/guestController.js";
 import { GUEST_STATES, createGuestRuntime } from "../src/guestRuntime.js";
+import { TAVERN_SIGN, TAVERN_SIGN_BUILD_KIND } from "../src/guestConfig.js";
 import { createActorNavigation, createActorWalkability, findGridPath } from "../src/gridPathfinder.js";
 import { createFreshGameSessionState } from "../src/gameSessionState.js";
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/sessionPersistence.js";
+import { createTavernSignRuntime } from "../src/tavernSignRuntime.js";
 
 const bounds = { left: 0, top: 0, right: 160, bottom: 160 };
 const clearPath = findGridPath({ start: { x: 8, y: 14 }, goal: { x: 72, y: 78 }, bounds, isWalkable: () => true });
@@ -86,6 +88,57 @@ assert.equal(signPng.readUInt32BE(16), 64);
 assert.equal(signPng.readUInt32BE(20), 32);
 assert.equal(signPng.byteLength, 2981);
 assert.equal(createHash("sha256").update(signPng).digest("hex"), "47b15a21480a0096e4541900425dd0d870d9f50d1401d12832a6828abeaef154");
+
+class SignSpriteStub {
+  constructor(x, y, frame) { this.x = x; this.y = y; this.frame = frame; }
+  setOrigin() { return this; }
+  setDepth(value) { this.depth = value; return this; }
+  setFrame(value) { this.frame = value; return this; }
+  setPosition(x, y) { this.x = x; this.y = y; return this; }
+  setTint(value) { this.tint = value; return this; }
+  setAlpha(value) { this.alpha = value; return this; }
+  destroy() { this.destroyed = true; }
+}
+const signColliders = new Map();
+const signWorld = {
+  bounds: { left: 0, top: 0, right: 1200, bottom: 900 },
+  setWorldObjectCollider(id, collider) { signColliders.set(id, collider); },
+  clearWorldObjectCollider(id) { signColliders.delete(id); },
+  getBlockingColliders(box) {
+    return [...signColliders].filter(([, collider]) => box.left < collider.right && box.right > collider.left
+      && box.top < collider.bottom && box.bottom > collider.top).map(([id]) => ({ id }));
+  },
+};
+const signRuntime = createTavernSignRuntime({ add: { sprite: (x, y, _key, frame) => new SignSpriteStub(x, y, frame) } }, {
+  getTavernOpen: () => false,
+  worldLayout: signWorld,
+});
+const originalSign = signRuntime.getState();
+assert(signRuntime.getBuildMoveTargetAt(originalSign.position), "the tavern sign is a build-mode move target");
+const movedSign = signRuntime.moveBuildTarget({ x: originalSign.position.x + 32, y: originalSign.position.y + 16 });
+assert(movedSign, "the tavern sign moves to a free build-grid point");
+const movedSignState = signRuntime.getState();
+assert.deepEqual(movedSignState.interactionPosition, {
+  x: originalSign.interactionPosition.x + 32,
+  y: originalSign.interactionPosition.y + 16,
+}, "moving the sign moves its interaction point");
+assert.deepEqual(movedSignState.guestCheckPoint, {
+  x: originalSign.guestCheckPoint.x + 32,
+  y: originalSign.guestCheckPoint.y + 16,
+}, "moving the sign moves the guest check point");
+assert.deepEqual(signRuntime.getStartingLayoutFurniture(), [{
+  id: TAVERN_SIGN.id,
+  kind: TAVERN_SIGN_BUILD_KIND,
+  position: movedSignState.position,
+}], "the moved sign participates in the canonical furniture layout");
+assert.equal(signRuntime.restoreStartingLayoutFurniture([{
+  id: TAVERN_SIGN.id,
+  kind: TAVERN_SIGN_BUILD_KIND,
+  position: originalSign.position,
+}]), true);
+assert.deepEqual(signRuntime.getState().position, originalSign.position, "starting-layout restore returns the sign to its authored point");
+signRuntime.destroy();
+assert.equal(signColliders.has(TAVERN_SIGN.id), false, "sign teardown clears its live collider");
 
 const runtimeConfig = Object.freeze({
   id: "guest",

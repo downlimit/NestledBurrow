@@ -13,6 +13,7 @@ This system owns world geometry, collision queries, resource definitions, gather
 - a mismatched tool cannot mutate a resource or farm cell;
 - resource rewards enter the inventory and removing a node removes its collision and presentation consistently;
 - inventory and wallet drag share one player-to-cursor throw direction; inventory throws a whole stack, while wallet drag throws one coin; dropped items remain non-blocking, use a `2×2` occupancy footprint, settle at a free point and can be picked up again;
+- a fresh Burrow places the starter sword and battle axe as ordinary pickable world items immediately beside the training dummy;
 - the fixed canonical well refills the eight-use water bucket;
 - potato and lemon crops share persisted soil/moisture rules and retain crop-specific growth and yield;
 - crop rot accumulates only while soil is fully dry; watering or rain resets the dry timer. A never-hydrated seed rots after 24 fully dry hours, while a crop that has received water rots after 48 fully dry hours.
@@ -25,7 +26,7 @@ This system owns world geometry, collision queries, resource definitions, gather
 - inventory state and item operations: `inventoryDomain.js`;
 - inventory/world-item runtime: `inventoryRuntime.js`;
 - farm rules/runtime and crop profiles: `farmingDomain.js`, `farmingRuntime.js`, `farmingConfig.js`;
-- world instances: `debrisRuntime.js`;
+- world resource instances, colliders, targeting and hit feedback: `debrisRuntime.js`; resource presentation adapter: `resourceVisuals.js`;
 - interaction targeting: `interaction.js`, `interactionRuntime.js`;
 - build placement of plants: `systems/build-and-authoring.md`;
 - persistence: `systems/persistence.md`.
@@ -43,6 +44,8 @@ This system owns world geometry, collision queries, resource definitions, gather
 - dry exposure is persisted per crop, advances during day and night only at 0% soil moisture, and resets from either manual watering or precipitation;
 - the canonical well is fixed infrastructure and is excluded from build placement, move and demolition;
 - planted trees are gatherable resource nodes, yield exactly five wood and use the axe.
+- authored Burrow trees and location-defined Nest trees register in the same `DebrisRuntime` and use the same `resourceVisuals.js` adapter; locations own placements only.
+- a fresh Burrow yard contains two planted trees, two small logs, one large log, three small stones and three large stones; their combined yield is exactly 15 wood and 12 stone, or 1.5 stove material costs.
 
 ## Current baseline
 

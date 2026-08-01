@@ -125,7 +125,7 @@ test("holding Space repeats resource work when each cooldown ends", async ({ pag
 
 test("resource hit feedback returns to its placement-grid anchor", async ({ page }) => {
   await boot(page);
-  const id = "yard-log-03";
+  const id = "yard-log-02";
   const definition = (await bridge(page, "getDebrisState")).definitions.find((item) => item.id === id);
   const expected = { x: definition.cell.x * 8, y: definition.cell.y * 8 };
   await interact(page, id);

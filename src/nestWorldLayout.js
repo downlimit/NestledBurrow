@@ -27,10 +27,11 @@ export function createNestWorldLayout() {
       const edge = isIslandEdge(islandTiles, x, y);
       const transportCell = containsTile(transportClearance, x, y);
       const deadEnd = deadEndKeys.has(key);
+      const innerCornerFrame = edge ? null : islandInnerCornerFrame(islandTiles, x, y);
       const frame = deadEnd
         ? OUTDOOR_FRAMES.islandCliff.top
-        : edge ? islandCliffFrame(x, y, ellipse) : grassFrame(x, y);
-      groundTiles.push({ x, y, frame, terrain: deadEnd ? "dead-end" : edge ? "cliff" : "grass" });
+        : edge ? islandCliffFrame(islandTiles, x, y) : innerCornerFrame ?? grassFrame(x, y);
+      groundTiles.push({ x, y, frame, terrain: deadEnd ? "dead-end" : edge ? "cliff" : innerCornerFrame ? "cliff-inner" : "grass" });
       if ((edge && !transportCell) || deadEnd) blockTile(blocked, x, y);
     }
   }
@@ -142,15 +143,27 @@ function isIslandEdge(cells, x, y) {
   return [[-1, 0], [1, 0], [0, -1], [0, 1]].some(([dx, dy]) => !cells.has(tileKey(x + dx, y + dy)));
 }
 
-function islandCliffFrame(x, y, ellipse) {
-  const dx = (x - ellipse.centerX) / ellipse.radiusX;
-  const dy = (y - ellipse.centerY) / ellipse.radiusY;
-  const horizontal = Math.abs(dx);
-  const vertical = Math.abs(dy);
-  if (horizontal > vertical * 1.55) return dx < 0 ? OUTDOOR_FRAMES.islandCliff.left : OUTDOOR_FRAMES.islandCliff.right;
-  if (vertical > horizontal * 1.55) return dy < 0 ? OUTDOOR_FRAMES.islandCliff.top : OUTDOOR_FRAMES.islandCliff.bottom;
-  if (dy < 0) return dx < 0 ? OUTDOOR_FRAMES.islandCliff.topLeft : OUTDOOR_FRAMES.islandCliff.topRight;
-  return dx < 0 ? OUTDOOR_FRAMES.islandCliff.bottomLeft : OUTDOOR_FRAMES.islandCliff.bottomRight;
+function islandCliffFrame(cells, x, y) {
+  const openNorth = !cells.has(tileKey(x, y - 1));
+  const openSouth = !cells.has(tileKey(x, y + 1));
+  const openWest = !cells.has(tileKey(x - 1, y));
+  const openEast = !cells.has(tileKey(x + 1, y));
+  if (openNorth && openWest) return OUTDOOR_FRAMES.islandCliff.topLeft;
+  if (openNorth && openEast) return OUTDOOR_FRAMES.islandCliff.topRight;
+  if (openSouth && openWest) return OUTDOOR_FRAMES.islandCliff.bottomLeft;
+  if (openSouth && openEast) return OUTDOOR_FRAMES.islandCliff.bottomRight;
+  if (openNorth) return OUTDOOR_FRAMES.islandCliff.top;
+  if (openSouth) return OUTDOOR_FRAMES.islandCliff.bottom;
+  if (openWest) return OUTDOOR_FRAMES.islandCliff.left;
+  return OUTDOOR_FRAMES.islandCliff.right;
+}
+
+function islandInnerCornerFrame(cells, x, y) {
+  if (!cells.has(tileKey(x - 1, y - 1))) return OUTDOOR_FRAMES.islandInnerCorner.topLeft;
+  if (!cells.has(tileKey(x + 1, y - 1))) return OUTDOOR_FRAMES.islandInnerCorner.topRight;
+  if (!cells.has(tileKey(x - 1, y + 1))) return OUTDOOR_FRAMES.islandInnerCorner.bottomLeft;
+  if (!cells.has(tileKey(x + 1, y + 1))) return OUTDOOR_FRAMES.islandInnerCorner.bottomRight;
+  return null;
 }
 
 function grassFrame(x, y) {

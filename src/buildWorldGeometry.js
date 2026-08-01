@@ -103,6 +103,15 @@ export function assetPivotWorldPosition(placementPosition, pivotOffset = { x: 0,
   });
 }
 
+// Simulation keeps the authored coordinates; visual owners snap only their
+// render position so pixel-art never lands between screen pixels.
+export function pixelAlignedWorldPoint(position = { x: 0, y: 0 }) {
+  return Object.freeze({
+    x: Math.round(Number(position.x)),
+    y: Math.round(Number(position.y)),
+  });
+}
+
 export function stableWorldDepthTieBreak(stableId = "") {
   let hash = 2166136261;
   for (const character of String(stableId)) {

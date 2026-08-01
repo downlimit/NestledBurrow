@@ -181,6 +181,7 @@ export class BuildModeRuntime {
     this.drag = null;
     this.panelDrag = null;
     this.scrollVelocity = 0;
+    this.activationPointerId = null;
     this.actionOpen = false;
     this.gridEnabled = false;
     this.grid = scene.add.graphics().setDepth(8990).setVisible(false);
@@ -194,6 +195,7 @@ export class BuildModeRuntime {
       this.toggle();
     };
     this.onWorldPointer = (pointer) => {
+      if (this.activationPointerId !== null && pointer?.id === this.activationPointerId) return;
       if (this.beginPanelDrag(pointer)) return;
       this.beginPointerDrag(pointer);
     };
@@ -203,10 +205,17 @@ export class BuildModeRuntime {
       else this.updateHoverPreview(pointer);
     };
     this.onPointerUp = (pointer) => {
+      if (this.activationPointerId !== null && pointer?.id === this.activationPointerId) {
+        this.activationPointerId = null;
+        return;
+      }
       if (this.panelDrag) this.endPanelDrag(pointer);
       else this.endPointerDrag(pointer);
     };
-    this.onPointerCancel = () => this.cancelPanelDrag();
+    this.onPointerCancel = () => {
+      this.activationPointerId = null;
+      this.cancelPanelDrag();
+    };
     this.onSceneUpdate = (_time, delta) => this.updateScrollInertia(delta);
     this.onUndoKey = (event) => {
       if (!this.active || this.actionOpen || event?.repeat || (!event?.ctrlKey && !event?.metaKey)) return;
@@ -245,7 +254,9 @@ export class BuildModeRuntime {
       OPEN_BUTTON.size,
       OPEN_BUTTON.size,
     ).setOrigin(0).setScrollFactor(0).setDepth(PANEL_DEPTH + 5).setInteractive();
-    this.openButtonHit.on("pointerdown", () => {
+    this.openButtonHit.on("pointerdown", (pointer, _localX, _localY, event) => {
+      this.activationPointerId = pointer?.id ?? null;
+      event?.stopPropagation?.();
       if (this.isActivationAllowed()) this.setActive(true);
     });
 
@@ -261,7 +272,11 @@ export class BuildModeRuntime {
       CLOSE_BUTTON.size,
       CLOSE_BUTTON.size,
     ).setOrigin(0).setScrollFactor(0).setDepth(PANEL_DEPTH + 5).setVisible(false);
-    this.closeButtonHit.on("pointerdown", () => this.setActive(false));
+    this.closeButtonHit.on("pointerdown", (pointer, _localX, _localY, event) => {
+      this.activationPointerId = pointer?.id ?? null;
+      event?.stopPropagation?.();
+      this.setActive(false);
+    });
   }
 
   drawGrid() {
@@ -690,6 +705,7 @@ export class BuildModeRuntime {
       this.openButtonHit.setInteractive();
     }
     if (!next) {
+      this.activationPointerId = null;
       this.drag = null;
       this.cancelPanelDrag();
       if (this.actionOpen) {

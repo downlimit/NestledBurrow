@@ -65,6 +65,7 @@ export class CameraFollowRuntime {
     this.tuning = normalizeCameraTuning(tuning);
     this.movingSpeedThreshold = movingSpeedThreshold;
     this.followTarget = scene.add.zone(presentationPosition.x, presentationPosition.y, 1, 1);
+    scene.cameras.main.roundPixels = true;
     scene.cameras.main.startFollow(this.followTarget, true, 1, 1);
     this.reset(presentationPosition);
   }
@@ -82,7 +83,7 @@ export class CameraFollowRuntime {
       progress: 0,
       moving: false,
     };
-    this.followTarget?.setPosition(presentationPosition.x, presentationPosition.y);
+    this.followTarget?.setPosition(Math.round(presentationPosition.x), Math.round(presentationPosition.y));
   }
 
   update({ presentationPosition, speed, deltaMs, maxPresentationSpeed = null }) {
@@ -94,7 +95,7 @@ export class CameraFollowRuntime {
       maxPresentationSpeed,
       tuning: this.tuning,
     });
-    this.followTarget.setPosition(this.state.target.x, this.state.target.y);
+    this.followTarget.setPosition(Math.round(this.state.target.x), Math.round(this.state.target.y));
     return this.getState();
   }
 
