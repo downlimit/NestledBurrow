@@ -1,0 +1,14 @@
+{
+  "homeGreeting": {
+    "speaker": "Home NPC",
+    "lines": {
+      "hello": "Hello there.",
+      "quietVillage": "The village is quiet today.",
+      "goodbye": "See you around."
+    }
+  },
+  "validation": {
+    "itemCount": "You have {count, plural, one {# item} other {# items}}.",
+    "visitorMood": "The visitor is {mood, select, happy {happy} sad {sad} other {calm}}."
+  }
+}
