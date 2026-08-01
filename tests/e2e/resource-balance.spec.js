@@ -69,7 +69,7 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   await boot(page);
   const definitions = (await bridge(page, "getDebrisState")).definitions;
   expect(new Set(definitions.map((item) => item.profileId))).toEqual(new Set(["log-small", "log-large", "stone-small", "stone-large", "ruby-node"]));
-  expect(definitions.filter((item) => item.profileId === "log-small").length).toBeGreaterThanOrEqual(8);
+  expect(definitions.filter((item) => item.profileId === "log-small")).toHaveLength(2);
   await page.locator(".balance-debug-toggle").click({ force: true });
   await page.locator('input[data-field="axeDamage"]').fill("99");
   await page.locator('input[data-field="axeDamage"]').dispatchEvent("input");

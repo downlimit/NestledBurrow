@@ -2430,9 +2430,7 @@ class WorldScene extends Phaser.Scene {
   startNewGame() {
     const result = this.sessionPersistence?.clear();
     if (result?.status === "error") console.warn("Session reset failed", result.diagnostic);
-    const reload = globalThis.location?.reload;
-    if (typeof reload === "function") reload.call(globalThis.location);
-    else this.scene.restart();
+    this.scene.restart();
   }
 
   installE2EBridge() { installWorldE2EBridge(this); }
