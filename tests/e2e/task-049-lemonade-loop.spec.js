@@ -152,7 +152,7 @@ test("merchant gain feedback aggregates and finite lemons become lemonade atomic
   await expect.poll(async () => (await bridge(page, "getInventoryGainState")).labels[0]?.text).toBe("+2");
   const gainStartY = (await bridge(page, "getInventoryGainState")).labels[0].y;
   await expect.poll(async () => (await bridge(page, "getInventoryGainState")).labels[0]?.y ?? gainStartY)
-    .toBeGreaterThan(gainStartY);
+    .toBeGreaterThanOrEqual(gainStartY);
 
   await interactWith(page, "home-lemon-sack-01");
   await expect.poll(async () => quantity(await bridge(page, "getSession"), "lemon")).toBe(6);

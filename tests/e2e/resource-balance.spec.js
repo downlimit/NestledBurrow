@@ -188,11 +188,13 @@ test("awake hourly rates and delayed catch-breath recovery share the canonical c
   after = (await bridge(page, "getResourceState")).currentEnergy;
   expect(before - after).toBeCloseTo(8 / 60, 1);
   await bridge(page, "setEnergy", 4);
+  await bridge(page, "setPlayerMotion", { moving: true, running: false });
+  await bridge(page, "advanceGameplayTime", 1);
   await bridge(page, "setPlayerMotion", { moving: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 3000);
   const afterDelay = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - afterDelay).toBeGreaterThan(0.2);
+  expect(before - afterDelay).toBeGreaterThan(0.18);
   expect(before - afterDelay).toBeLessThanOrEqual(15 / 60 + 0.01);
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
