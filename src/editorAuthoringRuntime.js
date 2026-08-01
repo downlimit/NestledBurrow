@@ -41,6 +41,7 @@ export function createPlantedTreeDefinition(object) {
   return Object.freeze({
     id: object.id,
     entityId: object.id,
+    worldId: "village",
     roomId: "yard",
     kind: RESOURCE_INTERACTION_KIND,
     profileId,
@@ -206,7 +207,7 @@ export function attachEditorAuthoringRuntime(scene, {
   function registerPlant(object) {
     if (!isPlantedTreeObject(object)) return null;
     object.kind = "plant";
-    object.item = { ...object.item, resourceProfileId: PLANTED_TREE_PROFILE_ID, objectType: "plant" };
+    object.item = { ...object.item, worldId: "village", resourceProfileId: PLANTED_TREE_PROFILE_ID, objectType: "plant" };
     object.collider = true;
     object.colliderGroup = `resource:${PLANTED_TREE_PROFILE_ID}`;
     object.resourceDefinition = createPlantedTreeDefinition(object);

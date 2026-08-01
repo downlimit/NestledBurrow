@@ -16,6 +16,7 @@
 - developer authoring отделён от gameplay save;
 - HUD, camera, audio и build UI имеют lifecycle owners;
 - interaction selection остаётся детерминированным контрактом.
+- `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle.
 
 ## `src/main.js` — только composition root
 
@@ -55,6 +56,12 @@
 ### Facilities и presentation
 
 Facility runtime владеет объектом, collider и use lifecycle. Presentation pose не мутирует безопасную motor position. Camera получает presentation target через явный adapter. Sleep/wake и interaction candidate остаются отдельными контрактами.
+
+### Локации мира
+
+`worldLocationConfig.js` задаёт постоянные ID, capabilities, транспорты и spawn-контракты. `WorldLocationCoordinator` выбирает активный layout, синхронизирует `sessionState.currentWorldId`, управляет transition lock и вызывает location lifecycle. `worldLocationLifecycle.js` монтирует и уничтожает домашние runtime-системы по capability активной локации. `WorldScene` создаёт эти owners и делегирует им порядок переключения.
+
+Геометрия Гнезда формируется в `nestWorldLayout.js` из одной модели острова для terrain render и collision. Домашний authoring остаётся привязан к capability `buildMode` локации `village`.
 
 ## Запрещённые преждевременные решения
 

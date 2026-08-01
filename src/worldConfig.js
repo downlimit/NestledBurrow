@@ -37,6 +37,16 @@ export const OUTDOOR_FRAMES = Object.freeze({
   pathTop: Object.freeze([3, 4, 5]),
   pathMiddle: Object.freeze([15, 16, 17]),
   pathBottom: Object.freeze([27, 28, 29]),
+  islandCliff: Object.freeze({
+    topLeft: 24,
+    top: 25,
+    topRight: 27,
+    left: 36,
+    right: 39,
+    bottomLeft: 60,
+    bottom: 61,
+    bottomRight: 63,
+  }),
 });
 
 export const HOUSE_FRAMES = Object.freeze({
@@ -63,4 +73,14 @@ export const HOUSE_FRAMES = Object.freeze({
     bottom: 82,
     bottomRight: 83,
   }),
+  transport: Object.freeze({
+    topLeft: 0,
+    topRight: 2,
+    pillarLeft: 12,
+    pillarRight: 14,
+  }),
+});
+
+export const TREE_FRAMES = Object.freeze({
+  planted: Object.freeze([0, 1, 2, 9, 10, 11, 18, 19, 20, 27, 28, 29]),
 });

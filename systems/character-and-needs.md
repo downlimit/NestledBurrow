@@ -6,6 +6,8 @@ Owns movement, time, sleep, energy and six continuous needs.
 
 ## Player contract
 
+Keyboard and mobile produce the same movement/run intent. The motor position is authoritative; presentation poses do not corrupt it. A location transition places the motor at its declared safe spawn, clears velocity, applies the exit-facing and resets camera follow before controls resume.
+
 All needs use `0..100` (higher is better) and HUD order `N/E/S/T/L/D`:
 
 | Symbol | ID | Meaning |
@@ -114,14 +116,15 @@ Friendly proximity pauses D loss. Meaningful conversation restores `15..30 D`; s
 - event-specific effects have visible world causes;
 - high needs never form a broad passive bonus stack;
 - camera/presentation never rewrites safe motor position.
+- a transition is re-armed only after the motor leaves the destination trigger.
 
 ## Current baseline
 
-Movement, running energy, sleep/wake, continuous time and all six needs exist. Current tuning predates this target.
+Movement, running energy, sleep/wake, continuous time and all six needs exist. Burrow/Nest travel retains needs, time and energy while resetting the motor and camera to the destination contract. Current tuning predates this target.
 
 ## Evidence
 
-`check:input`, `check:mobile-camera`, `check:movement`, `check:character`, `check:needs`, `check:clock-cycle`; browser E2E for movement/sleep paths.
+`check:input`, `check:mobile-camera`, `check:movement`, `check:character`, `check:needs`, `check:clock-cycle`, `check:task-059`; browser E2E for movement/sleep/location paths.
 
 ## Not fixed
 

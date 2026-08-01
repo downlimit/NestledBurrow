@@ -16,7 +16,7 @@ import {
   WORLD_ROWS,
   WORLD_WIDTH,
 } from "../src/worldConfig.js";
-import { PLACEMENT_CELL_SIZE, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
+import { getResourceObjectsForWorld, PLACEMENT_CELL_SIZE } from "../src/resourceConfig.js";
 import { getResourceProfile } from "../src/resourceDomain.js";
 
 const layout = createWorldLayout();
@@ -107,7 +107,7 @@ for (const [x, y] of formerTreeCells) {
 }
 
 const resourceCells = new Set();
-for (const resource of RESOURCE_OBJECTS) {
+for (const resource of getResourceObjectsForWorld("village")) {
   const footprint = getResourceProfile(resource.profileId).footprint;
   const placementOrigin = {
     x: resource.cell.x * PLACEMENT_CELL_SIZE,

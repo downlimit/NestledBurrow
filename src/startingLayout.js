@@ -9,6 +9,7 @@ const TREE_ITEM = Object.freeze({
   id: "tree",
   placement: "tree",
   objectType: "plant",
+  worldId: "village",
   resourceProfileId: "tree-planted",
   labelKey: "hud:buildMode.assets.tree",
   textureKey: TREES_TEXTURE_KEY,

@@ -13,6 +13,8 @@ import {
 } from "./worldConfig.js";
 import { PLACEMENT_CELL_SIZE } from "./resourceConfig.js";
 import { applyColliderOffsets, wallColliderGroup } from "./buildWorldGeometry.js";
+import { createNestWorldLayout } from "./nestWorldLayout.js";
+import { WORLD_IDS } from "./worldLocationConfig.js";
 
 function blockTile(blocked, tileX, tileY) {
   for (let y = 0; y < 2; y += 1) for (let x = 0; x < 2; x += 1) blocked.add(cellKey(tileX * 2 + x, tileY * 2 + y));
@@ -137,7 +139,9 @@ function getGrassFrame(x, y) {
     : OUTDOOR_FRAMES.grass;
 }
 
-export function createWorldLayout() {
+export function createWorldLayout(worldId = WORLD_IDS.village) {
+  if (worldId === WORLD_IDS.nest) return createNestWorldLayout();
+  if (worldId !== WORLD_IDS.village) throw new Error(`Unknown world layout: ${String(worldId)}`);
   const groundTiles = [];
   const houseFloorTiles = [];
   const houseWallTiles = [];

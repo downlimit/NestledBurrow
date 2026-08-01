@@ -26,6 +26,40 @@ export function installWorldE2EBridge(scene) {
       scene.cameraRuntime?.reset(player.motor.position);
       scene.interactionRuntime?.refresh?.();
     },
+    enterTransport: (transportId = null) => {
+      const transition = scene.worldLayout?.transitions?.find(({ id }) => !transportId || id === transportId);
+      if (!transition) throw new Error(`Unknown active transport: ${String(transportId)}`);
+      const player = scene.characterSystem.require(scene.sessionState.playerId);
+      player.motor.position = {
+        x: (transition.triggerBounds.left + transition.triggerBounds.right) / 2,
+        y: (transition.triggerBounds.top + transition.triggerBounds.bottom) / 2,
+      };
+      player.motor.movement = createMovementState({ facing: { x: 0, y: -1 } });
+      return scene.worldLocationCoordinator?.update?.();
+    },
+    getLocationState: () => ({
+      ...scene.worldLocationCoordinator?.getState?.(),
+      layout: scene.worldLayout ? {
+        locationId: scene.worldLayout.locationId,
+        bounds: { ...scene.worldLayout.bounds },
+        transitions: scene.worldLayout.transitions?.map((transition) => ({
+          id: transition.id,
+          destinationWorldId: transition.destinationWorldId,
+          footprintBounds: { ...transition.footprintBounds },
+          triggerBounds: { ...transition.triggerBounds },
+          safeSpawn: { ...transition.safeSpawn, facing: { ...transition.safeSpawn.facing } },
+        })) ?? [],
+      } : null,
+      home: {
+        npcCount: (scene.characterSystem?.values?.() ?? []).filter(({ id }) => id !== scene.sessionState.playerId).length,
+        facilityCount: scene.facilityRuntime?.getDefinitions?.().length ?? 0,
+        tavernPresent: Boolean(scene.tavernSignRuntime),
+        farmingPresent: Boolean(scene.farmingRuntime),
+        buildModePresent: Boolean(scene.buildMode),
+        bedPresent: Boolean(scene.debrisRuntime?.getBedDefinition?.()),
+      },
+    }),
+    saveSession: () => scene.saveSession(),
     getInteractionState: () => ({
       candidate: scene.interactionRuntime?.getCurrentCandidate() ?? null,
       dialogueActive: scene.interactionRuntime?.isDialogueActive() ?? false,
@@ -90,8 +124,8 @@ export function installWorldE2EBridge(scene) {
     expireHitCooldown: () => { scene.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; },
     getDebrisState: () => ({
       present: scene.debrisRuntime?.isPresent?.() ?? false,
-      definition: RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID),
-      definitions: RESOURCE_OBJECTS,
+      definition: scene.worldLayout?.resourceDefinitions?.[0] ?? RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID),
+      definitions: scene.worldLayout?.resourceDefinitions ?? [],
       plantedTrees: scene.movementDebugPanel?.authoringRuntime?.getPlantDefinitions?.() ?? [],
       bed: scene.debrisRuntime?.getBedDefinition?.() ?? null,
       beds: scene.debrisRuntime?.getBedDefinitions?.() ?? [],

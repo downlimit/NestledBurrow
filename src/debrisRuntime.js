@@ -4,8 +4,8 @@ import { getResourceProfile, resourceActionForTool } from "./resourceDomain.js";
 import { hitResourceNode } from "./gameSessionState.js";
 import { cellKey } from "./worldLayout.js";
 import { drawResource } from "./resourceVisuals.js";
-import { bindSpriteVisual } from "./facilityPreviewVisuals.js";
-import { TILE_SIZE, TREES_TEXTURE_KEY } from "./worldConfig.js";
+import { bindCompositeSpriteVisual, bindSpriteVisual } from "./facilityPreviewVisuals.js";
+import { TILE_SIZE, TREE_FRAMES, TREES_TEXTURE_KEY } from "./worldConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 
 export const BED_SLEEP_DEPTH_OFFSET = 0.25;
@@ -18,6 +18,8 @@ export function sleepingCharacterDepth(bedDepth) {
 export function createDebrisRuntime(scene, {
   sessionState,
   worldLayout,
+  resourceDefinitions = RESOURCE_OBJECTS,
+  includeBed = true,
   getSelectedItem = () => null,
   getGameplayTuning = () => ({}),
   onPersistentMutation = () => {},
@@ -43,16 +45,20 @@ export function createDebrisRuntime(scene, {
   const setBlocked = (definition, active) => {
     if (!active) return worldLayout.clearResourceCollider(definition.id);
     const profile = getResourceProfile(definition.profileId);
-    const width = profile.footprint.width * PLACEMENT_CELL_SIZE;
-    const height = profile.footprint.height * PLACEMENT_CELL_SIZE;
+    const collision = profile.collisionRect ?? {
+      left: 0,
+      top: 0,
+      right: profile.footprint.width * PLACEMENT_CELL_SIZE,
+      bottom: profile.footprint.height * PLACEMENT_CELL_SIZE,
+    };
     const topInset = profile.collisionTopInset ?? 0;
     const leftInset = profile.collisionLeftInset ?? 0;
     const rightInset = profile.collisionRightInset ?? 0;
     worldLayout.setResourceCollider(definition.id, {
-      left: definition.cell.x * PLACEMENT_CELL_SIZE + leftInset,
-      right: definition.cell.x * PLACEMENT_CELL_SIZE + width - rightInset,
-      top: definition.cell.y * PLACEMENT_CELL_SIZE + topInset,
-      bottom: definition.cell.y * PLACEMENT_CELL_SIZE + height,
+      left: definition.cell.x * PLACEMENT_CELL_SIZE + collision.left + leftInset,
+      right: definition.cell.x * PLACEMENT_CELL_SIZE + collision.right - rightInset,
+      top: definition.cell.y * PLACEMENT_CELL_SIZE + collision.top + topInset,
+      bottom: definition.cell.y * PLACEMENT_CELL_SIZE + collision.bottom,
     }, `resource:${definition.profileId}`);
   };
 
@@ -89,7 +95,7 @@ export function createDebrisRuntime(scene, {
 
   function updateCandidate(candidate) {
     const definition = candidate?.kind === "work-resource"
-      ? RESOURCE_OBJECTS.find((item) => item.id === candidate.entityId && isPresent(item))
+      ? resourceDefinitions.find((item) => item.id === candidate.entityId && isPresent(item))
       : null;
     if (definition && !resourceActionForTool(getResourceProfile(definition.profileId), getSelectedItem()?.id)) {
       clearTargetOutline();
@@ -118,7 +124,7 @@ export function createDebrisRuntime(scene, {
   }
 
   function hitWithFeedback(resourceId, result, onComplete = () => {}) {
-    const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
+    const definition = resourceDefinitions.find((item) => item.id === resourceId);
     if (!definition) return onComplete();
     const graphics = visuals.get(resourceId);
     if (!graphics) return onComplete();
@@ -136,7 +142,7 @@ export function createDebrisRuntime(scene, {
   }
 
   function damageLog(resourceId, damageMultiplier = 0.5) {
-    const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
+    const definition = resourceDefinitions.find((item) => item.id === resourceId);
     const profile = definition ? getResourceProfile(definition.profileId) : null;
     if (profile?.kind !== "log") return { status: "wrong-resource", mutated: false };
     const tuning = getGameplayTuning();
@@ -154,7 +160,7 @@ export function createDebrisRuntime(scene, {
   }
 
   function clearWithFeedback(resourceId, onComplete = () => {}) {
-    const definition = RESOURCE_OBJECTS.find((item) => item.id === resourceId);
+    const definition = resourceDefinitions.find((item) => item.id === resourceId);
     if (!definition) return onComplete();
     const graphics = visuals.get(resourceId);
     setBlocked(definition, false);
@@ -261,9 +267,11 @@ export function createDebrisRuntime(scene, {
     if (pose && depth !== null) characterVisual.setPresentationPose({ ...pose, depth });
   }
 
-  RESOURCE_OBJECTS.forEach(createVisual);
-  if (worldLayout.isBlockedCell(BED_WAKE_TILE.x * 2, BED_WAKE_TILE.y * 2)) throw new Error("BED_WAKE_TILE must remain walkable");
-  createBed(BED_OBJECT);
+  resourceDefinitions.forEach(createVisual);
+  if (includeBed) {
+    if (worldLayout.isBlockedCell(BED_WAKE_TILE.x * 2, BED_WAKE_TILE.y * 2)) throw new Error("BED_WAKE_TILE must remain walkable");
+    createBed(BED_OBJECT);
+  }
 
   return {
     getInteractionDefinitions() {
@@ -273,7 +281,7 @@ export function createDebrisRuntime(scene, {
           : definition
       ));
       const selectedToolId = getSelectedItem()?.id;
-      const resources = RESOURCE_OBJECTS.filter((definition) => isPresent(definition)
+      const resources = resourceDefinitions.filter((definition) => isPresent(definition)
         && resourceActionForTool(getResourceProfile(definition.profileId), selectedToolId));
       return [...resources, ...beds];
     },
@@ -288,7 +296,7 @@ export function createDebrisRuntime(scene, {
       return definition ? bedBounds(definition) : null;
     },
     getAuthoringInstances() {
-      const resources = RESOURCE_OBJECTS.flatMap((definition) => {
+      const resources = resourceDefinitions.flatMap((definition) => {
         const visual = visuals.get(definition.id);
         if (!visual) return [];
         const profile = getResourceProfile(definition.profileId);
@@ -321,7 +329,7 @@ export function createDebrisRuntime(scene, {
       return [...resources, ...beds];
     },
     applyAuthoringVisualOffset(profileKey, offset) {
-      for (const definition of RESOURCE_OBJECTS) {
+      for (const definition of resourceDefinitions) {
         if (`resource:${definition.profileId}` !== profileKey) continue;
         visuals.get(definition.id)?.setPosition?.(
           definition.cell.x * PLACEMENT_CELL_SIZE + offset.x,
@@ -343,13 +351,13 @@ export function createDebrisRuntime(scene, {
     moveBed,
     getBedDefinitionAt,
     getBedDemolitionTargetAt,
-    isPresent(id) { const definition = RESOURCE_OBJECTS.find((item) => item.id === (id ?? RESOURCE_OBJECTS[0].id)); return definition ? isPresent(definition) : false; },
+    isPresent(id) { const definition = resourceDefinitions.find((item) => item.id === (id ?? resourceDefinitions[0]?.id)); return definition ? isPresent(definition) : false; },
     getVisualState(id) {
       const graphics = visuals.get(id);
       return graphics ? { x: graphics.x, y: graphics.y, highlighted: targetOutlineId === id } : null;
     },
     hitWithFeedback, clearWithFeedback, damageLog, setSleeping,
-    rebuild() { for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); RESOURCE_OBJECTS.forEach(createVisual); },
+    rebuild() { for (const graphics of visuals.values()) graphics.destroy(); visuals.clear(); resourceDefinitions.forEach(createVisual); },
     destroy() {
       destroyed = true;
       clearTargetOutline();
@@ -359,17 +367,17 @@ export function createDebrisRuntime(scene, {
       for (const definition of bedDefinitions.values()) worldLayout.clearWorldObjectCollider(definition.id);
       bedVisuals.clear();
       bedDefinitions.clear();
-      for (const definition of RESOURCE_OBJECTS) setBlocked(definition, false);
+      for (const definition of resourceDefinitions) setBlocked(definition, false);
     },
   };
 }
 
 function drawResourceVisual(graphics, profile, progress = 0, options = {}) {
   if (profile.visual !== "tree") return drawResource(graphics, profile, progress, options);
-  if (!graphics.spriteImage) {
-    bindSpriteVisual(
+  if (!graphics.spriteContainer) {
+    bindCompositeSpriteVisual(
       graphics,
-      { key: TREES_TEXTURE_KEY, frame: 0 },
+      { key: TREES_TEXTURE_KEY, frames: TREE_FRAMES.planted, columns: 3, frameWidth: TILE_SIZE, frameHeight: TILE_SIZE },
       options.colorOverride ?? null,
     );
   }

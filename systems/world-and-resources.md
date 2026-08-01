@@ -7,6 +7,8 @@ This system owns world geometry, collision queries, resource definitions, gather
 ## Player-visible contract
 
 - world geometry renders and collides from the same semantic source;
+- the saved `currentWorldId` selects one active location layout, camera bounds and location-specific lifecycle;
+- paired `2x2` transports move the player between the home Burrow and the Island Nest automatically;
 - axe, pickaxe, hoe and water bucket expose separate strict actions;
 - a mismatched tool cannot mutate a resource or farm cell;
 - resource rewards enter the inventory and removing a node removes its collision and presentation consistently;
@@ -17,7 +19,8 @@ This system owns world geometry, collision queries, resource definitions, gather
 
 ## Owners
 
-- world geometry/collision: `worldLayout.js`, `worldConfig.js`;
+- location registry/transition lifecycle: `worldLocationConfig.js`, `worldLocationCoordinator.js`, `worldLocationLifecycle.js`;
+- world geometry/collision: `worldLayout.js`, `nestWorldLayout.js`, `worldConfig.js`;
 - profiles/actions/rewards: `resourceDomain.js`, `resourceConfig.js`;
 - inventory state and item operations: `inventoryDomain.js`;
 - inventory/world-item runtime: `inventoryRuntime.js`;
@@ -30,6 +33,9 @@ This system owns world geometry, collision queries, resource definitions, gather
 ## Invariants
 
 - stable IDs survive save/load and profile data is immutable;
+- `village` remains the home world ID, `nest` is the only additional registered world ID, and unknown saved IDs resolve to `village`;
+- every resource definition owns one `worldId`; only active-location definitions create visuals, colliders, targets and hit resolution;
+- a location switch destroys the previous location lifecycle before mounting the next one, so repeated travel cannot duplicate objects;
 - inventory has exactly ten slots; tools and loot share the movable-slot contract;
 - a fresh game owns exactly one axe, pickaxe, hoe and water bucket; migration adds missing tools without duplicates;
 - loot stacks by canonical item ID and the final resource hit is atomic when inventory is full;
@@ -40,7 +46,7 @@ This system owns world geometry, collision queries, resource definitions, gather
 
 ## Current baseline
 
-Logs, stones, ruby nodes and six starting planted trees support strict tool interactions, progress, inventory rewards, collision and persistence. The player can reorder ten hotbar slots, throw whole stacks toward the cursor and pick them up. Potato and lemon crops share persisted soil/moisture rules; the fixed well refills the water bucket.
+The home Burrow retains its existing `64x48` layout and systems. The `22x16` Island Nest uses one oval grass/cliff model for rendering and collision, a closed northern stone dead end, four gatherable trees and three stones. Resource progress persists across travel and reload. The player can reorder ten hotbar slots, throw whole stacks toward the cursor and pick them up. Potato and lemon crops share persisted soil/moisture rules; the fixed well refills the water bucket.
 
 ## Not yet
 
@@ -48,4 +54,4 @@ Inventory containers, stack splitting, tool progression, durability and seasonal
 
 ## Evidence
 
-`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, `check:task-056`, resource/farming Browser E2E.
+`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-059`, resource/farming/location Browser E2E.
