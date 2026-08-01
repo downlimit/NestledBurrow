@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Дикий Атолл — логический макет</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Дикий Атолл — логический макет</h1>
+      <div class="subtitle">Слайдшоу забега: игрок строит план, а события мира заставляют пересобирать его через потребности, маршрут и ячейки.</div>
+    </div>
+    <div class="header-actions">
+      <label class="subtitle">seed <input id="seedInput" class="seed-input" value=""></label>
+      <button id="newRunBtn" class="primary">Новый Атолл</button>
+      <button id="returnBtn" class="danger">Вернуться в Нору</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel sticky">
+      <div class="section">
+        <h2>Потребности</h2>
+        <div id="needs"></div>
+      </div>
+      <div class="section">
+        <div class="cargo-head"><strong>Инвентарь</strong><span id="slotSummary">10 мирных · 6 боевых</span></div>
+        <div id="baitSummary" class="event-card" style="margin:9px 0 0"></div>
+        <div id="inventory"></div>
+      </div>
+      <div class="section">
+        <h3>Активная химия</h3>
+        <div id="buffs" class="buffs"></div>
+      </div>
+      <div class="section">
+        <h3>Цель макета <span id="bingoScore" class="tag"></span></h3>
+        <div id="bingos"></div>
+      </div>
+      <div class="section">
+        <details>
+          <summary>Что проверяет макет</summary>
+          <ul>
+            <li>Все шесть шкал всегда активны в порядке N/E/S/T/L/D.</li>
+            <li>События меняют реальные объекты, обязательства и маршруты.</li>
+            <li>Потребности меняют ценность решений, а не заменяют игру штрафами.</li>
+            <li>Стэки занимают 10 мирных и 6 боевых numbered-ячеек.</li>
+            <li>Четыре action-ячейки предназначены только для активного оружия.</li>
+            <li>NPC-сегмент является отдельной веткой; только там можно присоединить остров.</li>
+            <li>Транспортные площадки сохраняют ремонт между забегами.</li>
+          </ul>
+        </details>
+      </div>
+    </aside>
+
+    <main class="panel">
+      <div class="section"><div id="routeStrip" class="route-strip"></div></div>
+      <div class="section"><div id="arena"></div></div>
+      <div class="section">
+        <h3>Походные действия</h3>
+        <div id="fieldActions" class="action-grid"></div>
+      </div>
+    </main>
+
+    <aside class="panel sticky right">
+      <div class="section">
+        <div class="log-header">
+          <h2>Журнал событий</h2>
+          <button id="clearLogBtn" class="ghost">Очистить</button>
+        </div>
+        <div id="log" class="log" style="margin-top:9px;border:1px solid #2d382f;border-radius:7px"></div>
+      </div>
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <h2 style="margin:0">Карта сегмента</h2>
+          <span id="segmentDepth" class="tag"></span>
+        </div>
+        <p id="segmentHint" class="subtitle" style="margin-top:7px"></p>
+        <div id="map" class="map"></div>
+      </div>
+      <div id="segmentChoiceSection" class="section" style="display:none"><div id="segmentChoices"></div></div>
+      <div class="section">
+        <h3>Лаборатория баланса</h3>
+        <div class="action-grid">
+          <button id="stressNeedsBtn">Снизить все шкалы на 18<small>Проверить одновременное давление.</small></button>
+          <button id="randomEventBtn">Заменить событие<small>Сгенерировать другую ситуацию на текущей арене.</small></button>
+          <button id="grantKitBtn">Выдать походный набор<small>Ресурсы для быстрого теста ремонта и решений.</small></button>
+          <button id="revealBtn">Разведать арену<small>Потратить энергию ради новизны и информации.</small></button>
+          <button id="resetGatesBtn" class="danger">Сбросить ремонт площадок<small>Очистить постоянный прогресс макета.</small></button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="modal" class="modal">
+  <div class="modal-card">
+    <h2 id="modalTitle">Забег завершён</h2>
+    <p id="modalText" class="arena-copy"></p>
+    <div id="modalSummary" class="summary-grid"></div>
+    <button id="modalClose">Закрыть</button>
+    <button id="modalNew" class="primary">Новый Атолл</button>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
