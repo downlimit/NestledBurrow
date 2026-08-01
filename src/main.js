@@ -32,11 +32,12 @@ import { WORLD_IDS } from "./worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "./worldLocationCoordinator.js";
 import { canTransitionWorldLocation, destroyWorldLocation, mountWorldLocation, renderWorldLocation } from "./worldLocationLifecycle.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, drainAwakeEnergy, hitResourceDefinition, refillEnergy, regenerateEnergy, resetBalanceRun } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, hitResourceDefinition, refillEnergy, resetBalanceRun } from "./gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
 import { createInteractionRuntime } from "./interactionRuntime.js";
+import { createInteractionApproachResolver } from "./interactionApproach.js";
 import { createInteractionHud } from "./interactionHud.js";
 import { createGameHud, shouldShakeEnergyAfterInteraction } from "./gameHud.js";
 import { createSessionPersistence } from "./sessionPersistence.js";
@@ -79,7 +80,9 @@ import { createDebrisRuntime, drawBed } from "./debrisRuntime.js";
 import { FACILITY_ASSETS, FACILITY_INTERACTION_KIND, FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
 import { drawFacility } from "./facilityPreviewVisuals.js";
-import { applyNeedsUpdate } from "./needsDomain.js";
+import { createNeedsRuntime } from "./needsRuntime.js";
+import { createNeedsFlowRuntime, needMeterValues } from "./needsFlowRuntime.js";
+import { createNeedsInteractionCoordinator } from "./needsInteractionCoordinator.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
 import { createCookingRuntime } from "./cookingRuntime.js";
@@ -393,6 +396,18 @@ class WorldScene extends Phaser.Scene {
     this.uiVisibilityCoordinator = new UiVisibilityCoordinator();
     this.uiVisibilityCoordinator.register(this.interactionHud, ["gameplay-overlay", "option-sensitive", "merchant-active", "inventory-action-blocked"]);
     applyGameplayTuning(this.sessionState, this.gameplayTuning);
+    this.needsRuntime = createNeedsRuntime({
+      sessionState: this.sessionState,
+      tuning: this.gameplayTuning.needs,
+      onCollapse: () => this.needsInteractionCoordinator?.collapse(),
+      onWake: () => this.needsInteractionCoordinator?.wake(),
+      onToiletAccidentReady: (event) => this.needsInteractionCoordinator?.beginToiletAccident(event),
+      onToiletAccident: ({ witnessed }) => this.gameHud?.showTransientMessage?.(
+        witnessed ? "hud:needs.toiletAccidentWitnessed" : "hud:needs.toiletAccidentPrivate",
+      ),
+    });
+    this.needsFlowRuntime = createNeedsFlowRuntime({ initialValues: needMeterValues(this.sessionState.gameplay) });
+    this.interactionApproachResolver = createInteractionApproachResolver({ worldLayout: this.worldLayout, getPlayer: () => this.playerCharacter });
     this.syncPlayerEnergyTarget();
     this.interactionRuntime = createInteractionRuntime({
       sessionState: this.sessionState,
@@ -400,18 +415,23 @@ class WorldScene extends Phaser.Scene {
       interactionDefinitions: [],
       getInteractionDefinitions: () => this.worldLocationCoordinator?.hasCapability("npcs") ? INTERACTION_DEFINITIONS : [],
       getDialogueDefinition,
-      onPersistentMutation: () => { this.gameHud?.render?.(); this.saveSession(); },
+      onPersistentMutation: (result) => {
+        if (result?.completion) this.needsRuntime?.applyMeaningfulConversation?.();
+        this.gameHud?.render?.();
+        this.saveSession();
+      },
       getStaticInteractionDefinitions: () => [
         ...(this.debrisRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.facilityRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.farmingRuntime?.getInteractionDefinitions?.() ?? []),
         ...(this.sleeping && !this.exhaustedSleeping ? [this.getSleepingWakeInteraction()] : []),
-        ...(this.exhaustedSleeping ? [this.getExhaustionWakeInteraction()] : []),
       ],
       isInteractionAllowed: (definition) => !this.cookingRuntime?.isActive?.()
+        && (this.needsInteractionCoordinator?.allowsInteraction?.(definition) ?? true)
         && (!this.facilityRuntime?.isUsing()
           || (definition.kind === FACILITY_INTERACTION_KIND && definition.id === this.facilityRuntime.getActiveId())),
+      resolveInteractionTarget: (definition, player) => this.interactionApproachResolver.resolve(definition, player),
       runWorldObjectInteraction: (candidate) => this.runWorldObjectInteraction(candidate),
       presenter: this.interactionHud,
     });
@@ -450,6 +470,18 @@ class WorldScene extends Phaser.Scene {
       getKitchenState: () => this.sessionState?.gameplay?.kitchen, getInventoryState: () => this.sessionState?.gameplay?.inventory,
       getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
       isFacilityReserved: (facilityId) => this.tavernServiceRuntime?.guestRuntime?.isDiningTableReserved?.(facilityId) ?? false,
+    });
+    this.needsInteractionCoordinator = createNeedsInteractionCoordinator({
+      facilityRuntime: this.facilityRuntime,
+      debrisRuntime: this.debrisRuntime,
+      getPlayer: () => this.playerCharacter,
+      startSleep: (options) => this.startSleeping(options),
+      stopSleep: (options) => this.wakeUp(options),
+      isSleeping: () => this.sleeping,
+      toiletAccidentTuning: this.gameplayTuning.needs.toiletAccident,
+      onToiletAccident: (event) => this.needsRuntime?.beginToiletAccident(event),
+      onToiletAccidentRecovery: (progress) => this.needsRuntime?.advanceToiletAccidentRecovery(progress),
+      refresh: () => this.interactionRuntime?.refresh?.(),
     });
   }
 
@@ -503,26 +535,27 @@ class WorldScene extends Phaser.Scene {
     }
     if (candidate.kind === FACILITY_INTERACTION_KIND) {
       const facility = this.facilityRuntime.getDefinition(candidate.payload.facilityId);
+      if (["cutting-table", "gas-stove"].includes(facility?.facilityType)
+        && !this.needsRuntime.canStartLongAction()) {
+        return { status: "urgent-toilet", mutated: false, messageKey: "hud:needs.urgentLongAction" };
+      }
       const kitchenResult = this.kitchenInteractionRuntime?.handleFacility?.(facility);
       if (kitchenResult?.status !== "ignored") {
         this.suppressNextInteract = true;
         this.interactionRuntime?.refresh?.();
         return kitchenResult;
       }
-      const player = this.characterSystem.require(this.sessionState.playerId);
-      const result = this.facilityRuntime.toggle(candidate.payload.facilityId, player.motor);
-      this.syncFacilityPresentationPose();
+      const result = this.needsInteractionCoordinator.useFacility(candidate.payload.facilityId, candidate.payload);
       this.suppressNextInteract = true;
       this.interactionRuntime?.refresh?.();
       return result;
     }
-    if (this.facilityRuntime?.isUsing()) return { status: "busy", mutated: false };
     if (candidate.kind === BED_INTERACTION_KIND) {
-      if (this.sleeping) this.wakeUp();
-      else this.startSleeping({ bedId: candidate.payload.bedId });
+      const result = this.needsInteractionCoordinator.useBed(candidate.payload.bedId, candidate.payload);
       this.suppressNextInteract = true;
-      return { status: this.sleeping ? "sleeping" : "awake", mutated: false };
+      return result;
     }
+    if (this.facilityRuntime?.isUsing() || this.needsInteractionCoordinator?.isLocked()) return { status: "busy", mutated: false };
     if (candidate.kind === "wake-exhausted") {
       return this.tryWakeFromExhaustion(this.e2eWakeRandom ?? Math.random);
     }
@@ -535,13 +568,15 @@ class WorldScene extends Phaser.Scene {
     const action = resourceActionForTool(profile, this.gameHud?.getSelectedInventoryItem?.()?.id);
     if (!action) return { status: "wrong-tool", mutated: false };
     const energyBefore = this.sessionState.gameplay.currentEnergy;
+    const physicalAction = this.needsRuntime.canPerformPhysicalAction(profile.requiredTool);
     const result = hitResourceDefinition(this.sessionState, definition, {
       action,
       damage: this.gameplayTuning.axeDamage,
-      energyPerHit: this.gameplayTuning.energyPerHit,
+      energyPerHit: physicalAction.cost,
       tuning: this.gameplayTuning,
     });
     if (result.mutated) {
+      this.needsRuntime.recordPhysicalAction(profile.requiredTool, { energyAlreadySpent: true });
       this.lastSuccessfulHitAtMs = nowMs;
       this.activeResourceProfileId = profile.id;
       this.interactionHud?.triggerCooldownFeedback?.();
@@ -574,25 +609,24 @@ class WorldScene extends Phaser.Scene {
 
   getPlayerCameraPosition() {
     const motorPosition = this.playerCharacter?.motor?.position;
-    if ((this.facilityRuntime?.isUsing?.() || this.sleeping) && motorPosition) {
+    if ((this.needsInteractionCoordinator?.isLocked?.() || this.sleeping) && motorPosition) {
       return { x: Number(motorPosition.x), y: Number(motorPosition.y) };
     }
     return this.getPlayerPresentationPosition();
   }
 
-  syncFacilityPresentationPose() {
-    if (!this.playerCharacter?.visual || this.sleeping) return;
-    this.playerCharacter.visual.setPresentationPose(this.facilityRuntime?.getPresentationPose?.() ?? null);
-  }
-
   syncPlayerEnergyTarget() {
     if (!this.playerCharacter?.motor || !this.sessionState?.gameplay) return;
-    this.playerCharacter.motor.targetSpeedMultiplier = energyTargetSpeedMultiplier(
+    const needsMovement = this.needsRuntime?.movementState?.();
+    this.playerCharacter.motor.targetSpeedMultiplier = needsMovement?.multiplier ?? energyTargetSpeedMultiplier(
       this.sessionState.gameplay.currentEnergy,
       this.sessionState.gameplay.maximumEnergy,
       this.gameplayTuning.minimumFatigueSpeedMultiplier,
     );
-    this.playerCharacter.motor.runSpeedMultiplier = this.isRunning ? this.gameplayTuning.runSpeedMultiplier : 1;
+    if (needsMovement && !needsMovement.runningAllowed) this.isRunning = false;
+    this.playerCharacter.motor.runSpeedMultiplier = this.isRunning
+      ? this.gameplayTuning.runSpeedMultiplier * (needsMovement?.runningSpeedMultiplier ?? 1)
+      : 1;
   }
 
   createPersistence() {
@@ -622,6 +656,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   saveSession() {
+    if (this.needsRuntime?.shouldSuppressPersistence?.()) return { status: "debug-skipped" };
     const result = this.sessionPersistence?.save(this.sessionState);
     if (result?.status === "error") console.warn("Session save failed", result.diagnostic);
     return result;
@@ -655,7 +690,14 @@ class WorldScene extends Phaser.Scene {
         this.syncPlayerEnergyTarget();
         this.gameHud?.render?.();
       },
-      onRefillEnergy: () => { refillEnergy(this.sessionState); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.saveSession(); },
+      onRefillEnergy: () => { refillEnergy(this.sessionState); this.needsFlowRuntime?.reset(needMeterValues(this.sessionState.gameplay)); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.saveSession(); },
+      onSetNeedsDebugPreset: (preset) => {
+        if (preset === "clear") this.needsRuntime?.clearDebugPreset?.();
+        else this.needsRuntime?.setDebugPreset?.(preset);
+        this.needsFlowRuntime?.reset(needMeterValues(this.sessionState.gameplay));
+        this.syncPlayerEnergyTarget();
+        this.gameHud?.render?.();
+      },
       onAddCookedDish: () => {
         const result = addInventoryItem(this.sessionState.gameplay.inventory, createInventoryItem("fried-potato-dish", 1));
         if (result.mutated) this.gameHud?.notifyInventoryGain?.(result);
@@ -882,7 +924,7 @@ class WorldScene extends Phaser.Scene {
       gameContainer: this.gameContainer,
       audioSettings: this.audioSettings,
       isCoarsePointer: () => this.isCoarsePointer(),
-      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, timeScale: this.simulationScale, selectedTimeScale: this.playerTimeScale, energyFlow: this.getEnergyFlow(), needsFlow: this.needsFlow }),
+      getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, timeScale: this.simulationScale, selectedTimeScale: this.playerTimeScale, energyFlow: this.getEnergyFlow(), needsFlow: this.getNeedsHudFlow() }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(), onTimeScaleChange: (scale) => { if (scale > 1) this.audioRuntime?.playEffect?.("time-speed-up"); else if (scale === 1 && this.playerTimeScale !== 1) this.audioRuntime?.playEffect?.("time-speed-normal"); this.playerTimeScale = scale; }, onDroppedItemCollision: (item, collider) => this.farmingRuntime?.handleDroppedItemCollision?.(item, collider), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
       onCoinDrop: (pointerWorld) => this.tavernServiceRuntime?.dropWalletCoin?.({
         position: this.playerCharacter?.motor?.position,
@@ -916,6 +958,8 @@ class WorldScene extends Phaser.Scene {
       spawnHarvestDrops: (itemId, quantity, origin) => this.gameHud?.spawnWorldItems?.(itemId, quantity, origin),
       isModalActive: () => Boolean(this.merchantRuntime?.isActive?.()
         || this.cookingRuntime?.isActive?.() || this.buildMode?.isActive?.() || this.gameHudConfirmationActive),
+      canPerformPhysicalAction: (toolId) => this.needsRuntime?.canPerformPhysicalAction?.(toolId) ?? { allowed: true, cost: 0 },
+      recordPhysicalAction: (toolId) => this.needsRuntime?.recordPhysicalAction?.(toolId),
       onPersistentMutation: () => { this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); }, playEffect: (type) => this.audioRuntime?.playEffect?.(type),
     });
   }
@@ -973,6 +1017,8 @@ class WorldScene extends Phaser.Scene {
       getControllerMoveDirection: () => this.getControllerMoveDirection(),
       playEffect: (type) => this.audioRuntime?.playEffect?.(type),
       damageLog: (resourceId, multiplier) => this.debrisRuntime?.damageLog?.(resourceId, multiplier),
+      canPerformPhysicalAction: (weaponId) => this.needsRuntime?.canPerformPhysicalAction?.(weaponId) ?? { allowed: true, cost: 0 },
+      recordPhysicalAction: (weaponId) => this.needsRuntime?.recordPhysicalAction?.(weaponId),
       isSuppressed: () => Boolean(
         this.sleeping
         || this.optionsOpen
@@ -980,6 +1026,7 @@ class WorldScene extends Phaser.Scene {
         || this.buildMode?.isActive?.()
         || this.cookingRuntime?.isActive?.()
         || this.facilityRuntime?.isUsing?.()
+        || this.needsInteractionCoordinator?.isLocked?.()
         || this.interactionRuntime?.isDialogueActive?.()
         || this.merchantRuntime?.isActive?.()
       ),
@@ -2472,14 +2519,14 @@ class WorldScene extends Phaser.Scene {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
+    this.interactionRuntime?.destroy();
+    this.interactionRuntime = null;
     this.destroyLocationLifecycle();
     this.worldLocationCoordinator?.destroy?.();
     this.worldLocationCoordinator = null;
     this.cameraRuntime?.destroy();
     this.cameraRuntime = null;
     this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
-    this.interactionRuntime?.destroy();
-    this.interactionRuntime = null;
     this.interactionHud?.destroy();
     this.interactionHud = null;
     this.movementDebugPanel?.destroy();
@@ -2526,13 +2573,12 @@ class WorldScene extends Phaser.Scene {
     this.e2eBridge = null;
   }
 
-  startSleeping({ exhausted = false, bedId = null } = {}) {
+  startSleeping({ exhausted = false, bedId = null, presentationHandled = false } = {}) {
     this.sleeping = true;
     this.exhaustedSleeping = exhausted;
     this.simulationScale = this.getSleepTimeScale();
     this.timeScale = this.simulationScale;
     const player = this.characterSystem.require(this.sessionState.playerId);
-    this.sleepOrigin = { ...player.motor.position };
     if (exhausted) {
       player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
       player.visual.setPresentationPose({ x: player.motor.position.x, y: player.motor.position.y - 4, facing: "up", angle: -90, showSleepMarker: true });
@@ -2540,7 +2586,7 @@ class WorldScene extends Phaser.Scene {
       const bed = this.debrisRuntime?.getBedDefinition?.(bedId) ?? BED_OBJECT;
       this.sleepingBedId = bed.id;
       player.motor.movement = createMovementState({ facing: { x: -1, y: 0 } });
-      player.visual.setPresentationPose({ x: bed.position.x, y: bed.position.y - 1, facing: "right", angle: -90, showSleepMarker: true });
+      if (!presentationHandled) player.visual.setPresentationPose({ x: bed.position.x, y: bed.position.y - 1, facing: "right", angle: -90, showSleepMarker: true });
     }
     this.debrisRuntime?.setSleeping(true, this.sleepingBedId);
     this.syncLowEnergyMarker();
@@ -2548,16 +2594,13 @@ class WorldScene extends Phaser.Scene {
     this.gameHud?.render?.();
   }
 
-  wakeUp() {
-    const wasExhausted = this.exhaustedSleeping;
+  wakeUp({ presentationHandled = false } = {}) {
     this.sleeping = false;
     this.exhaustedSleeping = false;
     this.simulationScale = this.playerTimeScale = 1;
     this.timeScale = 1;
     const player = this.characterSystem.require(this.sessionState.playerId);
-    player.visual.setPresentationPose(null);
-    if (!wasExhausted && this.sleepOrigin) player.motor.position = { ...this.sleepOrigin };
-    this.sleepOrigin = null;
+    if (!presentationHandled) player.visual.setPresentationPose(null);
     player.motor.movement = createMovementState({ facing: { x: 0, y: 1 } });
     this.debrisRuntime?.setSleeping(false);
     this.sleepingBedId = null;
@@ -2574,32 +2617,24 @@ class WorldScene extends Phaser.Scene {
     advanceGameTime(this.sessionState, realSeconds, this.simulationScale);
     this.farmingRuntime?.advanceTo?.(this.sessionState.gameplay.worldTimeSeconds);
     const activity = this.getNeedsActivityContext();
-    this.needsFlow = applyNeedsUpdate(this.sessionState.gameplay.needs, realSeconds, activity, this.gameplayTuning.needs);
+    const needsSnapshot = this.needsRuntime.update({
+      realSeconds,
+      simulationScale: this.simulationScale,
+      sleeping: this.sleeping,
+      collapsed: this.exhaustedSleeping,
+      protectedNeed: this.needsInteractionCoordinator?.getProtectedNeed?.() ?? null,
+      activity,
+    });
+    this.needsFlow = needsSnapshot.flow;
     const activeFacility = this.facilityRuntime?.getActiveType?.();
     if ((activeFacility === "shower" && this.sessionState.gameplay.needs.lustre >= 100)
       || (activeFacility === "toilet" && this.sessionState.gameplay.needs.toilet >= 100)
       || (activeFacility === "table" && this.sessionState.gameplay.needs.satiety >= 100)) {
-      this.facilityRuntime.stop();
-      this.syncFacilityPresentationPose();
-      this.interactionRuntime?.refresh?.();
-    }
-    if (this.sleeping) {
-      const gameHours = realSeconds * this.simulationScale * (86400 / this.gameplayTuning.realSecondsPerGameDay) / 3600;
-      regenerateEnergy(this.sessionState, { amount: this.getSleepEnergyPerGameHour() * gameHours });
-      if (this.sessionState.gameplay.currentEnergy >= this.sessionState.gameplay.maximumEnergy) this.wakeUp();
-    } else {
-      if (this.sessionState.gameplay.currentEnergy <= 0) {
-        this.startSleeping({ exhausted: true });
-      } else {
-        const flow = this.getEnergyFlow();
-        if (flow.direction === "up") {
-          regenerateEnergy(this.sessionState, { amount: this.gameplayTuning.lowEnergyIdleRegenPerSecond * realSeconds });
-        } else drainAwakeEnergy(this.sessionState, { amount: this.getAwakeDrainAmount(flow) * realSeconds });
-        if (this.sessionState.gameplay.currentEnergy <= 0) this.startSleeping({ exhausted: true });
-      }
+      this.needsInteractionCoordinator.exit();
     }
     this.syncPlayerEnergyTarget();
     this.updateDayNightLighting?.();
+    this.needsFlowRuntime?.advance(needMeterValues(this.sessionState.gameplay), deltaMs);
     this.gameHud?.render?.();
     this.autosaveAccumulatorSeconds = (this.autosaveAccumulatorSeconds ?? 0) + realSeconds;
     if (this.autosaveAccumulatorSeconds >= 1) {
@@ -2612,6 +2647,7 @@ class WorldScene extends Phaser.Scene {
     this.sampleFrameActions();
     this.meleeRuntime?.handleActions?.(this.frameActions);
     const realDeltaMs = delta;
+    this.needsInteractionCoordinator?.update(realDeltaMs);
     this.updateGameplayTime(realDeltaMs);
     this.cookingRuntime?.update?.(realDeltaMs);
     let worldDeltaMs = realDeltaMs * (this.simulationScale ?? 1);
@@ -2625,7 +2661,6 @@ class WorldScene extends Phaser.Scene {
       worldDeltaMs -= substepMs;
     }
     this.worldLocationCoordinator?.update?.();
-    this.syncFacilityPresentationPose();
     this.cameraRuntime?.update({
       presentationPosition: this.getPlayerCameraPosition(),
       speed: this.playerCharacter?.speed ?? 0,
@@ -2660,7 +2695,8 @@ class WorldScene extends Phaser.Scene {
     const actionIds = [keyboardPressed || mobilePressed ? "space" : null, pointerActionId, shiftPressed ? "shift" : null].filter(Boolean);
     this.frameMeleeItem = resolveMeleeActionItem(actionIds, (actionId) => this.gameHud?.getCombatActionItem?.(actionId));
     const shiftMeleeEquipped = isMeleeWeaponId(this.gameHud?.getCombatActionItem?.("shift")?.id);
-    const nextRunning = Boolean((this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()) && !this.sleeping; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
+    const runningAllowed = this.needsRuntime?.movementState?.().runningAllowed ?? true;
+    const nextRunning = Boolean((this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()) && !this.sleeping && !this.needsInteractionCoordinator?.isLocked?.() && runningAllowed; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
     this.syncPlayerEnergyTarget();
     this.syncLowEnergyMarker();
     this.frameActions = Object.freeze({
@@ -2678,11 +2714,6 @@ class WorldScene extends Phaser.Scene {
   }
 
   getInteractionCooldownProgress(nowMs = globalThis.performance?.now?.() ?? Date.now()) {
-    if (this.exhaustedSleeping) {
-      const durationMs = this.gameplayTuning.exhaustionWakeCooldownSeconds * 1000;
-      if (!(durationMs > 0) || !Number.isFinite(this.lastWakeAttemptAtMs)) return 0;
-      return Math.max(0, Math.min(1, 1 - (nowMs - this.lastWakeAttemptAtMs) / durationMs));
-    }
     return this.getHitCooldownProgress(nowMs);
   }
 
@@ -2690,20 +2721,16 @@ class WorldScene extends Phaser.Scene {
     return this.gameplayTuning.sleepTimeScale * (this.exhaustedSleeping ? this.gameplayTuning.exhaustionSleepScaleMultiplier : 1);
   }
 
-  getSleepEnergyPerGameHour() {
-    return this.gameplayTuning.sleepEnergyPerGameHour / (this.exhaustedSleeping ? 6 : 1);
-  }
-
   getEnergyFlow() {
     const gameplay = this.sessionState?.gameplay;
-    const player = this.playerCharacter?.motor;
-    if (!gameplay || !player) return null;
-    if (this.sleeping) return { direction: "up", arrows: 1 };
-    const isMoving = this.e2eEnergyMotion?.moving ?? (player.speed >= player.movementConfig.movingSpeedThreshold);
-    const fraction = gameplay.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
-    if (!isMoving && fraction < 0.15) return { direction: "up", arrows: 1 };
-    if (!isMoving) return { direction: "down", arrows: 1 };
-    return { direction: "down", arrows: (this.e2eEnergyMotion?.running ?? this.isRunning) ? 3 : 2 };
+    return gameplay ? this.needsFlowRuntime?.observe(needMeterValues(gameplay)).energy ?? null : null;
+  }
+
+  getNeedsHudFlow() {
+    const gameplay = this.sessionState?.gameplay;
+    if (!gameplay) return null;
+    const { energy, ...needsFlow } = this.needsFlowRuntime?.observe(needMeterValues(gameplay)) ?? {};
+    return needsFlow;
   }
 
   getNeedsActivityContext(nowMs = globalThis.performance?.now?.() ?? Date.now()) {
@@ -2722,9 +2749,13 @@ class WorldScene extends Phaser.Scene {
     }));
     return {
       facility: this.facilityRuntime?.getActiveType?.() ?? null,
+      moving,
       running,
       activeResourceKind: resourceKind,
+      activePhysicalTool: this.needsRuntime?.getState?.().activePhysicalTool,
       npcNearby,
+      sharedRest: Boolean(npcNearby && (this.facilityRuntime?.getActiveType?.() === "table" || this.sleeping)),
+      physicalAction: resourceActive,
     };
   }
 
@@ -2732,21 +2763,6 @@ class WorldScene extends Phaser.Scene {
     const gameplay = this.sessionState?.gameplay;
     const fraction = gameplay?.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
     this.playerCharacter?.visual?.setLowEnergyMarker?.(!this.sleeping && fraction > 0 && fraction < 0.1);
-  }
-
-  getAwakeDrainAmount(flow = this.getEnergyFlow()) {
-    if (flow?.arrows >= 3) return this.gameplayTuning.awakeRunDrainAmount;
-    if (flow?.arrows === 2) return this.gameplayTuning.awakeWalkDrainAmount;
-    return this.gameplayTuning.awakeDrainAmount;
-  }
-
-  getExhaustionWakeInteraction() {
-    const position = this.playerCharacter?.motor?.position ?? { x: 0, y: 0 };
-    return {
-      id: "wake-exhausted-player", entityId: "wake-exhausted-player", roomId: "world", kind: "wake-exhausted",
-      position: { x: position.x, y: position.y }, radius: 24, priority: 100, requiresFacing: false, facingDotThreshold: -1,
-      prompt: "hud:interaction.wake", payload: {},
-    };
   }
 
   getSleepingWakeInteraction() {
@@ -2762,25 +2778,10 @@ class WorldScene extends Phaser.Scene {
     };
   }
 
-  getWakeProbability() {
-    const gameplay = this.sessionState.gameplay;
-    const fraction = gameplay.maximumEnergy > 0 ? gameplay.currentEnergy / gameplay.maximumEnergy : 0;
-    if (fraction < 0.05) return 0.1;
-    if (fraction < 0.1) return 0.66;
-    return fraction > 0.25 ? 1 : 0.66;
-  }
-
-  tryWakeFromExhaustion(random = Math.random) {
+  tryWakeFromExhaustion() {
     if (!this.exhaustedSleeping) return { status: "ignored", mutated: false };
-    const nowMs = globalThis.performance?.now?.() ?? Date.now();
-    if (nowMs - this.lastWakeAttemptAtMs < this.gameplayTuning.exhaustionWakeCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
-    this.lastWakeAttemptAtMs = nowMs;
-    if (random() < this.getWakeProbability()) {
-      this.wakeUp();
-      return { status: "awake", mutated: true };
-    }
     this.gameHud?.showTransientMessage?.("hud:interaction.wakeFailed");
-    return { status: "wake-failed", mutated: false, transientMessageShown: true };
+    return { status: "collapse-locked", mutated: false, transientMessageShown: true };
   }
 
   createDayNightRuntime() {
@@ -2803,9 +2804,11 @@ class WorldScene extends Phaser.Scene {
 
   getControllerMoveDirection() {
     if (this.pivotEditEnabled) return { x: 0, y: 0 };
+    const approachDirection = this.needsInteractionCoordinator?.getMovementDirection?.();
+    if (approachDirection) return approachDirection;
     if (isPlayerMovementSuppressed({
       sleeping: this.sleeping,
-      facilityActive: this.facilityRuntime?.isUsing(),
+      facilityActive: this.facilityRuntime?.isUsing() || this.needsInteractionCoordinator?.isLocked?.(),
       dialogueActive: this.interactionRuntime?.isDialogueActive() || this.merchantRuntime?.isActive?.(),
       cookingActive: this.cookingRuntime?.isActive?.(),
     })) return { x: 0, y: 0 };

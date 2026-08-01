@@ -104,6 +104,8 @@ const plantObject = {
 const definition = createPlantedTreeDefinition(plantObject);
 assert.equal(definition.profileId, PLANTED_TREE_PROFILE_ID);
 assert.deepEqual(definition.position, { x: 56, y: 104 });
+assert.equal(definition.targetingMode, "facing-first");
+assert.equal(definition.targetingGroup, "extractable");
 
 const sessionState = {
   gameplay: {
@@ -113,10 +115,13 @@ const sessionState = {
   },
 };
 let result = null;
+assert.equal(applyPlantedTreeWork(sessionState, definition, { toolId: "pickaxe" }).status, "wrong-tool", "a pickaxe cannot work an authored tree");
+assert.equal(sessionState.gameplay.currentEnergy, 100, "a rejected tool does not spend energy");
 for (let hit = 0; hit < 7; hit += 1) {
   result = applyPlantedTreeWork(sessionState, definition, {
     damage: 1,
-    energyPerHit: 0.5,
+    energyPerHit: 0.2,
+    toolId: "axe",
     tuning: { smallLogChopHp: 7 },
   });
 }
@@ -124,7 +129,7 @@ assert.equal(result.status, "cleared");
 assert.deepEqual(result.reward, { resource: "wood", amount: 5 });
 assert.equal(getInventoryQuantity(sessionState.gameplay.inventory, "wood"), 5, "a planted tree yields exactly five inventory wood");
 assert.equal(result.inventory?.mutated, true);
-assert.equal(sessionState.gameplay.currentEnergy, 96.5);
+assert(Math.abs(sessionState.gameplay.currentEnergy - 98.6) < 1e-9, "seven authored axe hits spend the canonical 1.4 E");
 assert.equal(getResourceProfile(PLANTED_TREE_PROFILE_ID).kind, "plant");
 
 const colliderEntry = {

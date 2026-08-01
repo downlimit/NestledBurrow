@@ -1,5 +1,6 @@
 import { clampVectorLength } from "./input.js";
 import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "./movementConfig.js";
+import { energyMovementMultiplier } from "./needsDomain.js";
 
 const ZERO_VECTOR = Object.freeze({ x: 0, y: 0 });
 export const ENERGY_SPEED_MULTIPLIER_RATE = 1.5;
@@ -7,14 +8,8 @@ export const ENERGY_SPEED_MULTIPLIER_RATE = 1.5;
 export function energyTargetSpeedMultiplier(currentEnergy, maximumEnergy, minimumMultiplier = 0.25) {
   const maximum = Number(maximumEnergy);
   const current = Number(currentEnergy);
-  const fraction = maximum > 0 && Number.isFinite(current)
-    ? Math.min(1, Math.max(0, current / maximum))
-    : 0;
-  if (fraction >= 0.25) return 1;
-  const minimum = Math.min(1, Math.max(0.05, Number(minimumMultiplier) || 0.25));
-  if (fraction <= 0.01) return minimum;
-  const x = Math.min(1, Math.max(0, (fraction - 0.01) / 0.24));
-  return minimum + (1 - minimum) * (1 - (1 - x) ** 2);
+  const normalized = maximum > 0 && Number.isFinite(current) ? current / maximum * 100 : 0;
+  return energyMovementMultiplier(normalized) || Math.min(1, Math.max(0.05, Number(minimumMultiplier) || 0.55));
 }
 
 export function stepSpeedMultiplier(current, target, deltaMs, rate = ENERGY_SPEED_MULTIPLIER_RATE) {

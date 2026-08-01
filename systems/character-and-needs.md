@@ -2,125 +2,95 @@
 
 ## Purpose
 
-Owns movement, time, sleep, energy and six continuous needs.
+Owns movement, time, sleep, energy and continuous `0..100` needs. HUD order is fixed: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure and preserve normal function; they never create a broad passive bonus stack.
 
-## Player contract
+## Time, energy and satiety
 
-All needs use `0..100` (higher is better) and HUD order `N/E/S/T/L/D`:
+One hour is `60` real seconds. Waking E: ordinary `5/hour`, walking `5.5`, running `8`. Base actions: axe `0.2`, pickaxe `0.3`, hoe `0.15`, watering `0.1`, sword `0.75`, battle axe `0.1`.
 
-| Symbol | ID | Meaning |
-|---|---|---|
-| N | novelty | engagement and relief from repetition |
-| E | energy | physical capacity and wakefulness |
-| S | satiety | nutrition supporting effort/recovery |
-| T | toilet | physiological freedom; `0` causes an accident |
-| L | lustre | cleanliness, comfort, presentability |
-| D | dialogue | meaningful social fulfilment |
+Targets: `20h` near-idle, `16..18h` normal, `14..16h` heavy. Proofs: `10h ordinary + 6h walk + 1h run + 40 axe = 99 E`; `7h ordinary + 7h walk + 2h run + 50 uses at 0.25 = 102 E`.
 
-## Energy day target
-
-Rates are points per game hour; one game hour is `60` real seconds.
-
-| Current activity | Total E rate |
-|---|---:|
-| ordinary awake activity, waiting, conversation, cooking | `−5/hour` |
-| walking | `−5.5/hour` |
-| running | `−8/hour` |
-
-Tool work adds a discrete cost while the activity rate continues:
-
-| Use | Extra E |
-|---|---:|
-| axe / pickaxe | `−0.2 / −0.3` |
-| hoe / watering | `−0.15 / −0.1` |
-
-Targets from full E: about `20h` near-idle, `16–18h` normal day, `14–16h` heavy expedition. Scenarios: `10h ordinary + 6h walk + 1h run + 40 axe-like uses = 99 E`; `7h ordinary + 7h walk + 2h run + 50 uses averaging 0.25 E = 102 E`.
-
-Other rates: `S −7/hour`, `T −6/hour`, `L −1/hour`, `N −1/hour`, `D −2/hour` while awake without friendly company.
+Other waking rates are `S -7/hour`, `T -6/hour`, `N -1/hour`, `D -2/hour` without friendly company, plus the activity-dependent L rates below.
 
 ```text
-pressure(X,q) = clamp((q − X) / q, 0, 1)
-```
-
-## Energy and satiety
-
-```text
+pressure(X,q) = clamp((q - X) / q, 0, 1)
 hunger = pressure(S,30)
-hourly E spend = 5 + activity surcharge × (1 + 0.5 × hunger)
-tool E cost = base tool cost × (1 + 0.5 × hunger)
-E recovery multiplier = 1 − 0.4 × hunger
+urgency = T<=25 ? 1.25 : 1
+hourly E spend = 5 + activity surcharge * (1 + 0.5 * hunger)
+physical cost = base * (1 + 0.5 * hunger) * urgency * repetition
+E recovery multiplier = 1 - 0.4 * hunger
 ```
 
-Surcharges: `0` ordinary, `0.5` walking, `3` running. Hunger never multiplies the fixed `5 E/hour`; at `S=0`, walking is `5.75/hour`, running `9.5/hour`, tool costs `1.5×`, recovery `0.6×`. Food mainly restores S; meals may also restore E.
+Activity surcharge: ordinary `0`, walking `0.5`, running `3`. Hunger starts below `S=30` and scales linearly: at `S=15`, load/actions use `1.25x`, recovery `0.8x`; at `S=0`, `1.5x/0.6x`. The fixed base stays `5 E/hour`, making `S=0` totals `5/5.75/9.5`.
 
-No normal awake auto-regeneration. Anti-softlock only: at `E<15`, after `3` real seconds stationary/inactive and with `S>0`, catch-breath restores `1 E/real second` up to `15`.
-
-Sleep restores `14 E/game hour × recovery multiplier`. At `E=0`, collapse accelerates time until at least two game hours pass and E reaches `25`; other needs keep changing. Wake-up is deterministic.
+No normal awake regeneration exists. Catch-breath applies at `E<15` after three real seconds inactive with `S>0`: `+1 E/real second` up to `15`. Sleep restores `14 E/game hour * recovery multiplier`. At `E=0`, one collapse lasts at least two game hours and until E reaches `25`; other needs continue.
 
 ```text
-E≥30: speed 1.00
-10≤E<30: 0.80 + 0.20×(E−10)/20
-0<E<10: 0.60 + 0.20×E/10
+E>=30: speed 1
+10<=E<30: 0.80 + 0.20*(E-10)/20
+0<E<10: 0.60 + 0.20*E/10
 E=0: collapse
 ```
 
-Running is unavailable below `20 E`. Low E changes options, not tool yield.
+Running is unavailable below `20 E`.
 
-## Toilet and lustre
+## Toilet, lustre and movement
 
-- `T≥25`: no movement effect.
-- `10≤T<25`: hurried walk `1.05×`; running costs `1.25× E`; long actions cannot start below `20 T`.
-- `0<T<10`: speed falls `1.05→0.85`; running is unavailable.
-- `T=0`: set `T=70`, apply `−45 L`, `−20 N`, and `−15 D` if witnessed; add a local scent consequence.
+- `T>25`: no modifier; at `0<=T<=25`, walk is `1x`, run speed `1.15x`, run E surcharge `1.25x`.
+- T never slows movement or blocks running.
+- Long actions cannot start below `20 T`.
+- `T=0` for `10` game minutes starts one unskippable accident: three `750 ms` shakes, then puddle/scent hooks and `-20 N`/witnessed `-15 D`. During the final `2 s`, `T` rises `0->70` while L falls by `45`; control then returns.
 
-Facilities resolve T without losing L. Improvised relief restores T but costs L and may affect animals. Drinks/juicy meals use explicit T costs.
+| Activity | Total L loss/hour |
+|---|---:|
+| idle, walking, conversation, cooking | 1 |
+| running | 2 |
+| watering | 1.5 |
+| axe/logging | 3 |
+| hoe/soil | 3 |
+| pickaxe/mining | 4 |
+
+Resource work has priority over running; the same frame never stacks both. Tool hits have no discrete L cost. Future world events may use the explicit discrete-L domain hook.
+HUD arrows use actual N/E/S/T/L/D deltas through `660 ms`; normalization and pulse timing follow the presentation contract.
 
 ```text
-lustre pressure = pressure(L,25)
-speed multiplier = 1 − 0.12 × pressure
-novelty drain multiplier = 1 + 0.5 × pressure
+lustre speed = 1 - 0.50 * pressure(L,33)
+novelty drain multiplier = 1 + 0.5 * pressure(L,33)
 ```
 
-Low L is discomfort, not moral failure. Washing may remove useful camouflage or scent. Combined conscious movement multiplier from E/T/L is clamped to `0.55`.
+Below `L=33`, pressure grows linearly; at zero, speed is `0.5x` and N drain `1.5x`. E/L compose with a `0.5..1` clamp; T applies only to running.
 
 ## Novelty and dialogue
 
-After the third consecutive same labour action:
+After three same physical actions, repeats cost `1 N` and set `repetition = 1 + 0.3 * pressure(N,30)`. Activity change resets. Accepted melee actions spend E even on a miss and are blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
 
-```text
-energy action cost multiplier = 1 + 0.3 × pressure(N,30)
-```
+NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may restore D/E. Solo-rest E multiplier is `1 - 0.25 * pressure(D,30)`; D pressure multiplies novelty drain up to `1.25`.
 
-Each further repeat also costs `1 N`. New arena, changed activity or event response resets repetition. Gains: new arena `+6 N`, discovery/event `+8..15`, leisure `+10..25`. Low N discourages repetition without taking control away.
+## Long interaction timeline
 
-```text
-solo-rest E recovery multiplier = 1 − 0.25 × pressure(D,30)
-novelty drain multiplier *= 1 + 0.25 × pressure(D,30)
-```
+Long uses follow `approach -> enter -> active -> exit -> free`. Walls block both the route and final reach; a 1x1 object has eight perimeter points. The nearest route drains ordinary. Enter/exit affect only pose, preserve motor, and activate the effect only in active.
 
-Friendly proximity pauses D loss. Meaningful conversation restores `15..30 D`; shared rest may restore D+E. Low D makes social opportunities more valuable but does not reduce damage or movement.
+| Profile | Protected | Enter | Exit | Emergency |
+|---|---|---:|---:|---:|
+| shower | L | 700 ms | 900 ms | 400 ms |
+| toilet | T | 500 ms | 600 ms | 300 ms |
+| table/eating | S | 500 ms | 650 ms | 300 ms |
+| bed/sleep | E | 1000 ms | 1200 ms | 500 ms |
 
-## High-state policy
-
-`S>30` permits normal E spend/recovery. High N/L/D remove pressure and may satisfy contextual checks, but do not globally accelerate other meters. Useful conversion belongs to visible actions: camp, meal, washing and exploration.
+The target need is protected enter through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
 
 ## Invariants
 
-- values stay framework-free, JSON-safe and `0..100`;
-- time-based activity drain and discrete action costs are additive;
-- consequences belong to domain/runtime owners, not HUD;
-- event-specific effects have visible world causes;
-- high needs never form a broad passive bonus stack;
-- camera/presentation never rewrites safe motor position.
+- formulas stay deterministic, framework-free and JSON-safe;
+- time drain and discrete costs are additive;
+- event consequences have visible world causes and reusable outputs;
+- camera/presentation never rewrites safe motor position;
+- gameplay save excludes debug presets and interaction timeline state.
 
 ## Current baseline
 
-Movement, running energy, sleep/wake, continuous time and all six needs exist.
+`needsDomain.js` owns formulas; `needsRuntime.js` coordinates; `needsFlowRuntime.js` measures HUD deltas. Timeline/coordinator own long-use phases and protection; approach owns reachable points; `main.js` composes.
 
 ## Evidence
 
-`check:input`, `check:mobile-camera`, `check:movement`, `check:character`, `check:needs`, `check:clock-cycle`; browser E2E for movement/sleep paths.
-
-## Not fixed
-
-Food catalogue, combat costs, long-term rate upgrades, final feedback and post-playtest tuning.
+`check:needs`, `check:task-061`, `check:interaction`; focused browser E2E.

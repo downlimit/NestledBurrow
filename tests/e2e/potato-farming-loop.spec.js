@@ -48,13 +48,13 @@ async function faceFarmCell(page) {
     facing: { x: 1, y: 0 },
   });
   const selectedItem = (await bridge(page, "getFarmingState")).selectedItem;
-  await page.keyboard.down("KeyD");
   if (["hoe", "axe", "water-bucket"].includes(selectedItem)) {
+    await page.keyboard.down("KeyD");
     await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 1, y: 0 });
+    await page.keyboard.up("KeyD");
   } else {
     await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
   }
-  await page.keyboard.up("KeyD");
 }
 
 function inventoryQuantity(session, itemId) {
@@ -176,8 +176,8 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await faceFarmCell(page);
   await page.keyboard.down("KeyA");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: -1, y: 0 });
-  const leftFacingTarget = (await bridge(page, "getFarmingState")).targetCell;
-  expect(leftFacingTarget).toEqual({ x: FARM_CELL.x - 32, y: FARM_CELL.y });
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell)
+    .toEqual({ x: FARM_CELL.x - 32, y: FARM_CELL.y });
   await page.keyboard.up("KeyA");
   await page.keyboard.down("KeyW");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 0, y: -1 });
@@ -216,7 +216,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.type).toBe("potato");
 
   await bridge(page, "selectInventorySlot", 3);
-  await bridge(page, "placePlayerAt", { x: 430, y: 504, facing: { x: 1, y: 0 } });
+  await placeNear(page, "farm-well-1");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-refill-water-bucket");
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.waterBucket.currentWater).toBe(8);
@@ -242,6 +242,8 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.mature).toBe(true);
   await bridge(page, "setEnergy", 100);
   await bridge(page, "wakeUp");
+  await expect.poll(async () => (await bridge(page, "getRuntimeState")).sleeping).toBe(false);
+  await bridge(page, "selectInventorySlot", seedSlot);
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-harvest");
   await page.waitForTimeout(100);

@@ -15,7 +15,7 @@
 - session save JSON-safe и versioned;
 - developer authoring отделён от gameplay save;
 - HUD, camera, audio и build UI имеют lifecycle owners;
-- interaction selection остаётся детерминированным контрактом.
+- interaction selection остаётся детерминированным контрактом; collision-valid use position и visual aim position разделены, а общая extractable-группа ресурсов и растений ранжируется по направлению взгляда до локальной дистанции.
 - `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle.
 - Повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены.
 
@@ -57,6 +57,8 @@
 ### Facilities и presentation
 
 Facility runtime владеет объектом, collider и use lifecycle. Presentation pose не мутирует безопасную motor position. Camera получает presentation target через явный adapter. Sleep/wake и interaction candidate остаются отдельными контрактами.
+
+`InteractionApproachResolver` owns collision-valid perimeter use points and bounded route selection for every interaction candidate. `InteractionTimelineRuntime` owns transient enter/active/exit phases and pose interpolation. `ToiletAccidentTimelineRuntime` owns the unskippable shake/recovery sequence and puddle hook. `NeedsInteractionCoordinator` binds these phases to facility, sleep and protected-need outputs. `NeedsFlowRuntime` measures actual N/E/S/T/L/D value deltas for HUD direction and tier without action labels. These owners are not serialized; `WorldScene` only constructs them, delegates update and routes callbacks.
 
 ### Локации мира
 

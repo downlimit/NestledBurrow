@@ -19,6 +19,7 @@ import {
 } from "./farmingDomain.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { TILE_SIZE } from "./worldConfig.js";
+import { EXTRACTABLE_TARGETING_GROUP } from "./resourceConfig.js";
 
 const CROP_DEPTH_ANCHOR = Object.freeze({ x: 8, y: 14 });
 
@@ -28,6 +29,8 @@ export function createFarmingRuntime(scene, {
   getSelectedItem = () => null,
   spawnHarvestDrops = () => {},
   isModalActive = () => false,
+  canPerformPhysicalAction = () => ({ allowed: true, cost: 0 }),
+  recordPhysicalAction = () => ({ status: "unchanged" }),
   onPersistentMutation = () => {},
   playEffect = () => {},
   rng = Math.random,
@@ -105,6 +108,7 @@ export function createFarmingRuntime(scene, {
   }
 
   function definition(prefix, kind, point, prompt, priority) {
+    const extractable = [FARMING_INTERACTION_KINDS.harvest, FARMING_INTERACTION_KINDS.clearRotten, FARMING_INTERACTION_KINDS.axeCell].includes(kind);
     return {
       id: `${prefix}-${farmCellKey(point)}`,
       entityId: `farm-cell-${farmCellKey(point)}`,
@@ -114,6 +118,8 @@ export function createFarmingRuntime(scene, {
       priority,
       requiresFacing: false,
       facingDotThreshold: -1,
+      targetingMode: extractable ? "facing-first" : "priority-distance",
+      targetingGroup: extractable ? EXTRACTABLE_TARGETING_GROUP : null,
       prompt,
       payload: { x: point.x, y: point.y },
     };
@@ -162,6 +168,10 @@ export function createFarmingRuntime(scene, {
   function handleInteraction(candidate) {
     const point = { x: Number(candidate.payload?.x), y: Number(candidate.payload?.y) };
     const hadCrop = Boolean(findSoilCell(farm, point)?.crop);
+    const physicalTool = physicalToolForInteraction(candidate.kind);
+    if (physicalTool && !canPerformPhysicalAction(physicalTool).allowed) {
+      return { status: "insufficient-energy", mutated: false };
+    }
     let result;
     if (candidate.kind === FARMING_INTERACTION_KINDS.till || candidate.kind === FARMING_INTERACTION_KINDS.clearRotten) {
       result = tillSoil(farm, point, { valid: isTillingValid(point) });
@@ -186,6 +196,7 @@ export function createFarmingRuntime(scene, {
       return { status: "ignored", mutated: false };
     }
     if (result.mutated) {
+      if (physicalTool) recordPhysicalAction(physicalTool);
       if (candidate.kind === FARMING_INTERACTION_KINDS.till
         || candidate.kind === FARMING_INTERACTION_KINDS.clearRotten) playEffect("hoe-use");
       if (candidate.kind === FARMING_INTERACTION_KINDS.plant) playEffect("plant-seed");
@@ -290,6 +301,13 @@ export function createFarmingRuntime(scene, {
       highlight.destroy();
     },
   };
+}
+
+function physicalToolForInteraction(kind) {
+  if (kind === FARMING_INTERACTION_KINDS.axeCell) return "axe";
+  if (kind === FARMING_INTERACTION_KINDS.till || kind === FARMING_INTERACTION_KINDS.clearRotten) return "hoe";
+  if (kind === FARMING_INTERACTION_KINDS.water) return "watering";
+  return null;
 }
 
 function facingVector(facing) {

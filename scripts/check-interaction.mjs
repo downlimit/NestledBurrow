@@ -14,7 +14,8 @@ import {
   SESSION_STATE_VERSION,
 } from "../src/gameSessionState.js";
 import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction.js";
-import { RESOURCE_OBJECTS } from "../src/resourceConfig.js";
+import { createInteractionApproachResolver, hasDirectInteractionReach, perimeterInteractionPoints } from "../src/interactionApproach.js";
+import { EXTRACTABLE_TARGETING_GROUP, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
 
 function assertPlainSerializable(value, label) {
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(value))), JSON.stringify(value), `${label} survives JSON round-trip`);
@@ -111,6 +112,8 @@ const baseTarget = createInteractionTarget({
 assert.equal(baseTarget.priority, 0, "target priority defaults to 0");
 assert.equal(baseTarget.requiresFacing, true, "target requires facing by default");
 assert.equal(baseTarget.facingDotThreshold, 0, "target facing threshold defaults to 0");
+assert.equal(baseTarget.aimPosition, undefined, "ordinary target uses its current interaction position as the implicit aim point");
+assert.equal(baseTarget.targetingMode, "priority-distance", "ordinary interactions keep priority-distance targeting");
 assert.deepEqual(createInteractionTarget({ id: "empty-payload", entityId: "npc", kind: "dialogue", position: { x: 0, y: 0 }, radius: 1, prompt: "Talk" }).payload, {}, "payload defaults to empty object");
 assert(Object.isFrozen(baseTarget), "descriptor is frozen");
 assert(Object.isFrozen(baseTarget.position), "descriptor position is frozen");
@@ -120,11 +123,13 @@ assert.throws(() => createInteractionTarget({ ...baseTarget, id: "" }), /target 
 assert.throws(() => createInteractionTarget({ ...baseTarget, entityId: "" }), /entity ID/, "entity ID validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, kind: "" }), /kind/, "kind validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, position: { x: Infinity, y: 0 } }), /position x/, "position x validates");
+assert.throws(() => createInteractionTarget({ ...baseTarget, aimPosition: { x: Infinity, y: 0 } }), /aim position x/, "aim position x validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, radius: 0 }), /radius/, "radius validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, priority: NaN }), /priority/, "priority validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, requiresFacing: "yes" }), /requiresFacing/, "requiresFacing validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, facingDotThreshold: 2 }), /facingDotThreshold/, "facing threshold validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, prompt: "" }), /prompt/, "prompt validates");
+assert.throws(() => createInteractionTarget({ ...baseTarget, targetingMode: "nearest-angle" }), /targetingMode/, "targeting mode validates");
 assert.throws(() => createInteractionTarget({ ...baseTarget, payload: [] }), /plain serializable/, "payload validates plain object");
 assert.throws(() => createInteractionTarget({ ...baseTarget, payload: { nested: new Map([["key", "value"]]) } }), /plain objects/, "nested Map payloads are rejected instead of being silently erased");
 assert.throws(() => createInteractionTarget({ ...baseTarget, payload: { createdAt: new Date() } }), /plain objects/, "nested class instances are rejected instead of changing shape");
@@ -148,9 +153,22 @@ assert.equal(findBestInteractionTarget({ ...source, id: "home-npc" }, [baseTarge
 const closeLow = createInteractionTarget({ ...baseTarget, id: "close-low", position: { x: 1, y: 0 }, priority: 0 });
 const farHigh = createInteractionTarget({ ...baseTarget, id: "far-high", position: { x: 8, y: 0 }, priority: 1 });
 assert.equal(findBestInteractionTarget(source, [closeLow, farHigh]).targetId, "far-high", "priority beats distance");
+const lookedAtResource = createInteractionTarget({
+  ...baseTarget, id: "looked-at-resource", entityId: "looked-at-resource", kind: "work-resource",
+  position: { x: 7, y: 3 }, aimPosition: { x: 12, y: 0 }, priority: 1,
+  targetingMode: "facing-first", targetingGroup: EXTRACTABLE_TARGETING_GROUP,
+});
+const closerOffAxisResource = createInteractionTarget({
+  ...baseTarget, id: "closer-off-axis-resource", entityId: "closer-off-axis-resource", kind: "work-resource",
+  position: { x: 3, y: 0 }, aimPosition: { x: 8, y: 6 }, priority: 2,
+  targetingMode: "facing-first", targetingGroup: EXTRACTABLE_TARGETING_GROUP,
+});
+assert.equal(findBestInteractionTarget(source, [closerOffAxisResource, lookedAtResource]).targetId, "looked-at-resource", "extractables rank visual aim alignment before edge distance and local priority");
 const closeSame = createInteractionTarget({ ...baseTarget, id: "close-same", position: { x: 2, y: 0 } });
 const farSame = createInteractionTarget({ ...baseTarget, id: "far-same", position: { x: 3, y: 0 } });
 assert.equal(findBestInteractionTarget(source, [farSame, closeSame]).targetId, "close-same", "distance breaks equal priority");
+const routeNear = createInteractionTarget({ ...baseTarget, id: "route-near", position: { x: 8, y: 0 }, availabilityDistance: 1 });
+assert.equal(findBestInteractionTarget(source, [closeSame, routeNear]).targetId, "route-near", "reachable route distance ranks overlapping interactions");
 const tieB = createInteractionTarget({ ...baseTarget, id: "b-target", position: { x: 4, y: 0 } });
 const tieA = createInteractionTarget({ ...baseTarget, id: "a-target", position: { x: 4, y: 0 } });
 assert.equal(findBestInteractionTarget(source, [tieB, tieA]).targetId, "a-target", "ID tie-break is deterministic");
@@ -171,6 +189,40 @@ assert.equal(findBestInteractionTarget(source, []), null, "empty target list ret
 assert.equal(findBestInteractionTarget(source, [createInteractionTarget({ ...baseTarget, id: "no-access", position: { x: -2, y: 0 } })]), null, "no accessible targets returns null");
 assertPlainSerializable(baseTarget, "interaction target");
 assertPlainSerializable(candidate, "interaction candidate");
+
+assert.equal(perimeterInteractionPoints({ left: 32, right: 48, top: 32, bottom: 48 }).length, 8, "a 1x1 object exposes eight surrounding interaction points");
+const targetCollider = { left: 48, right: 64, top: 32, bottom: 48 };
+const blockingWall = { left: 31, right: 33, top: 0, bottom: 80 };
+const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+const approachWorld = {
+  bounds: { left: 0, top: 0, right: 128, bottom: 128 },
+  cellSize: 8,
+  isBlockedCell: () => false,
+  isBlockedBox: (box) => overlaps(box, targetCollider) || overlaps(box, blockingWall),
+  getResourceCollider: () => targetCollider,
+};
+const approachResolver = createInteractionApproachResolver({ worldLayout: approachWorld, getPlayer: () => ({ footWidth: 4, footDepth: 4 }) });
+const blockedDefinition = { ...baseTarget, id: "blocked-bed", entityId: "blocked-bed", position: { x: 56, y: 40 }, radius: 26, requiresFacing: false };
+assert.equal(approachResolver.resolve(blockedDefinition, { position: { x: 24, y: 40 } }), null, "interaction route cannot cross a wall or detour beyond its radius");
+approachWorld.isBlockedBox = (box) => overlaps(box, targetCollider);
+const reachableApproach = approachResolver.resolve(blockedDefinition, { position: { x: 24, y: 40 } });
+assert(reachableApproach?.payload.approachPath.length > 0, "reachable side resolves an approach route");
+assert.deepEqual(reachableApproach.aimPosition, blockedDefinition.position, "route use point never replaces the object's visual aim point");
+const finalReachWall = { left: 44, right: 46, top: 0, bottom: 80 };
+approachWorld.isBlockedBox = (box) => overlaps(box, targetCollider) || overlaps(box, finalReachWall);
+approachWorld.getWorldObjectColliders = () => [{ id: "wall-final-reach", groupKey: "wall:vertical", rect: finalReachWall, wallEdge: { x: 45, y: 40 } }];
+assert.equal(approachResolver.resolve(blockedDefinition, { position: { x: 24, y: 40 } }), null, "reachable approach point cannot activate an object through the final wall segment");
+approachWorld.isBlockedBox = (box) => overlaps(box, targetCollider);
+approachWorld.getResourceCollider = () => null;
+approachWorld.getWorldObjectColliders = () => [{ id: "farm-well-1", rect: targetCollider }];
+const reachableWorldObject = approachResolver.resolve({ ...blockedDefinition, id: "refill-farm-well-1", entityId: "farm-well-1" }, { position: { x: 24, y: 40 } });
+assert(reachableWorldObject?.payload.approachPath.length > 0, "generic interaction routing uses the target world-object collider instead of its blocked center");
+assert(RESOURCE_OBJECTS.every((definition) => definition.targetingMode === "facing-first" && definition.targetingGroup === EXTRACTABLE_TARGETING_GROUP), "all resource and planted-resource definitions share systemic facing-first targeting");
+const directReachWorld = {
+  getWorldObjectColliders: () => [{ id: "wall-1", groupKey: "wall:vertical", rect: blockingWall, wallEdge: { x: 32, y: 40 } }],
+};
+assert.equal(hasDirectInteractionReach(directReachWorld, { x: 24, y: 40 }, { x: 48, y: 40 }, "resource"), false, "immediate extractable interaction cannot pass through a wall");
+assert.equal(hasDirectInteractionReach(directReachWorld, { x: 24, y: 40 }, { x: 24, y: 64 }, "resource"), true, "same-side extractable remains directly reachable");
 
 
 const debrisTarget = createInteractionTarget({

@@ -6,6 +6,8 @@ import { TAVERN_SIGN } from "./guestConfig.js";
 import { DEFAULT_RESOURCE_ID, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { addInventoryItem, createInventoryItem, routePickedInventoryItem } from "./inventoryDomain.js";
 import { DEFAULT_SERVING_TABLE_ID } from "./cookingDomain.js";
+import { collides } from "./movement.js";
+import { needMeterValues } from "./needsFlowRuntime.js";
 
 export function installWorldE2EBridge(scene) {
   if (!import.meta.env.VITE_E2E) return null;
@@ -131,6 +133,15 @@ export function installWorldE2EBridge(scene) {
       scene.frameActions = Object.freeze({ interact: true, primary: false, secondary: false });
       scene.interactionRuntime?.update({ actions: scene.frameActions });
     },
+    completeInteractionApproach: () => {
+      const point = scene.needsInteractionCoordinator?.getApproachPoint?.();
+      if (!point) return false;
+      const player = scene.characterSystem.require(scene.sessionState.playerId);
+      player.motor.position = { ...point };
+      player.motor.movement = createMovementState();
+      scene.needsInteractionCoordinator.update(0);
+      return true;
+    },
     expireHitCooldown: () => { scene.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; },
     getDebrisState: () => ({
       present: scene.debrisRuntime?.isPresent?.() ?? false,
@@ -193,19 +204,32 @@ export function installWorldE2EBridge(scene) {
       values: clone(scene.sessionState.gameplay.needs),
       flow: clone(scene.needsFlow ?? {}),
       activity: scene.getNeedsActivityContext(),
+      runtime: clone(scene.needsRuntime?.getState?.() ?? {}),
     }),
     setNeeds: (values) => {
       for (const [id, value] of Object.entries(values ?? {})) {
         if (!(id in scene.sessionState.gameplay.needs)) continue;
         scene.sessionState.gameplay.needs[id] = Math.min(100, Math.max(0, Number(value) || 0));
       }
+      scene.needsFlowRuntime?.reset?.(needMeterValues(scene.sessionState.gameplay));
       scene.gameHud?.render?.();
     },
+    setNeedsDebugPreset: (preset) => {
+      const result = preset === "clear"
+        ? scene.needsRuntime?.clearDebugPreset?.()
+        : scene.needsRuntime?.setDebugPreset?.(preset);
+      scene.needsFlowRuntime?.reset?.(needMeterValues(scene.sessionState.gameplay));
+      scene.syncPlayerEnergyTarget();
+      scene.gameHud?.render?.();
+      return result;
+    },
+    performPhysicalAction: (toolId) => scene.needsRuntime?.recordPhysicalAction?.(toolId),
     setEnergy: (value) => {
       scene.sessionState.gameplay.currentEnergy = Math.max(
         0,
         Math.min(scene.sessionState.gameplay.maximumEnergy, Number(value) || 0),
       );
+      scene.needsFlowRuntime?.reset?.(needMeterValues(scene.sessionState.gameplay));
       scene.syncPlayerEnergyTarget();
       scene.gameHud?.render();
     },
@@ -215,6 +239,7 @@ export function installWorldE2EBridge(scene) {
         0,
         Math.min(scene.sessionState.gameplay.maximumEnergy, Number(current) || 0),
       );
+      scene.needsFlowRuntime?.reset?.(needMeterValues(scene.sessionState.gameplay));
       scene.syncPlayerEnergyTarget();
       scene.gameHud?.render();
     },
@@ -222,16 +247,24 @@ export function installWorldE2EBridge(scene) {
       const player = scene.characterSystem.require(scene.sessionState.playerId);
       player.motor.movement = createMovementState({ facing: { x: 1, y: 0 } });
       player.motor.movement.velocity.x = moving ? player.motor.movementConfig.movingSpeedThreshold : 0;
-      scene.e2eEnergyMotion = { moving: Boolean(moving), running: Boolean(running) };
-      scene.isRunning = Boolean(running);
+      const runningAllowed = scene.needsRuntime?.movementState?.().runningAllowed ?? true;
+      scene.e2eEnergyMotion = { moving: Boolean(moving), running: Boolean(running && runningAllowed) };
+      scene.isRunning = Boolean(running && runningAllowed);
+      scene.syncPlayerEnergyTarget();
     },
-    advanceGameplayTime: (milliseconds) => scene.updateGameplayTime(Math.max(0, Number(milliseconds) || 0)),
+    advanceGameplayTime: (milliseconds) => {
+      const deltaMs = Math.max(0, Number(milliseconds) || 0);
+      scene.needsInteractionCoordinator?.update?.(deltaMs);
+      scene.updateGameplayTime(deltaMs);
+    },
     getRuntimeState: () => ({
       sleeping: scene.sleeping,
       exhaustedSleeping: scene.exhaustedSleeping,
       cookingActive: scene.cookingRuntime?.isActive?.() ?? false,
       timeScale: scene.simulationScale,
       selectedTimeScale: scene.playerTimeScale,
+      needsRuntime: clone(scene.needsRuntime?.getState?.() ?? {}),
+      interactionTimeline: clone(scene.needsInteractionCoordinator?.getState?.() ?? {}),
     }),
     setWorldTimeSeconds: (value) => {
       const seconds = Math.max(0, Number(value) || 0);
@@ -300,6 +333,7 @@ function placePlayerNear(scene, entityId) {
         x: target.position.x + direction.x * distance,
         y: target.position.y + direction.y * distance,
       };
+      if (collides(player.motor.position, scene.worldLayout, player.motor.footWidth, player.motor.footDepth)) continue;
       player.motor.movement = createMovementState({ facing: { x: -direction.x, y: -direction.y } });
       scene.interactionRuntime?.update?.({ actions: { interact: false, primary: false, secondary: false } });
       if (scene.interactionRuntime?.getCurrentCandidate?.()?.entityId === entityId) {

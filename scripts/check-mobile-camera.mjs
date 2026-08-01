@@ -67,7 +67,7 @@ assert(interactionHud.includes("isInteractHeld()"), "mobile interaction exposes 
 assert(main.includes("mobileHeldResourceInteract") && main.includes("RESOURCE_INTERACTION_KIND"), "held mobile interaction repeats only repeatable resources");
 assert(main.includes("(this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()"), "keyboard and mobile sprint share one running state while Shift can own a combat action");
 assert(main.includes("presentationPosition: this.getPlayerCameraPosition()"), "camera uses the interaction-safe focus position");
-assert(main.includes("this.facilityRuntime?.isUsing?.() || this.sleeping"), "facility use and sleep keep the camera anchored to the unchanged motor position");
+assert(main.includes("(this.needsInteractionCoordinator?.isLocked?.() || this.sleeping) && motorPosition"), "long-use transitions and sleep keep the camera anchored to the unchanged motor position");
 assert(characterVisual.includes("setPresentationPose(pose)") && !characterVisual.includes("sleepingPose"), "facility and sleep use a general visual presentation boundary");
 assert(gameHud.includes("pinnedNeedId") && gameHud.includes("isCoarsePointer()"), "coarse pointer can pin needs tooltips");
 

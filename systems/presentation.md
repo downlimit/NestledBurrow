@@ -6,7 +6,7 @@ This system owns screen-space feedback and sensory presentation without becoming
 
 ## Owners
 
-- HUD/options: `gameHud.js`;
+- HUD/options: `gameHud.js`; immutable semantic pulse timings: `presentationTuning.js`;
 - inventory hotbar, drag input, selected-item marker and dropped-item presentation: `inventoryRuntime.js`;
 - combat loadout frames, item presentation and screen-space labels: `combatLoadoutRuntime.js`;
 - two-panel loadout dragging: `loadoutDragCoordinator.js`;
@@ -20,6 +20,7 @@ This system owns screen-space feedback and sensory presentation without becoming
 - camera: `cameraFollowRuntime.js`;
 - audio/settings: `audioRuntime.js`, `audioSettings.js`;
 - day/night color: `gameClock.js` plus scene overlay wiring.
+- reachable use-point selection: `interactionApproach.js`; long-use enter/exit interpolation: `interactionTimelineRuntime.js`, coordinated by `needsInteractionCoordinator.js`;
 
 ## Invariants
 
@@ -43,6 +44,8 @@ This system owns screen-space feedback and sensory presentation without becoming
 - HUD reads domain state and procedural effects fire only after the owning mutation succeeds;
 - day/night presentation does not cover HUD or alter gameplay state;
 - player-visible changes require managed preview acceptance.
+- long-use presentation tweens may move only the visible pose; the safe character motor remains unchanged, and transient phases are never persisted.
+- need-flow arrows use stable row-seeded phase offsets with no interval randomization or drift. One arrow is visible for exactly `1500 ms` and transparent for `3000 ms`; three arrows are visible for `3000 ms` and transparent for `500 ms`. The two-arrow profile is the exact linear midpoint: `2250 ms` visible and `1750 ms` transparent. Fade-in and fade-out are constant `180 ms` phases in every tier; only peak hold changes. Peak alpha is `0.9`, zero arrows remain fully transparent, and slow/medium/strong cycles are `4500/4000/3500 ms`.
 
 ## Current baseline
 

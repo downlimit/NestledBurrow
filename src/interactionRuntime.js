@@ -16,6 +16,7 @@ export function createInteractionRuntime({
   onPersistentMutation,
   getStaticInteractionDefinitions = () => [],
   isInteractionAllowed = () => true,
+  resolveInteractionTarget = (definition) => definition,
   runWorldObjectInteraction = () => ({ status: "ignored" }),
   presenter,
 }) {
@@ -44,19 +45,17 @@ export function createInteractionRuntime({
   function findCandidate() {
     const player = characterSystem.getSnapshot(sessionState.playerId);
     const targets = [];
+    const addTarget = (definition) => {
+      if (!isInteractionAllowed(definition)) return;
+      const resolved = resolveInteractionTarget(definition, player);
+      if (resolved) targets.push(createInteractionTarget({ ...definition, ...resolved }));
+    };
     for (const definition of getInteractionDefinitions()) {
-      if (!isInteractionAllowed(definition)) continue;
       if (!characterSystem.has(definition.entityId)) continue;
       const snapshot = characterSystem.getSnapshot(definition.entityId);
-      targets.push(createInteractionTarget({
-        ...definition,
-        position: snapshot.position,
-      }));
+      addTarget({ ...definition, position: snapshot.position });
     }
-    for (const definition of getStaticInteractionDefinitions()) {
-      if (!isInteractionAllowed(definition)) continue;
-      targets.push(createInteractionTarget(definition));
-    }
+    for (const definition of getStaticInteractionDefinitions()) addTarget(definition);
     return findBestInteractionTarget(player, targets);
   }
 

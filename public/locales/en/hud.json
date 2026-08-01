@@ -169,8 +169,11 @@
     "miss": "Miss"
   },
   "needs": {
+    "toiletAccidentPrivate": "Could not hold it. Time to clean up.",
+    "toiletAccidentWitnessed": "An awkward accident happened in front of others.",
+    "urgentLongAction": "Use the toilet before starting a long task.",
     "novelty": {
-      "tooltip": "Novelty - fresh, enjoyable experiences. Routine lowers it; movement and rare finds restore it."
+      "tooltip": "Novelty - fresh, enjoyable experiences. Repeated labour lowers it; new events restore it."
     },
     "energy": {
       "tooltip": "Energy - the reserve of strength for movement, work, and other actions."

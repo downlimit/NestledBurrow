@@ -46,6 +46,8 @@ export function createMeleeRuntime(scene, {
   isSuppressed = () => false,
   playEffect = () => {},
   damageLog = () => ({ status: "ignored", mutated: false }),
+  canPerformPhysicalAction = () => ({ allowed: true, cost: 0 }),
+  recordPhysicalAction = () => ({ status: "spent", mutated: false, cost: 0 }),
   getCombatTargets = () => [],
   debugEnabled = MELEE_DEBUG_ENABLED,
 } = {}) {
@@ -85,11 +87,12 @@ export function createMeleeRuntime(scene, {
     if (destroyed || !actions.primary || isSuppressed()) return { status: "ignored", accepted: false };
     const selected = getSelectedItem();
     const character = getPlayerCharacter();
-    const result = requestMeleeAttack(
+    const result = requestEnergyBackedMeleeAttack(
       state,
       selected?.id,
       getControllerMoveDirection(),
       character?.motor?.movement?.facingDirection,
+      { canPerformPhysicalAction, recordPhysicalAction },
     );
     if (result.status === "started" || result.status === "switched") {
       startStepPresentation();
@@ -602,6 +605,22 @@ export function createMeleeRuntime(scene, {
       damageNumbers.destroy();
     },
   };
+}
+
+export function requestEnergyBackedMeleeAttack(
+  state,
+  weaponId,
+  moveDirection,
+  currentFacing,
+  { canPerformPhysicalAction = () => ({ allowed: true, cost: 0 }), recordPhysicalAction = () => ({ cost: 0 }) } = {},
+) {
+  if (!getMeleeWeaponProfile(weaponId)) return requestMeleeAttack(state, weaponId, moveDirection, currentFacing);
+  const affordability = canPerformPhysicalAction(weaponId);
+  if (!affordability?.allowed) return { status: "insufficient-energy", accepted: false, cost: affordability?.cost ?? 0 };
+  const result = requestMeleeAttack(state, weaponId, moveDirection, currentFacing);
+  if (!result.accepted) return result;
+  const expenditure = recordPhysicalAction(weaponId);
+  return { ...result, energyCost: expenditure?.cost ?? affordability.cost ?? 0 };
 }
 
 export function dashDistanceForInterval(profile, elapsedMs, deltaMs) {

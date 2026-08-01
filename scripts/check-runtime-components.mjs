@@ -313,6 +313,7 @@ let gameplayTuning = { maximumEnergy: 100, axeDamage: 1, smallLogChopHp: 7, ener
 let changeCalls = 0;
 let resetCalls = 0;
 let addCookedDishCalls = 0;
+const needsDebugPresets = [];
 let colliderVisibility = null;
 let buildGridVisibility = null;
 let colliderEditMode = null;
@@ -331,6 +332,7 @@ panel = new MovementDebugPanel({
   enabled: true, gameplayTuning, documentRef: documentStub, storage,
   onGameplayTuningChange: () => changeCalls++,
   onResetBalanceRun: () => resetCalls++,
+  onSetNeedsDebugPreset: (preset) => needsDebugPresets.push(preset),
   onAddCookedDish: () => addCookedDishCalls++,
   onColliderVisibilityChange: (visible) => { colliderVisibility = visible; },
   onBuildGridVisibilityChange: (visible) => { buildGridVisibility = visible; },
@@ -368,7 +370,9 @@ assert(panel.status.textContent.includes("время 06:00") && panel.status.tex
 const resetButton = panel.panel.children.at(-1).children[0];
 resetButton.emit("click");
 assert.equal(resetCalls, 1, "balance reset action is wired");
-const addCookedDishButton = panel.panel.children.at(-1).children[2];
+for (const index of [2, 3, 4, 5]) panel.panel.children.at(-1).children[index].emit("click");
+assert.deepEqual(needsDebugPresets, ["hungry", "exhausted", "urgent-toilet", "clear"], "needs debug presets are wired outside gameplay tuning");
+const addCookedDishButton = panel.panel.children.at(-1).children[6];
 addCookedDishButton.emit("click");
 assert.equal(addCookedDishCalls, 1, "debug cooked-dish action is wired");
 panel.colliderCheckbox.checked = true;

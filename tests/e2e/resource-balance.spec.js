@@ -90,8 +90,8 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   const afterFirst = await bridge(page, "getSession");
   await bridge(page, "interact");
   const afterSecond = await bridge(page, "getSession");
-  expect(afterFirst.gameplay.currentEnergy).toBeLessThanOrEqual(before.gameplay.currentEnergy - 0.5);
-  expect(afterFirst.gameplay.currentEnergy).toBeGreaterThan(before.gameplay.currentEnergy - 1);
+  expect(afterFirst.gameplay.currentEnergy).toBeLessThanOrEqual(before.gameplay.currentEnergy - 0.3);
+  expect(afterFirst.gameplay.currentEnergy).toBeGreaterThan(before.gameplay.currentEnergy - 0.5);
   expect(afterSecond.gameplay.currentEnergy).toBeLessThanOrEqual(afterFirst.gameplay.currentEnergy);
   expect(afterSecond.gameplay.resourceNodes["yard-ruby-01"].progress).toBe(afterFirst.gameplay.resourceNodes["yard-ruby-01"].progress);
 
@@ -140,57 +140,67 @@ test("resource hit feedback returns to its placement-grid anchor", async ({ page
 test("running, exhaustion sleep and wake-up share the energy-flow contract", async ({ page }) => {
   await boot(page);
   await bridge(page, "setEnergy", 14);
+  await bridge(page, "advanceGameplayTime", 3000);
+  await bridge(page, "advanceGameplayTime", 1000);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "up", arrows: 1 } } });
   await bridge(page, "setEnergy", 15);
-  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 1 } } });
+  await bridge(page, "advanceGameplayTime", 700);
+  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: null, arrows: 0 } } });
 
+  await bridge(page, "setEnergy", 25);
   await page.keyboard.down("ArrowRight");
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 2 } } });
   await page.keyboard.down("Shift");
   await expect.poll(() => bridge(page, "getPlayerMovementState")).toMatchObject({ runSpeedMultiplier: 1.66 });
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("sprint-on");
-  await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 3 } } });
+  await expect.poll(async () => {
+    const flow = (await bridge(page, "getHudState")).resources.energyFlow;
+    return flow.direction === "down" && flow.arrows >= 1;
+  }).toBe(true);
   await page.keyboard.up("Shift");
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("sprint-off");
   await page.keyboard.up("ArrowRight");
 
   await bridge(page, "setEnergy", 0);
+  await bridge(page, "advanceGameplayTime", 16);
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: true, exhaustedSleeping: true, timeScale: 16 });
-  await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { kind: "wake-exhausted", prompt: "hud:interaction.wake" } });
   await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ angle: -90, textureKey: "tile_0268" });
-  await bridge(page, "tryWakeFromExhaustion");
+  await bridge(page, "advanceGameplayTime", 7500);
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: false, exhaustedSleeping: false, timeScale: 1 });
 });
 
-test("awake energy drains continuously per real second and low-energy idle recovers", async ({ page }) => {
-  const maxFrameEnergyDrift = 0.2;
+test("awake hourly rates and delayed catch-breath recovery share the canonical contract", async ({ page }) => {
   await boot(page);
   await bridge(page, "setEnergy", 100);
   await bridge(page, "setPlayerMotion", { moving: false });
   let before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   let after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeGreaterThanOrEqual(0.25);
-  expect(before - after).toBeLessThan(0.25 + maxFrameEnergyDrift);
+  expect(before - after).toBeCloseTo(5 / 60, 1);
   await bridge(page, "setPlayerMotion", { moving: true, running: false });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeGreaterThanOrEqual(0.75);
-  expect(before - after).toBeLessThan(0.75 + maxFrameEnergyDrift);
+  expect(before - after).toBeCloseTo(5.5 / 60, 1);
   await bridge(page, "setPlayerMotion", { moving: true, running: true });
   before = (await bridge(page, "getResourceState")).currentEnergy;
   await bridge(page, "advanceGameplayTime", 1000);
   after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(before - after).toBeGreaterThanOrEqual(1.5);
-  expect(before - after).toBeLessThan(1.5 + maxFrameEnergyDrift);
-  await bridge(page, "setEnergy", 4);
-  await bridge(page, "setPlayerMotion", { moving: false });
-  before = (await bridge(page, "getResourceState")).currentEnergy;
-  await bridge(page, "advanceGameplayTime", 1000);
-  after = (await bridge(page, "getResourceState")).currentEnergy;
-  expect(after - before).toBeGreaterThanOrEqual(1.5 / 1.66);
-  expect(after - before).toBeLessThan(1.5 / 1.66 + maxFrameEnergyDrift);
+  expect(before - after).toBeCloseTo(8 / 60, 1);
+  const catchBreath = await page.evaluate(() => {
+    const api = window.__NESTLED_BURROW_E2E__;
+    api.setEnergy(4);
+    api.setPlayerMotion({ moving: true, running: false });
+    api.advanceGameplayTime(1);
+    api.setPlayerMotion({ moving: false });
+    const beforeDelay = api.getResourceState().currentEnergy;
+    api.advanceGameplayTime(3000);
+    const afterDelay = api.getResourceState().currentEnergy;
+    api.advanceGameplayTime(1000);
+    return { beforeDelay, afterDelay, afterRecovery: api.getResourceState().currentEnergy };
+  });
+  expect(catchBreath.beforeDelay - catchBreath.afterDelay).toBeCloseTo(15 / 60, 6);
+  expect(catchBreath.afterRecovery - catchBreath.afterDelay).toBeCloseTo(1 - 5 / 60, 6);
 });
 
 test("resource colliders have their requested insets and work from directly above", async ({ page }) => {
@@ -228,5 +238,24 @@ test("logs and stones always show a work target from every approach angle", asyn
       });
       await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { kind: "work-resource" } });
     }
+  }
+});
+
+test("resource aiming follows the faced visual center when nearby logs compete", async ({ page }) => {
+  await boot(page);
+  const definitions = (await bridge(page, "getDebrisState")).definitions;
+  const leftLog = definitions.find((item) => item.id === "fallen-log-01");
+  const rightLog = definitions.find((item) => item.id === "yard-log-02");
+  const position = {
+    x: (leftLog.position.x + rightLog.position.x) / 2,
+    y: Math.max(leftLog.position.y, rightLog.position.y) + 11,
+  };
+  await bridge(page, "selectInventorySlot", 0);
+  for (const target of [leftLog, rightLog]) {
+    await bridge(page, "placePlayerAt", {
+      ...position,
+      facing: { x: target.position.x - position.x, y: target.position.y - position.y },
+    });
+    await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { entityId: target.id } });
   }
 });

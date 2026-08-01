@@ -349,9 +349,9 @@ export function createFacilityRuntime(scene, {
     getActiveId() {
       return activeFacilityId;
     },
-    getPresentationPose() {
-      if (!activeFacilityId) return null;
-      const facility = definitions.get(activeFacilityId);
+    getPresentationPose(facilityId = activeFacilityId) {
+      if (!facilityId) return null;
+      const facility = definitions.get(facilityId);
       if (!facility?.presentationPose) return null;
       const profileKey = `facility:${facility.facilityType}`;
       const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
