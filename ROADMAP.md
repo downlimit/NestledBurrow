@@ -14,15 +14,15 @@ Task #001 — Первая расчистка участка (PR #81)
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #065`.
+**Следующий свободный номер:** `Task #066`.
 
 ## Сейчас
 
-### Task #064 — Вынести world interaction dispatch из WorldScene
+### Task #065 — Вынести location lifecycle из WorldScene
 
-**Статус:** `Выполнено`.
+**Статус:** `Подготовлено`.
 
-**Результат:** Детерминированное исполнение недиалоговых взаимодействий и transient resource-action state перенесены из `WorldScene` в `WorldInteractionCoordinator`; `InteractionRuntime` сохранил targeting/dialogue lifecycle, location owners явно rebind-ятся без stale references.
+**Результат:** Заменить scene-wide `worldLocationLifecycle.js` явным location-scope runtime с capability-owned mount/destroy и отдельным world presentation owner, чтобы добавление третьей локации не требовало доступа к произвольному состоянию `WorldScene`.
 
 ## Следующий продуктовый вопрос
 
