@@ -32,14 +32,15 @@ import { WORLD_IDS } from "./worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "./worldLocationCoordinator.js";
 import { canTransitionWorldLocation, destroyWorldLocation, mountWorldLocation, renderWorldLocation } from "./worldLocationLifecycle.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, hitResourceDefinition, refillEnergy, resetBalanceRun } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, refillEnergy, resetBalanceRun } from "./gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
 import { createInteractionRuntime } from "./interactionRuntime.js";
+import { createWorldInteractionCoordinator } from "./worldInteractionCoordinator.js";
 import { createInteractionApproachResolver } from "./interactionApproach.js";
 import { createInteractionHud } from "./interactionHud.js";
-import { createGameHud, shouldShakeEnergyAfterInteraction } from "./gameHud.js";
+import { createGameHud } from "./gameHud.js";
 import { createSessionPersistence } from "./sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
@@ -52,11 +53,11 @@ import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./collid
 import { loadAssetProfiles, saveAssetProfiles } from "./assetProfiles.js";
 import { migrateDirectionalWallOverrides, worldDepthFromAnchorY } from "./buildWorldGeometry.js";
 import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./colliderResize.js";
-import { BED_INTERACTION_KIND, BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
+import { BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
 import { DEFAULT_RESOURCE_ID, getResourceObjectsForWorld, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { getResourceProfile, resourceActionForTool, resourceEffectType } from "./resourceDomain.js";
+import { getResourceProfile } from "./resourceDomain.js";
 import { createDebrisRuntime } from "./debrisRuntime.js";
-import { FACILITY_INTERACTION_KIND, FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
+import { FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
 import { createFacilityRuntime } from "./facilityRuntime.js";
 import { createNeedsRuntime } from "./needsRuntime.js";
 import { createNeedsFlowRuntime, needMeterValues } from "./needsFlowRuntime.js";
@@ -64,7 +65,7 @@ import { createNeedsInteractionCoordinator } from "./needsInteractionCoordinator
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
 import { createCookingRuntime } from "./cookingRuntime.js";
-import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_KIND } from "./guestConfig.js";
+import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET } from "./guestConfig.js";
 import { createTavernSignRuntime } from "./tavernSignRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
@@ -196,7 +197,6 @@ class WorldScene extends Phaser.Scene {
     this.simulationScale = this.playerTimeScale = 1;
     this.timeScale = 1;
     this.autosaveAccumulatorSeconds = 0;
-    this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY;
     this.lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
     this.createDayNightRuntime();
     this.createHud();
@@ -387,6 +387,27 @@ class WorldScene extends Phaser.Scene {
     this.needsFlowRuntime = createNeedsFlowRuntime({ initialValues: needMeterValues(this.sessionState.gameplay) });
     this.interactionApproachResolver = createInteractionApproachResolver({ worldLayout: this.worldLayout, getPlayer: () => this.playerCharacter });
     this.syncPlayerEnergyTarget();
+    this.worldInteractionCoordinator = createWorldInteractionCoordinator({
+      sessionState: this.sessionState,
+      getGameplayTuning: () => this.gameplayTuning,
+      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
+      getNeedsRuntime: () => this.needsRuntime,
+      getSleepingWakeInteraction: () => this.getSleepingWakeInteraction(),
+      isSleeping: () => this.sleeping,
+      isExhaustedSleeping: () => this.exhaustedSleeping,
+      getWakeRandom: () => this.e2eWakeRandom ?? Math.random,
+      tryWakeFromExhaustion: (rng) => this.tryWakeFromExhaustion(rng),
+      suppressNextInteract: () => { this.suppressNextInteract = true; },
+      showTransientMessage: (key) => this.gameHud?.showTransientMessage?.(key),
+      refreshInteractions: () => this.interactionRuntime?.refresh?.(),
+      triggerCooldownFeedback: () => this.interactionHud?.triggerCooldownFeedback?.(),
+      renderHud: () => this.gameHud?.render?.(),
+      notifyInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
+      syncPlayerEnergyTarget: () => this.syncPlayerEnergyTarget(),
+      triggerEnergyShake: () => this.gameHud?.triggerEnergyShake?.(),
+      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
+      saveSession: () => this.saveSession(),
+    });
     this.interactionRuntime = createInteractionRuntime({
       sessionState: this.sessionState,
       characterSystem: this.characterSystem,
@@ -398,19 +419,8 @@ class WorldScene extends Phaser.Scene {
         this.gameHud?.render?.();
         this.saveSession();
       },
-      getStaticInteractionDefinitions: () => [
-        ...(this.debrisRuntime?.getInteractionDefinitions?.() ?? []),
-        ...(this.facilityRuntime?.getInteractionDefinitions?.() ?? []),
-        ...(this.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
-        ...(this.farmingRuntime?.getInteractionDefinitions?.() ?? []),
-        ...(this.sleeping && !this.exhaustedSleeping ? [this.getSleepingWakeInteraction()] : []),
-      ],
-      isInteractionAllowed: (definition) => !this.cookingRuntime?.isActive?.()
-        && (this.needsInteractionCoordinator?.allowsInteraction?.(definition) ?? true)
-        && (!this.facilityRuntime?.isUsing()
-          || (definition.kind === FACILITY_INTERACTION_KIND && definition.id === this.facilityRuntime.getActiveId())),
+      worldInteractionCoordinator: this.worldInteractionCoordinator,
       resolveInteractionTarget: (definition, player) => this.interactionApproachResolver.resolve(definition, player),
-      runWorldObjectInteraction: (candidate) => this.runWorldObjectInteraction(candidate),
       presenter: this.interactionHud,
     });
   }
@@ -486,94 +496,6 @@ class WorldScene extends Phaser.Scene {
     });
     this.guestRuntime = this.tavernServiceRuntime.guestRuntime;
     this.coinRuntime = this.tavernServiceRuntime.coinRuntime;
-  }
-
-  runWorldObjectInteraction(candidate) {
-    const merchantResult = this.merchantRuntime?.handleInteraction?.(candidate);
-    if (merchantResult && merchantResult.status !== "ignored") {
-      this.suppressNextInteract = true;
-      return merchantResult;
-    }
-    const farmingResult = this.farmingRuntime?.handleInteraction?.(candidate);
-    if (farmingResult && farmingResult.status !== "ignored") {
-      let presentedFarmingResult = farmingResult;
-      if (farmingResult.messageKey) {
-        this.gameHud?.showTransientMessage?.(farmingResult.messageKey);
-        presentedFarmingResult = { ...farmingResult, transientMessageShown: true };
-      }
-      this.suppressNextInteract = true;
-      return presentedFarmingResult;
-    }
-    if (candidate.kind === TAVERN_SIGN_KIND) {
-      this.sessionState.gameplay.tavernOpen = !this.sessionState.gameplay.tavernOpen; this.audioRuntime?.playEffect?.(this.sessionState.gameplay.tavernOpen ? "tavern-open" : "tavern-close");
-      this.tavernSignRuntime?.sync?.();
-      this.interactionRuntime?.refresh?.();
-      this.suppressNextInteract = true;
-      return { status: this.sessionState.gameplay.tavernOpen ? "opened" : "closed", mutated: true };
-    }
-    if (candidate.kind === FACILITY_INTERACTION_KIND) {
-      const facility = this.facilityRuntime.getDefinition(candidate.payload.facilityId);
-      if (["cutting-table", "gas-stove"].includes(facility?.facilityType)
-        && !this.needsRuntime.canStartLongAction()) {
-        return { status: "urgent-toilet", mutated: false, messageKey: "hud:needs.urgentLongAction" };
-      }
-      const kitchenResult = this.kitchenInteractionRuntime?.handleFacility?.(facility);
-      if (kitchenResult?.status !== "ignored") {
-        this.suppressNextInteract = true;
-        this.interactionRuntime?.refresh?.();
-        return kitchenResult;
-      }
-      const result = this.needsInteractionCoordinator.useFacility(candidate.payload.facilityId, candidate.payload);
-      this.suppressNextInteract = true;
-      this.interactionRuntime?.refresh?.();
-      return result;
-    }
-    if (candidate.kind === BED_INTERACTION_KIND) {
-      const result = this.needsInteractionCoordinator.useBed(candidate.payload.bedId, candidate.payload);
-      this.suppressNextInteract = true;
-      return result;
-    }
-    if (this.facilityRuntime?.isUsing() || this.needsInteractionCoordinator?.isLocked()) return { status: "busy", mutated: false };
-    if (candidate.kind === "wake-exhausted") {
-      return this.tryWakeFromExhaustion(this.e2eWakeRandom ?? Math.random);
-    }
-    if (candidate.kind !== RESOURCE_INTERACTION_KIND) return { status: "ignored" };
-    const nowMs = globalThis.performance?.now?.() ?? Date.now();
-    if (nowMs - this.lastSuccessfulHitAtMs < this.gameplayTuning.universalHitCooldownSeconds * 1000) return { status: "cooldown", mutated: false };
-    const definition = this.debrisRuntime?.getResourceDefinition?.(candidate.payload.resourceId);
-    if (!definition) return { status: "unknown-resource", mutated: false };
-    const profile = getResourceProfile(definition.profileId);
-    const action = resourceActionForTool(profile, this.gameHud?.getSelectedInventoryItem?.()?.id);
-    if (!action) return { status: "wrong-tool", mutated: false };
-    const energyBefore = this.sessionState.gameplay.currentEnergy;
-    const physicalAction = this.needsRuntime.canPerformPhysicalAction(profile.requiredTool);
-    const result = hitResourceDefinition(this.sessionState, definition, {
-      action,
-      damage: this.gameplayTuning.axeDamage,
-      energyPerHit: physicalAction.cost,
-      tuning: this.gameplayTuning,
-    });
-    if (result.mutated) {
-      this.needsRuntime.recordPhysicalAction(profile.requiredTool, { energyAlreadySpent: true });
-      this.lastSuccessfulHitAtMs = nowMs;
-      this.activeResourceProfileId = profile.id;
-      this.interactionHud?.triggerCooldownFeedback?.();
-      this.gameHud?.render?.();
-      if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory);
-      this.applySuccessfulHitFeedback(resourceEffectType(profile, result.status), energyBefore);
-      this.debrisRuntime?.hitWithFeedback?.(definition.id, result, () => this.interactionRuntime?.refresh?.());
-      this.saveSession();
-    }
-    return result;
-  }
-
-  applySuccessfulHitFeedback(effectType, energyBefore) {
-    this.syncPlayerEnergyTarget();
-    this.audioRuntime?.playEffect?.(effectType);
-    const gameplay = this.sessionState.gameplay;
-    if (shouldShakeEnergyAfterInteraction({ mutated: true, energyBefore, currentEnergy: gameplay.currentEnergy, maximumEnergy: gameplay.maximumEnergy })) {
-      this.gameHud?.triggerEnergyShake?.();
-    }
   }
 
   getPlayerPresentationPosition() {
@@ -692,7 +614,7 @@ class WorldScene extends Phaser.Scene {
       onColliderRound: () => this.roundSelectedCollider(),
       onPivotAlign: (axis) => this.alignSelectedPivot(axis),
       onVisualOffsetReset: () => this.resetSelectedVisualOffset(),
-      onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
+      onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.worldInteractionCoordinator?.resetResourceActivity?.(); this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
       getStatusSnapshot: () => {
         if (!this.playerCharacter) return null;
         return {
@@ -1253,6 +1175,8 @@ class WorldScene extends Phaser.Scene {
     this.mobileJoystick = null;
     this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
+    this.worldInteractionCoordinator?.destroy?.();
+    this.worldInteractionCoordinator = null;
     this.destroyLocationLifecycle();
     this.worldLocationCoordinator?.destroy?.();
     this.worldLocationCoordinator = null;
@@ -1403,7 +1327,7 @@ class WorldScene extends Phaser.Scene {
     const currentCandidate = this.interactionRuntime?.getCurrentCandidate?.() ?? null;
     this.merchantRuntime?.updateCandidate?.(currentCandidate);
     this.debrisRuntime?.updateCandidate?.(currentCandidate); this.farmingRuntime?.updateCandidate?.(currentCandidate);
-    this.interactionHud?.setCooldownProgress?.(this.getInteractionCooldownProgress());
+    this.interactionHud?.setCooldownProgress?.(this.worldInteractionCoordinator?.getResourceCooldownProgress?.() ?? 0);
     this.updateMovementDebugStatus();
     this.renderColliderDebug();
   }
@@ -1439,16 +1363,6 @@ class WorldScene extends Phaser.Scene {
     this.suppressNextInteract = false;
   }
 
-  getHitCooldownProgress(nowMs = globalThis.performance?.now?.() ?? Date.now()) {
-    const durationMs = this.gameplayTuning?.universalHitCooldownSeconds * 1000;
-    if (!(durationMs > 0) || !Number.isFinite(this.lastSuccessfulHitAtMs)) return 0;
-    return Math.max(0, Math.min(1, 1 - (nowMs - this.lastSuccessfulHitAtMs) / durationMs));
-  }
-
-  getInteractionCooldownProgress(nowMs = globalThis.performance?.now?.() ?? Date.now()) {
-    return this.getHitCooldownProgress(nowMs);
-  }
-
   getSleepTimeScale() {
     return this.gameplayTuning.sleepTimeScale * (this.exhaustedSleeping ? this.gameplayTuning.exhaustionSleepScaleMultiplier : 1);
   }
@@ -1469,10 +1383,8 @@ class WorldScene extends Phaser.Scene {
     const player = this.playerCharacter?.motor;
     const moving = this.e2eEnergyMotion?.moving ?? (player?.speed >= player?.movementConfig?.movingSpeedThreshold);
     const running = Boolean(moving && (this.e2eEnergyMotion?.running ?? this.isRunning));
-    const hitWindowMs = this.gameplayTuning.universalHitCooldownSeconds * 1000;
-    const resourceActive = Boolean(this.activeResourceProfileId)
-      && nowMs - this.lastSuccessfulHitAtMs <= hitWindowMs;
-    const resourceKind = resourceActive ? getResourceProfile(this.activeResourceProfileId).kind : null;
+    const resourceActivity = this.worldInteractionCoordinator?.getResourceActivitySnapshot?.(nowMs)
+      ?? { active: false, kind: null };
     const playerPosition = player?.position;
     const npcNearby = Boolean(playerPosition && NPCS.some((npc) => {
       if (!this.characterSystem?.has?.(npc.id)) return false;
@@ -1483,11 +1395,11 @@ class WorldScene extends Phaser.Scene {
       facility: this.facilityRuntime?.getActiveType?.() ?? null,
       moving,
       running,
-      activeResourceKind: resourceKind,
+      activeResourceKind: resourceActivity.kind,
       activePhysicalTool: this.needsRuntime?.getState?.().activePhysicalTool,
       npcNearby,
       sharedRest: Boolean(npcNearby && (this.facilityRuntime?.getActiveType?.() === "table" || this.sleeping)),
-      physicalAction: resourceActive,
+      physicalAction: resourceActivity.active,
     };
   }
 

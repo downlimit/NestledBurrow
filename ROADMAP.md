@@ -20,9 +20,9 @@ Task #001 — Первая расчистка участка (PR #81)
 
 ### Task #064 — Вынести world interaction dispatch из WorldScene
 
-**Статус:** `Подготовлено`.
+**Статус:** `Выполнено`.
 
-**Результат:** Перенести детерминированное исполнение недиалоговых взаимодействий и transient resource-action state из `WorldScene` в явный `WorldInteractionCoordinator`, сохранив `InteractionRuntime` владельцем targeting/dialogue lifecycle, а специализированные runtime-системы — владельцами своих мутаций.
+**Результат:** Детерминированное исполнение недиалоговых взаимодействий и transient resource-action state перенесены из `WorldScene` в `WorldInteractionCoordinator`; `InteractionRuntime` сохранил targeting/dialogue lifecycle, location owners явно rebind-ятся без stale references.
 
 ## Следующий продуктовый вопрос
 

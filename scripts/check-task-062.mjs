@@ -12,7 +12,8 @@ const packageJson = JSON.parse(read("package.json"));
 const architectureCheck = read("scripts/check-architecture-boundaries.mjs");
 
 assert(main.split("\n").length <= 2400, "WorldScene must remain within the 2400-line composition ceiling");
-assert(architectureCheck.includes("MAX_WORLD_SCENE_LINES = 2400"), "the architecture ceiling must be fixed at 2400 lines");
+const architectureCeiling = Number(architectureCheck.match(/MAX_WORLD_SCENE_LINES = (\d+)/u)?.[1]);
+assert(architectureCeiling <= 2400, "later architecture work may tighten but never loosen the Task #062 ceiling");
 assert(main.includes("createWorldBuildCoordinator({"), "WorldScene must explicitly construct the world build owner");
 assert(!main.includes("createWorldBuildCoordinator(this"), "the coordinator may not discover dependencies through WorldScene fields");
 assert(!main.includes("createBuildModeRuntime"), "WorldScene may not create or wire BuildModeRuntime");

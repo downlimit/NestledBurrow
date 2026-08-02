@@ -14,10 +14,8 @@ export function createInteractionRuntime({
   resolveDialogueId,
   completeDialogue,
   onPersistentMutation,
-  getStaticInteractionDefinitions = () => [],
-  isInteractionAllowed = () => true,
+  worldInteractionCoordinator,
   resolveInteractionTarget = (definition) => definition,
-  runWorldObjectInteraction = () => ({ status: "ignored" }),
   presenter,
 }) {
   let destroyed = false;
@@ -46,7 +44,7 @@ export function createInteractionRuntime({
     const player = characterSystem.getSnapshot(sessionState.playerId);
     const targets = [];
     const addTarget = (definition) => {
-      if (!isInteractionAllowed(definition)) return;
+      if (!(worldInteractionCoordinator?.isInteractionAllowed?.(definition) ?? true)) return;
       const resolved = resolveInteractionTarget(definition, player);
       if (resolved) targets.push(createInteractionTarget({ ...definition, ...resolved }));
     };
@@ -55,7 +53,7 @@ export function createInteractionRuntime({
       const snapshot = characterSystem.getSnapshot(definition.entityId);
       addTarget({ ...definition, position: snapshot.position });
     }
-    for (const definition of getStaticInteractionDefinitions()) addTarget(definition);
+    for (const definition of worldInteractionCoordinator?.getStaticInteractionDefinitions?.() ?? []) addTarget(definition);
     return findBestInteractionTarget(player, targets);
   }
 
@@ -72,8 +70,7 @@ export function createInteractionRuntime({
 
   function startCandidateInteraction(candidate) {
     if (candidate.kind !== "dialogue") {
-      const result = runWorldObjectInteraction(candidate);
-      if (result?.mutated) onPersistentMutation?.({ candidate, result });
+      const result = worldInteractionCoordinator?.handle?.(candidate) ?? { status: "ignored" };
       if (result?.status === "cooldown") {
         currentCandidate = candidate;
         presenter?.showPrompt?.({ promptKey: candidate.prompt });

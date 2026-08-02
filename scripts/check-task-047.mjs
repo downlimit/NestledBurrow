@@ -222,6 +222,7 @@ const gameHudSource = readFileSync(new URL("../src/gameHud.js", import.meta.url)
 const farmingRuntimeSource = readFileSync(new URL("../src/farmingRuntime.js", import.meta.url), "utf8");
 const inventoryRuntimeSource = readFileSync(new URL("../src/inventoryRuntime.js", import.meta.url), "utf8");
 const debrisRuntimeSource = readFileSync(new URL("../src/debrisRuntime.js", import.meta.url), "utf8");
+const worldInteractionCoordinatorSource = readFileSync(new URL("../src/worldInteractionCoordinator.js", import.meta.url), "utf8");
 assert(!mainSource.includes("neighborQuest"), "composition root has no obsolete quest owner");
 assert(!mainSource.includes("street-npc"), "composition root has no obsolete street NPC");
 assert(!/rawPotatoes|preparedPotatoes/.test(gameHudSource), "obsolete kitchen inventory counters are absent from HUD");
@@ -229,7 +230,7 @@ assert(farmingRuntimeSource.includes("character.motor?.movement?.desiredDirectio
 assert(inventoryRuntimeSource.includes("setTintMode(TINT_MODE_FILL)") && inventoryRuntimeSource.includes("colorOverride: 0xffffff"), "dropped items use opaque-pixel silhouette outlines");
 assert(debrisRuntimeSource.includes("resourceActionForTool"), "resource interaction targets use the strict resource/tool matrix");
 assert(debrisRuntimeSource.includes("colorOverride: 0x8ed6ff") && debrisRuntimeSource.includes(".setAlpha(0.22)"), "available axe targets use a subtle blue silhouette outline");
-assert(mainSource.includes('status: "wrong-tool"'), "resource handler rejects bypasses without the selected axe");
+assert(worldInteractionCoordinatorSource.includes('status: "wrong-tool"'), "resource handler rejects bypasses without the selected axe");
 
 console.log("Task #047 checks passed: atomic economy, stacks, hydration, growth, rot, migration, prompt and depth");
 

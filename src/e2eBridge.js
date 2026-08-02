@@ -137,7 +137,7 @@ export function installWorldE2EBridge(scene) {
       scene.needsInteractionCoordinator.update(0);
       return true;
     },
-    expireHitCooldown: () => { scene.lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY; },
+    expireHitCooldown: () => scene.worldInteractionCoordinator?.expireResourceCooldown?.(),
     getDebrisState: () => ({
       present: scene.debrisRuntime?.isPresent?.() ?? false,
       definition: scene.worldLayout?.resourceDefinitions?.[0] ?? RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID),
