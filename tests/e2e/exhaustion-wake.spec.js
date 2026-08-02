@@ -25,7 +25,7 @@ async function collapseWithGuaranteedWake(page) {
     exhaustedSleeping: true,
   });
   await expect.poll(async () => bridge(page, "getInteractionState")).toMatchObject({
-    candidate: { kind: "wake-exhausted", prompt: "hud:interaction.wake" },
+    candidate: { kind: "wake-exhausted", prompt: "hud:interaction.tryWake" },
   });
 }
 
