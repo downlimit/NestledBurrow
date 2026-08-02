@@ -22,7 +22,7 @@ export const COMBAT_ITEM_ACTION_PREFERENCES = Object.freeze({
 export const INVENTORY_TOOL_IDS = Object.freeze(["axe", "pickaxe", "hoe", "water-bucket", "sword", "battle-axe"]);
 export const INVENTORY_ITEM_IDS = Object.freeze([
   ...INVENTORY_TOOL_IDS,
-  "wood", "stone", "ruby", "berry", "potato-seed", "potato", "lemon-seed", "lemon",
+  "wood", "stone", "ruby", "potato-seed", "potato", "lemon-seed", "lemon",
   "sliced-potato", "lemonade", "fried-potato-dish",
 ]);
 export const INVENTORY_ITEM_KINDS = Object.freeze({
@@ -35,7 +35,6 @@ export const INVENTORY_ITEM_KINDS = Object.freeze({
   wood: "loot",
   stone: "loot",
   ruby: "loot",
-  berry: "loot",
   "potato-seed": "loot",
   potato: "loot",
   "lemon-seed": "loot",
@@ -45,7 +44,6 @@ export const INVENTORY_ITEM_KINDS = Object.freeze({
   "fried-potato-dish": "loot",
 });
 export const INVENTORY_STACK_LIMITS = Object.freeze({
-  berry: 99,
   "potato-seed": 99,
   potato: 99,
   "lemon-seed": 99,
@@ -221,148 +219,311 @@ export function getInventoryQuantity(inventory, itemId) {
     .reduce((total, item) => total + item.quantity, 0);
 }
 
-export function addInventoryItem(inventory, item, { preferredIndex = null } = {}) {
-  assertPlainRecord(inventory, "Inventory");
-  const normalized = createInventoryItem(item.id, item.quantity);
-  const slots = inventory.slots;
-  if (!Array.isArray(slots) || slots.length !== INVENTORY_SLOT_COUNT) {
-    throw new Error(`Inventory must contain exactly ${INVENTORY_SLOT_COUNT} slots`);
+export function getLoadoutItemQuantity({ inventory, combatLoadout }, itemId) {
+  const id = normalizeItemId(itemId);
+  const peacefulQuantity = getInventoryQuantity(inventory, id);
+  const combatQuantity = normalizeCombatLoadout(combatLoadout).slots
+    .filter((item) => item?.id === id)
+    .reduce((total, item) => total + item.quantity, 0);
+  return peacefulQuantity + combatQuantity;
+}
+
+export function findInventoryStack(inventory, itemId) {
+  const id = normalizeItemId(itemId);
+  const limit = inventoryStackLimit(id);
+  return inventory.slots.findIndex((item) => item?.id === id && item.kind === "loot" && item.quantity < limit);
+}
+
+export function findFirstEmptyInventorySlot(inventory) {
+  return inventory.slots.findIndex((item) => item === null);
+}
+
+export function canAddInventoryItem(inventory, item) {
+  const normalized = normalizeInventoryBatch(item);
+  if (normalized.kind === "tool") {
+    if (inventory.slots.some((slot) => slot?.id === normalized.id)) return { status: "duplicate-tool", canAdd: false };
+    const slotIndex = findFirstEmptyInventorySlot(inventory);
+    return slotIndex >= 0
+      ? { status: "empty-slot", canAdd: true, slotIndex, plan: [{ slotIndex, added: 1, quantity: 1 }] }
+      : { status: "inventory-full", canAdd: false };
   }
-  if (normalized.kind === "tool" && slots.some((slot) => slot?.id === normalized.id)) {
-    return { status: "duplicate-tool", mutated: false, item: cloneInventoryItem(normalized) };
+  const limit = inventoryStackLimit(normalized.id);
+  let remaining = normalized.quantity;
+  const plan = [];
+  for (let slotIndex = 0; slotIndex < inventory.slots.length && remaining > 0; slotIndex += 1) {
+    const slot = inventory.slots[slotIndex];
+    if (slot?.id !== normalized.id || slot.kind !== "loot" || slot.quantity >= limit) continue;
+    const added = Math.min(remaining, limit - slot.quantity);
+    plan.push({ slotIndex, added, quantity: slot.quantity + added });
+    remaining -= added;
   }
-  const initialQuantity = normalized.quantity;
-  let remaining = initialQuantity;
-  if (normalized.kind === "loot") {
-    for (let index = 0; index < slots.length && remaining > 0; index += 1) {
-      const existing = slots[index];
-      if (existing?.id !== normalized.id || existing.kind !== "loot") continue;
-      const capacity = inventoryStackLimit(existing.id) - existing.quantity;
-      if (capacity <= 0) continue;
-      const added = Math.min(capacity, remaining);
-      existing.quantity += added;
-      remaining -= added;
-      if (remaining === 0) {
-        return {
-          status: "stacked",
-          mutated: true,
-          itemId: normalized.id,
-          quantity: initialQuantity,
-          slotIndex: index,
-          slotIndexes: [index],
-        };
-      }
-    }
+  for (let slotIndex = 0; slotIndex < inventory.slots.length && remaining > 0; slotIndex += 1) {
+    if (inventory.slots[slotIndex] !== null) continue;
+    const added = Math.min(remaining, limit);
+    plan.push({ slotIndex, added, quantity: added });
+    remaining -= added;
   }
-  const indexes = preferredIndex === null
-    ? slots.map((_slot, index) => index)
-    : [preferredIndex, ...slots.map((_slot, index) => index).filter((index) => index !== preferredIndex)];
-  const inserted = [];
-  for (const index of indexes) {
-    if (remaining <= 0) break;
-    if (slots[index] !== null) continue;
-    const amount = Math.min(remaining, inventoryStackLimit(normalized.id));
-    slots[index] = createInventoryItem(normalized.id, amount);
-    inserted.push(index);
-    remaining -= amount;
-  }
-  if (remaining > 0) {
-    for (const index of inserted) slots[index] = null;
-    return { status: "inventory-full", mutated: false, item: cloneInventoryItem(normalized) };
+  if (remaining > 0) return { status: "inventory-full", canAdd: false, remaining, plan: [] };
+  const usesEmptySlot = plan.some(({ slotIndex }) => inventory.slots[slotIndex] === null);
+  return {
+    status: usesEmptySlot ? "empty-slot" : "stack",
+    canAdd: true,
+    slotIndex: plan[0]?.slotIndex ?? -1,
+    quantity: plan[0]?.quantity ?? normalized.quantity,
+    plan,
+  };
+}
+
+export function addInventoryItem(inventory, item) {
+  const normalized = normalizeInventoryBatch(item);
+  const availability = canAddInventoryItem(inventory, normalized);
+  if (!availability.canAdd) return { ...availability, mutated: false, item: normalized };
+  const plan = (availability.plan ?? []).map((operation) => ({
+    ...operation,
+    wasEmpty: inventory.slots[operation.slotIndex] === null,
+  }));
+  for (const operation of plan) {
+    const existing = inventory.slots[operation.slotIndex];
+    inventory.slots[operation.slotIndex] = existing
+      ? { ...existing, quantity: operation.quantity }
+      : createInventoryItem(normalized.id, operation.quantity);
   }
   return {
-    status: "inserted",
+    status: availability.status === "stack" ? "stacked" : "inserted",
     mutated: true,
-    itemId: normalized.id,
-    quantity: initialQuantity,
-    slotIndex: inserted[0],
-    slotIndexes: inserted,
+    slotIndex: availability.slotIndex,
+    slots: plan.map(({ slotIndex }) => slotIndex),
+    plan,
+    item: { ...normalized },
   };
-}
-
-export function takeInventorySlot(inventory, index, quantity = null) {
-  assertPlainRecord(inventory, "Inventory");
-  if (!Number.isInteger(index) || index < 0 || index >= INVENTORY_SLOT_COUNT) {
-    throw new Error(`Inventory slot index out of range: ${index}`);
-  }
-  const item = inventory.slots[index];
-  if (!item) return { status: "empty", mutated: false, item: null };
-  const takeQuantity = quantity === null ? item.quantity : normalizeQuantity(quantity);
-  if (takeQuantity > item.quantity) throw new Error("Cannot take more items than a slot contains");
-  const taken = createInventoryItem(item.id, takeQuantity);
-  if (takeQuantity === item.quantity) inventory.slots[index] = null;
-  else item.quantity -= takeQuantity;
-  return { status: "taken", mutated: true, item: taken, slotIndex: index };
-}
-
-export function swapInventorySlots(inventory, fromIndex, toIndex) {
-  if (fromIndex === toIndex) return { status: "unchanged", mutated: false };
-  if (![fromIndex, toIndex].every((index) => Number.isInteger(index) && index >= 0 && index < INVENTORY_SLOT_COUNT)) {
-    throw new Error("Inventory swap indexes must be valid");
-  }
-  [inventory.slots[fromIndex], inventory.slots[toIndex]] = [inventory.slots[toIndex], inventory.slots[fromIndex]];
-  return { status: "swapped", mutated: true, fromIndex, toIndex };
-}
-
-export function swapLoadoutSlots({ inventory, combatLoadout }, source, target) {
-  const panels = {
-    [LOADOUT_PANELS.PEACEFUL]: inventory?.slots,
-    [LOADOUT_PANELS.COMBAT]: combatLoadout?.slots,
-  };
-  const sourceSlots = panels[source?.panel];
-  const targetSlots = panels[target?.panel];
-  if (!sourceSlots || !targetSlots) return { status: "invalid-panel", mutated: false };
-  if (!Number.isInteger(source.index) || !Number.isInteger(target.index)
-    || source.index < 0 || source.index >= sourceSlots.length
-    || target.index < 0 || target.index >= targetSlots.length) {
-    return { status: "invalid-slot", mutated: false };
-  }
-  if (source.panel === target.panel && source.index === target.index) return { status: "unchanged", mutated: false };
-  const sourceItem = sourceSlots[source.index];
-  const targetItem = targetSlots[target.index];
-  if (!sourceItem && !targetItem) return { status: "empty", mutated: false };
-  sourceSlots[source.index] = targetItem;
-  targetSlots[target.index] = sourceItem;
-  return { status: "swapped", mutated: true, source, target };
 }
 
 export function preferredCombatActionIdForItem(itemId) {
-  return COMBAT_ITEM_ACTION_PREFERENCES[itemId] ?? null;
+  const id = normalizeItemId(itemId);
+  return COMBAT_ITEM_ACTION_PREFERENCES[id] ?? null;
 }
 
 export function routePickedInventoryItem({ inventory, combatLoadout }, item, { combatMode = false } = {}) {
-  const normalized = createInventoryItem(item.id, item.quantity);
-  const preferredActionId = preferredCombatActionIdForItem(normalized.id);
-  const preferredIndex = preferredActionId ? COMBAT_ACTION_SLOT_INDEXES[preferredActionId] : null;
-  const combatIndexes = preferredIndex === null
-    ? COMBAT_NUMBER_SLOT_INDEXES
-    : [preferredIndex, ...COMBAT_NUMBER_SLOT_INDEXES];
-  if (preferredIndex !== null || combatMode) {
-    for (const index of combatIndexes) {
-      if (combatLoadout.slots[index] !== null) continue;
-      combatLoadout.slots[index] = normalized;
-      return { status: "inserted", mutated: true, panel: LOADOUT_PANELS.COMBAT, slotIndex: index, itemId: normalized.id, quantity: normalized.quantity };
-    }
+  const normalized = normalizeInventoryBatch(item);
+  const allSlots = [...(inventory?.slots ?? []), ...(combatLoadout?.slots ?? [])];
+  if (normalized.kind === "tool" && allSlots.some((slot) => slot?.id === normalized.id)) {
+    return { status: "duplicate-tool", mutated: false, panel: null, item: normalized };
   }
-  const result = addInventoryItem(inventory, normalized);
-  return result.mutated
-    ? { ...result, panel: LOADOUT_PANELS.PEACEFUL }
-    : { ...result, panel: null };
+
+  const preferredAction = preferredCombatActionIdForItem(normalized.id);
+  const combatSlotIndexes = preferredAction
+    ? [COMBAT_ACTION_SLOT_INDEXES[preferredAction], ...COMBAT_NUMBER_SLOT_INDEXES]
+    : combatMode
+      ? COMBAT_NUMBER_SLOT_INDEXES
+      : [];
+  if (combatSlotIndexes.length > 0 && Array.isArray(combatLoadout?.slots)) {
+    const combatResult = addInventoryItemToSlots(combatLoadout.slots, combatSlotIndexes, normalized);
+    if (combatResult.mutated) return { ...combatResult, panel: LOADOUT_PANELS.COMBAT };
+  }
+
+  const peacefulResult = addInventoryItem(inventory, normalized);
+  return { ...peacefulResult, panel: peacefulResult.mutated ? LOADOUT_PANELS.PEACEFUL : null };
+}
+
+function addInventoryItemToSlots(slots, slotIndexes, item) {
+  const plan = [];
+  if (item.kind === "tool") {
+    const slotIndex = slotIndexes.find((index) => slots[index] === null);
+    if (slotIndex === undefined) return { status: "combat-slots-full", mutated: false, item };
+    plan.push({ slotIndex, added: 1, quantity: 1, wasEmpty: true });
+  } else {
+    const limit = inventoryStackLimit(item.id);
+    let remaining = item.quantity;
+    for (const slotIndex of slotIndexes) {
+      const existing = slots[slotIndex];
+      if (existing?.id !== item.id || existing.kind !== "loot" || existing.quantity >= limit) continue;
+      const added = Math.min(remaining, limit - existing.quantity);
+      plan.push({ slotIndex, added, quantity: existing.quantity + added, wasEmpty: false });
+      remaining -= added;
+      if (remaining === 0) break;
+    }
+    for (const slotIndex of slotIndexes) {
+      if (remaining === 0) break;
+      if (slots[slotIndex] !== null) continue;
+      const added = Math.min(remaining, limit);
+      plan.push({ slotIndex, added, quantity: added, wasEmpty: true });
+      remaining -= added;
+    }
+    if (remaining > 0) return { status: "combat-slots-full", mutated: false, item };
+  }
+
+  for (const operation of plan) {
+    const existing = slots[operation.slotIndex];
+    slots[operation.slotIndex] = existing
+      ? { ...existing, quantity: operation.quantity }
+      : createInventoryItem(item.id, operation.quantity);
+  }
+  return {
+    status: plan.some(({ wasEmpty }) => wasEmpty) ? "inserted" : "stacked",
+    mutated: true,
+    slotIndex: plan[0]?.slotIndex ?? -1,
+    slots: plan.map(({ slotIndex }) => slotIndex),
+    plan,
+    item: { ...item },
+  };
+}
+
+export function inventoryCapacityFor(inventory, itemId) {
+  const id = normalizeItemId(itemId);
+  if (itemKind(id) === "tool") {
+    return inventory.slots.some((slot) => slot?.id === id) ? 0 : Number(findFirstEmptyInventorySlot(inventory) >= 0);
+  }
+  const limit = inventoryStackLimit(id);
+  return inventory.slots.reduce((total, slot) => {
+    if (slot === null) return total + limit;
+    if (slot.id === id && slot.kind === "loot") return total + Math.max(0, limit - slot.quantity);
+    return total;
+  }, 0);
+}
+
+export function addInventoryItemUpTo(inventory, item) {
+  const normalized = normalizeInventoryBatch(item);
+  const accepted = Math.min(normalized.quantity, inventoryCapacityFor(inventory, normalized.id));
+  if (accepted <= 0) {
+    return { status: "inventory-full", mutated: false, accepted: 0, remaining: normalized.quantity, item: normalized, plan: [] };
+  }
+  const result = addInventoryItem(inventory, { ...normalized, quantity: accepted });
+  return { ...result, accepted, remaining: normalized.quantity - accepted };
+}
+
+function normalizeInventoryBatch(item) {
+  assertPlainRecord(item, "Inventory item batch");
+  const id = normalizeItemId(item.id);
+  const kind = itemKind(id);
+  return {
+    id,
+    kind,
+    quantity: kind === "tool" ? 1 : normalizeQuantity(item.quantity),
+  };
+}
+
+export function takeInventoryItem(inventory, itemId, quantity = 1) {
+  const id = normalizeItemId(itemId);
+  let remaining = normalizeQuantity(quantity);
+  if (getInventoryQuantity(inventory, id) < remaining) {
+    return { status: "insufficient-quantity", mutated: false, item: createInventoryItem(id, Math.min(remaining, inventoryStackLimit(id))) };
+  }
+  const slots = [];
+  for (let slotIndex = inventory.slots.length - 1; slotIndex >= 0 && remaining > 0; slotIndex -= 1) {
+    const slot = inventory.slots[slotIndex];
+    if (slot?.id !== id) continue;
+    const taken = Math.min(remaining, slot.quantity);
+    slot.quantity -= taken;
+    remaining -= taken;
+    slots.push(slotIndex);
+    if (slot.quantity === 0) inventory.slots[slotIndex] = null;
+  }
+  return { status: "taken", mutated: true, slots, item: { id, kind: itemKind(id), quantity } };
+}
+
+export function takeLoadoutItem({ inventory, combatLoadout }, itemId, quantity = 1) {
+  const id = normalizeItemId(itemId);
+  const requested = normalizeQuantity(quantity);
+  if (getLoadoutItemQuantity({ inventory, combatLoadout }, id) < requested) {
+    return { status: "insufficient-quantity", mutated: false, item: createInventoryItem(id, Math.min(requested, inventoryStackLimit(id))) };
+  }
+  const peacefulQuantity = Math.min(requested, getInventoryQuantity(inventory, id));
+  const peaceful = peacefulQuantity > 0 ? takeInventoryItem(inventory, id, peacefulQuantity) : null;
+  const combatQuantity = requested - peacefulQuantity;
+  const combat = combatQuantity > 0 ? takeInventoryItem(combatLoadout, id, combatQuantity) : null;
+  return {
+    status: "taken",
+    mutated: true,
+    peaceful,
+    combat,
+    item: { id, kind: itemKind(id), quantity: requested },
+  };
+}
+
+export function swapInventorySlots(inventory, fromIndex, toIndex) {
+  assertSlotIndex(fromIndex);
+  assertSlotIndex(toIndex);
+  if (fromIndex === toIndex) return { status: "unchanged", mutated: false };
+  const item = inventory.slots[fromIndex];
+  inventory.slots[fromIndex] = inventory.slots[toIndex];
+  inventory.slots[toIndex] = item;
+  return { status: "swapped", mutated: true, fromIndex, toIndex };
+}
+
+export function swapLoadoutSlots({ inventory, combatLoadout }, from, to) {
+  const collections = {
+    [LOADOUT_PANELS.PEACEFUL]: inventory?.slots,
+    [LOADOUT_PANELS.COMBAT]: combatLoadout?.slots,
+  };
+  const fromSlots = collections[from?.panel];
+  const toSlots = collections[to?.panel];
+  if (!Array.isArray(fromSlots) || !Array.isArray(toSlots)) {
+    throw new Error("Loadout transfer requires peaceful and combat slot collections");
+  }
+  assertCollectionSlotIndex(from?.index, fromSlots.length, "Loadout source");
+  assertCollectionSlotIndex(to?.index, toSlots.length, "Loadout target");
+  if (from.panel === to.panel && from.index === to.index) {
+    return { status: "unchanged", mutated: false, from: { ...from }, to: { ...to } };
+  }
+  const item = fromSlots[from.index];
+  if (!item) return { status: "empty-slot", mutated: false, from: { ...from }, to: { ...to } };
+  fromSlots[from.index] = toSlots[to.index];
+  toSlots[to.index] = item;
+  return {
+    status: "loadout-swapped",
+    mutated: true,
+    from: { ...from },
+    to: { ...to },
+    item: cloneInventoryItem(item),
+  };
+}
+
+export function takeInventorySlot(inventory, slotIndex) {
+  assertSlotIndex(slotIndex);
+  const item = inventory.slots[slotIndex];
+  if (!item) return { status: "empty-slot", mutated: false, item: null };
+  inventory.slots[slotIndex] = null;
+  return { status: "taken", mutated: true, slotIndex, item: cloneInventoryItem(item) };
+}
+
+export function resetInventory(inventory) {
+  const fresh = createFreshInventory();
+  inventory.slots.splice(0, inventory.slots.length, ...fresh.slots);
+  return { status: "reset", mutated: true };
+}
+
+export function createWorldItemId(worldItems = []) {
+  let maximum = 0;
+  for (const item of worldItems) {
+    const match = /^dropped-item-(\d+)$/.exec(String(item?.id ?? ""));
+    if (match) maximum = Math.max(maximum, Number(match[1]));
+  }
+  return `dropped-item-${maximum + 1}`;
 }
 
 export function normalizeWorldItems(value = []) {
   if (!Array.isArray(value)) throw new Error("World items must be an array");
-  return value.map((entry, index) => {
-    assertPlainRecord(entry, `World item ${index}`);
-    const item = createInventoryItem(entry.item?.id, entry.item?.quantity);
-    const x = Number(entry.x);
-    const y = Number(entry.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`World item ${index} must have finite coordinates`);
-    return {
-      id: normalizeItemId(entry.id, `World item ${index} ID`),
-      item,
-      x,
-      y,
-    };
+  const ids = new Set();
+  return value.map((raw, index) => {
+    assertPlainRecord(raw, `World item ${index}`);
+    const id = normalizeItemId(raw.id, `World item ${index} ID`);
+    if (ids.has(id)) throw new Error(`Duplicate world item ID: ${id}`);
+    ids.add(id);
+    const x = Number(raw.x);
+    const y = Number(raw.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`World item ${id} position must be finite`);
+    return { id, item: createInventoryItem(raw.item?.id, raw.item?.quantity), x, y };
   });
+}
+
+function assertSlotIndex(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= INVENTORY_SLOT_COUNT) {
+    throw new Error(`Inventory slot index must be in 0..${INVENTORY_SLOT_COUNT - 1}`);
+  }
+}
+
+function assertCollectionSlotIndex(index, slotCount, label) {
+  if (!Number.isInteger(index) || index < 0 || index >= slotCount) {
+    throw new Error(`${label} index must be in 0..${slotCount - 1}`);
+  }
 }
