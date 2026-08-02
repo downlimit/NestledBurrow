@@ -105,8 +105,12 @@ export function createNeedsRuntime({
 
   function wakeFromCollapse() {
     collapseElapsedGameHours = 0;
+    gameplay().currentEnergy = Math.max(
+      gameplay().currentEnergy,
+      Math.max(1, Number(tuning.collapse.wakeEnergy) || 0),
+    );
     onWake({ collapsed: true, manual: true });
-    return { status: "awake", mutated: true };
+    return { status: "awake", mutated: true, energy: gameplay().currentEnergy };
   }
 
   function getPhysicalActionCost(toolId) {
