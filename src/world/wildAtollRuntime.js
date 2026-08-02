@@ -1,11 +1,13 @@
 import { addInventoryItem, createInventoryItem } from "../inventory/inventoryDomain.js";
+import { getResourceProfile } from "../resources/resourceDomain.js";
+import { drawResourceVisual } from "../resources/resourceVisuals.js";
 import { HUD_COLORS, HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import {
-  applyWildAtollRouteEntry,
-  resolveWildAtollGrassDrop,
-  wildAtollFrameIndex,
-  WILD_ATOLL_ROUTES,
+  createWildAtollArenaNodes,
+  getWildAtollArenaDefinition,
+  getWildAtollExitPoint,
+  WILD_ATOLL_ARENAS,
 } from "./wildAtollDomain.js";
 import {
   HOUSE_FRAMES,
@@ -16,25 +18,13 @@ import {
 } from "./worldConfig.js";
 
 const NEST_PHASE = "nest";
-const INTERACTION_RADIUS = 28;
-const SWORD_REACH = 38;
-const GRASS_POSITIONS = Object.freeze([
-  [5, 6], [7, 6], [9, 6], [12, 6], [14, 6], [16, 6],
-  [6, 9], [8, 10], [10, 9], [12, 10], [14, 9], [16, 10],
-  [7, 12], [10, 12], [13, 12], [15, 12],
-]);
+const INTERACTION_RADIUS = 27;
 const NEST_ATOLL_ENTRANCE = Object.freeze({ x: 11 * TILE_SIZE, y: 6 * TILE_SIZE });
-const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 8 * TILE_SIZE });
-const ENTRY_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 12 * TILE_SIZE });
-const ENTRY_POINTS = Object.freeze({
-  forecast: Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE }),
-  mist: Object.freeze({ x: 6 * TILE_SIZE, y: 5 * TILE_SIZE }),
-  stone: Object.freeze({ x: 16 * TILE_SIZE, y: 5 * TILE_SIZE }),
-  leave: Object.freeze({ x: 4 * TILE_SIZE, y: 10 * TILE_SIZE }),
-});
-const ROUTE_RETURN_POINT = Object.freeze({ x: 11 * TILE_SIZE, y: 4 * TILE_SIZE });
-const ROUTE_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 13 * TILE_SIZE - 6 });
-const PROMPT_RECT = Object.freeze({ x: 70, y: 148, width: 180, height: 22 });
+const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE });
+const SOUTH_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 14 * TILE_SIZE });
+const NORTH_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 8 * TILE_SIZE });
+const TITLE_Y = 112;
+const PROMPT_RECT = Object.freeze({ x: 56, y: 130, width: 208, height: 20 });
 
 export function createWildAtollRuntime(scene, {
   localization,
@@ -48,10 +38,6 @@ export function createWildAtollRuntime(scene, {
   showMessage = (keyOrText, options) => scene.gameHud?.showTransientMessage?.(keyOrText, options),
   saveSession = () => scene.saveSession?.(),
   playEffect = (type) => scene.audioRuntime?.playEffect?.(type),
-  syncNeeds = () => {
-    scene.syncPlayerEnergyTarget?.();
-    scene.gameHud?.render?.();
-  },
 } = {}) {
   const promptBackground = scene.add.graphics().setDepth(HUD_DEPTH + 34).setScrollFactor(0).setVisible(false);
   const promptText = createManagedText(scene, 0, 0, "", {
@@ -63,37 +49,39 @@ export function createWildAtollRuntime(scene, {
     .setDepth(HUD_DEPTH + 36)
     .setScrollFactor(0)
     .disableInteractive();
-  const titleText = createManagedText(scene, 0, 0, "", {
+  const titleText = createManagedText(scene, 0, TITLE_Y, "", {
     fontSize: "8px",
     color: "#f2eadc",
-  }).setDepth(HUD_DEPTH - 2).setScrollFactor(0).setVisible(false);
+  }).setDepth(HUD_DEPTH + 20).setScrollFactor(0).setVisible(false);
 
   let mountedInNest = false;
   let runActive = false;
   let runSeed = "";
-  let routeId = NEST_PHASE;
+  let arenaId = NEST_PHASE;
   let candidate = null;
-  let visuals = [];
-  let grass = new Map();
+  let arenaVisuals = [];
+  let activeNodeVisuals = new Map();
+  let runNodes = new Map();
   let destroyed = false;
   let runSerial = 0;
 
   function mountNestEntrance() {
     mountedInNest = true;
     runActive = false;
-    routeId = NEST_PHASE;
+    arenaId = NEST_PHASE;
     candidate = null;
-    clearArena();
-    visuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
+    clearArenaPresentation();
+    arenaVisuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
     titleText.setVisible(false);
   }
 
   function unmountNest() {
     mountedInNest = false;
     runActive = false;
-    routeId = NEST_PHASE;
+    arenaId = NEST_PHASE;
     candidate = null;
-    clearArena();
+    runNodes.clear();
+    clearArenaPresentation();
     renderPrompt();
     titleText.setVisible(false);
   }
@@ -102,180 +90,178 @@ export function createWildAtollRuntime(scene, {
     runActive = true;
     runSerial += 1;
     runSeed = `${Date.now()}-${runSerial}`;
-    routeId = WILD_ATOLL_ROUTES.entry;
-    candidate = null;
-    clearArena();
-    renderEntryArena();
-    setPlayerPosition(ENTRY_SPAWN);
+    runNodes = new Map();
+    renderArena(WILD_ATOLL_ARENAS.edge, "south");
     showMessage("hud:atoll.arrival");
   }
 
   function leaveRun() {
     runActive = false;
-    routeId = NEST_PHASE;
+    arenaId = NEST_PHASE;
     candidate = null;
-    clearArena();
-    visuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
+    runNodes.clear();
+    clearArenaPresentation();
+    arenaVisuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
     titleText.setVisible(false);
     setPlayerPosition(NEST_RETURN_SPAWN);
     showMessage("hud:atoll.leftRun");
   }
 
-  function clearArena() {
-    const layout = getWorldLayout();
-    for (const entry of grass.values()) layout?.clearWorldObjectCollider?.(entry.id);
-    grass.clear();
-    visuals.forEach((object) => object.destroy?.());
-    visuals = [];
-  }
-
-  function renderEntryArena() {
-    visuals.push(...createCave(scene, ENTRY_POINTS.mist.x, ENTRY_POINTS.mist.y));
-    visuals.push(...createCave(scene, ENTRY_POINTS.stone.x, ENTRY_POINTS.stone.y));
-    visuals.push(...createCave(scene, ENTRY_POINTS.leave.x, ENTRY_POINTS.leave.y));
-    const marker = createManagedText(scene, ENTRY_POINTS.forecast.x - 3, ENTRY_POINTS.forecast.y - 14, "?", {
-      fontSize: "12px",
-      color: "#f4d57b",
-    }).setDepth(620 + ENTRY_POINTS.forecast.y);
-    visuals.push(marker);
-    setTitle("hud:atoll.entryTitle");
-  }
-
-  function enterRoute(nextRouteId) {
-    routeId = nextRouteId;
+  function renderArena(nextArenaId, entrySide) {
+    arenaId = nextArenaId;
     candidate = null;
-    clearArena();
-    visuals.push(...createCave(scene, ROUTE_RETURN_POINT.x, ROUTE_RETURN_POINT.y));
-    applyWildAtollRouteEntry(getGameplayState(), nextRouteId);
-    if (nextRouteId === WILD_ATOLL_ROUTES.mist) {
-      setTitle("hud:atoll.mistTitle");
-      showMessage("hud:atoll.mistEntered");
-    } else {
-      setTitle("hud:atoll.stoneTitle");
-      showMessage("hud:atoll.stoneEntered");
+    clearArenaPresentation();
+    const definition = getWildAtollArenaDefinition(arenaId);
+    const nodes = nodesForArena(arenaId);
+    for (const node of nodes) {
+      if (!node.cleared) createNodeVisual(node);
     }
-    setPlayerPosition(ROUTE_SPAWN);
-    spawnGrass();
-    syncNeeds();
-    saveSession();
+    for (const exit of definition.exits) createExitVisual(exit);
+    setTitle(definition.titleKey);
+    setPlayerPosition(entrySide === "north" ? NORTH_SPAWN : SOUTH_SPAWN);
   }
 
-  function returnToEntry() {
-    routeId = WILD_ATOLL_ROUTES.entry;
-    candidate = null;
-    clearArena();
-    renderEntryArena();
-    setPlayerPosition(ENTRY_SPAWN);
-    showMessage("hud:atoll.returned");
+  function nodesForArena(id) {
+    if (!runNodes.has(id)) runNodes.set(id, createWildAtollArenaNodes(runSeed, id));
+    return runNodes.get(id);
   }
 
-  function spawnGrass() {
+  function clearArenaPresentation() {
     const layout = getWorldLayout();
-    const detailFrames = OUTDOOR_FRAMES.grassDetails;
-    GRASS_POSITIONS.forEach(([tileX, tileY], index) => {
-      const id = `atoll-grass-${runSerial}-${index}`;
-      const x = tileX * TILE_SIZE;
-      const y = tileY * TILE_SIZE;
-      const frame = detailFrames[wildAtollFrameIndex(runSeed, index, detailFrames.length)];
-      const sprite = scene.add.image(x, y, OUTDOOR_TEXTURE_KEY, frame)
-        .setOrigin(0)
-        .setTint(routeId === WILD_ATOLL_ROUTES.mist ? 0xb8d9b0 : 0xc7b69b)
-        .setDepth(560 + y + TILE_SIZE);
-      const rect = Object.freeze({ left: x + 2, top: y + 4, right: x + 14, bottom: y + 15 });
-      layout?.setWorldObjectCollider?.(id, rect, "atoll:grass", { atollGrass: true });
-      grass.set(id, { id, index, x: x + TILE_SIZE / 2, y: y + TILE_SIZE / 2, sprite, rect });
-      visuals.push(sprite);
-    });
+    for (const node of activeNodeVisuals.values()) layout?.clearWorldObjectCollider?.(node.colliderId);
+    activeNodeVisuals.clear();
+    for (const object of arenaVisuals) object.destroy?.();
+    arenaVisuals = [];
   }
 
-  function cutGrass(actionId) {
-    if (!runActive || routeId === WILD_ATOLL_ROUTES.entry) return false;
-    const item = scene.gameHud?.getCombatActionItem?.(actionId);
-    if (item?.id !== "sword") return false;
-    if (scene.needsRuntime?.canPerformPhysicalAction?.("sword")?.allowed === false) return false;
-    const player = getPlayerCharacter();
-    const position = player?.motor?.position;
-    const facing = player?.motor?.movement?.facingDirection;
-    if (!position || !facing) return false;
-    const target = [...grass.values()]
-      .map((entry) => {
-        const dx = entry.x - position.x;
-        const dy = entry.y - position.y;
-        const distance = Math.hypot(dx, dy);
-        const dot = distance > 0 ? (dx * facing.x + dy * facing.y) / distance : 1;
-        return { entry, distance, dot };
-      })
-      .filter(({ distance, dot }) => distance <= SWORD_REACH && dot >= 0.15)
-      .sort((a, b) => a.distance - b.distance || b.dot - a.dot)[0]?.entry;
-    if (!target) return false;
-    removeGrass(target);
-    resolveGrassDrop(target);
-    playEffect("melee-log-thud");
-    return true;
+  function createExitVisual(exit) {
+    const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
+    if (exit.cave) {
+      arenaVisuals.push(...createCave(scene, point.x, point.y - TILE_SIZE));
+      return;
+    }
+    const marker = scene.add.graphics()
+      .setPosition(point.x - 10, point.y - 4)
+      .setDepth(555 + point.y);
+    marker.fillStyle(0x263b31, 0.92).fillRect(0, 0, 20, 8);
+    marker.fillStyle(0x89b58b, 0.72).fillRect(2, 2, 16, 4);
+    marker.fillStyle(0xd8cfaa, 0.75).fillRect(8, 1, 4, 6);
+    arenaVisuals.push(marker);
   }
 
-  function removeGrass(target) {
-    getWorldLayout()?.clearWorldObjectCollider?.(target.id);
-    grass.delete(target.id);
-    target.sprite.destroy();
-    visuals = visuals.filter((object) => object !== target.sprite);
+  function createNodeVisual(node) {
+    const x = node.tileX * TILE_SIZE;
+    const y = node.tileY * TILE_SIZE;
+    const graphics = scene.add.graphics().setPosition(x, y).setDepth(560 + y + TILE_SIZE);
+    drawNode(graphics, node);
+    const colliderId = `${node.id}-${runSerial}`;
+    getWorldLayout()?.setWorldObjectCollider?.(colliderId, {
+      left: x + 2,
+      top: y + 5,
+      right: x + 14,
+      bottom: y + 15,
+    }, `atoll:${node.kind}`, { atollResource: true, nodeId: node.id });
+    const entry = { node, graphics, colliderId, x: x + 8, y: y + 9 };
+    activeNodeVisuals.set(node.id, entry);
+    arenaVisuals.push(graphics);
   }
 
-  function resolveGrassDrop(target) {
-    const itemId = resolveWildAtollGrassDrop({ seed: runSeed, grassIndex: target.index, routeId });
-    if (!itemId) return;
+  function drawNode(graphics, node) {
+    graphics.clear().setScale?.(1);
+    if (node.kind === "berry") {
+      drawBerryBush(graphics);
+      return;
+    }
+    drawResourceVisual(graphics, getResourceProfile(node.profileId), node.progress);
+  }
+
+  function activateCandidate() {
+    if (!candidate) return false;
+    if (candidate.kind === "enter") {
+      beginRun();
+      return true;
+    }
+    if (candidate.kind === "resource") {
+      workResource(candidate.nodeId);
+      return true;
+    }
+    if (candidate.kind === "exit") {
+      activateExit(candidate.exit);
+      return true;
+    }
+    return false;
+  }
+
+  function activateExit(exit) {
+    if (exit.target === "nest") {
+      leaveRun();
+      return;
+    }
+    const entrySide = exit.direction === "south" ? "north" : "south";
+    renderArena(exit.target, entrySide);
+  }
+
+  function workResource(nodeId) {
+    const visual = activeNodeVisuals.get(nodeId);
+    const node = visual?.node;
+    if (!node || node.cleared) return;
+    const selectedItem = scene.gameHud?.getSelectedInventoryItem?.() ?? null;
+    if (node.requiredTool && selectedItem?.id !== node.requiredTool) {
+      showMessage(node.requiredTool === "axe" ? "hud:atoll.needAxe" : "hud:atoll.needPickaxe");
+      return;
+    }
+    if (node.requiredTool) {
+      const preview = scene.needsRuntime?.canPerformPhysicalAction?.(node.requiredTool);
+      if (preview?.allowed === false) {
+        showMessage("hud:interaction.notEnoughEnergy");
+        return;
+      }
+      const spent = scene.needsRuntime?.recordPhysicalAction?.(node.requiredTool);
+      if (spent?.mutated === false) {
+        showMessage("hud:interaction.notEnoughEnergy");
+        return;
+      }
+      node.progress = Math.min(1, node.progress + 1 / node.hp);
+      playEffect(node.requiredTool === "axe" ? "chop" : "mine");
+      scene.syncPlayerEnergyTarget?.();
+      renderHud();
+      saveSession();
+      if (node.progress < 1) {
+        drawNode(visual.graphics, node);
+        return;
+      }
+    } else {
+      node.progress = 1;
+      playEffect("inventory-change");
+    }
+    clearResourceNode(node, visual);
+  }
+
+  function clearResourceNode(node, visual) {
+    node.cleared = true;
+    getWorldLayout()?.clearWorldObjectCollider?.(visual.colliderId);
+    activeNodeVisuals.delete(node.id);
+    visual.graphics.destroy();
+    arenaVisuals = arenaVisuals.filter((object) => object !== visual.graphics);
     const gameplay = getGameplayState();
-    const result = addInventoryItem(gameplay.inventory, createInventoryItem(itemId, 1));
+    const result = addInventoryItem(gameplay.inventory, createInventoryItem(node.itemId, 1));
     if (result.mutated) {
       notifyInventoryGain(result);
       renderHud();
       saveSession();
       return;
     }
-    spawnWorldItems(itemId, 1, { x: target.x, y: target.y });
-  }
-
-  function readForecast() {
-    showMessage(localization.t("hud:atoll.forecastText"), { literalText: true, durationMs: 5200 });
-  }
-
-  function activateCandidate() {
-    if (!candidate) return false;
-    if (candidate.id === "enter") beginRun();
-    else if (candidate.id === "forecast") readForecast();
-    else if (candidate.id === WILD_ATOLL_ROUTES.mist) enterRoute(WILD_ATOLL_ROUTES.mist);
-    else if (candidate.id === WILD_ATOLL_ROUTES.stone) enterRoute(WILD_ATOLL_ROUTES.stone);
-    else if (candidate.id === "return") returnToEntry();
-    else if (candidate.id === "leave") leaveRun();
-    return true;
+    spawnWorldItems(node.itemId, 1, { x: visual.x, y: visual.y });
   }
 
   function onAction(actionId) {
-    if (!mountedInNest || destroyed) return;
-    if (actionId === "space" && candidate && activateCandidate()) {
-      scene.suppressNextInteract = true;
-      return;
-    }
-    cutGrass(actionId);
-  }
-
-  function onPointerDown(pointer, _currentlyOver, event) {
-    if (!mountedInNest || scene.isHudPoint?.(pointer.x, pointer.y)) return;
-    const actionId = pointer?.rightButtonDown?.() ? "rmb" : pointer?.leftButtonDown?.() ? "lmb" : null;
-    if (!actionId) return;
-    if (cutGrass(actionId)) {
-      event?.stopPropagation?.();
-      pointer?.event?.stopPropagation?.();
-    }
+    if (!mountedInNest || destroyed || actionId !== "space") return;
+    if (candidate && activateCandidate()) scene.suppressNextInteract = true;
   }
 
   function onKeyboard(event) {
-    if (event?.repeat || isEditableTarget(event?.target)) return;
-    const actionId = event.code === "Space" ? "space"
-      : event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift"
-        : null;
-    if (!actionId) return;
-    onAction(actionId);
+    if (event?.repeat || isEditableTarget(event?.target) || event.code !== "Space") return;
+    onAction("space");
   }
 
   function update() {
@@ -291,20 +277,33 @@ export function createWildAtollRuntime(scene, {
   function findCandidate() {
     const position = getPlayerCharacter()?.motor?.position;
     if (!position) return null;
-    const candidates = routeId === NEST_PHASE
-      ? [{ id: "enter", point: NEST_ATOLL_ENTRANCE, labelKey: "hud:atoll.promptEnter" }]
-      : routeId === WILD_ATOLL_ROUTES.entry
-        ? [
-            { id: "forecast", point: ENTRY_POINTS.forecast, labelKey: "hud:atoll.promptForecast" },
-            { id: WILD_ATOLL_ROUTES.mist, point: ENTRY_POINTS.mist, labelKey: "hud:atoll.promptMist" },
-            { id: WILD_ATOLL_ROUTES.stone, point: ENTRY_POINTS.stone, labelKey: "hud:atoll.promptStone" },
-            { id: "leave", point: ENTRY_POINTS.leave, labelKey: "hud:atoll.promptLeave" },
-          ]
-        : [{ id: "return", point: ROUTE_RETURN_POINT, labelKey: "hud:atoll.promptReturn" }];
-    return candidates
-      .map((entry) => ({ ...entry, distance: Math.hypot(entry.point.x - position.x, entry.point.y - position.y) }))
+    if (!runActive) {
+      const distance = Math.hypot(NEST_ATOLL_ENTRANCE.x - position.x, NEST_ATOLL_ENTRANCE.y - position.y);
+      return distance <= INTERACTION_RADIUS
+        ? { kind: "enter", id: "enter", labelKey: "hud:atoll.promptEnter", distance }
+        : null;
+    }
+    const definition = getWildAtollArenaDefinition(arenaId);
+    const exits = definition.exits.map((exit) => {
+      const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
+      return {
+        kind: "exit",
+        id: `exit:${exit.id}`,
+        exit,
+        labelKey: exit.promptKey,
+        distance: Math.hypot(point.x - position.x, point.y - position.y),
+      };
+    });
+    const resources = [...activeNodeVisuals.values()].map((entry) => ({
+      kind: "resource",
+      id: `resource:${entry.node.id}`,
+      nodeId: entry.node.id,
+      labelKey: entry.node.promptKey,
+      distance: Math.hypot(entry.x - position.x, entry.y - position.y),
+    }));
+    return [...exits, ...resources]
       .filter((entry) => entry.distance <= INTERACTION_RADIUS)
-      .sort((a, b) => a.distance - b.distance)[0] ?? null;
+      .sort((left, right) => left.distance - right.distance)[0] ?? null;
   }
 
   function renderPrompt() {
@@ -326,7 +325,7 @@ export function createWildAtollRuntime(scene, {
     promptBackground
       .fillStyle(HUD_COLORS.panel, 0.94).fillRect(x, PROMPT_RECT.y, width, PROMPT_RECT.height)
       .lineStyle(1, HUD_COLORS.border, 0.95).strokeRect(x + 0.5, PROMPT_RECT.y + 0.5, width - 1, PROMPT_RECT.height - 1);
-    promptText.setPosition(Math.round((320 - promptText.width) / 2), PROMPT_RECT.y + 6);
+    promptText.setPosition(Math.round((320 - promptText.width) / 2), PROMPT_RECT.y + 5);
     promptZone.setPosition(x, PROMPT_RECT.y).setSize(width, PROMPT_RECT.height).setInteractive({ useHandCursor: true });
   }
 
@@ -336,7 +335,7 @@ export function createWildAtollRuntime(scene, {
       fontFamily: localization.getLocale().fontKey,
       fontSize: "8px",
       color: "#f2eadc",
-    }).setText(value).setPosition(Math.round((320 - titleText.width) / 2), 30).setVisible(true);
+    }).setText(value).setPosition(Math.round((320 - titleText.width) / 2), TITLE_Y).setVisible(true);
   }
 
   function setPlayerPosition(point) {
@@ -351,17 +350,12 @@ export function createWildAtollRuntime(scene, {
   promptZone.on("pointerdown", (pointer, _x, _y, event) => {
     event?.stopPropagation?.();
     pointer?.event?.stopPropagation?.();
-    activateCandidate();
+    if (candidate && activateCandidate()) scene.suppressNextInteract = true;
   });
-  scene.input.on("pointerdown", onPointerDown);
   globalThis.window?.addEventListener?.("keydown", onKeyboard);
   scene.events.on("update", update);
   const unsubscribe = localization?.subscribe?.(() => {
-    if (runActive) {
-      setTitle(routeId === WILD_ATOLL_ROUTES.mist
-        ? "hud:atoll.mistTitle"
-        : routeId === WILD_ATOLL_ROUTES.stone ? "hud:atoll.stoneTitle" : "hud:atoll.entryTitle");
-    }
+    if (runActive) setTitle(getWildAtollArenaDefinition(arenaId).titleKey);
     renderPrompt();
   });
 
@@ -372,18 +366,16 @@ export function createWildAtollRuntime(scene, {
       mountedInNest,
       active: runActive,
       runSeed,
-      routeId,
-      grassRemaining: grass.size,
+      arenaId,
       candidateId: candidate?.id ?? null,
+      remainingNodes: runActive ? nodesForArena(arenaId).filter((node) => !node.cleared).length : 0,
     }),
-    startRoute(route, { seed = `${Date.now()}` } = {}) {
-      if (route !== WILD_ATOLL_ROUTES.mist && route !== WILD_ATOLL_ROUTES.stone) {
-        throw new Error(`Unknown Wild Atoll route: ${route}`);
-      }
+    startArena(nextArenaId, { seed = `${Date.now()}` } = {}) {
       if (!mountedInNest) mountNestEntrance();
-      if (!runActive) beginRun();
+      runActive = true;
       runSeed = String(seed);
-      enterRoute(route);
+      runNodes = new Map();
+      renderArena(nextArenaId, "south");
     },
     destroy() {
       if (destroyed) return;
@@ -391,7 +383,6 @@ export function createWildAtollRuntime(scene, {
       unmountNest();
       unsubscribe?.();
       scene.events.off("update", update);
-      scene.input.off("pointerdown", onPointerDown);
       globalThis.window?.removeEventListener?.("keydown", onKeyboard);
       promptZone.destroy();
       promptBackground.destroy();
@@ -415,6 +406,14 @@ function createCave(scene, centerX, topY) {
     textureKey,
     frame,
   ).setOrigin(0).setDepth(560 + topY + 2 * TILE_SIZE));
+}
+
+function drawBerryBush(graphics) {
+  graphics.fillStyle(0x234526, 1).fillRect(3, 7, 11, 7).fillRect(5, 4, 7, 9);
+  graphics.fillStyle(0x3f7040, 1).fillRect(2, 8, 4, 4).fillRect(10, 6, 5, 5).fillRect(6, 3, 5, 4);
+  graphics.fillStyle(0x7954a8, 1).fillRect(5, 8, 2, 2).fillRect(10, 10, 2, 2).fillRect(8, 5, 2, 2);
+  graphics.fillStyle(0xb99ad8, 1).fillRect(5, 8, 1, 1).fillRect(10, 10, 1, 1).fillRect(8, 5, 1, 1);
+  graphics.fillStyle(0x5b3824, 1).fillRect(8, 13, 2, 3);
 }
 
 function isEditableTarget(target) {
