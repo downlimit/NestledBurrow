@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { collides } from "../src/character/movement.js";
 import { createInventoryItem } from "../src/inventory/inventoryDomain.js";
 import { useCombatNumberSlot } from "../src/inventory/combatQuickUse.js";
 import {
@@ -7,6 +9,14 @@ import {
   WILD_ATOLL_ARENAS,
   WILD_ATOLL_STARTER_PATH,
 } from "../src/world/wildAtollDomain.js";
+import { createWorldLayout } from "../src/world/worldLayout.js";
+import { createWorldLocationCoordinator } from "../src/world/worldLocationCoordinator.js";
+import { ATOLL_WORLD_MODEL, WORLD_IDS } from "../src/world/worldLocationConfig.js";
+import { TILE_SIZE } from "../src/world/worldConfig.js";
+
+const runtimeSource = readFileSync("src/world/wildAtollRuntime.js", "utf8");
+const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
+const enHud = JSON.parse(readFileSync("public/locales/en/hud.json", "utf8"));
 
 function gameplayFixture() {
   return {
@@ -70,6 +80,34 @@ function gameplayFixture() {
   const mine = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.mine);
   assert.ok(forest.filter((node) => node.kind === "log").length > forest.filter((node) => node.kind === "stone").length);
   assert.ok(mine.filter((node) => node.kind === "stone").length > mine.filter((node) => node.kind === "log").length);
+}
+
+{
+  const coordinator = createWorldLocationCoordinator({
+    sessionState: { currentWorldId: WORLD_IDS.atoll },
+    createLayout: (worldId) => createWorldLayout(worldId),
+  });
+  const layout = coordinator.createInitialLayout();
+  assert.equal(layout.transitions.length, 0, "Atoll has no persistent transport assets beneath arena presentation");
+  assert.equal(collides(ATOLL_WORLD_MODEL.spawn, layout, 8, 5), false, "entry spawn is collision-safe");
+  for (const arenaId of Object.values(WILD_ATOLL_ARENAS)) {
+    for (const node of createWildAtollArenaNodes("task-068", arenaId)) {
+      const point = { x: node.tileX * TILE_SIZE + 8, y: node.tileY * TILE_SIZE + 9 };
+      assert.equal(collides(point, layout, 8, 5), false, `${arenaId}:${node.index} starts on walkable arena terrain`);
+      assert.ok(Math.hypot(point.x - ATOLL_WORLD_MODEL.spawn.x, point.y - ATOLL_WORLD_MODEL.spawn.y) > 16, `${arenaId}:${node.index} does not trap the entry spawn`);
+    }
+  }
+}
+
+{
+  assert(runtimeSource.includes("const TITLE_Y = 112"), "arena title stays below the top HUD controls");
+  assert(runtimeSource.includes("WORLD_IDS.atoll"), "arena runtime mounts in the isolated Atoll world");
+  assert(!runtimeSource.includes("forecast"), "forecast marker and abstract arena forecast are removed");
+  for (const [locale, atoll] of [["ru", ruHud.atoll], ["en", enHud.atoll]]) {
+    for (const [key, value] of Object.entries(atoll)) {
+      assert(!/[—–?]/u.test(value), `${locale} Atoll label ${key} uses only supported glyphs`);
+    }
+  }
 }
 
 console.log("Task #068 contracts OK");
