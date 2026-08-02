@@ -51,6 +51,7 @@
     "energyRestored": "Energy restored",
     "chop": "Chop",
     "mine": "Mine",
+    "gatherBerries": "Gather berries",
     "shower": "Use shower",
     "leaveShower": "Leave shower",
     "toilet": "Use toilet",
@@ -104,35 +105,47 @@
       "coins": "coins"
     },
     "servingStock": {
-      "lemonade1": "Lemonade 1/4 — take",
-      "lemonade2": "Lemonade 2/4 — take",
-      "lemonade3": "Lemonade 3/4 — take",
-      "lemonade4": "Lemonade 4/4 — take",
-      "friedPotatoDish1": "Potato dish 1/4 — take",
-      "friedPotatoDish2": "Potato dish 2/4 — take",
-      "friedPotatoDish3": "Potato dish 3/4 — take",
-      "friedPotatoDish4": "Potato dish 4/4 — take"
+      "lemonade1": "Lemonade 1/4 - take",
+      "lemonade2": "Lemonade 2/4 - take",
+      "lemonade3": "Lemonade 3/4 - take",
+      "lemonade4": "Lemonade 4/4 - take",
+      "friedPotatoDish1": "Potato dish 1/4 - take",
+      "friedPotatoDish2": "Potato dish 2/4 - take",
+      "friedPotatoDish3": "Potato dish 3/4 - take",
+      "friedPotatoDish4": "Potato dish 4/4 - take"
     }
   },
   "atoll": {
-    "arrival": "You entered the edge clearing of the Wild Atoll.",
+    "arrival": "The first paths begin here.",
     "leftRun": "You returned to Island Nest.",
-    "edgeTitle": "WILD ATOLL / EDGE CLEARING",
-    "groveTitle": "WILD ATOLL / QUIET GROVE",
-    "forkTitle": "WILD ATOLL / FORK",
-    "forestTitle": "FOREST T1 / FIRST CLEARING",
-    "mineTitle": "MINES T1 / FIRST CHAMBER",
-    "promptEnter": "SPACE - ENTER WILD ATOLL",
-    "promptReturnNest": "SPACE - RETURN TO NEST",
-    "promptForward": "SPACE - CONTINUE",
-    "promptBack": "SPACE - GO BACK",
-    "promptForest": "SPACE - ENTER FOREST",
-    "promptMine": "SPACE - DESCEND INTO MINES",
-    "promptChop": "SPACE - CHOP WITH AXE",
-    "promptMineResource": "SPACE - MINE WITH PICKAXE",
-    "promptGatherBerry": "SPACE - GATHER BERRIES",
-    "needAxe": "Select the axe in the peaceful inventory first",
-    "needPickaxe": "Select the pickaxe in the peaceful inventory first"
+    "promptEnter": "SPACE - WILD ATOLL",
+    "segmentStarter": "THE FIRST PATHS",
+    "arenas": {
+      "root": "FRINGE",
+      "meadow": "MEADOW",
+      "stones": "STONES",
+      "pond": "POND",
+      "thicket": "THICKET",
+      "roots": "ROOTS",
+      "slope": "SCREE",
+      "edge": "PASS"
+    },
+    "paths": {
+      "meadow": "SPACE - TO MEADOW",
+      "stones": "SPACE - TO STONES",
+      "pond": "SPACE - TO POND",
+      "thicket": "SPACE - TO THICKET",
+      "roots": "SPACE - TO ROOTS",
+      "slope": "SPACE - TO SCREE",
+      "edge": "SPACE - TO PASS",
+      "forestT1": "SPACE - FOREST T1",
+      "mineT1": "SPACE - MINES T1",
+      "nest": "SPACE - TO NEST"
+    },
+    "segmentLocked": {
+      "forestT1": "The forest trail is still closed.",
+      "mineT1": "The mine descent is still closed."
+    }
   },
   "quickUse": {
     "empty": "The slot is empty",
@@ -168,11 +181,11 @@
     "balance_many": "Coins: {count}",
     "balance_other": "Coins: {count}",
     "buy": "BUY 1",
-    "buyPrice": "BUY · {count}",
-    "buyPrice_one": "BUY · {count}",
-    "buyPrice_few": "BUY · {count}",
-    "buyPrice_many": "BUY · {count}",
-    "buyPrice_other": "BUY · {count}",
+    "buyPrice": "BUY - {count}",
+    "buyPrice_one": "BUY - {count}",
+    "buyPrice_few": "BUY - {count}",
+    "buyPrice_many": "BUY - {count}",
+    "buyPrice_other": "BUY - {count}",
     "exit": "SPACE - CLOSE",
     "not-enough-coins": "Not enough coins",
     "inventory-full": "Inventory is full"
