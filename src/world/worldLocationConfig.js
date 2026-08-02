@@ -11,6 +11,7 @@ import {
 export const WORLD_IDS = Object.freeze({
   village: "village",
   nest: "nest",
+  atoll: "atoll",
 });
 
 export const TRANSPORT_PROFILE = deepFreeze({
@@ -57,6 +58,12 @@ export const NEST_ISLAND_MODEL = deepFreeze({
   ],
 });
 
+export const ATOLL_WORLD_MODEL = deepFreeze({
+  columns: 22,
+  rows: 18,
+  spawn: { x: 11 * TILE_SIZE, y: 14 * TILE_SIZE, facing: { x: 0, y: -1 } },
+});
+
 export const WORLD_LOCATION_DEFINITIONS = deepFreeze({
   [WORLD_IDS.village]: {
     id: WORLD_IDS.village,
@@ -94,7 +101,26 @@ export const WORLD_LOCATION_DEFINITIONS = deepFreeze({
     },
     loadSpawn: nestTransport.safeSpawn,
     transports: [nestTransport],
-    futureExit: { id: "nest-north-dead-end", destinationWorldId: null },
+    futureExit: { id: "nest-north-dead-end", destinationWorldId: WORLD_IDS.atoll },
+  },
+  [WORLD_IDS.atoll]: {
+    id: WORLD_IDS.atoll,
+    productName: "Дикий Атолл",
+    columns: ATOLL_WORLD_MODEL.columns,
+    rows: ATOLL_WORLD_MODEL.rows,
+    capabilities: {
+      homeSystems: false,
+      npcs: false,
+      facilities: false,
+      tavernService: false,
+      farming: false,
+      cooking: false,
+      buildMode: false,
+      meleeWeapons: false,
+      trainingDummy: false,
+    },
+    loadSpawn: ATOLL_WORLD_MODEL.spawn,
+    transports: [],
   },
 });
 
