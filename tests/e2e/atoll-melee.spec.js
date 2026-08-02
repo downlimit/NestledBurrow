@@ -22,7 +22,7 @@ test("Wild Atoll mounts common melee runtime for sword and battle axe", async ({
   await boot(page);
 
   await bridge(page, "enterTransport", "village-nest-transport");
-  await expect.poll(async () => (await bridge(page, "getLocationState")).currentWorldId).toBe("nest");
+  await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("nest");
 
   await bridge(page, "placePlayerAt", {
     x: 11 * 16,
@@ -31,7 +31,7 @@ test("Wild Atoll mounts common melee runtime for sword and battle axe", async ({
   });
   await page.waitForTimeout(120);
   await page.keyboard.press("Space");
-  await expect.poll(async () => (await bridge(page, "getLocationState")).currentWorldId, { timeout: 2000 }).toBe("atoll");
+  await expect.poll(async () => (await bridge(page, "getLocationState")).worldId, { timeout: 2000 }).toBe("atoll");
   await expect.poll(() => bridge(page, "getMeleeState")).not.toBeNull();
 
   await bridge(page, "addCombatInventoryItem", { itemId: "sword" });
