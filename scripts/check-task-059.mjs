@@ -25,7 +25,7 @@ assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.meleeWeapons, true,
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.trainingDummy, true, "the training dummy remains village-owned");
 assert.equal(WORLD_LOCATION_DEFINITIONS.nest.capabilities.meleeWeapons, true, "Nest retains the shared weapon runtime");
 assert.equal(WORLD_LOCATION_DEFINITIONS.nest.capabilities.trainingDummy, false, "Nest excludes the village training dummy");
-assert.equal(WORLD_LOCATION_DEFINITIONS.atoll.capabilities.meleeWeapons, false, "Atoll arena resources use their own tool-gated interactions");
+assert.equal(WORLD_LOCATION_DEFINITIONS.atoll.capabilities.meleeWeapons, true, "Atoll retains the same shared weapon runtime as every gameplay space");
 assert.deepEqual(
   [WORLD_LOCATION_DEFINITIONS.nest.columns, WORLD_LOCATION_DEFINITIONS.nest.rows],
   [22, 16],
