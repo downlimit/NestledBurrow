@@ -20,9 +20,9 @@ const INTERACTION_RADIUS = 27;
 const NEST_ATOLL_ENTRANCE = Object.freeze({ x: 11 * TILE_SIZE, y: 6 * TILE_SIZE });
 const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
 const SOUTH_SPAWN = Object.freeze({ ...ATOLL_WORLD_MODEL.spawn });
-const SEGMENT_TITLE_Y = 17;
-const ARENA_TITLE_Y = 27;
-const TITLE_MAX_WIDTH = 224;
+const SEGMENT_TITLE_Y = 46;
+const ARENA_TITLE_Y = 56;
+const TITLE_MAX_WIDTH = 180;
 const PROMPT_RECT = Object.freeze({ x: 62, y: 128, width: 196, height: 20 });
 const COLLAPSE_FADE_OUT_MS = 5000;
 const COLLAPSE_BLACK_HOLD_MS = 2000;
@@ -154,6 +154,14 @@ export function createWildAtollRuntime(scene, {
     for (const resource of resources) owner.registerResource?.(resource);
   }
 
+  function ensureArenaResourcesRegistered() {
+    if (mountedWorldId !== WORLD_IDS.atoll || !runActive || !arenaId || activeResourceIds.length > 0) return;
+    const definition = getWildAtollArenaDefinition(arenaId);
+    if (definition.resources.length === 0 || !debrisRuntime()) return;
+    registerArenaResources(definition);
+    scene.interactionRuntime?.refresh?.();
+  }
+
   function clearArenaPresentation({ removeResourceState = true } = {}) {
     const owner = debrisRuntime();
     for (const resourceId of activeResourceIds) {
@@ -238,6 +246,7 @@ export function createWildAtollRuntime(scene, {
       if (worldId === WORLD_IDS.nest) mountNestEntrance();
       else if (worldId === WORLD_IDS.atoll) mountAtollRun();
     }
+    ensureArenaResourcesRegistered();
     if (mountedWorldId === WORLD_IDS.atoll
       && runActive
       && !collapseRecoveryActive
