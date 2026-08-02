@@ -20,15 +20,15 @@ Owns world geometry, collisions, resources, farming and inventory items.
 
 ## Owners
 
-- location registry/transitions, owner lifecycle and presentation: `worldLocationConfig.js`, `worldLocationCoordinator.js`, `worldLocationRuntime.js`, `worldPresentationRuntime.js`;
-- world geometry/collision: `worldLayout.js`, `nestWorldLayout.js`, `worldConfig.js`;
-- profiles/actions/rewards: `resourceDomain.js`, `resourceConfig.js`;
-- inventory state and item operations: `inventoryDomain.js`;
-- inventory/world-item runtime: `inventoryRuntime.js`;
-- farm rules/runtime and crop profiles: `farmingDomain.js`, `farmingRuntime.js`, `farmingConfig.js`;
-- world resource instances, colliders, targeting and hit feedback: `debrisRuntime.js`; resource presentation adapter: `resourceVisuals.js`;
-- interaction targeting and dialogue lifecycle: `interaction.js`, `interactionRuntime.js`;
-- non-dialogue world dispatch and transient resource-action state: `worldInteractionCoordinator.js`;
+- location config/transitions/lifecycle/presentation: `src/world/worldLocationConfig.js`, `src/world/worldLocationCoordinator.js`, `src/world/worldLocationRuntime.js`, `src/world/worldPresentationRuntime.js`;
+- world geometry/collision: `src/world/worldLayout.js`, `src/world/nestWorldLayout.js`, `src/world/worldConfig.js`;
+- profiles/actions/rewards: `src/resources/resourceDomain.js`, `src/resources/resourceConfig.js`;
+- inventory state and item operations: `src/inventory/inventoryDomain.js`;
+- inventory/world-item runtime: `src/inventory/inventoryRuntime.js`;
+- farm rules/runtime/profiles: `src/resources/farmingDomain.js`, `src/resources/farmingRuntime.js`, `src/resources/farmingConfig.js`;
+- resource instances/colliders/targeting/hit feedback: `src/resources/debrisRuntime.js`; visuals: `src/resources/resourceVisuals.js`;
+- interaction targeting/dialogue: `src/interaction/interaction.js`, `src/interaction/interactionRuntime.js`;
+- non-dialogue dispatch/resource-action state: `src/interaction/worldInteractionCoordinator.js`;
 - build placement of plants: `systems/build-and-authoring.md`;
 - persistence: `systems/persistence.md`.
 
@@ -37,23 +37,23 @@ Owns world geometry, collisions, resources, farming and inventory items.
 - stable IDs survive save/load and profile data is immutable;
 - `village` remains the home world ID, `nest` is the only additional registered world ID, and unknown saved IDs resolve to `village`;
 - every resource owns one `worldId`; only active-location resources create visuals, colliders, targets and hit resolution;
-- switches reset candidate/unbind, destroy active owners, then presentation; mount reverses that boundary and exposes a named read-only `getOwners()` snapshot;
+- switches reset candidate/unbind, destroy owners, then presentation; mount reverses this and exposes a read-only named `getOwners()` snapshot;
 - `tavernService`/`cooking` require `facilities`; farming mounts independently;
 - location-specific interaction owners are explicitly rebound after mount and detached before teardown;
-- non-dialogue dispatch order is merchant, farming, tavern sign, facility, bed, busy gate, exhausted wake and resource; the first handled result completes dispatch;
+- dispatch order is merchant, farming, tavern sign, facility, bed, busy gate, exhausted wake, resource; first handled result wins;
 - inventory has exactly ten slots; tools and loot share the movable-slot contract;
 - a fresh game owns exactly one axe, pickaxe, hoe and water bucket; migration adds missing tools without duplicates;
 - loot stacks by canonical item ID and the final resource hit is atomic when inventory is full;
 - potato crops require eight effective daylight hours, lemon crops require four, and each crop applies its own daily cap and yield;
-- dry exposure is persisted per crop, advances during day and night only at 0% soil moisture, and resets from either manual watering or precipitation;
+- persisted dry exposure advances day and night at 0% moisture and resets from watering or precipitation;
 - the canonical well is fixed infrastructure and is excluded from build placement, move and demolition;
 - planted trees are gatherable resource nodes, yield exactly five wood and use the axe.
-- authored Burrow trees and location-defined Nest trees register in the same `DebrisRuntime` and use the same `resourceVisuals.js` adapter; locations own placements only.
+- Burrow and Nest trees share `DebrisRuntime` and `src/resources/resourceVisuals.js`; locations own placements only.
 - a fresh Burrow yard contains two planted trees, two small logs, one large log, three small stones and three large stones; their combined yield is exactly 15 wood and 12 stone, or 1.5 stove material costs.
 
 ## Current baseline
 
-The Burrow is `64x48`; the `22x16` Island Nest has oval grass/cliff geometry, a closed northern dead end, four trees and three stones. Resource progress persists across travel/reload. `WorldLocationRuntime` mounts capabilities and delegates frame phases; `WorldInteractionCoordinator` executes through its active owner snapshot. The ten-slot hotbar supports reorder, stack throw and pickup. Potato/lemon crops persist soil/moisture; the fixed well refills the bucket.
+The Burrow is `64x48`; the `22x16` Island Nest has oval grass/cliff geometry, a closed northern dead end, four trees and three stones. Resource progress persists across travel/reload. `WorldLocationRuntime` mounts capabilities/frame phases; `WorldInteractionCoordinator` uses its active owner snapshot. The ten-slot hotbar supports reorder, stack throw and pickup. Potato/lemon crops persist soil/moisture; the fixed well refills the bucket.
 
 ## Not yet
 

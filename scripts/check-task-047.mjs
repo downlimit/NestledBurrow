@@ -4,7 +4,7 @@ import {
   FARMING_FRAMES,
   POTATO_CROP_PROFILE,
   WATER_BUCKET_CAPACITY,
-} from "../src/farmingConfig.js";
+} from "../src/resources/farmingConfig.js";
 import {
   advanceFarmTime,
   axeFarmCell,
@@ -18,28 +18,28 @@ import {
   soilFrame,
   tillSoil,
   waterSoil,
-} from "../src/farmingDomain.js";
+} from "../src/resources/farmingDomain.js";
 import {
   addInventoryItem,
   canAddInventoryItem,
   createFreshInventory,
   getInventoryQuantity,
-} from "../src/inventoryDomain.js";
-import { purchasePotatoSeed } from "../src/merchantDomain.js";
-import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/sessionPersistence.js";
-import { createFreshGameSessionState } from "../src/gameSessionState.js";
-import { compactPromptRect, compactPromptWidth } from "../src/interactionHud.js";
-import { INVENTORY_HUD_AREA } from "../src/inventoryRuntime.js";
-import { worldDepthFromAnchorY } from "../src/buildWorldGeometry.js";
+} from "../src/inventory/inventoryDomain.js";
+import { purchasePotatoSeed } from "../src/resources/merchantDomain.js";
+import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/session/sessionPersistence.js";
+import { createFreshGameSessionState } from "../src/session/gameSessionState.js";
+import { compactPromptRect, compactPromptWidth } from "../src/ui/interactionHud.js";
+import { INVENTORY_HUD_AREA } from "../src/inventory/inventoryRuntime.js";
+import { worldDepthFromAnchorY } from "../src/build/buildWorldGeometry.js";
 import {
   characterBoundsCenter,
   stableGridAnchor,
   stableHoeAimDirection,
-} from "../src/farmingRuntime.js";
-import { UiVisibilityCoordinator } from "../src/uiVisibilityCoordinator.js";
-import { NPCS } from "../src/npcConfig.js";
-import { TAVERN_SIGN } from "../src/guestConfig.js";
-import { DOOR_LEFT, TILE_SIZE } from "../src/worldConfig.js";
+} from "../src/resources/farmingRuntime.js";
+import { UiVisibilityCoordinator } from "../src/ui/uiVisibilityCoordinator.js";
+import { NPCS } from "../src/character/npcConfig.js";
+import { TAVERN_SIGN } from "../src/tavern/guestConfig.js";
+import { DOOR_LEFT, TILE_SIZE } from "../src/world/worldConfig.js";
 
 const HOUR = 3600;
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -218,11 +218,11 @@ uiVisibility.setClassHidden("option-sensitive", false);
 assert.equal(merchantVisibility.at(-1), false);
 
 const mainSource = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
-const gameHudSource = readFileSync(new URL("../src/gameHud.js", import.meta.url), "utf8");
-const farmingRuntimeSource = readFileSync(new URL("../src/farmingRuntime.js", import.meta.url), "utf8");
-const inventoryRuntimeSource = readFileSync(new URL("../src/inventoryRuntime.js", import.meta.url), "utf8");
-const debrisRuntimeSource = readFileSync(new URL("../src/debrisRuntime.js", import.meta.url), "utf8");
-const worldInteractionCoordinatorSource = readFileSync(new URL("../src/worldInteractionCoordinator.js", import.meta.url), "utf8");
+const gameHudSource = readFileSync(new URL("../src/ui/gameHud.js", import.meta.url), "utf8");
+const farmingRuntimeSource = readFileSync(new URL("../src/resources/farmingRuntime.js", import.meta.url), "utf8");
+const inventoryRuntimeSource = readFileSync(new URL("../src/inventory/inventoryRuntime.js", import.meta.url), "utf8");
+const debrisRuntimeSource = readFileSync(new URL("../src/resources/debrisRuntime.js", import.meta.url), "utf8");
+const worldInteractionCoordinatorSource = readFileSync(new URL("../src/interaction/worldInteractionCoordinator.js", import.meta.url), "utf8");
 assert(!mainSource.includes("neighborQuest"), "composition root has no obsolete quest owner");
 assert(!mainSource.includes("street-npc"), "composition root has no obsolete street NPC");
 assert(!/rawPotatoes|preparedPotatoes/.test(gameHudSource), "obsolete kitchen inventory counters are absent from HUD");

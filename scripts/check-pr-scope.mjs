@@ -21,7 +21,7 @@ assert.equal(requiresPreview(["src/main.js"]), true);
 assert.equal(requiresPreview(["package-lock.json"]), true);
 assert.equal(requiresPreview([".github/workflows/pr-check.yml", "src/main.js"]), true);
 assert.equal(requiresBrowser([".github/workflows/pr-check.yml", "package.json"]), false);
-assert.equal(requiresBrowser(["src/worldBuildCoordinator.js", "package.json"]), true);
+assert.equal(requiresBrowser(["src/build/worldBuildCoordinator.js", "package.json"]), true);
 assert.equal(requiresBrowser(["public/locales/en/translation.json"]), true);
 
 const noPreviewBody = `<!-- nestled-burrow-delivery:v1

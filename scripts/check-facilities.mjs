@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { BED_ASSET, BED_OBJECT } from "../src/debrisConfig.js";
-import { FACILITIES, FACILITY_ASSETS, PLATED_DISH_ASSET, preloadFacilityAssets } from "../src/facilityConfig.js";
-import { createFacilityRuntime } from "../src/facilityRuntime.js";
-import { createNewGameInventory } from "../src/inventoryDomain.js";
-import { DEFAULT_SERVING_TABLE_ID } from "../src/cookingDomain.js";
-import { pixelAlignedWorldPoint } from "../src/buildWorldGeometry.js";
+import { BED_ASSET, BED_OBJECT } from "../src/resources/debrisConfig.js";
+import { FACILITIES, FACILITY_ASSETS, PLATED_DISH_ASSET, preloadFacilityAssets } from "../src/facilities/facilityConfig.js";
+import { createFacilityRuntime } from "../src/facilities/facilityRuntime.js";
+import { createNewGameInventory } from "../src/inventory/inventoryDomain.js";
+import { DEFAULT_SERVING_TABLE_ID } from "../src/tavern/cookingDomain.js";
+import { pixelAlignedWorldPoint } from "../src/build/buildWorldGeometry.js";
 
 assert.deepEqual(pixelAlignedWorldPoint({ x: 392, y: 372.5 }), { x: 392, y: 373 }, "half-pixel authored coordinates snap only at the visual boundary");
 
@@ -62,15 +62,15 @@ const preloaded = [];
 preloadFacilityAssets({ load: { image(key, path) { preloaded.push([key, path]); } } }, "/NestledBurrow/");
 assert(preloaded.some(([key, path]) => key === BED_ASSET.key && path === `/NestledBurrow/${BED_ASSET.path}`), "the uploaded bed sprite is preloaded with the facility sprite set");
 
-const facilitySource = readFileSync("src/facilityRuntime.js", "utf8");
+const facilitySource = readFileSync("src/facilities/facilityRuntime.js", "utf8");
 assert(facilitySource.includes("drawFacility(graphics, facility.facilityType)"), "runtime and build previews share the facility presentation adapter");
 assert(facilitySource.includes("pixelAlignedWorldPoint"), "facility graphics and serving dishes use the shared pixel-aligned render position");
-const previewSource = readFileSync("src/facilityPreviewVisuals.js", "utf8");
+const previewSource = readFileSync("src/facilities/facilityPreviewVisuals.js", "utf8");
 assert(previewSource.includes("bindSpriteVisual"));
 assert(!previewSource.includes("fillRect"));
 assert(!previewSource.includes("fillEllipse"));
 assert(!previewSource.includes("fillCircle"));
-const debrisSource = readFileSync("src/debrisRuntime.js", "utf8");
+const debrisSource = readFileSync("src/resources/debrisRuntime.js", "utf8");
 assert(debrisSource.includes("bindSpriteVisual(graphics, BED_ASSET"));
 assert(debrisSource.includes("pixelAlignedWorldPoint"), "resource graphics, including large stones and logs, use the shared pixel-aligned render position");
 assert(!debrisSource.includes("0x5c3a2a"));

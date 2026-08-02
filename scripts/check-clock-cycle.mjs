@@ -3,7 +3,7 @@ import {
   advanceGameTime,
   createFreshGameSessionState,
   normalizeGameSessionState,
-} from "../src/gameSessionState.js";
+} from "../src/session/gameSessionState.js";
 import {
   DAY_NIGHT_COLORS,
   DAY_NIGHT_MULTIPLY_STRENGTH,
@@ -12,8 +12,8 @@ import {
   LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER,
   dayNightMultiplyColor,
   formatClock,
-} from "../src/gameClock.js";
-import { DEFAULT_GAMEPLAY_TUNING } from "../src/debrisConfig.js";
+} from "../src/session/gameClock.js";
+import { DEFAULT_GAMEPLAY_TUNING } from "../src/resources/debrisConfig.js";
 
 assert.equal(DEFAULT_GAME_SECONDS_PER_REAL_SECOND, 60, "one real second advances one game minute");
 let state = createFreshGameSessionState();

@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const main = read("src/main.js");
-const coordinator = read("src/worldBuildCoordinator.js");
-const locationRuntime = read("src/worldLocationRuntime.js");
-const e2eBridge = read("src/e2eBridge.js");
-const authoring = read("src/editorAuthoringRuntime.js");
-const startingLayout = read("src/startingLayout.js");
+const coordinator = read("src/build/worldBuildCoordinator.js");
+const locationRuntime = read("src/world/worldLocationRuntime.js");
+const e2eBridge = read("src/devtools/e2eBridge.js");
+const authoring = read("src/build/editorAuthoringRuntime.js");
+const startingLayout = read("src/build/startingLayout.js");
 const packageJson = JSON.parse(read("package.json"));
 const architectureCheck = read("scripts/check-architecture-boundaries.mjs");
 

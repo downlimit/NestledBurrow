@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { createFreshGameSessionState } from "../src/gameSessionState.js";
-import { createWorldLocationRuntime, validateLocationCapabilities } from "../src/worldLocationRuntime.js";
-import { createWorldPresentationRuntime } from "../src/worldPresentationRuntime.js";
-import { WORLD_LOCATION_DEFINITIONS } from "../src/worldLocationConfig.js";
+import { createFreshGameSessionState } from "../src/session/gameSessionState.js";
+import { createWorldLocationRuntime, validateLocationCapabilities } from "../src/world/worldLocationRuntime.js";
+import { createWorldPresentationRuntime } from "../src/world/worldPresentationRuntime.js";
+import { WORLD_LOCATION_DEFINITIONS } from "../src/world/worldLocationConfig.js";
 
 const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const main = read("src/main.js");
-const runtimeSource = read("src/worldLocationRuntime.js");
-const presentationSource = read("src/worldPresentationRuntime.js");
-const e2eBridge = read("src/e2eBridge.js");
+const runtimeSource = read("src/world/worldLocationRuntime.js");
+const presentationSource = read("src/world/worldPresentationRuntime.js");
+const e2eBridge = read("src/devtools/e2eBridge.js");
 const architectureCheck = read("scripts/check-architecture-boundaries.mjs");
 
 assert.equal(existsSync("src/worldLocationLifecycle.js"), false, "scene-wide lifecycle module must be removed");

@@ -27,12 +27,12 @@ assert.equal(invalid.metadata.valid, false);
 assert.equal(invalid.preview, true, "invalid metadata must preserve path-based preview");
 assert.equal(invalid.autoMerge, false, "invalid metadata must disable automatic merge routing");
 
-const impact = analyzeSource("src/worldBuildCoordinator.js");
-assert(impact.importers.includes("src/worldLocationRuntime.js"), "owner scan must find the location-runtime importer");
+const impact = analyzeSource("src/build/worldBuildCoordinator.js");
+assert(impact.importers.includes("src/world/worldLocationRuntime.js"), "owner scan must find the location-runtime importer");
 assert(impact.checks.includes("scripts/check-task-062.mjs"), "owner scan must find source-address contract checks");
 
 const selected = selectValidationScripts(
-  ["AGENTS.md", "src/worldBuildCoordinator.js", "scripts/check-task-063.mjs"],
+  ["AGENTS.md", "src/build/worldBuildCoordinator.js", "scripts/check-task-063.mjs"],
   "063",
   {
     "check:docs": "node scripts/check-doc-contracts.mjs",

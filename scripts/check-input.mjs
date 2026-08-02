@@ -8,9 +8,9 @@ import {
   isInsideJoystickActivation,
   isPlayerMovementSuppressed,
   isTouchJoystickSupported,
-} from "../src/input.js";
-import { MobileJoystick } from "../src/mobileJoystick.js";
-import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
+} from "../src/controls/input.js";
+import { MobileJoystick } from "../src/controls/mobileJoystick.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
 
 function near(actual, expected, message) {
   assert(Math.abs(actual - expected) < 1e-12, `${message}: expected ${expected}, got ${actual}`);
@@ -211,7 +211,7 @@ assert.equal(
 );
 
 const mainSource = readFileSync("src/main.js", "utf8");
-const interactionHudSource = readFileSync("src/interactionHud.js", "utf8");
+const interactionHudSource = readFileSync("src/ui/interactionHud.js", "utf8");
 assert(mainSource.includes('addKeys("SPACE")'), "desktop interaction is bound to Space");
 assert(!mainSource.includes('addKeys("E,SPACE")') && !mainSource.includes('interactKeys.E'), "desktop interaction no longer advertises or samples E");
 assert(interactionHudSource.includes("SPACE · "), "desktop interaction prompt advertises uppercase Space with middle-dot separator");

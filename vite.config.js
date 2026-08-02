@@ -6,12 +6,12 @@ import {
   createColliderDefaultsModuleSource,
   normalizeColliderOverrides,
   COLLIDER_DEFAULTS_SAVE_ENDPOINT,
-} from "./src/colliderDebugOverrides.js";
+} from "./src/build/colliderDebugOverrides.js";
 import {
   createStartingLayoutModuleSource,
   normalizeStartingLayout,
   STARTING_LAYOUT_SAVE_ENDPOINT,
-} from "./src/startingLayout.js";
+} from "./src/build/startingLayout.js";
 
 const AUTHORING_BODY_LIMIT = 1024 * 1024;
 
@@ -26,13 +26,13 @@ function resolveBuildId() {
 
 const AUTHORING_WRITERS = Object.freeze({
   [STARTING_LAYOUT_SAVE_ENDPOINT]: Object.freeze({
-    targetPath: resolve("src/startingLayoutDefault.js"),
+    targetPath: resolve("src/build/startingLayoutDefault.js"),
     normalize: normalizeStartingLayout,
     serialize: createStartingLayoutModuleSource,
     summarize: (layout) => ({ status: "saved", objects: layout.buildObjects.length }),
   }),
   [COLLIDER_DEFAULTS_SAVE_ENDPOINT]: Object.freeze({
-    targetPath: resolve("src/colliderDefaults.js"),
+    targetPath: resolve("src/build/colliderDefaults.js"),
     normalize: normalizeColliderOverrides,
     serialize: createColliderDefaultsModuleSource,
     summarize: (overrides) => ({ status: "saved", groups: Object.keys(overrides).length }),

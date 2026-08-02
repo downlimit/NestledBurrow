@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { DIALOGUE_DEFINITIONS, getDialogueDefinition } from "../src/dialogueConfig.js";
-import { createFreshGameSessionState } from "../src/gameSessionState.js";
-import { INTERACTION_DEFINITIONS, SEED_MERCHANT_INTERACTION_KIND } from "../src/interactionConfig.js";
-import { createInteractionRuntime } from "../src/interactionRuntime.js";
+import { DIALOGUE_DEFINITIONS, getDialogueDefinition } from "../src/interaction/dialogueConfig.js";
+import { createFreshGameSessionState } from "../src/session/gameSessionState.js";
+import { INTERACTION_DEFINITIONS, SEED_MERCHANT_INTERACTION_KIND } from "../src/interaction/interactionConfig.js";
+import { createInteractionRuntime } from "../src/interaction/interactionRuntime.js";
 
 assert.deepEqual(Object.keys(DIALOGUE_DEFINITIONS), [], "obsolete neighbor dialogue definitions are removed");
 for (const inheritedId of ["__proto__", "constructor", "toString"]) {

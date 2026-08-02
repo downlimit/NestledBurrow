@@ -14,24 +14,24 @@ import {
   isPhysicalAltEvent,
   reduceInventoryModeState,
   transformPresentationRect,
-} from "../src/inventoryModeRuntime.js";
+} from "../src/inventory/inventoryModeRuntime.js";
 import {
   INVENTORY_HUD_AREA,
   INVENTORY_SLOT_AREAS,
   inventorySlotLabelScreenPosition,
-} from "../src/inventoryRuntime.js";
+} from "../src/inventory/inventoryRuntime.js";
 import {
   LOADOUT_PANELS,
   createEmptyCombatLoadout,
   createNewGameInventory,
   swapLoadoutSlots,
-} from "../src/inventoryDomain.js";
-import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
-import { createGameCanvasInputGuard } from "../src/gameCanvasInputGuard.js";
+} from "../src/inventory/inventoryDomain.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
+import { createGameCanvasInputGuard } from "../src/controls/gameCanvasInputGuard.js";
 import {
   COMBAT_ACTION_LABEL_BOTTOM_OVERFLOW,
   combatActionLabelScreenPosition,
-} from "../src/combatLoadoutRuntime.js";
+} from "../src/combat/combatLoadoutRuntime.js";
 
 let state = createInventoryModeState();
 assert.deepEqual(state, {
@@ -158,12 +158,12 @@ assert(peaceful.combat.y > combat.combat.y, "combat panel grows into view from b
 assert(combat.peaceful.y > peaceful.peaceful.y, "peaceful panel shrinks upward when combat opens");
 
 const mainSource = readFileSync("src/main.js", "utf8");
-const hudSource = readFileSync("src/gameHud.js", "utf8");
-const inventorySource = readFileSync("src/inventoryRuntime.js", "utf8");
-const modeSource = readFileSync("src/inventoryModeRuntime.js", "utf8");
-const combatSource = readFileSync("src/combatLoadoutRuntime.js", "utf8");
-const dragSource = readFileSync("src/loadoutDragCoordinator.js", "utf8");
-const persistenceSource = readFileSync("src/sessionPersistence.js", "utf8");
+const hudSource = readFileSync("src/ui/gameHud.js", "utf8");
+const inventorySource = readFileSync("src/inventory/inventoryRuntime.js", "utf8");
+const modeSource = readFileSync("src/inventory/inventoryModeRuntime.js", "utf8");
+const combatSource = readFileSync("src/combat/combatLoadoutRuntime.js", "utf8");
+const dragSource = readFileSync("src/inventory/loadoutDragCoordinator.js", "utf8");
+const persistenceSource = readFileSync("src/session/sessionPersistence.js", "utf8");
 
 assert(!mainSource.includes("INVENTORY_MODES"), "composition root does not own the presentation state machine");
 assert(hudSource.includes("createInventoryModeRuntime(scene"), "GameHud composes the canonical mode owner");

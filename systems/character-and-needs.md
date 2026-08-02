@@ -85,12 +85,12 @@ The target need is protected enter through exit; recovery is active-only. Normal
 - time drain and discrete costs are additive;
 - event consequences have visible world causes and reusable outputs;
 - camera/presentation never rewrites safe motor position;
-- location-scoped facility and needs-interaction owners mount and unmount through `WorldLocationRuntime`, which also owns their real-time delegation;
+- `WorldLocationRuntime` mounts/unmounts location facility/needs owners and delegates realtime;
 - gameplay save excludes debug presets and interaction timeline state.
 
 ## Current baseline
 
-`needsDomain.js` owns formulas; global `needsRuntime.js` coordinates; `needsFlowRuntime.js` measures HUD deltas. Timelines own phases/protection; approach owns reachable points. `WorldLocationRuntime` owns facility/needs-interaction lifecycle and realtime update; `main.js` composes.
+`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timelines own phases/protection; approach owns reachable points. `WorldLocationRuntime` owns facility/needs lifecycle and realtime update; `src/main.js` composes.
 
 ## Evidence
 

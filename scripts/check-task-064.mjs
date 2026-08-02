@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BED_INTERACTION_KIND } from "../src/debrisConfig.js";
-import { FACILITY_INTERACTION_KIND } from "../src/facilityConfig.js";
-import { createFreshGameSessionState } from "../src/gameSessionState.js";
-import { TAVERN_SIGN_KIND } from "../src/guestConfig.js";
-import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
-import { createWorldInteractionCoordinator } from "../src/worldInteractionCoordinator.js";
+import { BED_INTERACTION_KIND } from "../src/resources/debrisConfig.js";
+import { FACILITY_INTERACTION_KIND } from "../src/facilities/facilityConfig.js";
+import { createFreshGameSessionState } from "../src/session/gameSessionState.js";
+import { TAVERN_SIGN_KIND } from "../src/tavern/guestConfig.js";
+import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
+import { createWorldInteractionCoordinator } from "../src/interaction/worldInteractionCoordinator.js";
 
 const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const main = read("src/main.js");
-const coordinatorSource = read("src/worldInteractionCoordinator.js");
-const interactionRuntime = read("src/interactionRuntime.js");
-const locationRuntime = read("src/worldLocationRuntime.js");
+const coordinatorSource = read("src/interaction/worldInteractionCoordinator.js");
+const interactionRuntime = read("src/interaction/interactionRuntime.js");
+const locationRuntime = read("src/world/worldLocationRuntime.js");
 const architectureCheck = read("scripts/check-architecture-boundaries.mjs");
 
 assert(!main.includes("runWorldObjectInteraction"), "WorldScene must not execute world interactions");

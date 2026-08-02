@@ -6,7 +6,7 @@ This system separates player session progress from developer-authored project de
 
 ## Session save
 
-`gameSessionState.js` owns JSON-safe normalized state. `sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
+`src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
 Session data includes player/world progress, needs, peaceful inventory, combat loadout, dropped items, resources, farm/water state, kitchen serving stock and repair, tavern sign, guest service snapshots and coins. Selected slot and in-flight presentation state are transient.
 

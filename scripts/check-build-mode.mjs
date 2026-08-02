@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { BUILD_ASSET_GROUPS, BUILD_CARPET_FRAME_BY_MASK, BUILD_SURFACE_CUSTOM_MASKS, BUILD_SURFACE_FRAME_BY_MASK, getBuildSurfaceMask, getBuildVerticalWallFrame, getBuildVerticalWallOffset, getBuildWallColumnDepthOffset, getBuildWallColumnOffset, getBuildWallFrames } from "../src/buildAssetCatalog.js";
-import { BUILD_GRID, BuildModeRuntime, getBuildDragPoints, getBuildWallDragAxis, shouldToggleBuildMode, snapBuildPoint, snapBuildSurfacePoint, snapBuildWallDragPoint, snapBuildWallEdge } from "../src/buildModeRuntime.js";
-import { HOUSE_FRAMES, TILE_SIZE, WORLD_HEIGHT, WORLD_WIDTH } from "../src/worldConfig.js";
-import { HUD_DEPTH } from "../src/hud.js";
-import { createFacilityRuntime } from "../src/facilityRuntime.js";
-import { createWorldLayout } from "../src/worldLayout.js";
+import { BUILD_ASSET_GROUPS, BUILD_CARPET_FRAME_BY_MASK, BUILD_SURFACE_CUSTOM_MASKS, BUILD_SURFACE_FRAME_BY_MASK, getBuildSurfaceMask, getBuildVerticalWallFrame, getBuildVerticalWallOffset, getBuildWallColumnDepthOffset, getBuildWallColumnOffset, getBuildWallFrames } from "../src/build/buildAssetCatalog.js";
+import { BUILD_GRID, BuildModeRuntime, getBuildDragPoints, getBuildWallDragAxis, shouldToggleBuildMode, snapBuildPoint, snapBuildSurfacePoint, snapBuildWallDragPoint, snapBuildWallEdge } from "../src/build/buildModeRuntime.js";
+import { HOUSE_FRAMES, TILE_SIZE, WORLD_HEIGHT, WORLD_WIDTH } from "../src/world/worldConfig.js";
+import { HUD_DEPTH } from "../src/ui/hud.js";
+import { createFacilityRuntime } from "../src/facilities/facilityRuntime.js";
+import { createWorldLayout } from "../src/world/worldLayout.js";
 
 class DisplayStub {
   constructor() {

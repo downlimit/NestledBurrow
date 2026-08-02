@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { AUDIO_STORAGE_KEY, DEFAULT_AUDIO_SETTINGS, clampVolume, createAudioSettingsStore, deserializeAudioSettings, getEffectiveEffectsVolume, getEffectiveMusicVolume } from "../src/audioSettings.js";
-import { MUSIC_CROSSFADE_SECONDS, MUSIC_FADE_OUT_SECONDS, MUSIC_PLAYLIST, PROCEDURAL_SFX, PhaserAudioRuntime, choosePlaylistTrack, getFadeEnvelope, getMusicUrl } from "../src/audioRuntime.js";
-import { getResourceProfile, resourceEffectType } from "../src/resourceDomain.js";
+import { AUDIO_STORAGE_KEY, DEFAULT_AUDIO_SETTINGS, clampVolume, createAudioSettingsStore, deserializeAudioSettings, getEffectiveEffectsVolume, getEffectiveMusicVolume } from "../src/audio/audioSettings.js";
+import { MUSIC_CROSSFADE_SECONDS, MUSIC_FADE_OUT_SECONDS, MUSIC_PLAYLIST, PROCEDURAL_SFX, PhaserAudioRuntime, choosePlaylistTrack, getFadeEnvelope, getMusicUrl } from "../src/audio/audioRuntime.js";
+import { getResourceProfile, resourceEffectType } from "../src/resources/resourceDomain.js";
 
 function memory() { const data = new Map(); return { data, getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) }; }
 function hash(path) { return createHash("sha256").update(readFileSync(path)).digest("hex"); }
@@ -105,12 +105,12 @@ assert.equal(effectRuntime.lastEffectType, "well-refill");
 assert.equal(effectRuntime.effectPlayCount, 1);
 assert(scheduled.filter(([event]) => event === "start").length >= 3, "layered effects schedule all requested voices");
 effectRuntime.destroy();
-const audioRuntimeSource = readFileSync("src/audioRuntime.js", "utf8");
+const audioRuntimeSource = readFileSync("src/audio/audioRuntime.js", "utf8");
 assert(!audioRuntimeSource.includes("visibilitychange")); assert(!audioRuntimeSource.includes("blur"));
 const eventWiringSource = [
-  "src/main.js", "src/worldBuildCoordinator.js", "src/worldInteractionCoordinator.js", "src/inventoryRuntime.js", "src/farmingRuntime.js",
-  "src/cookingRuntime.js", "src/merchantRuntime.js", "src/kitchenInteractionRuntime.js",
-  "src/guestFeedback.js", "src/tavernServiceRuntime.js", "src/meleeRuntime.js",
+  "src/main.js", "src/build/worldBuildCoordinator.js", "src/interaction/worldInteractionCoordinator.js", "src/inventory/inventoryRuntime.js", "src/resources/farmingRuntime.js",
+  "src/tavern/cookingRuntime.js", "src/resources/merchantRuntime.js", "src/tavern/kitchenInteractionRuntime.js",
+  "src/tavern/guestFeedback.js", "src/tavern/tavernServiceRuntime.js", "src/combat/meleeRuntime.js",
 ].map((path) => readFileSync(path, "utf8")).join("\n");
 for (const effectId of task047Effects.filter((id) => !id.startsWith("wood-") && !id.startsWith("stone-") && !id.startsWith("ruby-"))) {
   assert(eventWiringSource.includes(`"${effectId}"`), `${effectId} is wired to a gameplay event`);

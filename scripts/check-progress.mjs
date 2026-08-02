@@ -5,7 +5,7 @@ import {
   createSessionPersistence,
   deserializeSessionEnvelope,
   serializeSessionEnvelope,
-} from "../src/sessionPersistence.js";
+} from "../src/session/sessionPersistence.js";
 import {
   createFreshGameSessionState,
   getEntityFlag,
@@ -19,9 +19,9 @@ import {
   drainAwakeEnergy,
   regenerateEnergy,
   advanceGameTime,
-} from "../src/gameSessionState.js";
-import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
-import { getResourceProfile, resolveActionHp } from "../src/resourceDomain.js";
+} from "../src/session/gameSessionState.js";
+import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
+import { getResourceProfile, resolveActionHp } from "../src/resources/resourceDomain.js";
 
 function createMemoryStorage({ failGet = false, failSet = false, failRemove = false } = {}) {
   const data = new Map();
@@ -217,8 +217,8 @@ assert.deepEqual({ wood: rewardState.gameplay.wood, stone: rewardState.gameplay.
 
 console.log("progress checks passed");
 
-import { applyGameplayTuning, refillEnergy } from "../src/gameSessionState.js";
-import { GAMEPLAY_DEBUG_STORAGE_KEY, loadGameplayDebugTuning, saveGameplayDebugTuning } from "../src/gameplayDebugTuning.js";
+import { applyGameplayTuning, refillEnergy } from "../src/session/gameSessionState.js";
+import { GAMEPLAY_DEBUG_STORAGE_KEY, loadGameplayDebugTuning, saveGameplayDebugTuning } from "../src/devtools/gameplayDebugTuning.js";
 const tuningStorage = createMemoryStorage();
 const normalizedTuning = loadGameplayDebugTuning({ enabled: true, storage: { getItem: () => JSON.stringify({ maximumEnergy: 12.4, clearingEnergyCost: -1, hitsPerLog: 9 }) } });
 assert.equal(normalizedTuning.maximumEnergy, 12, "developer tuning normalizes maximum energy");

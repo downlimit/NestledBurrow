@@ -15,10 +15,10 @@
 - `LIBRARY.md`
 - `REVIEW.md`
 - `src/main.js`
-- `src/input.js`
-- `src/movement.js`
-- `src/worldConfig.js`
-- `src/visualConfig.js`
+- `src/controls/input.js`
+- `src/character/movement.js`
+- `src/world/worldConfig.js`
+- `src/character/visualConfig.js`
 
 Начать ветку от актуального `main`.
 

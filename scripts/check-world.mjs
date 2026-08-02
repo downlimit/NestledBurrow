@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { createGridCollisionEnvironment } from "../src/collisionEnvironment.js";
-import { collides, moveWithCollision } from "../src/movement.js";
-import { NPCS } from "../src/npcConfig.js";
-import { cellKey, createWorldLayout, isBlockedCell } from "../src/worldLayout.js";
+import { createGridCollisionEnvironment } from "../src/world/collisionEnvironment.js";
+import { collides, moveWithCollision } from "../src/character/movement.js";
+import { NPCS } from "../src/character/npcConfig.js";
+import { cellKey, createWorldLayout, isBlockedCell } from "../src/world/worldLayout.js";
 import {
   DOOR_LEFT,
   DOOR_Y,
@@ -15,9 +15,9 @@ import {
   WORLD_HEIGHT,
   WORLD_ROWS,
   WORLD_WIDTH,
-} from "../src/worldConfig.js";
-import { getResourceObjectsForWorld, PLACEMENT_CELL_SIZE } from "../src/resourceConfig.js";
-import { getResourceProfile } from "../src/resourceDomain.js";
+} from "../src/world/worldConfig.js";
+import { getResourceObjectsForWorld, PLACEMENT_CELL_SIZE } from "../src/resources/resourceConfig.js";
+import { getResourceProfile } from "../src/resources/resourceDomain.js";
 
 const layout = createWorldLayout();
 const footWidth = 8;
@@ -239,7 +239,7 @@ for (const [contract, message] of invalidContracts) {
   assert.throws(() => createGridCollisionEnvironment(contract), message, "invalid environment contract reports a clear error");
 }
 
-const movementSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/movement.js", import.meta.url), "utf8"));
+const movementSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../src/character/movement.js", import.meta.url), "utf8"));
 assert(!movementSource.includes("worldConfig.js"), "movement.js does not import worldConfig.js");
 assert(!movementSource.includes(".blocked"), "production resolver does not read blocked diagnostic data");
 

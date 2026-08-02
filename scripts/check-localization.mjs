@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { DIALOGUE_DEFINITIONS } from "../src/dialogueConfig.js";
-import { INTERACTION_DEFINITIONS } from "../src/interactionConfig.js";
-import { createGameSessionState } from "../src/gameSessionState.js";
+import { DIALOGUE_DEFINITIONS } from "../src/interaction/dialogueConfig.js";
+import { INTERACTION_DEFINITIONS } from "../src/interaction/interactionConfig.js";
+import { createGameSessionState } from "../src/session/gameSessionState.js";
 import { FALLBACK_LANGUAGE, LOCALIZATION_NAMESPACES, SUPPORTED_LOCALES, normalizeLanguageCode } from "../src/localization/locales.js";
 
 const root = "public/locales";
@@ -47,7 +47,7 @@ for (const locale of SUPPORTED_LOCALES) {
   assert(d.validation.itemCount.includes("plural"), `${locale} representative plural exists`);
   assert(d.validation.visitorMood.includes("select"), `${locale} representative select exists`);
 }
-for (const file of ["src/dialogueConfig.js", "src/interactionConfig.js", "src/interactionRuntime.js", "src/interactionHud.js"]) {
+for (const file of ["src/interaction/dialogueConfig.js", "src/interaction/interactionConfig.js", "src/interaction/interactionRuntime.js", "src/ui/interactionHud.js"]) {
   const text = readFileSync(file, "utf8");
   for (const literal of ["TALK", "NEXT", "CLOSE", "HELLO THERE", "THE VILLAGE IS QUIET", "SEE YOU AROUND", "HOME NPC"]) {
     assert(!text.includes(literal), `${file} has no user-facing English literal ${literal}`);

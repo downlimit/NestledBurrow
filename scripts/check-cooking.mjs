@@ -19,16 +19,16 @@ import {
   startCookingStep,
   STOVE_REPAIR_COST,
   takeStarterLemons,
-} from "../src/cookingDomain.js";
+} from "../src/tavern/cookingDomain.js";
 import {
   addInventoryItem,
   createFreshInventory,
   createInventoryItem,
   getInventoryQuantity,
-} from "../src/inventoryDomain.js";
-import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
-import { createKitchenInteractionRuntime } from "../src/kitchenInteractionRuntime.js";
-import { SAVE_SCHEMA_VERSION } from "../src/sessionPersistence.js";
+} from "../src/inventory/inventoryDomain.js";
+import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
+import { createKitchenInteractionRuntime } from "../src/tavern/kitchenInteractionRuntime.js";
+import { SAVE_SCHEMA_VERSION } from "../src/session/sessionPersistence.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const fresh = createFreshGameSessionState();

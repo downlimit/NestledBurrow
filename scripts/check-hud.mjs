@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { FULLSCREEN_HIT_AREA, FULLSCREEN_PANEL_AREA, HUD_GLYPHS, compactBuildLabel, isPointInRect, measureBitmapText } from "../src/hud.js";
+import { FULLSCREEN_HIT_AREA, FULLSCREEN_PANEL_AREA, HUD_GLYPHS, compactBuildLabel, isPointInRect, measureBitmapText } from "../src/ui/hud.js";
 import {
   CLOCK_HUD_AREA,
   COIN_HUD_AREA,
@@ -23,9 +23,9 @@ import {
   needFlowPhaseOffset,
   needFlowPulseAlpha,
   shouldShakeEnergyAfterInteraction,
-} from "../src/gameHud.js";
-import { NEED_FLOW_PULSE_TUNING } from "../src/presentationTuning.js";
-import { INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "../src/inventoryRuntime.js";
+} from "../src/ui/gameHud.js";
+import { NEED_FLOW_PULSE_TUNING } from "../src/ui/presentationTuning.js";
+import { INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "../src/inventory/inventoryRuntime.js";
 import {
   COMBAT_PANEL_AREA,
   COMBAT_SLOT_DEFINITIONS,
@@ -33,15 +33,15 @@ import {
   INVENTORY_MODES,
   PEACEFUL_EAR_AREA,
   transformPresentationRect,
-} from "../src/inventoryModeRuntime.js";
+} from "../src/inventory/inventoryModeRuntime.js";
 import {
   THROW_AIM_RADIUS,
   THROW_AIM_SIZE,
   createThrowAimIndicator,
   throwAimPixels,
   throwAimPose,
-} from "../src/throwAimIndicator.js";
-import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
+} from "../src/ui/throwAimIndicator.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
 
 const DIALOGUE_TOP = GAME_HEIGHT - 64;
 const rects = [
@@ -226,14 +226,14 @@ assert.equal(needFlowPulseAlpha(0, 100, "energy"), 0, "zero arrows remain fully 
 for (const char of "v devabcdef0123456789<>") assert(HUD_GLYPHS[char], `bitmap glyph exists for ${char}`);
 
 const main = readFileSync("src/main.js", "utf8");
-const gameHud = readFileSync("src/gameHud.js", "utf8");
-const inventoryRuntime = readFileSync("src/inventoryRuntime.js", "utf8");
-const inventoryModeRuntime = readFileSync("src/inventoryModeRuntime.js", "utf8");
-const throwAimIndicator = readFileSync("src/throwAimIndicator.js", "utf8");
-const inventoryVisuals = readFileSync("src/inventoryVisuals.js", "utf8");
-const interactionHud = readFileSync("src/interactionHud.js", "utf8");
-const debrisRuntime = readFileSync("src/debrisRuntime.js", "utf8");
-const resourceVisuals = readFileSync("src/resourceVisuals.js", "utf8");
+const gameHud = readFileSync("src/ui/gameHud.js", "utf8");
+const inventoryRuntime = readFileSync("src/inventory/inventoryRuntime.js", "utf8");
+const inventoryModeRuntime = readFileSync("src/inventory/inventoryModeRuntime.js", "utf8");
+const throwAimIndicator = readFileSync("src/ui/throwAimIndicator.js", "utf8");
+const inventoryVisuals = readFileSync("src/inventory/inventoryVisuals.js", "utf8");
+const interactionHud = readFileSync("src/ui/interactionHud.js", "utf8");
+const debrisRuntime = readFileSync("src/resources/debrisRuntime.js", "utf8");
+const resourceVisuals = readFileSync("src/resources/resourceVisuals.js", "utf8");
 const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
 const enHud = JSON.parse(readFileSync("public/locales/en/hud.json", "utf8"));
 

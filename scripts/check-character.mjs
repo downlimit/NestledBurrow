@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCharacter } from "../src/character.js";
-import { createCharacterMotor } from "../src/characterMotor.js";
-import { createCharacterVisual } from "../src/characterVisual.js";
-import { createCharacterSystem } from "../src/characterSystem.js";
-import { createControllerCommand } from "../src/controllerCommand.js";
+import { createCharacter } from "../src/character/character.js";
+import { createCharacterMotor } from "../src/character/characterMotor.js";
+import { createCharacterVisual } from "../src/character/characterVisual.js";
+import { createCharacterSystem } from "../src/character/characterSystem.js";
+import { createControllerCommand } from "../src/character/controllerCommand.js";
 import {
   BLOCKED_WAYPOINT_ADVANCE_MS,
   PATROL_MODE_LOOP,
@@ -14,36 +14,36 @@ import {
   createPatrolController,
   createPlayerController,
   WAYPOINT_TOLERANCE,
-} from "../src/controllers.js";
-import { DEFAULT_MOVEMENT_CONFIG } from "../src/movementConfig.js";
+} from "../src/character/controllers.js";
+import { DEFAULT_MOVEMENT_CONFIG } from "../src/character/movementConfig.js";
 import {
   ACTOR_PROFILE_IDS,
   ACTOR_PROFILES,
   createDebugMovementConfigFromPolicy,
   getActorProfile,
-} from "../src/actorProfiles.js";
-import { moveWithCollision } from "../src/movement.js";
-import { worldDepthFromAnchorY } from "../src/buildWorldGeometry.js";
-import { NPCS } from "../src/npcConfig.js";
+} from "../src/character/actorProfiles.js";
+import { moveWithCollision } from "../src/character/movement.js";
+import { worldDepthFromAnchorY } from "../src/build/buildWorldGeometry.js";
+import { NPCS } from "../src/character/npcConfig.js";
 import {
   FACING_HYSTERESIS,
   PLAYER_FOOT_DEPTH,
   PLAYER_FOOT_WIDTH,
   PLAYER_IDLE_FRAME_INDEX,
-} from "../src/visualConfig.js";
+} from "../src/character/visualConfig.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   CHARACTER_VISUAL_PROFILES,
   getCharacterVisualProfile,
-} from "../src/characterVisualProfiles.js";
-import { createWorldLayout } from "../src/worldLayout.js";
-import { CHARACTER_FACINGS, quantizeCharacterFacing } from "../src/characterFacing.js";
+} from "../src/character/characterVisualProfiles.js";
+import { createWorldLayout } from "../src/world/worldLayout.js";
+import { CHARACTER_FACINGS, quantizeCharacterFacing } from "../src/character/characterFacing.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
-const locationRuntimeSource = fs.readFileSync(path.join(root, "src/worldLocationRuntime.js"), "utf8");
-const characterSource = fs.readFileSync(path.join(root, "src/character.js"), "utf8");
-const worldConfigSource = fs.readFileSync(path.join(root, "src/worldConfig.js"), "utf8");
+const locationRuntimeSource = fs.readFileSync(path.join(root, "src/world/worldLocationRuntime.js"), "utf8");
+const characterSource = fs.readFileSync(path.join(root, "src/character/character.js"), "utf8");
+const worldConfigSource = fs.readFileSync(path.join(root, "src/world/worldConfig.js"), "utf8");
 
 assert(/createCharacterSystem\(\{ collisionEnvironment: this\.worldLayout \}\)/.test(mainSource), "WorldScene creates a CharacterSystem after layout creation");
 assert(/createCharacter\(this, \{\s*id: "player"/s.test(mainSource), "player is created through Character");

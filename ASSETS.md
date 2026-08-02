@@ -19,8 +19,8 @@ This project uses only the listed third-party or project-provided assets in the 
   - `public/assets/third-party/basic-village/Outdoor_tileset.png`
   - `public/assets/third-party/basic-village/House_tileset.png`
   - `public/assets/third-party/basic-village/Trees_and_bushes.png`
-- **Selected frame groups:** centralized under semantic names in `src/worldConfig.js` as `OUTDOOR_FRAMES` and `HOUSE_FRAMES`; tree variants are assembled in `src/worldLayout.js` from verified 3×4 regions.
-- **World composition:** `src/worldLayout.js`
+- **Selected frame groups:** centralized under semantic names in `src/world/worldConfig.js` as `OUTDOOR_FRAMES` and `HOUSE_FRAMES`; tree variants are assembled in `src/world/worldLayout.js` from verified 3×4 regions.
+- **World composition:** `src/world/worldLayout.js`
 - **Integrity and geometry checks:** `scripts/check-visual.mjs`
 - **Rendered verification:** `scripts/check-room-preview.py`
 

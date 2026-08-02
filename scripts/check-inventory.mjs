@@ -20,10 +20,10 @@ import {
   swapInventorySlots,
   swapLoadoutSlots,
   takeInventorySlot,
-} from "../src/inventoryDomain.js";
-import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
-import { deserializeSessionEnvelope, serializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/sessionPersistence.js";
-import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
+} from "../src/inventory/inventoryDomain.js";
+import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
+import { deserializeSessionEnvelope, serializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/session/sessionPersistence.js";
+import { DEFAULT_GAMEPLAY_TUNING } from "../src/resources/resourceConfig.js";
 import {
   INVENTORY_HUD_AREA,
   INVENTORY_SLOT_AREAS,
@@ -35,12 +35,12 @@ import {
   inventorySlotIndexAt,
   inventoryWaterBarState,
   shouldRenderInventoryQuantity,
-} from "../src/inventoryRuntime.js";
+} from "../src/inventory/inventoryRuntime.js";
 import {
   THROW_ORIGIN_HEIGHT_RATIO,
   throwDirectionTowardPoint,
   throwOriginFromPlayer,
-} from "../src/worldThrowDirection.js";
+} from "../src/inventory/worldThrowDirection.js";
 
 const inventory = createFreshInventory();
 assert.equal(INVENTORY_SLOT_COUNT, 10);
@@ -231,11 +231,11 @@ assert.equal(blocked.status, "inventory-full");
 assert.equal(blocked.mutated, false);
 assert.deepEqual(JSON.parse(JSON.stringify(fullState)), beforeFull, "full-inventory final hit is atomic");
 
-const runtimeSource = readFileSync("src/inventoryRuntime.js", "utf8");
-const hudSource = readFileSync("src/gameHud.js", "utf8");
+const runtimeSource = readFileSync("src/inventory/inventoryRuntime.js", "utf8");
+const hudSource = readFileSync("src/ui/gameHud.js", "utf8");
 assert(runtimeSource.includes("swapInventorySlots") && runtimeSource.includes("dropSlot(fromIndex, worldPointFromPointer(scene, pointer))"));
 assert(runtimeSource.includes("routePickedInventoryItem") && runtimeSource.includes("combatMode: isCombatMode()"));
-assert(hudSource.includes("dropLoadoutSlot") && readFileSync("src/loadoutDragCoordinator.js", "utf8").includes("onWorldDrop(source, pointer)"), "loadout edit can drop combat slots into the world");
+assert(hudSource.includes("dropLoadoutSlot") && readFileSync("src/inventory/loadoutDragCoordinator.js", "utf8").includes("onWorldDrop(source, pointer)"), "loadout edit can drop combat slots into the world");
 assert(runtimeSource.includes("throwOriginFromPlayer(sprite)") && runtimeSource.includes("throwDirectionTowardPoint(origin, pointerWorld, character.lastFacing)"));
 assert(runtimeSource.includes("DROP_HITBOX_SIZE = 2"));
 assert(runtimeSource.includes("directionX *= -1") && runtimeSource.includes("directionY *= -1"));

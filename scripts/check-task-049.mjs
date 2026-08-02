@@ -15,13 +15,13 @@ import {
   repairStove,
   reserveServingItem,
   takeStarterLemons,
-} from "../src/cookingDomain.js";
+} from "../src/tavern/cookingDomain.js";
 import {
   LEMON_CROP_PROFILE,
   POTATO_CROP_PROFILE,
   STARTER_WELL,
   WATER_BUCKET_CAPACITY,
-} from "../src/farmingConfig.js";
+} from "../src/resources/farmingConfig.js";
 import {
   advanceFarmTime,
   createFreshFarmState,
@@ -30,15 +30,15 @@ import {
   plantCrop,
   tillSoil,
   waterSoil,
-} from "../src/farmingDomain.js";
-import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
+} from "../src/resources/farmingDomain.js";
+import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
 import {
   aggregateInventoryGain,
   INVENTORY_GAIN_DROP_MS,
   INVENTORY_GAIN_DURATION_MS,
   INVENTORY_GAIN_HOLD_MS,
   INVENTORY_GAIN_ICON_HOLD_SCALE,
-} from "../src/inventoryGainPresentation.js";
+} from "../src/inventory/inventoryGainPresentation.js";
 import {
   INVENTORY_ITEM_IDS,
   INVENTORY_TOOL_IDS,
@@ -47,21 +47,21 @@ import {
   createInventoryItem,
   getInventoryQuantity,
   normalizeInventory,
-} from "../src/inventoryDomain.js";
-import { LEMONADE_FRAME_ORDER } from "../src/lemonadeConfig.js";
-import { LEMON_SEED_PRICE, POTATO_SEED_PRICE } from "../src/merchantDomain.js";
-import { normalizeCoinValue } from "../src/coinRuntime.js";
-import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
-import { RESOURCE_OBJECTS } from "../src/resourceConfig.js";
-import { getResourceProfile, resourceActionForTool } from "../src/resourceDomain.js";
-import { STARTER_TREE_OBJECTS } from "../src/startingLayout.js";
-import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/sessionPersistence.js";
+} from "../src/inventory/inventoryDomain.js";
+import { LEMONADE_FRAME_ORDER } from "../src/tavern/lemonadeConfig.js";
+import { LEMON_SEED_PRICE, POTATO_SEED_PRICE } from "../src/resources/merchantDomain.js";
+import { normalizeCoinValue } from "../src/tavern/coinRuntime.js";
+import { DEFAULT_GAMEPLAY_TUNING } from "../src/resources/resourceConfig.js";
+import { RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
+import { getResourceProfile, resourceActionForTool } from "../src/resources/resourceDomain.js";
+import { STARTER_TREE_OBJECTS } from "../src/build/startingLayout.js";
+import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
 import {
   GUEST_ACTIVE_CAP,
   allowedGuestWaveSize,
   sampleGuestSpawnDelay,
   sampleGuestWaveSize,
-} from "../src/tavernServiceDomain.js";
+} from "../src/tavern/tavernServiceDomain.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -273,7 +273,7 @@ const mainSource = readFileSync("src/main.js", "utf8");
 assert(mainSource.includes('showTransientMessage?.("hud:interaction.wakeFailed")'));
 assert(mainSource.includes("transientMessageShown: true"), "system messages preserve the interaction action label");
 assert(mainSource.includes('prompt: "hud:interaction.wake"'));
-const persistenceSource = readFileSync("src/sessionPersistence.js", "utf8");
+const persistenceSource = readFileSync("src/session/sessionPersistence.js", "utf8");
 assert(!persistenceSource.includes("notifyInventoryGain"), "load and migration do not invoke gain presentation");
 const trustedWorktree = `safe.directory=${process.cwd().replaceAll("\\", "/")}`;
 const changed = [

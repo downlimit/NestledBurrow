@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { PROCEDURAL_SFX } from "../src/audioRuntime.js";
-import { BED_SLEEP_DEPTH_OFFSET, sleepingCharacterDepth } from "../src/debrisRuntime.js";
+import { PROCEDURAL_SFX } from "../src/audio/audioRuntime.js";
+import { BED_SLEEP_DEPTH_OFFSET, sleepingCharacterDepth } from "../src/resources/debrisRuntime.js";
 
-const farmingSource = readFileSync(new URL("../src/farmingRuntime.js", import.meta.url), "utf8");
-const debrisSource = readFileSync(new URL("../src/debrisRuntime.js", import.meta.url), "utf8");
-const coinSource = readFileSync(new URL("../src/coinRuntime.js", import.meta.url), "utf8");
-const cookingSource = readFileSync(new URL("../src/cookingRuntime.js", import.meta.url), "utf8");
+const farmingSource = readFileSync(new URL("../src/resources/farmingRuntime.js", import.meta.url), "utf8");
+const debrisSource = readFileSync(new URL("../src/resources/debrisRuntime.js", import.meta.url), "utf8");
+const coinSource = readFileSync(new URL("../src/tavern/coinRuntime.js", import.meta.url), "utf8");
+const cookingSource = readFileSync(new URL("../src/tavern/cookingRuntime.js", import.meta.url), "utf8");
 
 for (const effectId of ["hoe-use", "plant-seed", "crop-impact"]) {
   assert(PROCEDURAL_SFX[effectId]?.voices?.length > 0, `${effectId} has a procedural oscillator voice`);

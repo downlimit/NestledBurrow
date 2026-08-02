@@ -15,24 +15,24 @@ Task number не меняется при repair, rebase или повторно�
 - Depends on: `Task #014 — Расширить цикл расчистки и сна`
 - Merge phase: `1`
 - Owned paths:
-  - `src/gameClock.js`
+  - `src/session/gameClock.js`
   - `src/dayNightRuntime.js`, только если отдельный runtime упрощает код
   - `src/main.js`
-  - `src/gameSessionState.js`
-  - `src/debrisConfig.js`
-  - `src/debrisRuntime.js`
-  - `src/gameHud.js`
-  - `src/interactionHud.js`
-  - `src/gameplayDebugTuning.js`
-  - `src/movementDebugPanel.js`
+  - `src/session/gameSessionState.js`
+  - `src/resources/debrisConfig.js`
+  - `src/resources/debrisRuntime.js`
+  - `src/ui/gameHud.js`
+  - `src/ui/interactionHud.js`
+  - `src/devtools/gameplayDebugTuning.js`
+  - `src/devtools/movementDebugPanel.js`
   - `public/locales/ru/hud.json`
   - `public/locales/en/hud.json`
   - релевантные `scripts/check-*.mjs`
   - `tests/e2e/localized-loop.spec.js`
 - Shared files allowed only when required:
-  - `src/characterSystem.js`
-  - `src/character.js`
-  - `src/controllers.js`
+  - `src/character/characterSystem.js`
+  - `src/character/character.js`
+  - `src/character/controllers.js`
 - Forbidden paths:
   - `.github/**`
   - `PROJECT.md`
@@ -97,7 +97,7 @@ Task number не меняется при repair, rebase или повторно�
 
 ### 2. Канонический игровой clock
 
-Создать маленький чистый модуль, например `src/gameClock.js`.
+Создать маленький чистый модуль, например `src/session/gameClock.js`.
 
 Константы:
 

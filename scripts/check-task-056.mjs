@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   DRY_CROP_ROT_SECONDS,
   DRY_SEED_ROT_SECONDS,
-} from "../src/farmingConfig.js";
+} from "../src/resources/farmingConfig.js";
 import {
   advanceFarmTime,
   createFreshFarmState,
@@ -12,11 +12,11 @@ import {
   refillWaterBucket,
   tillSoil,
   waterSoil,
-} from "../src/farmingDomain.js";
+} from "../src/resources/farmingDomain.js";
 import {
   addInventoryItem,
   createFreshInventory,
-} from "../src/inventoryDomain.js";
+} from "../src/inventory/inventoryDomain.js";
 
 const HOUR = 3600;
 const CELL = Object.freeze({ x: 16, y: 16 });
