@@ -8,8 +8,9 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 
 - HUD/options: `src/ui/gameHud.js`; immutable semantic pulse timings: `src/ui/presentationTuning.js`;
 - inventory hotbar/drag/selection/world items: `src/inventory/inventoryRuntime.js`;
-- combat loadout frames/items/labels: `src/combat/combatLoadoutRuntime.js`;
-- two-panel loadout dragging: `src/inventory/loadoutDragCoordinator.js`;
+- combat loadout frames/items/labels and numbered-slot activation: `src/combat/combatLoadoutRuntime.js`;
+- combat self-use rules: `src/inventory/combatQuickUse.js`;
+- two-panel loadout dragging and click-vs-drag routing: `src/inventory/loadoutDragCoordinator.js`;
 - HUD modes, physical Alt and panel transitions: `src/inventory/inventoryModeRuntime.js`;
 - inventory item visuals: `src/inventory/inventoryVisuals.js`;
 - inventory gain feedback: `src/inventory/inventoryGainPresentation.js`;
@@ -31,7 +32,9 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 - the lower inventory HUD starts in `PEACEFUL`; a short physical Alt toggles `PEACEFUL`/`COMBAT`, while held Alt exposes `LOADOUT_EDIT` only until release;
 - interaction input/prompt stay disabled from Alt keydown through transition, `LOADOUT_EDIT`, and stable `COMBAT`;
 - held Alt enables atomic inventory/loadout drag-swap; release cancels unfinished drag without latching `LOADOUT_EDIT`;
-- stable `COMBAT` keeps combat actions inactive; its slots become drag targets only while Alt is held;
+- stable `COMBAT` keeps four action slots weapon-driven; number slots `1–6` accept a click or matching number key as a self-use request;
+- quick use is disabled during Alt, transitions, suppression and editable-field input; a drag never also applies the item;
+- unsupported, empty, waterless and already-full uses do not mutate inventory, bucket or needs;
 - the Q/E ear follows panel transitions through an opacity tween and never appears or disappears in one frame;
 - inventory transforms include frames, items, quantities, selection, water gauge, input zones and gain feedback; drops, held items and throw aim stay world-space;
 - modal HUD suppression, blur, scene pause/sleep and destroy clear held Alt and restore the current stable mode;
@@ -49,12 +52,12 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 
 ## Current baseline
 
-Localized HUD, peaceful/combat/loadout-edit lower panels, persistent ten-slot combat loadout with two-way drag, ten-slot inventory, 700 ms aggregated gain feedback, transient interaction messages, dropped-item presentation, needs, options, fullscreen, audio, mobile joystick, presentation camera and day/night multiply are integrated.
+Localized HUD, peaceful/combat/loadout-edit lower panels, persistent ten-slot combat loadout with two-way drag, six numbered self-use slots, ten-slot inventory, 700 ms aggregated gain feedback, transient interaction messages, dropped-item presentation, needs, options, fullscreen, audio, mobile joystick, presentation camera and day/night multiply are integrated. Current self-use profiles are cooked potato dish for satiety and bucket water for lustre.
 
 ## Not yet
 
-Final art direction, accessibility pass, complete controller navigation, stack splitting, finished sound design and target-device performance polish.
+Final art direction, accessibility pass, complete controller navigation, stack splitting, additional expedition consumables, finished sound design and target-device performance polish.
 
 ## Evidence
 
-`check:inventory`, `check:hud`, `check:task-053`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-048`, `check:task-049`, `check:visual`, relevant Browser E2E.
+`check:inventory`, `check:hud`, `check:task-053`, `check:task-068`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-048`, `check:task-049`, `check:visual`, relevant Browser E2E.
