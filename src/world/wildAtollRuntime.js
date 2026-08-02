@@ -74,6 +74,7 @@ export function createWildAtollRuntime(scene, {
   let runSerial = 0;
   let collapseRecoveryActive = false;
   let collapseDelay = null;
+  let originalGetSleepTimeScale = null;
 
   function debrisRuntime() {
     return scene.worldLocationRuntime?.getOwners?.().debrisRuntime ?? scene.debrisRuntime ?? null;
@@ -159,7 +160,8 @@ export function createWildAtollRuntime(scene, {
       if (owner?.getResourceDefinition?.(resourceId)) {
         owner.unregisterResource?.(resourceId, { removeState: removeResourceState });
       } else if (removeResourceState) {
-        delete scene.sessionState?.gameplay?.resourceNodes?.[resourceId];
+        const nodes = scene.sessionState?.gameplay?.resourceNodes;
+        if (nodes) delete nodes[resourceId];
       }
     }
     activeResourceIds = [];
@@ -236,6 +238,13 @@ export function createWildAtollRuntime(scene, {
       if (worldId === WORLD_IDS.nest) mountNestEntrance();
       else if (worldId === WORLD_IDS.atoll) mountAtollRun();
     }
+    if (mountedWorldId === WORLD_IDS.atoll
+      && runActive
+      && !collapseRecoveryActive
+      && !scene.sleeping
+      && Number(scene.sessionState?.gameplay?.currentEnergy) <= 0) {
+      beginCollapseRecovery();
+    }
     if (!mountedWorldId || collapseRecoveryActive) {
       candidate = null;
       renderPrompt();
@@ -302,10 +311,8 @@ export function createWildAtollRuntime(scene, {
   }
 
   function setTitles(segmentKey, arenaKey) {
-    const segmentText = translate(segmentKey);
-    const arenaText = translate(arenaKey);
-    setFittedTitle(segmentTitleText, segmentText, SEGMENT_TITLE_Y, 7, "#d9cda9");
-    setFittedTitle(arenaTitleText, arenaText, ARENA_TITLE_Y, 8, "#f2eadc");
+    setFittedTitle(segmentTitleText, translate(segmentKey), SEGMENT_TITLE_Y, 7, "#d9cda9");
+    setFittedTitle(arenaTitleText, translate(arenaKey), ARENA_TITLE_Y, 8, "#f2eadc");
   }
 
   function setFittedTitle(textObject, value, y, preferredSize, color) {
@@ -357,6 +364,11 @@ export function createWildAtollRuntime(scene, {
     candidate = null;
     renderPrompt();
     scene.interactionRuntime?.resetCandidate?.();
+    if (typeof scene.getSleepTimeScale === "function" && originalGetSleepTimeScale === null) {
+      originalGetSleepTimeScale = scene.getSleepTimeScale;
+      scene.getSleepTimeScale = () => 1;
+    }
+    scene.startSleeping?.({ exhausted: true });
     blackout.setVisible(true).setAlpha(0);
     scene.tweens.add({
       targets: blackout,
@@ -368,15 +380,29 @@ export function createWildAtollRuntime(scene, {
     return true;
   }
 
+  function restoreSleepTimeScale() {
+    if (originalGetSleepTimeScale === null) return;
+    scene.getSleepTimeScale = originalGetSleepTimeScale;
+    originalGetSleepTimeScale = null;
+  }
+
   function completeCollapseBehindBlack() {
     if (destroyed || !collapseRecoveryActive) return;
-    scene.startSleeping?.({ exhausted: true });
+    restoreSleepTimeScale();
+    const minimumGameHours = Number(scene.gameplayTuning?.needs?.collapse?.minimumGameHours) || 2;
+    const wakeEnergy = Number(scene.gameplayTuning?.needs?.collapse?.wakeEnergy) || 25;
+    let wakeReached = false;
     let steps = 0;
-    while (scene.sleeping && steps < COLLAPSE_SIMULATION_MAX_STEPS) {
+    while (!wakeReached && steps < COLLAPSE_SIMULATION_MAX_STEPS) {
+      const beforeElapsed = Number(scene.needsRuntime?.getState?.().collapseElapsedGameHours) || 0;
       scene.updateGameplayTime?.(COLLAPSE_SIMULATION_STEP_MS);
+      const afterElapsed = Number(scene.needsRuntime?.getState?.().collapseElapsedGameHours) || 0;
+      const currentEnergy = Number(scene.sessionState?.gameplay?.currentEnergy) || 0;
+      wakeReached = currentEnergy >= wakeEnergy
+        && (afterElapsed >= minimumGameHours || afterElapsed + 1e-9 < beforeElapsed);
       steps += 1;
     }
-    if (scene.sleeping) scene.wakeUp?.();
+    scene.wakeUp?.();
     leaveAtoll({ silent: true });
     collapseDelay = scene.time.delayedCall(COLLAPSE_BLACK_HOLD_MS, () => {
       collapseDelay = null;
@@ -440,6 +466,7 @@ export function createWildAtollRuntime(scene, {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      restoreSleepTimeScale();
       collapseDelay?.remove?.(false);
       collapseDelay = null;
       scene.tweens.killTweensOf(blackout);
