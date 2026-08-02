@@ -49,14 +49,14 @@
       "edge": "FAR SHORE"
     },
     "forested-isthmus": {
-      "root": "SANDY SPIT",
-      "left1": "QUIET SHORE",
+      "root": "FORESTED NECK",
+      "left1": "GREEN SPUR",
       "right1": "TRACKED PATH",
-      "left2": "SMOKE IN THE TREES",
-      "right2": "OLD PILINGS",
+      "left2": "SMOKE RIDGE",
+      "right2": "FLOATING VERGE",
       "left3": "STRANGE LANTERN",
-      "right3": "LOW BRIDGE",
-      "edge": "ISLAND JETTY"
+      "right3": "NARROW ISTHMUS",
+      "edge": "ROVING ISLAND"
     },
     "deep-skerries": {
       "root": "SHADED VERGE",
@@ -99,14 +99,14 @@
       "edge": "FAR VAULT"
     },
     "shadow-isthmus": {
-      "root": "SHADOWED ENTRY",
-      "left1": "NARROW SPIT",
+      "root": "SHADOWED NECK",
+      "left1": "STONE SPUR",
       "right1": "TRACKS IN DUST",
       "left2": "MUFFLED BELL",
       "right2": "STRANGE FIRE",
-      "left3": "OLD WALKWAY",
-      "right3": "STONE PILINGS",
-      "edge": "SHADOW JETTY"
+      "left3": "FLOATING SCREE",
+      "right3": "BROKEN ISTHMUS",
+      "edge": "WANDERING ISLAND"
     },
     "deep-grotto": {
       "root": "LOWER ENTRANCE",
@@ -162,14 +162,14 @@
       "edge": "SPACE - FAR SHORE"
     },
     "forested-isthmus": {
-      "root": "SPACE - SANDY SPIT",
-      "left1": "SPACE - QUIET SHORE",
+      "root": "SPACE - FORESTED NECK",
+      "left1": "SPACE - GREEN SPUR",
       "right1": "SPACE - TRACKED PATH",
-      "left2": "SPACE - SMOKE IN THE TREES",
-      "right2": "SPACE - OLD PILINGS",
+      "left2": "SPACE - SMOKE RIDGE",
+      "right2": "SPACE - FLOATING VERGE",
       "left3": "SPACE - STRANGE LANTERN",
-      "right3": "SPACE - LOW BRIDGE",
-      "edge": "SPACE - ISLAND JETTY"
+      "right3": "SPACE - NARROW ISTHMUS",
+      "edge": "SPACE - ROVING ISLAND"
     },
     "deep-skerries": {
       "root": "SPACE - SHADED VERGE",
@@ -212,14 +212,14 @@
       "edge": "SPACE - FAR VAULT"
     },
     "shadow-isthmus": {
-      "root": "SPACE - SHADOWED ENTRY",
-      "left1": "SPACE - NARROW SPIT",
+      "root": "SPACE - SHADOWED NECK",
+      "left1": "SPACE - STONE SPUR",
       "right1": "SPACE - TRACKS IN DUST",
       "left2": "SPACE - MUFFLED BELL",
       "right2": "SPACE - STRANGE FIRE",
-      "left3": "SPACE - OLD WALKWAY",
-      "right3": "SPACE - STONE PILINGS",
-      "edge": "SPACE - SHADOW JETTY"
+      "left3": "SPACE - FLOATING SCREE",
+      "right3": "SPACE - BROKEN ISTHMUS",
+      "edge": "SPACE - WANDERING ISLAND"
     },
     "deep-grotto": {
       "root": "SPACE - LOWER ENTRANCE",
