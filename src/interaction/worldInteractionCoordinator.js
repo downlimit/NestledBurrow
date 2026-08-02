@@ -294,7 +294,7 @@ function createExhaustedWakeInteraction(base, worldId) {
     entityId: "wake-exhausted-player",
     roomId: worldId ?? "world",
     kind: "wake-exhausted",
-    prompt: "hud:interaction.wake",
+    prompt: "hud:interaction.tryWake",
     payload: {},
   };
 }
