@@ -116,7 +116,7 @@ export const WORLD_LOCATION_DEFINITIONS = deepFreeze({
       farming: false,
       cooking: false,
       buildMode: false,
-      meleeWeapons: false,
+      meleeWeapons: true,
       trainingDummy: false,
     },
     loadSpawn: ATOLL_WORLD_MODEL.spawn,
