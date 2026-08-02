@@ -1,10 +1,10 @@
-export const RESOURCE_ACTIONS = Object.freeze(["chop", "mine", "mow"]);
+export const RESOURCE_ACTIONS = Object.freeze(["chop", "mine", "mow", "gather"]);
 export const LARGE_RESOURCE_HP_MULTIPLIER = 1.6;
 
 function freezeProfile(profile) {
   return Object.freeze({
     ...profile,
-    actionHp: Object.freeze({ chop: null, mine: null, mow: null, ...profile.actionHp }),
+    actionHp: Object.freeze({ chop: null, mine: null, mow: null, gather: null, ...profile.actionHp }),
     reward: Object.freeze({ ...profile.reward }),
     footprint: Object.freeze({ ...profile.footprint }),
   });
@@ -17,6 +17,7 @@ const profiles = [
   { id: "stone-large", kind: "stone", size: "large", requiredTool: "pickaxe", preferredAction: "mine", actionHp: { mine: { value: 7, multiplier: LARGE_RESOURCE_HP_MULTIPLIER } }, reward: { resource: "stone", amount: 3 }, visual: "stone", footprint: { width: 3, height: 3 }, collisionTopInset: 4.5, prompt: "hud:interaction.mine", sfx: "mine" },
   { id: "ruby-node", kind: "ruby", size: "small", requiredTool: "pickaxe", preferredAction: "mine", actionHp: { mine: 5 }, reward: { resource: "rubies", amount: 1 }, visual: "ruby", footprint: { width: 2, height: 2 }, prompt: "hud:interaction.mine", sfx: "mine" },
   { id: "tree-planted", kind: "plant", size: "large", requiredTool: "axe", preferredAction: "chop", actionHp: { chop: "smallLogChopHp" }, reward: { resource: "wood", amount: 5 }, visual: "tree", footprint: { width: 2, height: 2 }, collisionRect: { left: 16, top: 48, right: 32, bottom: 64 }, prompt: "hud:interaction.chop", sfx: "chop" },
+  { id: "berry-bush", kind: "berry", size: "small", requiredTool: null, preferredAction: "gather", actionHp: { gather: 1 }, reward: { resource: "berry", amount: 1 }, visual: "berry", footprint: { width: 2, height: 2 }, collisionTopInset: 4, prompt: "hud:interaction.gatherBerries", sfx: "inventory-change" },
 ].map(freezeProfile);
 
 export const RESOURCE_PROFILES = Object.freeze(Object.fromEntries(profiles.map((profile) => [profile.id, profile])));
@@ -28,10 +29,13 @@ export function getResourceProfile(profileId) {
 }
 
 export function resourceActionForTool(profile, toolId) {
-  return profile?.requiredTool === toolId ? profile.preferredAction : null;
+  if (!profile) return null;
+  if (profile.requiredTool == null) return profile.preferredAction;
+  return profile.requiredTool === toolId ? profile.preferredAction : null;
 }
 
 export function resourceEffectType(profile, status) {
+  if (profile?.kind === "berry") return "inventory-change";
   const kind = profile?.kind === "ruby" ? "ruby"
     : profile?.kind === "stone" ? "stone"
       : "wood";
