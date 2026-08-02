@@ -1,1 +1,0 @@
-Trigger Pull Request Check after successful full validation.
