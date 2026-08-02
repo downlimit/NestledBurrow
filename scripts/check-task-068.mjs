@@ -6,21 +6,22 @@ import { useCombatNumberSlot } from "../src/inventory/combatQuickUse.js";
 import {
   createWildAtollArenaResources,
   getWildAtollArenaDefinition,
-  getWildAtollExitPoint,
+  getWildAtollSegmentDefinition,
+  WILD_ATOLL_ALL_ARENAS,
   WILD_ATOLL_ARENAS,
+  WILD_ATOLL_SEGMENT_IDS,
   WILD_ATOLL_SEGMENTS,
-  WILD_ATOLL_STARTER_ARENAS,
   WILD_ATOLL_STARTER_LEVELS,
 } from "../src/world/wildAtollDomain.js";
 import { createWorldLayout } from "../src/world/worldLayout.js";
 import { createWorldLocationCoordinator } from "../src/world/worldLocationCoordinator.js";
 import { ATOLL_WORLD_MODEL, WORLD_IDS } from "../src/world/worldLocationConfig.js";
 import { getResourceProfile, resolveActionHp, resourceActionForTool } from "../src/resources/resourceDomain.js";
-import { TILE_SIZE } from "../src/world/worldConfig.js";
 
 const runtimeSource = readFileSync("src/world/wildAtollRuntime.js", "utf8");
-const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
-const enHud = JSON.parse(readFileSync("public/locales/en/hud.json", "utf8"));
+const localesSource = readFileSync("src/localization/locales.js", "utf8");
+const ruAtoll = JSON.parse(readFileSync("public/locales/ru/atoll.json", "utf8"));
+const enAtoll = JSON.parse(readFileSync("public/locales/en/atoll.json", "utf8"));
 
 function gameplayFixture() {
   return {
@@ -55,40 +56,51 @@ function gameplayFixture() {
 
 {
   assert.deepEqual(WILD_ATOLL_STARTER_LEVELS.map((level) => level.length), [1, 2, 2, 2, 1]);
-  assert.equal(WILD_ATOLL_STARTER_ARENAS.length, 8, "starter segment contains eight arenas");
-  assert.equal(new Set(WILD_ATOLL_STARTER_ARENAS).size, 8, "starter arena IDs are unique");
-  const levelByArena = new Map(WILD_ATOLL_STARTER_LEVELS.flatMap((level, levelIndex) => (
-    level.map((arenaId) => [arenaId, levelIndex])
-  )));
-  for (const arenaId of WILD_ATOLL_STARTER_ARENAS) {
-    const definition = getWildAtollArenaDefinition(arenaId);
-    assert.equal(definition.segmentId, WILD_ATOLL_SEGMENTS.starter);
-    for (const exit of definition.exits.filter((entry) => entry.kind === "path")) {
-      assert.equal(
-        levelByArena.get(exit.targetArenaId),
-        levelByArena.get(arenaId) + 1,
-        `${arenaId} advances exactly one arena level`,
-      );
+  assert.equal(WILD_ATOLL_SEGMENT_IDS.length, 7, "starter, two T1 and four T2 segments exist");
+  assert.equal(WILD_ATOLL_ALL_ARENAS.length, 56, "every segment contains eight arenas");
+  assert.equal(new Set(WILD_ATOLL_ALL_ARENAS).size, 56, "all arena IDs are unique");
+
+  for (const segmentId of WILD_ATOLL_SEGMENT_IDS) {
+    const segment = getWildAtollSegmentDefinition(segmentId);
+    assert.deepEqual(segment.levels.map((level) => level.length), [1, 2, 2, 2, 1], `${segmentId} keeps the common arena graph`);
+    assert.equal(segment.arenaIds.length, 8);
+    const levelByArena = new Map(segment.levels.flatMap((level, levelIndex) => (
+      level.map((arenaId) => [arenaId, levelIndex])
+    )));
+    for (const arenaId of segment.arenaIds) {
+      const definition = getWildAtollArenaDefinition(arenaId);
+      assert.equal(definition.segmentId, segmentId);
+      for (const exit of definition.exits.filter((entry) => entry.kind === "path")) {
+        assert.equal(levelByArena.get(exit.targetArenaId), levelByArena.get(arenaId) + 1, `${arenaId} advances one arena level`);
+      }
+    }
+    const terminal = getWildAtollArenaDefinition(segment.terminalArenaId);
+    assert.equal(terminal.terminal, true);
+    assert.equal(terminal.resources.length, 0, `${segmentId} terminal is reserved for route choice and return`);
+    assert.equal(terminal.exits.filter((exit) => exit.kind === "teleport" && exit.targetWorldId === WORLD_IDS.nest).length, 1);
+    for (const arenaId of segment.arenaIds.filter((id) => id !== segment.terminalArenaId)) {
+      assert.equal(getWildAtollArenaDefinition(arenaId).exits.some((exit) => exit.kind === "teleport"), false);
     }
   }
-  const root = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.root);
-  const rootPaths = root.exits.filter((exit) => exit.kind === "path");
-  assert.deepEqual(rootPaths.map((exit) => exit.targetArenaId), [WILD_ATOLL_ARENAS.meadow, WILD_ATOLL_ARENAS.stones]);
-  const rootPoints = rootPaths.map((exit) => getWildAtollExitPoint(exit.direction, TILE_SIZE));
-  assert(rootPoints.every((point) => point.y < ATOLL_WORLD_MODEL.spawn.y), "both second-arena exits are north of the entry spawn");
-  assert(Math.abs(rootPoints[0].x - rootPoints[1].x) > 2 * 44, "starter choices have separate interaction zones");
 
-  const terminal = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.edge);
-  assert.equal(terminal.terminal, true);
-  assert.equal(terminal.resources.length, 0, "terminal arena is a decision/return arena without resource clutter");
-  assert.deepEqual(
-    terminal.exits.filter((exit) => exit.kind === "segment").map((exit) => exit.targetSegmentId),
-    [WILD_ATOLL_SEGMENTS.forestT1, WILD_ATOLL_SEGMENTS.mineT1],
-  );
-  assert.equal(terminal.exits.filter((exit) => exit.kind === "teleport" && exit.targetWorldId === WORLD_IDS.nest).length, 1);
-  for (const arenaId of WILD_ATOLL_STARTER_ARENAS.filter((id) => id !== WILD_ATOLL_ARENAS.edge)) {
-    assert.equal(getWildAtollArenaDefinition(arenaId).exits.some((exit) => exit.kind === "teleport"), false);
-  }
+  assert.deepEqual(getWildAtollSegmentDefinition(WILD_ATOLL_SEGMENTS.starter).nextSegmentIds, [
+    WILD_ATOLL_SEGMENTS.forestT1,
+    WILD_ATOLL_SEGMENTS.mineT1,
+  ]);
+  assert.deepEqual(getWildAtollSegmentDefinition(WILD_ATOLL_SEGMENTS.forestT1).nextSegmentIds, [
+    WILD_ATOLL_SEGMENTS.forestGroveT2,
+    WILD_ATOLL_SEGMENTS.forestWetlandsT2,
+  ]);
+  assert.deepEqual(getWildAtollSegmentDefinition(WILD_ATOLL_SEGMENTS.mineT1).nextSegmentIds, [
+    WILD_ATOLL_SEGMENTS.mineCrystalT2,
+    WILD_ATOLL_SEGMENTS.mineDepthsT2,
+  ]);
+  for (const segmentId of [
+    WILD_ATOLL_SEGMENTS.forestGroveT2,
+    WILD_ATOLL_SEGMENTS.forestWetlandsT2,
+    WILD_ATOLL_SEGMENTS.mineCrystalT2,
+    WILD_ATOLL_SEGMENTS.mineDepthsT2,
+  ]) assert.deepEqual(getWildAtollSegmentDefinition(segmentId).nextSegmentIds, []);
 }
 
 {
@@ -120,7 +132,7 @@ function gameplayFixture() {
   const layout = coordinator.createInitialLayout();
   assert.equal(layout.transitions.length, 0, "Atoll world has no hidden persistent transport assets");
   assert.equal(collides(ATOLL_WORLD_MODEL.spawn, layout, 8, 5), false, "arena entry spawn is collision-safe");
-  for (const arenaId of WILD_ATOLL_STARTER_ARENAS) {
+  for (const arenaId of WILD_ATOLL_ALL_ARENAS) {
     for (const definition of createWildAtollArenaResources("task-068", "run", arenaId)) {
       assert.equal(collides(definition.position, layout, 8, 5), false, `${definition.id} starts on walkable terrain`);
       assert.ok(
@@ -135,19 +147,20 @@ function gameplayFixture() {
   assert(runtimeSource.includes("registerResource"), "Atoll registers nodes with DebrisRuntime");
   assert(runtimeSource.includes("unregisterResource"), "Atoll removes transient nodes through DebrisRuntime");
   assert(!runtimeSource.includes("workResource("), "Atoll has no private resource-hit implementation");
-  assert(runtimeSource.includes("const INTERACTION_RADIUS = 44"), "starter exits have a usable interaction radius");
-  assert(runtimeSource.includes("createTrailExit"), "ordinary arena exits are visibly represented");
-  assert(runtimeSource.includes("availableExitIds"), "preview diagnostics expose current arena choices");
+  assert(runtimeSource.includes("renderArena(nextSegment.entryArenaId)"), "segment exits enter the next segment");
+  assert(runtimeSource.includes("WILD_ATOLL_ALL_ARENAS"), "run cleanup covers every generated segment");
+  assert(!runtimeSource.includes("blockedMessageKey"), "implemented segments are not represented by locked messages");
   assert(runtimeSource.includes("COLLAPSE_FADE_OUT_MS = 5000"));
   assert(runtimeSource.includes("COLLAPSE_FADE_IN_MS = 3000"));
   assert(runtimeSource.includes("beginCollapseRecovery"));
   assert(runtimeSource.includes("value === key || value === namespaceFreeKey"), "technical localization keys fail closed");
   assert(!runtimeSource.toLowerCase().includes("forecast"));
-  for (const [locale, atoll] of [["ru", ruHud.atoll], ["en", enHud.atoll]]) {
+  assert(localesSource.includes('"atoll"'), "Atoll owns a dedicated localization namespace");
+  for (const [locale, atoll] of [["ru", ruAtoll], ["en", enAtoll]]) {
     for (const [key, value] of flatten(atoll)) {
       assert(!/[—–?]/u.test(value), `${locale} Atoll label ${key} uses supported punctuation`);
       assert(value.length <= 40, `${locale} Atoll label ${key} fits the compact HUD budget`);
-      assert(!/^(?:hud:)?atoll\./.test(value), `${locale} Atoll label ${key} is not a technical key`);
+      assert(!/^(?:hud:|atoll:)/.test(value), `${locale} Atoll label ${key} is not a technical key`);
     }
   }
 }
