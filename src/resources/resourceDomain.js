@@ -2,9 +2,10 @@ export const RESOURCE_ACTIONS = Object.freeze(["chop", "mine", "mow", "gather"])
 export const LARGE_RESOURCE_HP_MULTIPLIER = 1.6;
 
 function freezeProfile(profile) {
+  const actionHp = { chop: null, mine: null, mow: null, ...profile.actionHp };
   return Object.freeze({
     ...profile,
-    actionHp: Object.freeze({ chop: null, mine: null, mow: null, gather: null, ...profile.actionHp }),
+    actionHp: Object.freeze(actionHp),
     reward: Object.freeze({ ...profile.reward }),
     footprint: Object.freeze({ ...profile.footprint }),
   });
