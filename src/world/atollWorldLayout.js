@@ -2,13 +2,7 @@ import { applyColliderOffsets } from "../build/buildWorldGeometry.js";
 import { PLACEMENT_CELL_SIZE } from "../resources/resourceConfig.js";
 import { createGridCollisionEnvironment } from "./collisionEnvironment.js";
 import { OUTDOOR_FRAMES, TILE_SIZE } from "./worldConfig.js";
-import { WORLD_IDS } from "./worldLocationConfig.js";
-
-export const ATOLL_WORLD_MODEL = Object.freeze({
-  columns: 22,
-  rows: 18,
-  spawn: Object.freeze({ x: 11 * TILE_SIZE, y: 14 * TILE_SIZE }),
-});
+import { ATOLL_WORLD_MODEL, WORLD_IDS } from "./worldLocationConfig.js";
 
 export function createAtollWorldLayout() {
   const { columns, rows, spawn } = ATOLL_WORLD_MODEL;
