@@ -20,9 +20,9 @@ Task #001 — Первая расчистка участка (PR #81)
 
 ### Task #065 — Вынести location lifecycle из WorldScene
 
-**Статус:** `Подготовлено`.
+**Статус:** `Выполнено`.
 
-**Результат:** Заменить scene-wide `worldLocationLifecycle.js` явным location-scope runtime с capability-owned mount/destroy и отдельным world presentation owner, чтобы добавление третьей локации не требовало доступа к произвольному состоянию `WorldScene`.
+**Результат:** Scene-wide lifecycle заменён на `WorldLocationRuntime` с capability-owned mount/destroy и отдельный `WorldPresentationRuntime`; `WorldScene` делегирует lifecycle через явные dependencies и публичные snapshots.
 
 ## Следующий продуктовый вопрос
 

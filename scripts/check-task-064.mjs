@@ -11,7 +11,7 @@ const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const main = read("src/main.js");
 const coordinatorSource = read("src/worldInteractionCoordinator.js");
 const interactionRuntime = read("src/interactionRuntime.js");
-const locationLifecycle = read("src/worldLocationLifecycle.js");
+const locationRuntime = read("src/worldLocationRuntime.js");
 const architectureCheck = read("scripts/check-architecture-boundaries.mjs");
 
 assert(!main.includes("runWorldObjectInteraction"), "WorldScene must not execute world interactions");
@@ -27,9 +27,9 @@ assert(interactionRuntime.includes("worldInteractionCoordinator?.isInteractionAl
 assert(interactionRuntime.includes("worldInteractionCoordinator?.handle"));
 assert(interactionRuntime.includes("startDialogue") && interactionRuntime.includes("advanceActiveDialogue"), "InteractionRuntime must retain dialogue lifecycle");
 assert(!interactionRuntime.includes("runWorldObjectInteraction"));
-assert(locationLifecycle.includes("worldInteractionCoordinator?.rebindLocationOwners"));
-assert(locationLifecycle.indexOf("worldInteractionCoordinator?.unbindLocationOwners") < locationLifecycle.indexOf("merchantRuntime?.destroy"));
-assert.equal(Number(architectureCheck.match(/MAX_WORLD_SCENE_LINES = (\d+)/u)?.[1]), 1520);
+assert(locationRuntime.includes("worldInteractionCoordinator?.rebindLocationOwners"));
+assert(locationRuntime.indexOf("worldInteractionCoordinator?.unbindLocationOwners") < locationRuntime.indexOf("merchantRuntime?.destroy"));
+assert(Number(architectureCheck.match(/MAX_WORLD_SCENE_LINES = (\d+)/u)?.[1]) <= 1520);
 assert(read("src/main.js").split("\n").length <= 1520);
 
 const dispatchNames = [

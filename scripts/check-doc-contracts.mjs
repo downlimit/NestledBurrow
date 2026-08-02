@@ -130,9 +130,11 @@ requireText(library, [
 requireText(architecture, [
   "src/main.js",
   "жёсткий предел",
-  "1520",
+  "1300",
   "WorldBuildCoordinator",
   "WorldInteractionCoordinator",
+  "WorldLocationRuntime",
+  "WorldPresentationRuntime",
   "Build и authoring",
   "Tavern service",
   "не вводятся",

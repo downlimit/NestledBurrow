@@ -120,7 +120,8 @@ export function attachEditorAuthoringRuntime(scene, {
   confirmColliderDraft = () => scene.confirmColliderDraft?.(),
 } = {}) {
   if (!scene?.worldLayout) throw new Error("World scene is unavailable");
-  const buildCoordinator = scene.worldBuildCoordinator;
+  const getLocationOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
+  const buildCoordinator = getLocationOwners().worldBuildCoordinator;
   if (!buildCoordinator?.getPlacedObjects || !buildCoordinator?.placeBuildAsset) {
     throw new Error("World build coordinator is unavailable");
   }
@@ -140,7 +141,7 @@ export function attachEditorAuthoringRuntime(scene, {
   }
 
   function restorePlantVisual(object) {
-    scene.debrisRuntime?.registerResource?.(object.resourceDefinition, {
+    getLocationOwners().debrisRuntime?.registerResource?.(object.resourceDefinition, {
       onVisualChange: (visual) => { object.sprites = visual ? [visual] : []; },
     });
     object.resourceCleared = stateFor(object.id).cleared;
@@ -148,7 +149,7 @@ export function attachEditorAuthoringRuntime(scene, {
 
   function registerPlant(object) {
     if (!isPlantedTreeObject(object)) return null;
-    const ownedVisual = scene.debrisRuntime?.getResourceVisual?.(object.id);
+    const ownedVisual = getLocationOwners().debrisRuntime?.getResourceVisual?.(object.id);
     for (const sprite of object.sprites ?? []) if (sprite !== ownedVisual) sprite.destroy?.();
     scene.worldLayout.clearWorldObjectCollider(object.id);
     object.sprites = [];
@@ -176,8 +177,8 @@ export function attachEditorAuthoringRuntime(scene, {
 
   function getAuthoringInstances() {
     return [
-      ...(scene.debrisRuntime?.getAuthoringInstances?.() ?? []),
-      ...(scene.facilityRuntime?.getAuthoringInstances?.() ?? []),
+      ...(getLocationOwners().debrisRuntime?.getAuthoringInstances?.() ?? []),
+      ...(getLocationOwners().facilityRuntime?.getAuthoringInstances?.() ?? []),
     ].filter((instance) => scene.assetProfiles?.[instance.profileKey]);
   }
 
@@ -206,8 +207,8 @@ export function attachEditorAuthoringRuntime(scene, {
       ...scene.assetProfiles,
       [profileKey]: Object.freeze({ ...current, visualOffset: Object.freeze(offset) }),
     });
-    scene.debrisRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
-    scene.facilityRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
+    getLocationOwners().debrisRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
+    getLocationOwners().facilityRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
     return offset;
   }
 
@@ -224,7 +225,7 @@ export function attachEditorAuthoringRuntime(scene, {
       const depth = assetDepthFromPivot(instance.anchor, offset, 500, instance.id);
       for (const target of instance.targets) target.setDepth?.(depth);
     }
-    scene.facilityRuntime?.syncKitchenVisuals?.();
+    getLocationOwners().facilityRuntime?.syncKitchenVisuals?.();
     return offset;
   }
 
@@ -256,7 +257,7 @@ export function attachEditorAuthoringRuntime(scene, {
     if (!isPlantedTreeObject(object)) return;
     plants.delete(object.id);
     selectionBoundsById.delete(object.id);
-    scene.debrisRuntime?.unregisterResource?.(object.id, { removeState });
+    getLocationOwners().debrisRuntime?.unregisterResource?.(object.id, { removeState });
     scene.interactionRuntime?.refresh?.();
   }
 

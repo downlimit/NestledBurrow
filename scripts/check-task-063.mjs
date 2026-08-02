@@ -28,7 +28,7 @@ assert.equal(invalid.preview, true, "invalid metadata must preserve path-based p
 assert.equal(invalid.autoMerge, false, "invalid metadata must disable automatic merge routing");
 
 const impact = analyzeSource("src/worldBuildCoordinator.js");
-assert(impact.importers.includes("src/main.js"), "owner scan must find the composition-root importer");
+assert(impact.importers.includes("src/worldLocationRuntime.js"), "owner scan must find the location-runtime importer");
 assert(impact.checks.includes("scripts/check-task-062.mjs"), "owner scan must find source-address contract checks");
 
 const selected = selectValidationScripts(

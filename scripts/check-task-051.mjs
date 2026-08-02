@@ -357,19 +357,21 @@ assert.deepEqual([2, 2, 2, 2].map((amount, index) => aggregateTransientNumber(da
 }, 1000).amount), [2, 4, 6, 8]);
 
 const main = readFileSync("src/main.js", "utf8");
+const locationRuntime = readFileSync("src/worldLocationRuntime.js", "utf8");
 const worldBuildCoordinator = readFileSync("src/worldBuildCoordinator.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const combatLoadout = readFileSync("src/combatLoadoutRuntime.js", "utf8");
-assert(main.includes("createMeleeRuntime(this"));
+assert(locationRuntime.includes("melee: createMeleeRuntime") && locationRuntime.includes("this.factories.melee(this.renderingHost"));
 assert(main.includes("getControllerMoveDirection: () => this.getControllerMoveDirection()"));
-assert(main.includes("this.meleeRuntime?.beforeCharacterUpdate?.(substepMs)"));
-assert(main.includes("this.meleeRuntime?.afterCharacterUpdate?.(substepMs)"));
+assert(locationRuntime.includes("this.owners.meleeRuntime?.beforeCharacterUpdate?.(deltaMs)"));
+assert(locationRuntime.includes("this.owners.meleeRuntime?.afterCharacterUpdate?.(deltaMs)"));
 assert(main.includes("getCombatActionItem"), "melee resolves weapons from combat action slots");
-assert(main.includes("getSelectedItem: () => this.frameMeleeItem"), "melee runtime receives only the pressed combat action item");
+assert(main.includes("getFrameMeleeItem: () => this.frameMeleeItem")
+  && locationRuntime.includes("getSelectedItem: () => this.callbacks.getFrameMeleeItem?.()"), "melee runtime receives only the pressed combat action item");
 assert(main.includes("consumePointerAction") && main.includes('shiftPressed ? "shift" : null'), "LMB, RMB, Space and Shift share the combat action route");
 assert(main.includes("primary: Boolean(this.frameMeleeItem) && !this.suppressNextInteract"), "stable combat mode permits its resolved melee action");
 assert(main.includes("maxPresentationSpeed: this.meleeRuntime?.getCameraFollowSpeedLimit?.()"), "camera smoothing is enabled only by the active melee runtime");
-assert(main.includes("playEffect: (type) => this.audioRuntime?.playEffect?.(type)"), "melee hit timing routes synthetic SFX through the shared audio runtime");
+assert(locationRuntime.includes("playEffect: (type) => this.globalOwners.audioRuntime?.playEffect?.(type)"), "melee hit timing routes synthetic SFX through the shared audio runtime");
 assert(worldBuildCoordinator.includes("getBuildMoveTargetAt")
   && worldBuildCoordinator.includes("moveBuildTarget")
   && worldBuildCoordinator.includes("restoreBuildTarget"), "build move updates and undoes the dummy home anchor");
@@ -390,7 +392,7 @@ assert(meleeRuntime.includes('groupKey === "resource:ruby-node"') && meleeRuntim
 assert(meleeRuntime.includes('startsWith("resource:log-")') && meleeRuntime.includes('"melee-log-thud"'), "logs produce a dull melee impact");
 assert(meleeRuntime.includes("index * MELEE_HIT_SOUND_STAGGER_MS"), "multiple hit sounds from one swing use the shared stagger interval");
 assert(meleeRuntime.includes('hitEffect: "training-dummy-hit"') && meleeRuntime.includes("target.hitEffect ?? combatEffect"), "training dummy routes its own impact sound through the shared stagger queue");
-assert(main.includes("damageLog: (resourceId, multiplier)") && meleeRuntime.includes("profile.resourceDamageMultiplier"), "battle axe resource damage routes only through log damage");
+assert(locationRuntime.includes("damageLog: (resourceId, multiplier)") && meleeRuntime.includes("profile.resourceDamageMultiplier"), "battle axe resource damage routes only through log damage");
 const persistence = readFileSync("src/sessionPersistence.js", "utf8");
 assert(!persistence.includes('"sword"') && !persistence.includes('"battle-axe"'), "save migration does not inject melee weapons");
 

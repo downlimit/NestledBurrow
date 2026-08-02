@@ -7,9 +7,17 @@ const normalize = (path) => path.replaceAll("\\", "/");
 const SOURCE_EXTENSIONS = new Set([".js", ".mjs", ".ts", ".py", ".md", ".json", ".yml", ".yaml"]);
 
 function trackedFiles(root) {
-  const result = spawnSync("git", ["ls-files"], { cwd: root, encoding: "utf8", windowsHide: true });
+  const result = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+    cwd: root,
+    encoding: "utf8",
+    windowsHide: true,
+  });
   if (result.status !== 0) throw new Error(result.stderr.trim() || "git ls-files failed");
-  return result.stdout.split(/\r?\n/u).filter(Boolean).map(normalize);
+  return result.stdout
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .map(normalize)
+    .filter((path) => existsSync(join(root, normalizeNative(path))));
 }
 
 function localImports(text) {

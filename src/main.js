@@ -7,20 +7,17 @@ import { getFootBox } from "./movement.js";
 import { createMovementState, createRuntimeMovementConfig, energyTargetSpeedMultiplier } from "./characterMovement.js";
 import {
   ACTOR_PROFILE_IDS,
-  createDebugMovementConfigFromPolicy,
   getActorProfile,
 } from "./actorProfiles.js";
 import { createCharacter } from "./character.js";
 import { createCharacterSystem } from "./characterSystem.js";
-import { createIdleController, createPatrolController, createPlayerController } from "./controllers.js";
+import { createPlayerController } from "./controllers.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
   GAME_WIDTH,
   HOUSE_IMAGE_PATH,
-  HOUSE_FRAMES,
   HOUSE_TEXTURE_KEY,
-  OUTDOOR_FRAMES,
   OUTDOOR_IMAGE_PATH,
   OUTDOOR_TEXTURE_KEY,
   TILE_SIZE,
@@ -30,9 +27,10 @@ import {
 import { createWorldLayout } from "./worldLayout.js";
 import { WORLD_IDS } from "./worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "./worldLocationCoordinator.js";
-import { canTransitionWorldLocation, destroyWorldLocation, mountWorldLocation, renderWorldLocation } from "./worldLocationLifecycle.js";
+import { createWorldLocationRuntime } from "./worldLocationRuntime.js";
+import { createWorldPresentationRuntime } from "./worldPresentationRuntime.js";
 import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState, refillEnergy, resetBalanceRun } from "./gameSessionState.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState } from "./gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
 import { getDialogueDefinition } from "./dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
@@ -48,40 +46,28 @@ import { createAudioSettingsStore } from "./audioSettings.js";
 import { PhaserAudioRuntime, preloadMusicPlaylist } from "./audioRuntime.js";
 import { HUD_DEPTH } from "./hud.js";
 import { createMobileJoystick } from "./mobileJoystick.js";
-import { MovementDebugPanel, loadMovementDebugConfig } from "./movementDebugPanel.js";
+import { loadMovementDebugConfig } from "./movementDebugPanel.js";
 import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./colliderDebugOverrides.js";
 import { loadAssetProfiles, saveAssetProfiles } from "./assetProfiles.js";
-import { migrateDirectionalWallOverrides, worldDepthFromAnchorY } from "./buildWorldGeometry.js";
+import { migrateDirectionalWallOverrides } from "./buildWorldGeometry.js";
 import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./colliderResize.js";
 import { BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
-import { DEFAULT_RESOURCE_ID, getResourceObjectsForWorld, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { getResourceProfile } from "./resourceDomain.js";
-import { createDebrisRuntime } from "./debrisRuntime.js";
+import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
 import { FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
-import { createFacilityRuntime } from "./facilityRuntime.js";
 import { createNeedsRuntime } from "./needsRuntime.js";
 import { createNeedsFlowRuntime, needMeterValues } from "./needsFlowRuntime.js";
-import { createNeedsInteractionCoordinator } from "./needsInteractionCoordinator.js";
 import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
 import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
-import { createCookingRuntime } from "./cookingRuntime.js";
 import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET } from "./guestConfig.js";
-import { createTavernSignRuntime } from "./tavernSignRuntime.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
   toPhaserFrame,
 } from "./characterVisualProfiles.js";
 import { preloadFarmingAssets } from "./farmingConfig.js";
-import { createFarmingRuntime } from "./farmingRuntime.js";
-import { createMerchantRuntime } from "./merchantRuntime.js";
-import { createWorldBuildCoordinator } from "./worldBuildCoordinator.js";
 import { preloadLemonadeAssets } from "./lemonadeConfig.js";
-import { createTavernServiceRuntime } from "./tavernServiceRuntime.js";
-import { createKitchenInteractionRuntime } from "./kitchenInteractionRuntime.js";
 import { installWorldE2EBridge } from "./e2eBridge.js";
 import { UiVisibilityCoordinator } from "./uiVisibilityCoordinator.js";
-import { addInventoryItem, createInventoryItem } from "./inventoryDomain.js";
 import { createGameCanvasInputGuard } from "./gameCanvasInputGuard.js";
 import {
   createMeleeStartingWorldItems,
@@ -90,7 +76,6 @@ import {
   resolveMeleeActionItem,
   TRAINING_DUMMY,
 } from "./meleeConfig.js";
-import { createMeleeRuntime } from "./meleeRuntime.js";
 import { loadStartingLayout } from "./startingLayout.js";
 import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
 
@@ -167,15 +152,16 @@ class WorldScene extends Phaser.Scene {
     saveColliderDebugOverrides(this.colliderOverrides, window.localStorage);
     this.createGameplayTuning();
     this.loadSessionState();
+    this.worldPresentationRuntime = createWorldPresentationRuntime({ renderingHost: this });
     this.worldLocationCoordinator = createWorldLocationCoordinator({
       sessionState: this.sessionState,
       createLayout: (worldId) => createWorldLayout(worldId),
       applyColliderOverrides: (layout) => this.applyColliderOverridesToLayout(layout),
       getPlayerCharacter: () => this.playerCharacter,
-      canTransition: () => this.canTransitionLocation(),
-      beforeLocationChange: () => this.destroyLocationLifecycle(),
+      canTransition: () => this.worldLocationRuntime?.canTransition?.() ?? false,
+      beforeLocationChange: () => this.worldLocationRuntime?.unmount?.(),
       applyLocationLayout: ({ layout }) => this.applyLocationLayout(layout),
-      afterLocationChange: () => this.mountLocationLifecycle(),
+      afterLocationChange: ({ definition, layout }) => this.worldLocationRuntime?.mount?.({ definition, layout }),
       setCameraBounds: (bounds) => this.cameras.main.setBounds(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top),
       resetCamera: (position) => this.cameraRuntime?.reset?.(position),
       refreshInteractions: () => this.interactionRuntime?.refresh?.(),
@@ -184,7 +170,6 @@ class WorldScene extends Phaser.Scene {
     this.worldLayout = this.worldLocationCoordinator.createInitialLayout();
     this.characterSystem = createCharacterSystem({ collisionEnvironment: this.worldLayout });
     this.cameras.main.setBounds(0, 0, this.worldLayout.bounds.right, this.worldLayout.bounds.bottom);
-    this.renderWorld();
     this.createCharacterAnimations();
     this.createInput();
     this.createCharacters();
@@ -200,34 +185,15 @@ class WorldScene extends Phaser.Scene {
     this.lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
     this.createDayNightRuntime();
     this.createHud();
-    this.mountLocationLifecycle();
+    this.createLocationRuntime();
+    this.worldLocationRuntime.mount({
+      definition: this.worldLocationCoordinator.getCurrentDefinition(),
+      layout: this.worldLayout,
+    });
     this.attachSceneListeners();
     this.createJoystick();
     this.syncIntegerZoom();
     this.installE2EBridge();
-  }
-
-  renderWorld() { renderWorldLocation(this, { outdoorTextureKey: OUTDOOR_TEXTURE_KEY, houseTextureKey: HOUSE_TEXTURE_KEY, treesTextureKey: TREES_TEXTURE_KEY, tileSize: TILE_SIZE }); }
-
-  addTile(tile, textureKey, depth) {
-    const sprite = this.add
-      .image(tile.worldX ?? tile.x * TILE_SIZE, tile.worldY ?? tile.y * TILE_SIZE, textureKey, tile.frame)
-      .setOrigin(0, 0)
-      .setDepth(depth);
-    this.worldRenderSprites?.push?.(sprite);
-    return sprite;
-  }
-
-  createCanonicalWallEntry(tile) {
-    const depth = worldDepthFromAnchorY((tile.worldY ?? tile.y * TILE_SIZE) + TILE_SIZE, tile.id);
-    const extraSprites = (tile.supplements ?? []).map((supplement) => this.add
-      .image(supplement.worldX, supplement.worldY, HOUSE_TEXTURE_KEY, supplement.frame)
-      .setOrigin(0, 0)
-      .setCrop(supplement.cropX, 0, supplement.cropWidth, TILE_SIZE)
-      .setDepth(depth));
-    this.worldRenderSprites?.push?.(...extraSprites);
-    const sprite = this.addTile(tile, HOUSE_TEXTURE_KEY, depth);
-    return { sprite, extraSprites, tile };
   }
 
   createCharacterAnimations() {
@@ -250,7 +216,6 @@ class WorldScene extends Phaser.Scene {
     const playerVisualProfile = getCharacterVisualProfile(CHARACTER_VISUAL_PROFILE_IDS.player);
     const debugOverrides = loadMovementDebugConfig({ enabled: this.movementDebugEnabled });
     this.movementConfig = createRuntimeMovementConfig(debugOverrides, playerProfile.movement);
-    this.npcMovementConfigs = [];
     this.playerCharacter = createCharacter(this, {
       id: "player",
       spawn: this.worldLayout.spawn,
@@ -265,60 +230,6 @@ class WorldScene extends Phaser.Scene {
     });
     this.characterSystem.add(this.playerCharacter);
     this.player = this.characterSystem.require("player").sprite;
-  }
-
-  mountVillageCharacters() {
-    this.npcMovementConfigs = [];
-    for (const npc of NPCS) {
-      if (this.characterSystem.has(npc.id)) continue;
-      const actorProfile = getActorProfile(npc.profileId);
-      const visualProfile = getCharacterVisualProfile(npc.visualProfileId);
-      this.characterSystem.add(createCharacter(this, {
-        id: npc.id,
-        spawn: npc.spawn,
-        controller: npc.patrol
-          ? createPatrolController({
-            ...npc.patrol,
-            isPaused: () => this.interactionRuntime?.isEntityInActiveDialogue(npc.id) ?? false,
-          })
-          : createIdleController(),
-        movementConfig: this.createNpcRuntimeMovementConfig(actorProfile),
-        actorProfile,
-        visualProfile,
-      }));
-    }
-  }
-
-  destroyVillageCharacters() {
-    for (const npc of NPCS) this.characterSystem?.remove?.(npc.id);
-    this.npcMovementConfigs = [];
-  }
-
-  createNpcRuntimeMovementConfig(profile) {
-    if (!this.movementDebugEnabled) {
-      return createRuntimeMovementConfig(profile.movement, profile.movement);
-    }
-
-    const config = createRuntimeMovementConfig(
-      createDebugMovementConfigFromPolicy(profile, this.movementConfig),
-      profile.movement,
-    );
-    this.npcMovementConfigs.push({ profileId: profile.id, movementConfig: config });
-    return config;
-  }
-
-  syncNpcMovementConfig() {
-    if (!this.npcMovementConfigs) return;
-    for (const npcConfig of this.npcMovementConfigs) {
-      const profile = getActorProfile(npcConfig.profileId);
-      Object.assign(
-        npcConfig.movementConfig,
-        createRuntimeMovementConfig(
-          createDebugMovementConfigFromPolicy(profile, this.movementConfig),
-          profile.movement,
-        ),
-      );
-    }
   }
 
   createInput() {
@@ -425,79 +336,6 @@ class WorldScene extends Phaser.Scene {
     });
   }
 
-  createMerchantRuntime() {
-    this.merchantRuntime = createMerchantRuntime(this, {
-      sessionState: this.sessionState,
-      localization: this.localization,
-      onActiveChange: () => this.syncGameplayHudVisibility(),
-      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
-      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
-      onPersistentMutation: () => {
-        this.gameHud?.render?.();
-        this.saveSession();
-      },
-    });
-    this.unregisterMerchantVisibility = this.uiVisibilityCoordinator?.register?.(this.merchantRuntime, ["gameplay-overlay", "option-sensitive"]);
-  }
-
-  createDebrisRuntime() {
-    this.debrisRuntime = createDebrisRuntime(this, {
-      sessionState: this.sessionState,
-      worldLayout: this.worldLayout,
-      resourceDefinitions: getResourceObjectsForWorld(this.worldLocationCoordinator.getCurrentDefinition().id),
-      includeBed: this.worldLocationCoordinator.hasCapability("homeSystems"),
-      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
-      getGameplayTuning: () => this.gameplayTuning,
-      onPersistentMutation: (result) => { this.gameHud?.render?.(); if (result.inventory?.mutated) this.gameHud?.notifyInventoryGain?.(result.inventory); this.interactionRuntime?.refresh?.(); this.saveSession(); },
-    });
-  }
-
-  createFacilityRuntime() {
-    this.facilityRuntime = createFacilityRuntime(this, {
-      worldLayout: this.worldLayout,
-      getKitchenState: () => this.sessionState?.gameplay?.kitchen, getInventoryState: () => this.sessionState?.gameplay?.inventory,
-      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
-      isFacilityReserved: (facilityId) => this.tavernServiceRuntime?.guestRuntime?.isDiningTableReserved?.(facilityId) ?? false,
-    });
-    this.needsInteractionCoordinator = createNeedsInteractionCoordinator({
-      facilityRuntime: this.facilityRuntime,
-      debrisRuntime: this.debrisRuntime,
-      getPlayer: () => this.playerCharacter,
-      startSleep: (options) => this.startSleeping(options),
-      stopSleep: (options) => this.wakeUp(options),
-      isSleeping: () => this.sleeping,
-      toiletAccidentTuning: this.gameplayTuning.needs.toiletAccident,
-      onToiletAccident: (event) => this.needsRuntime?.beginToiletAccident(event),
-      onToiletAccidentRecovery: (progress) => this.needsRuntime?.advanceToiletAccidentRecovery(progress),
-      refresh: () => this.interactionRuntime?.refresh?.(),
-    });
-  }
-
-  createTavernRuntime() {
-    this.tavernSignRuntime = createTavernSignRuntime(this, {
-      getTavernOpen: () => this.sessionState?.gameplay?.tavernOpen,
-      worldLayout: this.worldLayout,
-    });
-    this.tavernServiceRuntime = createTavernServiceRuntime(this, {
-      sessionState: this.sessionState,
-      worldLayout: this.worldLayout,
-      facilityRuntime: this.facilityRuntime,
-      characterSystem: this.characterSystem,
-      createNpcMovementConfig: (profile) => this.createNpcRuntimeMovementConfig(profile),
-      getPlayerPosition: () => this.playerCharacter?.motor?.position,
-      getSignPoint: () => this.tavernSignRuntime?.getGuestCheckPoint?.() ?? GUEST_CONFIG.points.sign,
-      onPersistentMutation: (result) => {
-        if (result?.status === "coin-collected") this.gameHud?.notifyCoinDelta?.(result.value);
-        this.facilityRuntime?.syncKitchenVisuals?.();
-        this.gameHud?.render?.();
-        this.interactionRuntime?.refresh?.();
-        this.saveSession();
-      },
-    });
-    this.guestRuntime = this.tavernServiceRuntime.guestRuntime;
-    this.coinRuntime = this.tavernServiceRuntime.coinRuntime;
-  }
-
   getPlayerPresentationPosition() {
     const sprite = this.playerCharacter?.sprite;
     const motor = this.playerCharacter?.motor;
@@ -569,91 +407,86 @@ class WorldScene extends Phaser.Scene {
   applyLocationLayout(layout) {
     this.worldLayout = layout;
     if (this.characterSystem) this.characterSystem.collisionEnvironment = layout;
-    this.renderWorld();
   }
 
-  mountLocationLifecycle() { mountWorldLocation(this); }
-
-  destroyLocationLifecycle() { destroyWorldLocation(this); }
-
-  canTransitionLocation() { return canTransitionWorldLocation(this); }
-
-  createMovementDebugPanel() {
-    this.movementDebugPanel = new MovementDebugPanel({
-      enabled: this.movementDebugEnabled,
+  createLocationRuntime() {
+    this.worldLocationRuntime = createWorldLocationRuntime({
+      renderingHost: this,
+      inputHost: this.input,
+      sessionState: this.sessionState,
+      localization: this.localization,
+      presentationRuntime: this.worldPresentationRuntime,
+      characterSystem: this.characterSystem,
       movementConfig: this.movementConfig,
-      onConfigChange: () => this.syncNpcMovementConfig(),
+      movementDebugEnabled: this.movementDebugEnabled,
       gameplayTuning: this.gameplayTuning,
-      onGameplayTuningChange: (tuning) => {
-        applyGameplayTuning(this.sessionState, tuning);
-        this.cameraRuntime?.setTuning(tuning);
-        this.syncPlayerEnergyTarget();
-        this.gameHud?.render?.();
+      globalOwners: {
+        worldInteractionCoordinator: this.worldInteractionCoordinator,
+        interactionRuntime: this.interactionRuntime,
+        uiVisibilityCoordinator: this.uiVisibilityCoordinator,
+        gameHud: this.gameHud,
+        audioRuntime: this.audioRuntime,
+        needsRuntime: this.needsRuntime,
+        needsFlowRuntime: this.needsFlowRuntime,
+        cameraRuntime: this.cameraRuntime,
       },
-      onRefillEnergy: () => { refillEnergy(this.sessionState); this.needsFlowRuntime?.reset(needMeterValues(this.sessionState.gameplay)); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.saveSession(); },
-      onSetNeedsDebugPreset: (preset) => {
-        if (preset === "clear") this.needsRuntime?.clearDebugPreset?.();
-        else this.needsRuntime?.setDebugPreset?.(preset);
-        this.needsFlowRuntime?.reset(needMeterValues(this.sessionState.gameplay));
-        this.syncPlayerEnergyTarget();
-        this.gameHud?.render?.();
+      callbacks: {
+        getPlayerCharacter: () => this.playerCharacter,
+        getFrameMeleeItem: () => this.frameMeleeItem,
+        getControllerMoveDirection: () => this.getControllerMoveDirection(),
+        getAssetProfiles: () => this.assetProfiles,
+        getMobileJoystick: () => this.mobileJoystick,
+        isSleeping: () => this.sleeping,
+        isOptionsOpen: () => this.optionsOpen,
+        isConfirmationActive: () => this.gameHudConfirmationActive,
+        startSleep: (options) => this.startSleeping(options),
+        stopSleep: (options) => this.wakeUp(options),
+        setCookingOverlayActive: (active) => { this.cookingOverlayActive = Boolean(active); },
+        syncGameplayHudVisibility: () => this.syncGameplayHudVisibility(),
+        syncPlayerEnergyTarget: () => this.syncPlayerEnergyTarget(),
+        updateGameplayTime: (deltaMs) => this.updateGameplayTime(deltaMs),
+        saveSession: () => this.saveSession(),
       },
-      onAddCookedDish: () => {
-        const result = addInventoryItem(this.sessionState.gameplay.inventory, createInventoryItem("fried-potato-dish", 1));
-        if (result.mutated) this.gameHud?.notifyInventoryGain?.(result);
-        this.gameHud?.render?.();
-        this.interactionRuntime?.refresh?.();
-        this.saveSession();
-      },
-      onColliderVisibilityChange: (visible) => this.setColliderDebugVisible(visible),
-      onBuildGridVisibilityChange: (visible) => this.buildMode?.setGridEnabled?.(visible),
-      onColliderEditModeChange: (active) => this.setColliderEditMode(active),
-      onPivotEditModeChange: (active) => this.setPivotEditMode(active),
-      onVisualOffsetEditModeChange: (active) => this.setVisualOffsetEditMode(active),
-      onColliderDraftConfirm: () => this.confirmColliderDraft(),
-      onColliderRound: () => this.roundSelectedCollider(),
-      onPivotAlign: (axis) => this.alignSelectedPivot(axis),
-      onVisualOffsetReset: () => this.resetSelectedVisualOffset(),
-      onResetBalanceRun: () => { resetBalanceRun(this.sessionState); this.worldInteractionCoordinator?.resetResourceActivity?.(); this.debrisRuntime?.rebuild?.(); this.syncPlayerEnergyTarget(); this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); },
-      getStatusSnapshot: () => {
-        if (!this.playerCharacter) return null;
-        return {
-          energy: this.sessionState?.gameplay?.currentEnergy,
-          clock: formatClock(this.sessionState?.gameplay?.worldTimeSeconds, this.localization.getLanguage()),
-          smallLogsCleared: RESOURCE_OBJECTS.filter((item) => getResourceProfile(item.profileId).id === "log-small" && this.sessionState?.gameplay?.resourceNodes[item.id]?.cleared).length,
-          wood: this.sessionState?.gameplay?.wood,
-          stone: this.sessionState?.gameplay?.stone,
-          rubies: this.sessionState?.gameplay?.rubies,
-        };
+      authoring: {
+        setColliderDebugVisible: (visible) => this.setColliderDebugVisible(visible),
+        setColliderEditMode: (active) => this.setColliderEditMode(active),
+        setPivotEditMode: (active) => this.setPivotEditMode(active),
+        setVisualOffsetEditMode: (active) => this.setVisualOffsetEditMode(active),
+        confirmColliderDraft: () => this.confirmColliderDraft(),
+        roundSelectedCollider: () => this.roundSelectedCollider(),
+        alignSelectedPivot: (axis) => this.alignSelectedPivot(axis),
+        resetSelectedVisualOffset: () => this.resetSelectedVisualOffset(),
+        beginColliderEditPointer: (pointer) => this.beginColliderEditPointer(pointer),
+        continueColliderEditPointer: (pointer) => this.continueColliderEditPointer(pointer),
+        endColliderEditPointer: () => { this.colliderResizeDrag = null; },
+        beginPivotEditPointer: (pointer) => this.beginPivotEditPointer(pointer),
+        continuePivotEditPointer: (pointer) => this.continuePivotEditPointer(pointer),
+        endPivotEditPointer: () => { this.pivotDrag = null; },
+        handlePivotKeyDown: (event) => this.handlePivotKeyDown(event),
+        beginVisualOffsetEditPointer: (pointer) => this.beginVisualOffsetEditPointer(pointer),
+        continueVisualOffsetEditPointer: (pointer) => this.continueVisualOffsetEditPointer(pointer),
+        endVisualOffsetEditPointer: () => { this.visualOffsetDrag = null; },
+        handleVisualOffsetKeyDown: (event) => this.handleVisualOffsetKeyDown(event),
       },
     });
-    this.onColliderEditPointerDown = (pointer) => this.beginColliderEditPointer(pointer);
-    this.onColliderEditPointerMove = (pointer) => this.continueColliderEditPointer(pointer);
-    this.onColliderEditPointerUp = () => { this.colliderResizeDrag = null; };
-    this.input.on("pointerdown", this.onColliderEditPointerDown);
-    this.input.on("pointermove", this.onColliderEditPointerMove);
-    this.input.on("pointerup", this.onColliderEditPointerUp);
-    this.onPivotEditPointerDown = (pointer) => this.beginPivotEditPointer(pointer);
-    this.onPivotEditPointerMove = (pointer) => this.continuePivotEditPointer(pointer);
-    this.onPivotEditPointerUp = () => { this.pivotDrag = null; };
-    this.onPivotKeyDown = (event) => this.handlePivotKeyDown(event);
-    this.input.on("pointerdown", this.onPivotEditPointerDown);
-    this.input.on("pointermove", this.onPivotEditPointerMove);
-    this.input.on("pointerup", this.onPivotEditPointerUp);
-    this.input.keyboard.on("keydown", this.onPivotKeyDown);
-    this.onVisualOffsetEditPointerDown = (pointer) => this.beginVisualOffsetEditPointer(pointer);
-    this.onVisualOffsetEditPointerMove = (pointer) => this.continueVisualOffsetEditPointer(pointer);
-    this.onVisualOffsetEditPointerUp = () => { this.visualOffsetDrag = null; };
-    this.onVisualOffsetKeyDown = (event) => this.handleVisualOffsetKeyDown(event);
-    this.input.on("pointerdown", this.onVisualOffsetEditPointerDown);
-    this.input.on("pointermove", this.onVisualOffsetEditPointerMove);
-    this.input.on("pointerup", this.onVisualOffsetEditPointerUp);
-    this.input.keyboard.on("keydown", this.onVisualOffsetKeyDown);
   }
 
-  updateMovementDebugStatus() {
-    this.movementDebugPanel?.updateStatus();
-  }
+  get locationOwners() { return this.worldLocationRuntime?.getOwners?.() ?? {}; }
+  get merchantRuntime() { return this.locationOwners.merchantRuntime ?? null; }
+  get debrisRuntime() { return this.locationOwners.debrisRuntime ?? null; }
+  get meleeRuntime() { return this.locationOwners.meleeRuntime ?? null; }
+  get facilityRuntime() { return this.locationOwners.facilityRuntime ?? null; }
+  get needsInteractionCoordinator() { return this.locationOwners.needsInteractionCoordinator ?? null; }
+  get tavernSignRuntime() { return this.locationOwners.tavernSignRuntime ?? null; }
+  get tavernServiceRuntime() { return this.locationOwners.tavernServiceRuntime ?? null; }
+  get guestRuntime() { return this.locationOwners.guestRuntime ?? null; }
+  get coinRuntime() { return this.locationOwners.coinRuntime ?? null; }
+  get farmingRuntime() { return this.locationOwners.farmingRuntime ?? null; }
+  get cookingRuntime() { return this.locationOwners.cookingRuntime ?? null; }
+  get kitchenInteractionRuntime() { return this.locationOwners.kitchenInteractionRuntime ?? null; }
+  get movementDebugPanel() { return this.locationOwners.movementDebugPanel ?? null; }
+  get worldBuildCoordinator() { return this.locationOwners.worldBuildCoordinator ?? null; }
+  get buildMode() { return this.locationOwners.buildModeRuntime ?? null; }
 
   setColliderDebugVisible(visible) {
     this.colliderDebugVisible = Boolean(visible);
@@ -824,6 +657,7 @@ class WorldScene extends Phaser.Scene {
       gameContainer: this.gameContainer,
       audioSettings: this.audioSettings,
       isCoarsePointer: () => this.isCoarsePointer(),
+      getLocationOwners: () => this.worldLocationRuntime?.getOwners?.() ?? {},
       getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, timeScale: this.simulationScale, selectedTimeScale: this.playerTimeScale, energyFlow: this.getEnergyFlow(), needsFlow: this.getNeedsHudFlow() }),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(), onTimeScaleChange: (scale) => { if (scale > 1) this.audioRuntime?.playEffect?.("time-speed-up"); else if (scale === 1 && this.playerTimeScale !== 1) this.audioRuntime?.playEffect?.("time-speed-normal"); this.playerTimeScale = scale; }, onDroppedItemCollision: (item, collider) => this.farmingRuntime?.handleDroppedItemCollision?.(item, collider), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
       onCoinDrop: (pointerWorld) => this.tavernServiceRuntime?.dropWalletCoin?.({
@@ -848,129 +682,6 @@ class WorldScene extends Phaser.Scene {
       this.saveSession();
     }
     this.syncGameplayHudVisibility();
-  }
-
-  createFarmingRuntime() {
-    this.farmingRuntime = createFarmingRuntime(this, {
-      sessionState: this.sessionState,
-      worldLayout: this.worldLayout,
-      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
-      spawnHarvestDrops: (itemId, quantity, origin) => this.gameHud?.spawnWorldItems?.(itemId, quantity, origin),
-      isModalActive: () => Boolean(this.merchantRuntime?.isActive?.()
-        || this.cookingRuntime?.isActive?.() || this.buildMode?.isActive?.() || this.gameHudConfirmationActive),
-      canPerformPhysicalAction: (toolId) => this.needsRuntime?.canPerformPhysicalAction?.(toolId) ?? { allowed: true, cost: 0 },
-      recordPhysicalAction: (toolId) => this.needsRuntime?.recordPhysicalAction?.(toolId),
-      onPersistentMutation: () => { this.gameHud?.render?.(); this.interactionRuntime?.refresh?.(); this.saveSession(); }, playEffect: (type) => this.audioRuntime?.playEffect?.(type),
-    });
-  }
-
-  createCookingRuntime() {
-    this.cookingRuntime = createCookingRuntime(this, {
-      sessionState: this.sessionState,
-      localization: this.localization, playEffect: (type) => this.audioRuntime?.playEffect?.(type),
-      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
-      onActiveChange: (active) => {
-        this.cookingOverlayActive = Boolean(active);
-        this.gameHud?.setGameplayOverlayActive?.(active);
-        this.syncGameplayHudVisibility();
-        this.mobileJoystick?.reset?.();
-        if (active) {
-          const player = this.characterSystem?.require?.(this.sessionState.playerId);
-          if (player?.motor?.movement?.velocity) {
-            player.motor.movement.velocity.x = 0;
-            player.motor.movement.velocity.y = 0;
-          }
-        } else {
-          this.interactionRuntime?.refresh?.();
-        }
-      },
-      onPersistentMutation: () => {
-        this.facilityRuntime?.syncKitchenVisuals?.();
-        this.gameHud?.render?.();
-        this.interactionRuntime?.refresh?.();
-        this.saveSession();
-      },
-    });
-    this.kitchenInteractionRuntime = createKitchenInteractionRuntime({
-      sessionState: this.sessionState,
-      facilityRuntime: this.facilityRuntime,
-      cookingRuntime: this.cookingRuntime,
-      localization: this.localization,
-      getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
-      onInventoryGain: (result) => this.gameHud?.notifyInventoryGain?.(result),
-      showMessage: (key, options) => this.gameHud?.showTransientMessage?.(key, options),
-      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
-      onPersistentMutation: () => {
-        this.gameHud?.render?.();
-        this.interactionRuntime?.refresh?.();
-        this.saveSession();
-      },
-    });
-  }
-
-  createMeleeRuntime() {
-    this.meleeRuntime = createMeleeRuntime(this, {
-      worldLayout: this.worldLayout,
-      includeTrainingDummy: this.worldLocationCoordinator.hasCapability("trainingDummy"),
-      getPlayerCharacter: () => this.playerCharacter,
-      getSelectedItem: () => this.frameMeleeItem,
-      getControllerMoveDirection: () => this.getControllerMoveDirection(),
-      playEffect: (type) => this.audioRuntime?.playEffect?.(type),
-      damageLog: (resourceId, multiplier) => this.debrisRuntime?.damageLog?.(resourceId, multiplier),
-      canPerformPhysicalAction: (weaponId) => this.needsRuntime?.canPerformPhysicalAction?.(weaponId) ?? { allowed: true, cost: 0 },
-      recordPhysicalAction: (weaponId) => this.needsRuntime?.recordPhysicalAction?.(weaponId),
-      isSuppressed: () => Boolean(
-        this.sleeping
-        || this.optionsOpen
-        || this.gameHudConfirmationActive
-        || this.buildMode?.isActive?.()
-        || this.cookingRuntime?.isActive?.()
-        || this.facilityRuntime?.isUsing?.()
-        || this.needsInteractionCoordinator?.isLocked?.()
-        || this.interactionRuntime?.isDialogueActive?.()
-        || this.merchantRuntime?.isActive?.()
-      ),
-    });
-  }
-
-  createBuildCoordinator() {
-    this.worldBuildCoordinator = createWorldBuildCoordinator({
-      renderingHost: this,
-      localization: this.localization,
-      worldLayout: this.worldLayout,
-      assetProfiles: () => this.assetProfiles,
-      farmState: this.sessionState.gameplay.farm,
-      groundSprites: this.groundSprites,
-      floorSprites: this.floorSprites,
-      wallSprites: this.wallSprites,
-      facilityRuntime: this.facilityRuntime,
-      debrisRuntime: this.debrisRuntime,
-      tavernSignRuntime: this.tavernSignRuntime,
-      meleeRuntime: this.meleeRuntime,
-      hasFarmCell: (point) => this.farmingRuntime?.hasFarmCell?.(point) ?? false,
-      getPlayerFootBox: () => {
-        const player = this.characterSystem?.require?.(this.sessionState.playerId);
-        return player
-          ? getFootBox(player.motor.position, player.motor.footWidth, player.motor.footDepth)
-          : null;
-      },
-      addCanonicalTile: (tile, textureKey, depth) => this.addTile(tile, textureKey, depth),
-      createCanonicalWallEntry: (tile) => this.createCanonicalWallEntry(tile),
-      playEffect: (effect) => this.audioRuntime?.playEffect?.(effect),
-      refreshInteractions: () => this.interactionRuntime?.refresh?.(),
-      persistGameplay: () => this.saveSession(),
-      isActivationAllowed: () => !this.cookingRuntime?.isActive?.(),
-      getBuildGridEnabled: () => Boolean(this.movementDebugPanel?.buildGridCheckbox?.checked),
-      onModeChange: (active) => {
-        this.audioRuntime?.playEffect?.(active ? "menu-open" : "menu-close");
-        this.syncGameplayHudVisibility();
-        this.movementDebugPanel?.setSuppressed?.(active);
-        this.mobileJoystick?.reset?.();
-        if (!active) this.interactionRuntime?.refresh?.();
-      },
-    });
-    this.buildMode = this.worldBuildCoordinator.getBuildModeRuntime();
-    this.farmingRuntime?.attachWorldBuildCoordinator?.(this.worldBuildCoordinator);
   }
 
   syncGameplayHudVisibility() {
@@ -1171,13 +882,16 @@ class WorldScene extends Phaser.Scene {
     this.gameCanvasInputGuard = null;
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
+    this.interactionRuntime?.destroy();
+    this.worldLocationRuntime?.destroy?.();
+    this.worldLocationRuntime = null;
+    this.worldPresentationRuntime?.destroy?.();
+    this.worldPresentationRuntime = null;
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
-    this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
     this.worldInteractionCoordinator?.destroy?.();
     this.worldInteractionCoordinator = null;
-    this.destroyLocationLifecycle();
     this.worldLocationCoordinator?.destroy?.();
     this.worldLocationCoordinator = null;
     this.cameraRuntime?.destroy();
@@ -1185,30 +899,6 @@ class WorldScene extends Phaser.Scene {
     this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
     this.interactionHud?.destroy();
     this.interactionHud = null;
-    this.movementDebugPanel?.destroy();
-    this.movementDebugPanel = null;
-    if (this.onColliderEditPointerDown) this.input.off("pointerdown", this.onColliderEditPointerDown);
-    if (this.onColliderEditPointerMove) this.input.off("pointermove", this.onColliderEditPointerMove);
-    if (this.onColliderEditPointerUp) this.input.off("pointerup", this.onColliderEditPointerUp);
-    this.onColliderEditPointerDown = null;
-    this.onColliderEditPointerMove = null;
-    this.onColliderEditPointerUp = null;
-    if (this.onPivotEditPointerDown) this.input.off("pointerdown", this.onPivotEditPointerDown);
-    if (this.onPivotEditPointerMove) this.input.off("pointermove", this.onPivotEditPointerMove);
-    if (this.onPivotEditPointerUp) this.input.off("pointerup", this.onPivotEditPointerUp);
-    if (this.onPivotKeyDown) this.input.keyboard.off("keydown", this.onPivotKeyDown);
-    this.onPivotEditPointerDown = null;
-    this.onPivotEditPointerMove = null;
-    this.onPivotEditPointerUp = null;
-    this.onPivotKeyDown = null;
-    if (this.onVisualOffsetEditPointerDown) this.input.off("pointerdown", this.onVisualOffsetEditPointerDown);
-    if (this.onVisualOffsetEditPointerMove) this.input.off("pointermove", this.onVisualOffsetEditPointerMove);
-    if (this.onVisualOffsetEditPointerUp) this.input.off("pointerup", this.onVisualOffsetEditPointerUp);
-    if (this.onVisualOffsetKeyDown) this.input.keyboard.off("keydown", this.onVisualOffsetKeyDown);
-    this.onVisualOffsetEditPointerDown = null;
-    this.onVisualOffsetEditPointerMove = null;
-    this.onVisualOffsetEditPointerUp = null;
-    this.onVisualOffsetKeyDown = null;
     this.visualOffsetDebugGraphics?.destroy();
     this.visualOffsetDebugGraphics = null;
     if (this.onHudToggleKey) this.input.keyboard.off("keydown-X", this.onHudToggleKey);
@@ -1301,19 +991,14 @@ class WorldScene extends Phaser.Scene {
 
   update(_time, delta) {
     this.sampleFrameActions();
-    this.meleeRuntime?.handleActions?.(this.frameActions);
+    this.worldLocationRuntime?.handleFrameActions?.(this.frameActions);
     const realDeltaMs = delta;
-    this.needsInteractionCoordinator?.update(realDeltaMs);
-    this.updateGameplayTime(realDeltaMs);
-    this.cookingRuntime?.update?.(realDeltaMs);
+    this.worldLocationRuntime?.updateRealTime?.(realDeltaMs);
     let worldDeltaMs = realDeltaMs * (this.simulationScale ?? 1);
     this.setNpcAnimationTimeScale(this.simulationScale ?? 1);
     while (worldDeltaMs > 0) {
       const substepMs = Math.min(50, worldDeltaMs);
-      this.tavernServiceRuntime?.update(substepMs);
-      this.meleeRuntime?.beforeCharacterUpdate?.(substepMs);
-      this.characterSystem?.update(substepMs);
-      this.meleeRuntime?.afterCharacterUpdate?.(substepMs);
+      this.worldLocationRuntime?.runWorldStep?.(substepMs, (stepMs) => this.characterSystem?.update(stepMs));
       worldDeltaMs -= substepMs;
     }
     this.worldLocationCoordinator?.update?.();
@@ -1325,10 +1010,8 @@ class WorldScene extends Phaser.Scene {
     });
     this.interactionRuntime?.update({ actions: this.frameActions });
     const currentCandidate = this.interactionRuntime?.getCurrentCandidate?.() ?? null;
-    this.merchantRuntime?.updateCandidate?.(currentCandidate);
-    this.debrisRuntime?.updateCandidate?.(currentCandidate); this.farmingRuntime?.updateCandidate?.(currentCandidate);
+    this.worldLocationRuntime?.updateCandidate?.(currentCandidate);
     this.interactionHud?.setCooldownProgress?.(this.worldInteractionCoordinator?.getResourceCooldownProgress?.() ?? 0);
-    this.updateMovementDebugStatus();
     this.renderColliderDebug();
   }
 

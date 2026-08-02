@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 const main = readFileSync("src/main.js", "utf8").replace(/\r\n/g, "\n");
 const lineCount = main.split("\n").length;
-const MAX_WORLD_SCENE_LINES = 1520;
+const MAX_WORLD_SCENE_LINES = 1300;
 
 assert(
   lineCount <= MAX_WORLD_SCENE_LINES,

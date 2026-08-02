@@ -2,25 +2,25 @@
 
 ## Purpose
 
-This system owns world geometry, collisions, resources, farming and inventory items.
+Owns world geometry, collisions, resources, farming and inventory items.
 
 ## Player-visible contract
 
 - world geometry renders and collides from the same semantic source;
-- the saved `currentWorldId` selects one active location layout, camera bounds and location-specific lifecycle;
-- paired `2x2` transports move the player between the home Burrow and the Island Nest automatically;
+- saved `currentWorldId` selects the active layout, camera bounds and lifecycle;
+- paired `2x2` transports automatically connect the Burrow and Island Nest;
 - axe, pickaxe, hoe and water bucket expose separate strict actions;
 - a mismatched tool cannot mutate a resource or farm cell;
 - resource rewards enter the inventory and removing a node removes its collision and presentation consistently;
-- inventory and wallet drag share player-to-cursor throwing; inventory throws a stack and wallet one coin. Drops stay non-blocking, use a `2×2` footprint, settle at a free point and remain pickable;
-- a fresh Burrow places the starter sword and battle axe as ordinary pickable world items immediately beside the training dummy;
+- inventory/wallet drag throws player-to-cursor: a stack or one coin. Non-blocking `2×2` drops settle at a free point and stay pickable;
+- a fresh Burrow places pickable starter sword and battle axe beside the training dummy;
 - the fixed canonical well refills the eight-use water bucket;
 - potato and lemon crops share persisted soil/moisture rules and retain crop-specific growth and yield;
-- crop rot accumulates only while soil is fully dry; watering or rain resets the dry timer. A never-hydrated seed rots after 24 fully dry hours, while a crop that has received water rots after 48 fully dry hours.
+- rot advances only at fully dry soil; watering/rain resets it. Never-hydrated seeds rot after 24 dry hours, previously watered crops after 48.
 
 ## Owners
 
-- location registry/transition lifecycle: `worldLocationConfig.js`, `worldLocationCoordinator.js`, `worldLocationLifecycle.js`;
+- location registry/transitions, owner lifecycle and presentation: `worldLocationConfig.js`, `worldLocationCoordinator.js`, `worldLocationRuntime.js`, `worldPresentationRuntime.js`;
 - world geometry/collision: `worldLayout.js`, `nestWorldLayout.js`, `worldConfig.js`;
 - profiles/actions/rewards: `resourceDomain.js`, `resourceConfig.js`;
 - inventory state and item operations: `inventoryDomain.js`;
@@ -37,7 +37,8 @@ This system owns world geometry, collisions, resources, farming and inventory it
 - stable IDs survive save/load and profile data is immutable;
 - `village` remains the home world ID, `nest` is the only additional registered world ID, and unknown saved IDs resolve to `village`;
 - every resource owns one `worldId`; only active-location resources create visuals, colliders, targets and hit resolution;
-- location switches destroy the old lifecycle before mounting the new one, preventing duplicates;
+- switches reset candidate/unbind, destroy active owners, then presentation; mount reverses that boundary and exposes a named read-only `getOwners()` snapshot;
+- `tavernService`/`cooking` require `facilities`; farming mounts independently;
 - location-specific interaction owners are explicitly rebound after mount and detached before teardown;
 - non-dialogue dispatch order is merchant, farming, tavern sign, facility, bed, busy gate, exhausted wake and resource; the first handled result completes dispatch;
 - inventory has exactly ten slots; tools and loot share the movable-slot contract;
@@ -52,7 +53,7 @@ This system owns world geometry, collisions, resources, farming and inventory it
 
 ## Current baseline
 
-The Burrow keeps its `64x48` layout. The `22x16` Island Nest has oval grass/cliff geometry, a closed northern dead end, four trees and three stones. Resource progress persists across travel and reload. `InteractionRuntime` selects candidates and owns dialogue; `WorldInteractionCoordinator` executes through active owners. The ten-slot hotbar supports reordering, whole-stack throwing and pickup. Potato and lemon crops persist soil/moisture; the fixed well refills the bucket.
+The Burrow is `64x48`; the `22x16` Island Nest has oval grass/cliff geometry, a closed northern dead end, four trees and three stones. Resource progress persists across travel/reload. `WorldLocationRuntime` mounts capabilities and delegates frame phases; `WorldInteractionCoordinator` executes through its active owner snapshot. The ten-slot hotbar supports reorder, stack throw and pickup. Potato/lemon crops persist soil/moisture; the fixed well refills the bucket.
 
 ## Not yet
 
@@ -60,4 +61,4 @@ Inventory containers, stack splitting, tool progression, durability and seasonal
 
 ## Evidence
 
-`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-059`, `check:task-064`, resource/farming/location Browser E2E.
+`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-059`, `check:task-064`, `check:task-065`, focused location E2E.

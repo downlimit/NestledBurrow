@@ -41,6 +41,7 @@ import { CHARACTER_FACINGS, quantizeCharacterFacing } from "../src/characterFaci
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
+const locationRuntimeSource = fs.readFileSync(path.join(root, "src/worldLocationRuntime.js"), "utf8");
 const characterSource = fs.readFileSync(path.join(root, "src/character.js"), "utf8");
 const worldConfigSource = fs.readFileSync(path.join(root, "src/worldConfig.js"), "utf8");
 
@@ -48,10 +49,10 @@ assert(/createCharacterSystem\(\{ collisionEnvironment: this\.worldLayout \}\)/.
 assert(/createCharacter\(this, \{\s*id: "player"/s.test(mainSource), "player is created through Character");
 assert(/actorProfile: playerProfile/.test(mainSource), "player is created with the player actor profile");
 assert(/visualProfile: playerVisualProfile/.test(mainSource), "player is created with the player visual profile");
-assert(/for \(const npc of NPCS\)/.test(mainSource), "NPCs are registered through stable creation order");
-assert(/const actorProfile = getActorProfile\(npc\.profileId\)/.test(mainSource), "NPC profiles are looked up from NPC config");
-assert(/actorProfile,/.test(mainSource), "NPCs are created with their configured actor profiles");
-assert(/visualProfile,/.test(mainSource), "NPCs are created with their configured visual profiles");
+assert(/for \(const npc of NPCS\)/.test(locationRuntimeSource), "NPCs are registered through stable creation order");
+assert(/const actorProfile = getActorProfile\(npc\.profileId\)/.test(locationRuntimeSource), "NPC profiles are looked up from NPC config");
+assert(/actorProfile,/.test(locationRuntimeSource), "NPCs are created with their configured actor profiles");
+assert(/visualProfile,/.test(locationRuntimeSource), "NPCs are created with their configured visual profiles");
 assert(!/updatePlayerAnimation|updatePlayerDepth|updateLastFacing/.test(mainSource), "WorldScene does not keep player-only movement/animation helpers");
 assert(!/moveWithCollision/.test(characterSource), "Character delegates world collision to CharacterMotor");
 assert(!/PLAYER_SPEED/.test(worldConfigSource), "worldConfig does not export player speed");
@@ -61,7 +62,10 @@ assert(/new CameraFollowRuntime\(this,/.test(mainSource), "WorldScene composes t
 assert(!/startFollow\(this\.player/.test(mainSource), "camera no longer follows the player sprite directly");
 assert(!/this\.characters\s*=/.test(mainSource), "WorldScene does not keep a mutable character array registry");
 assert(!/this\.characters\.forEach/.test(mainSource), "WorldScene does not update a mutable character array directly");
-assert(/this\.characterSystem\?\.update\((delta|worldDeltaMs|substepMs)\)/.test(mainSource), "WorldScene updates characters through CharacterSystem");
+assert(
+  /runWorldStep\?\.\(substepMs, \(stepMs\) => this\.characterSystem\?\.update\(stepMs\)\)/.test(mainSource),
+  "WorldScene passes CharacterSystem update through the location-runtime world-step callback",
+);
 assert(/Math\.min\(50, worldDeltaMs\)/.test(mainSource), "accelerated simulation uses bounded movement substeps");
 
 

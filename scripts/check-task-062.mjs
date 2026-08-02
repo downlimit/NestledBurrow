@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const main = read("src/main.js");
 const coordinator = read("src/worldBuildCoordinator.js");
-const lifecycle = read("src/worldLocationLifecycle.js");
+const locationRuntime = read("src/worldLocationRuntime.js");
 const e2eBridge = read("src/e2eBridge.js");
 const authoring = read("src/editorAuthoringRuntime.js");
 const startingLayout = read("src/startingLayout.js");
@@ -14,8 +14,8 @@ const architectureCheck = read("scripts/check-architecture-boundaries.mjs");
 assert(main.split("\n").length <= 2400, "WorldScene must remain within the 2400-line composition ceiling");
 const architectureCeiling = Number(architectureCheck.match(/MAX_WORLD_SCENE_LINES = (\d+)/u)?.[1]);
 assert(architectureCeiling <= 2400, "later architecture work may tighten but never loosen the Task #062 ceiling");
-assert(main.includes("createWorldBuildCoordinator({"), "WorldScene must explicitly construct the world build owner");
-assert(!main.includes("createWorldBuildCoordinator(this"), "the coordinator may not discover dependencies through WorldScene fields");
+assert(locationRuntime.includes("worldBuildCoordinator({"), "the location owner must explicitly construct the world build owner");
+assert(!locationRuntime.includes("worldBuildCoordinator(this"), "the coordinator may not discover dependencies through WorldScene fields");
 assert(!main.includes("createBuildModeRuntime"), "WorldScene may not create or wire BuildModeRuntime");
 
 for (const state of [
@@ -74,13 +74,13 @@ assert(coordinator.includes("[...action].reverse()"), "grouped undo must reverse
 assert(coordinator.includes("getEffectiveCollider"), "placement and drag anchoring must retain effective-collider geometry");
 assert(coordinator.includes("TAVERN_SIGN_BUILD_KIND") && coordinator.includes('target.kind === "training-dummy"'), "special furniture routes must remain delegated to their runtime owners");
 
-for (const source of [lifecycle, e2eBridge, authoring, startingLayout]) {
+for (const source of [locationRuntime, e2eBridge, authoring, startingLayout]) {
   assert(!source.includes("scene.buildPlacedObjects"), "consumers must use the coordinator public API instead of its internal Map");
   assert(!source.includes("scene.buildUndoStack"), "consumers may not access grouped undo internals");
   assert(!source.includes("scene.buildPreviewObjects"), "consumers may not access preview internals");
 }
-assert(lifecycle.includes("worldBuildCoordinator?.destroy?.()"), "location teardown must delegate build cleanup to the coordinator");
-assert(e2eBridge.includes("worldBuildCoordinator?.applyBuildMove"), "E2E build requests must delegate through the coordinator public API");
+assert(locationRuntime.includes("worldBuildCoordinator?.destroy?.()"), "location teardown must delegate build cleanup to the coordinator");
+assert(e2eBridge.includes("owners.worldBuildCoordinator?.applyBuildMove"), "E2E build requests must delegate through the coordinator public API");
 assert(authoring.includes("buildCoordinator.getPlacedObjects()"), "developer authoring must consume the coordinator public API");
 assert(startingLayout.includes("requireBuildCoordinator(scene)"), "starting-layout authoring must resolve the coordinator public API");
 

@@ -150,25 +150,34 @@ assert.equal(resolveColliderSelectionPointer([colliderEntry], selectionBounds, t
 
 function captureScene(cleared) {
   const placedObjects = new Map([[plantObject.id, plantObject]]);
-  return {
-    worldBuildCoordinator: {
-      getPlacedObjects: () => [...placedObjects.values()],
-      getPlacedObject: (id) => placedObjects.get(id) ?? null,
-      getNextBuildObjectId: () => 9,
-      getCellKey: ({ x, y }) => `${x},${y}`,
-      restoreBuildPlacedObject: () => true,
-    },
-    floorSprites: new Map(),
-    wallSprites: new Map(),
-    worldLayout: {
-      houseFloorTiles: [],
-      houseWallTiles: [],
-    },
+  const worldBuildCoordinator = {
+    getPlacedObjects: () => [...placedObjects.values()],
+    getPlacedObject: (id) => placedObjects.get(id) ?? null,
+    getNextBuildObjectId: () => 9,
+    getCellKey: ({ x, y }) => `${x},${y}`,
+    restoreBuildPlacedObject: () => true,
+  };
+  const owners = {
+    worldBuildCoordinator,
     facilityRuntime: { getDefinitions: () => [] },
     meleeRuntime: {
       getStartingLayoutFurniture: () => [{ id: "training-dummy-01", kind: "training-dummy", position: { x: 144, y: 50 } }],
     },
     debrisRuntime: { getBedDefinitions: () => [] },
+  };
+  return {
+    worldLocationRuntime: { getOwners: () => owners },
+    worldPresentationRuntime: {
+      getBuildSurfaceRegistries: () => ({
+        groundSprites: new Map(),
+        floorSprites: new Map(),
+        wallSprites: new Map(),
+      }),
+    },
+    worldLayout: {
+      houseFloorTiles: [],
+      houseWallTiles: [],
+    },
     sessionState: {
       gameplay: {
         resourceNodes: {
@@ -215,12 +224,21 @@ assert.deepEqual(canonicalLayout.furniture, [
 assert.equal(canonicalLayout.facilities.some((facility) => (
   facility.footprint.x <= -10000 || facility.footprint.y <= -10000
 )), false, "temporary facility staging coordinates never enter the canonical layout");
-assert.throws(() => captureStartingLayout({
-  ...captureScene(false),
-  facilityRuntime: {
-    getDefinitions: () => [{ id: "staged-facility", footprint: { x: -10256, y: -10000 } }],
-  },
-}), /temporary staging position/, "capture fails closed while a facility remains staged");
+const stagedScene = captureScene(false);
+const stagedOwners = stagedScene.worldLocationRuntime.getOwners();
+stagedScene.worldLocationRuntime = {
+  getOwners: () => ({
+    ...stagedOwners,
+    facilityRuntime: {
+      getDefinitions: () => [{ id: "staged-facility", footprint: { x: -10256, y: -10000 } }],
+    },
+  }),
+};
+assert.throws(
+  () => captureStartingLayout(stagedScene),
+  /temporary staging position/,
+  "capture fails closed while a facility remains staged",
+);
 const corruptedDraftStorage = createStorage();
 corruptedDraftStorage.setItem(STARTING_LAYOUT_STORAGE_KEY, JSON.stringify({
   ...canonicalLayout,

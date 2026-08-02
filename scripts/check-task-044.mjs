@@ -154,29 +154,35 @@ assert.deepEqual(backup.colliderOverrides[WALL_COLLIDER_GROUPS.vertical], legacy
 const visualTarget = { x: 100, y: 200, setPosition(x, y) { this.x = x; this.y = y; return this; }, setDepth() { return this; } };
 const visualProfiles = normalizeAssetProfiles();
 const visualCollider = { left: 100, right: 148, top: 200, bottom: 216 };
+const visualBuildCoordinator = {
+  getPlacedObjects: () => [],
+  getPlacedObject: () => null,
+  placeBuildAsset: () => ({ status: "ignored" }),
+};
+const visualFacilityRuntime = {
+  getAuthoringInstances: () => [{
+    id: "table-visual",
+    profileKey: "facility:table",
+    anchor: { x: 100, y: 200 },
+    bounds: visualCollider,
+    targets: [visualTarget],
+  }],
+  applyAuthoringVisualOffset(_profileKey, offset) { visualTarget.setPosition(100 + offset.x, 200 + offset.y); },
+  syncKitchenVisuals() {},
+};
 const visualScene = {
   assetProfiles: visualProfiles,
   colliderOverrides: {},
-  worldBuildCoordinator: {
-    getPlacedObjects: () => [],
-    getPlacedObject: () => null,
-    placeBuildAsset: () => ({ status: "ignored" }),
+  worldLocationRuntime: {
+    getOwners: () => ({
+      worldBuildCoordinator: visualBuildCoordinator,
+      facilityRuntime: visualFacilityRuntime,
+    }),
   },
   sessionState: { gameplay: { resourceNodes: {} } },
   worldLayout: {
     setColliderOverride() {},
     getWorldObjectColliders: () => [{ id: "table-visual", rect: visualCollider }],
-  },
-  facilityRuntime: {
-    getAuthoringInstances: () => [{
-      id: "table-visual",
-      profileKey: "facility:table",
-      anchor: { x: 100, y: 200 },
-      bounds: visualCollider,
-      targets: [visualTarget],
-    }],
-    applyAuthoringVisualOffset(_profileKey, offset) { visualTarget.setPosition(100 + offset.x, 200 + offset.y); },
-    syncKitchenVisuals() {},
   },
 };
 const authoringRuntime = attachEditorAuthoringRuntime(visualScene, { storage: null });
