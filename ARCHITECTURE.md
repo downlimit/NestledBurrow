@@ -18,7 +18,7 @@
 - interaction selection остаётся детерминированным контрактом; collision-valid use position и visual aim position разделены, а общая extractable-группа ресурсов и растений ранжируется по направлению взгляда до локальной дистанции.
 - `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle.
 - Повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены.
-- Дикий Атолл разделяет topology/resource-placement rules (`src/world/wildAtollDomain.js`) и transient arena presentation/input (`src/world/wildAtollRuntime.js`); его первый slice не сериализуется и не меняет session schema.
+- Дикий Атолл имеет отдельный transport-free world layout (`src/world/atollWorldLayout.js`), topology/resource-placement rules (`src/world/wildAtollDomain.js`) и transient arena presentation/input (`src/world/wildAtollRuntime.js`); его arena state не сериализуется.
 - Применение предметов из numbered combat slots разделяет UI activation (`src/combat/combatLoadoutRuntime.js`) и мутацию item/needs (`src/inventory/combatQuickUse.js`).
 
 ## `src/main.js` — только composition root
@@ -82,9 +82,9 @@ Quick use is available only in stable `COMBAT`; Alt, panel transition, modal sup
 
 ### Дикий Атолл: первый runtime slice
 
-`src/world/wildAtollDomain.js` owns starter topology, exit semantics and deterministic placement of actual resource nodes. `src/world/wildAtollRuntime.js` owns one transient run while the player is in Island Nest: northern entrance, three-arena starter path, exactly two cave exits at the Forest/Mines fork, local node state, world visuals/colliders, tool-gated harvesting and reward delivery.
+`src/world/atollWorldLayout.js` owns a rectangular collision environment with blocked outer boundary and no static transports. `src/world/wildAtollDomain.js` owns starter topology, exit semantics and deterministic placement of actual resource nodes. `src/world/wildAtollRuntime.js` owns the northern Nest entrance and one transient run inside `WORLD_IDS.atoll`: three starter arenas, exactly two cave exits at the Forest/Mines fork, local node state, world visuals/colliders, tool-gated harvesting and reward delivery.
 
-The slice deliberately reuses Island Nest and creates no new world ID, persistence field or final arena graph. It reads the current location/layout/player through narrow scene adapters, uses the peaceful inventory selection for axe/pickaxe gating, asks the existing needs owner to price and record physical work, and sends ordinary inventory/world-item mutations through existing owners. Arena transitions do not mutate needs directly. Future multi-location arenas must move lifecycle composition into `WorldLocationRuntime`; they may not expand this transient prototype into a second location coordinator.
+Nest entry and edge return call `WorldLocationCoordinator.transitionTo` with explicit safe spawns. That method reuses the canonical location lifecycle without requiring a paired persistent transport or creating a hidden transition lock. Internal arena transitions remain inside the Atoll runtime. The runtime uses peaceful inventory selection for axe/pickaxe gating, asks the existing needs owner to price and record physical work, and sends ordinary inventory/world-item mutations through existing owners. Arena transitions do not mutate needs directly. Future multi-location segments extend the registered location/lifecycle model and do not create a second coordinator.
 
 ### World interaction execution
 
@@ -94,11 +94,11 @@ The slice deliberately reuses Island Nest and creates no new world ID, persisten
 
 ### Локации мира
 
-`src/world/worldLocationConfig.js` задаёт постоянные ID, capabilities, транспорты и spawn-контракты. `WorldLocationCoordinator` выбирает активный layout, синхронизирует `sessionState.currentWorldId`, управляет transition lock и вызывает публичный location lifecycle.
+`src/world/worldLocationConfig.js` задаёт постоянные ID, capabilities, транспорты и spawn-контракты. `WorldLocationCoordinator` выбирает активный layout, синхронизирует `sessionState.currentWorldId`, управляет transition lock, поддерживает explicit transport-free transitions и вызывает публичный location lifecycle.
 
 `WorldLocationRuntime` один раз создаётся на scene/session, получает явные dependencies и factories, затем владеет location-scoped owners, capability-driven mount/unmount, frame-action/realtime/world-step порядком, candidate consumers и transition guard. Его `getOwners()` возвращает read-only snapshot с именованными полями; string service locator и поиск по полям `WorldScene` запрещены. `WorldPresentationRuntime` отдельно владеет terrain/floor/wall/supplement/decoration/transport sprites и surface registries. Presentation монтируется первой и уничтожается последней; interaction unbind и candidate reset происходят до teardown owners. `WorldScene` создаёт эти два владельца, передаёт adapters/callbacks и делегирует lifecycle.
 
-Геометрия Гнезда формируется в `src/world/nestWorldLayout.js` из одной модели острова для terrain render и collision. Домашний authoring остаётся привязан к capability `buildMode` локации `village`.
+Геометрия Гнезда формируется в `src/world/nestWorldLayout.js` из одной модели острова для terrain render и collision. Геометрия арен Атолла формируется в `src/world/atollWorldLayout.js`. Домашний authoring остаётся привязан к capability `buildMode` локации `village`.
 
 ## Запрещённые преждевременные решения
 
