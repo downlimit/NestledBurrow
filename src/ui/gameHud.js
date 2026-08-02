@@ -239,8 +239,6 @@ export function createGameHud(scene, options) {
     loadoutDragCoordinator,
     isSuppressed: isInventoryModeSuppressed,
     onStateChange: () => {
-      const mode = inventoryModeHud?.getState?.();
-      if (mode?.stableMode === INVENTORY_MODES.COMBAT && !mode.altDown) inventoryHud?.clearSelection?.();
       scene.syncGameplayHudVisibility?.();
       scene.interactionRuntime?.refresh?.();
     },
