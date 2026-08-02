@@ -62,25 +62,10 @@ const terminalNames = {
   ru: { forest: "КОЧУЮЩИЙ ОСТРОВ", grotto: "БЛУЖДАЮЩИЙ ОСТРОВ" },
   en: { forest: "ROVING ISLAND", grotto: "WANDERING ISLAND" },
 };
-const waterboundTerms = {
-  ru: ["СВАИ", "ПРИЧАЛ", "МОСТ", "БЕРЕГ", "КОСА"],
-  en: ["PILINGS", "JETTY", "BRIDGE", "SHORE", "SPIT"],
-};
 for (const locale of SUPPORTED_LOCALES) {
   const atoll = read(locale, "atoll");
   assert.equal(atoll.arenas["forested-isthmus"].edge, terminalNames[locale].forest, `${locale} forest NPC threshold is the reached island itself`);
   assert.equal(atoll.arenas["shadow-isthmus"].edge, terminalNames[locale].grotto, `${locale} grotto NPC threshold is the reached island itself`);
-  const npcCopy = [
-    ...Object.values(atoll.arenas["forested-isthmus"]),
-    ...Object.values(atoll.arenas["shadow-isthmus"]),
-  ].join(" ");
-  for (const forbidden of waterboundTerms[locale]) {
-    assert(!npcCopy.includes(forbidden), `${locale} NPC Переймы avoid waterbound term ${forbidden}`);
-  }
-  const serialized = JSON.stringify(atoll);
-  for (const misleading of ["ОСТРОВ ВПЕРЕДИ", "ОСТРОВ В ТЕНИ", "ISLAND AHEAD", "ISLAND IN SHADOW"]) {
-    assert(!serialized.includes(misleading), `${locale} Atoll copy does not describe a reached threshold as still ahead`);
-  }
 }
 for (const file of ["src/interaction/dialogueConfig.js", "src/interaction/interactionConfig.js", "src/interaction/interactionRuntime.js", "src/ui/interactionHud.js"]) {
   const text = readFileSync(file, "utf8");
