@@ -53,61 +53,72 @@ const SEGMENT_SPECS = Object.freeze([
     id: WILD_ATOLL_SEGMENTS.starter,
     segmentKey: "atoll:segments.starter",
     resourcePattern: STARTER_RESOURCE_PATTERN,
+    routeComposition: "right",
     nextSegments: [WILD_ATOLL_SEGMENTS.sereneSkerries, WILD_ATOLL_SEGMENTS.sereneGrotto],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.sereneSkerries,
     segmentKey: "atoll:segments.sereneSkerries",
     resourcePattern: FOREST_RESOURCE_PATTERN,
+    routeComposition: "left",
     nextSegments: [WILD_ATOLL_SEGMENTS.forestedIsthmus, WILD_ATOLL_SEGMENTS.deepSkerries],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.forestedIsthmus,
     segmentKey: "atoll:segments.forestedIsthmus",
     resourcePattern: STARTER_RESOURCE_PATTERN,
+    routeComposition: "right",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.deepSkerries,
     segmentKey: "atoll:segments.deepSkerries",
     resourcePattern: FOREST_RESOURCE_PATTERN,
+    routeComposition: "left",
     nextSegments: [WILD_ATOLL_SEGMENTS.motu, WILD_ATOLL_SEGMENTS.fearsomeSkerries],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.motu,
     segmentKey: "atoll:segments.motu",
     resourcePattern: STARTER_RESOURCE_PATTERN,
+    routeComposition: "right",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.fearsomeSkerries,
     segmentKey: "atoll:segments.fearsomeSkerries",
     resourcePattern: FOREST_RESOURCE_PATTERN,
+    routeComposition: "left",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.sereneGrotto,
     segmentKey: "atoll:segments.sereneGrotto",
     resourcePattern: MINE_RESOURCE_PATTERN,
+    routeComposition: "right",
     nextSegments: [WILD_ATOLL_SEGMENTS.shadowIsthmus, WILD_ATOLL_SEGMENTS.deepGrotto],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.shadowIsthmus,
     segmentKey: "atoll:segments.shadowIsthmus",
     resourcePattern: STARTER_RESOURCE_PATTERN,
+    routeComposition: "left",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.deepGrotto,
     segmentKey: "atoll:segments.deepGrotto",
     resourcePattern: MINE_RESOURCE_PATTERN,
+    routeComposition: "right",
     nextSegments: [WILD_ATOLL_SEGMENTS.blueHole, WILD_ATOLL_SEGMENTS.relictGrotto],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.blueHole,
     segmentKey: "atoll:segments.blueHole",
     resourcePattern: MINE_RESOURCE_PATTERN,
+    routeComposition: "left",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.relictGrotto,
     segmentKey: "atoll:segments.relictGrotto",
     resourcePattern: MINE_RESOURCE_PATTERN,
+    routeComposition: "right",
   }),
 ]);
 
@@ -207,11 +218,15 @@ export function hashUnit(text) {
   return (hash >>> 0) / 0x100000000;
 }
 
-function segmentSpec({ id, segmentKey, resourcePattern, nextSegments = [] }) {
+function segmentSpec({ id, segmentKey, resourcePattern, routeComposition, nextSegments = [] }) {
+  if (routeComposition !== "left" && routeComposition !== "right") {
+    throw new Error(`Unknown Wild Atoll route composition: ${String(routeComposition)}`);
+  }
   return Object.freeze({
     id,
     segmentKey,
     resourcePattern,
+    routeComposition,
     nextSegments: Object.freeze([...nextSegments]),
   });
 }
@@ -252,12 +267,13 @@ function buildSegment(spec) {
     direction,
     promptKey: `atoll:paths.${spec.id}.${arenaNodeName(targetArenaId)}`,
   });
+  const [entryLeftDirection, entryRightDirection] = branchDirections(spec.routeComposition);
   const terminalExits = [
     ...spec.nextSegments.map((targetSegmentId, index) => Object.freeze({
       id: targetSegmentId,
       kind: "segment",
       targetSegmentId,
-      direction: index === 0 ? "north-west" : "north-east",
+      direction: branchDirections(spec.routeComposition)[index],
       promptKey: `atoll:segmentPaths.${targetSegmentId}`,
     })),
     Object.freeze({
@@ -269,11 +285,11 @@ function buildSegment(spec) {
     }),
   ];
   const arenas = Object.freeze([
-    arena(ids.root, [pathTo(ids.left1, "north-west"), pathTo(ids.right1, "north-east")]),
-    arena(ids.left1, [pathTo(ids.left2, "north-west"), pathTo(ids.right2, "north-east")]),
-    arena(ids.right1, [pathTo(ids.left2, "north-west"), pathTo(ids.right2, "north-east")]),
-    arena(ids.left2, [pathTo(ids.left3, "north-west"), pathTo(ids.right3, "north-east")]),
-    arena(ids.right2, [pathTo(ids.left3, "north-west"), pathTo(ids.right3, "north-east")]),
+    arena(ids.root, [pathTo(ids.left1, entryLeftDirection), pathTo(ids.right1, entryRightDirection)]),
+    arena(ids.left1, [pathTo(ids.left2, "north"), pathTo(ids.right2, "north-east")]),
+    arena(ids.right1, [pathTo(ids.left2, "north-west"), pathTo(ids.right2, "north")]),
+    arena(ids.left2, [pathTo(ids.left3, "north"), pathTo(ids.right3, "north-east")]),
+    arena(ids.right2, [pathTo(ids.left3, "north-west"), pathTo(ids.right3, "north")]),
     arena(ids.left3, [pathTo(ids.edge, "north")]),
     arena(ids.right3, [pathTo(ids.edge, "north")]),
     arena(ids.edge, terminalExits, true),
@@ -281,6 +297,7 @@ function buildSegment(spec) {
   return Object.freeze({
     id: spec.id,
     segmentKey: spec.segmentKey,
+    routeComposition: spec.routeComposition,
     entryArenaId: ids.root,
     terminalArenaId: ids.edge,
     levels,
@@ -288,6 +305,12 @@ function buildSegment(spec) {
     arenas,
     nextSegmentIds: spec.nextSegments,
   });
+}
+
+function branchDirections(routeComposition) {
+  return routeComposition === "left"
+    ? Object.freeze(["north-west", "north"])
+    : Object.freeze(["north", "north-east"]);
 }
 
 function arenaNodeName(arenaId) {
