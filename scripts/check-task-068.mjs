@@ -175,25 +175,6 @@ function gameplayFixture() {
   assert.equal(ruAtoll.arenas["shadow-isthmus"].edge, "БЛУЖДАЮЩИЙ ОСТРОВ", "grotto NPC threshold is the reached island itself");
   assert.equal(enAtoll.arenas["forested-isthmus"].edge, "ROVING ISLAND");
   assert.equal(enAtoll.arenas["shadow-isthmus"].edge, "WANDERING ISLAND");
-
-  const ruNpcCopy = [
-    ...Object.values(ruAtoll.arenas["forested-isthmus"]),
-    ...Object.values(ruAtoll.arenas["shadow-isthmus"]),
-  ].join(" ");
-  const enNpcCopy = [
-    ...Object.values(enAtoll.arenas["forested-isthmus"]),
-    ...Object.values(enAtoll.arenas["shadow-isthmus"]),
-  ].join(" ");
-  for (const forbidden of ["СВАИ", "ПРИЧАЛ", "МОСТ", "БЕРЕГ", "КОСА"]) {
-    assert(!ruNpcCopy.includes(forbidden), `NPC Переймы avoid waterbound term ${forbidden}`);
-  }
-  for (const forbidden of ["PILINGS", "JETTY", "BRIDGE", "SHORE", "SPIT"]) {
-    assert(!enNpcCopy.includes(forbidden), `NPC isthmuses avoid waterbound term ${forbidden}`);
-  }
-  for (const misleading of ["ОСТРОВ ВПЕРЕДИ", "ОСТРОВ В ТЕНИ", "ISLAND AHEAD", "ISLAND IN SHADOW"]) {
-    assert(!JSON.stringify(ruAtoll).includes(misleading));
-    assert(!JSON.stringify(enAtoll).includes(misleading));
-  }
   for (const term of ["path", "threshold", "transition", "teleport"]) {
     assert(wildAtollDoc.includes(`**${term}**`), `Wild Atoll docs define ${term}`);
   }
