@@ -99,7 +99,11 @@ export function createLoadoutDragCoordinator(scene, {
     const source = { panel: candidate.panel, index: candidate.index };
     const wasDragging = dragging;
     cancel();
-    if (!enabled || !wasDragging) return;
+    if (!enabled) return;
+    if (!wasDragging) {
+      panels.get(source.panel)?.onClick?.(source.index);
+      return;
+    }
     const target = targetAt(pointer.x, pointer.y);
     if (!target) {
       onWorldDrop(source, pointer);
