@@ -6,7 +6,11 @@ Owns repeatable expeditions connecting home preparation, compact arenas, route d
 
 ## Terms
 
-A **segment** is a literary named zone containing connected arenas. An **arena** is one compact playable location inside that segment. Segment names establish place and mood; arena names and exit tips stay short and practical.
+A **segment** is a literary named zone containing connected arenas. An **arena** is one compact playable location inside that segment.
+
+A **path** connects two arenas inside one segment. A **threshold** is the final arena of a segment. A **transition** is an onward transport on a threshold that enters another segment. A **teleport** returns the player from a threshold to Island Nest.
+
+Segment names establish place and mood; arena names and path tips stay short and practical. A threshold name describes the place already reached, never a destination still supposedly ahead.
 
 ## Product loop
 
@@ -22,29 +26,39 @@ Food, tools, consumables, information and relationships prepared at home must al
 Island Nest
 └─ First Trails
    ├─ Безмятежные Шхеры
-   │  ├─ Лесистая Перейма -> NPC route -> Nest
+   │  ├─ Лесистая Перейма -> NPC threshold -> teleport to Nest
    │  └─ Дремучие Шхеры
-   │     ├─ Моту -> Nest
-   │     └─ Грозные Шхеры -> Nest
+   │     ├─ Моту -> teleport to Nest
+   │     └─ Грозные Шхеры -> teleport to Nest
    └─ Безмятежный Грот
-      ├─ Теневая Перейма -> NPC route -> Nest
+      ├─ Теневая Перейма -> NPC threshold -> teleport to Nest
       └─ Глубокий Грот
-         ├─ Голубая дыра -> Nest
-         └─ Реликтовый Грот -> Nest
+         ├─ Голубая дыра -> teleport to Nest
+         └─ Реликтовый Грот -> teleport to Nest
 ```
 
-All canonical named segments are traversable. `Лесистая Перейма` and `Теневая Перейма` are the current NPC-route segments; actual random NPC selection, dialogue and island attachment are future encounter work.
+All canonical named segments are traversable. `Лесистая Перейма` and `Теневая Перейма` are terminal NPC segments. Their thresholds are the reached NPC-island destination and expose only the teleport to Island Nest. Actual random NPC selection, dialogue and island attachment are future encounter work.
 
 ## Segment format
 
-Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -> 2 -> 1` graph. Cross-links allow routes to reconverge without creating a back exit.
+Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -> 2 -> 1` graph. Cross-links allow routes to reconverge without creating a back path.
 
 - the first seven arenas contain a lightweight mixture of ordinary resource nodes;
-- the final arena may contain no resources;
-- the final arena always contains a white teleport to Island Nest;
-- starter, T1 and T2 terminal arenas expose their canonical onward segment entrances;
-- NPC, automation and T3 segments are terminal and return to the Nest;
-- entering another segment resets the player to that segment's entry arena while preserving the same transient run.
+- the eighth arena is the threshold and may contain no resources;
+- every threshold contains a white teleport to Island Nest;
+- starter, T1 and T2 thresholds also expose their canonical onward transitions;
+- NPC, automation and T3 thresholds expose only the teleport;
+- entering a transition resets the player to the next segment's entry arena while preserving the same transient run.
+
+## Path composition
+
+A two-path arena never presents two mirrored diagonal exits. It presents one straight northern path plus one diagonal path:
+
+- a left-side arena uses north and north-east;
+- a right-side arena uses north-west and north;
+- the entry arena and threshold transitions use north plus the diagonal selected by that segment's composition.
+
+This keeps the route readable while preventing every arena from repeating the same north-west/north-east fork.
 
 ## Arena naming and mood
 
@@ -52,10 +66,11 @@ Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -
 - T1 arena names are harmless and welcoming;
 - T2 names suggest denser forest or deeper stone without presenting the branch as terminal danger;
 - T3 names are mysterious and dangerous;
-- NPC-route names hint at tracks, lights, smoke, piers and an inhabited island ahead;
-- automation-route names hint at soul stones, crystals, magnets, unusual metals and other future special materials.
+- NPC-segment names hint at tracks, lights, smoke and inhabited structures;
+- an NPC threshold names the reached pier or landing rather than saying that an island is still ahead;
+- automation-segment names hint at soul stones, crystals, magnets, unusual metals and other future special materials.
 
-Arena exits display only `SPACE - <next arena>` or the canonical next segment name. All compact labels use the supported ASCII hyphen and remain within the HUD length budget.
+Path tips display only `SPACE - <next arena>`. Transition tips display the canonical next segment name. Teleport tips name Island Nest. All compact labels use the supported ASCII hyphen and remain within the HUD length budget.
 
 ## Resource filling
 
@@ -71,11 +86,11 @@ Arena exits display only `SPACE - <next arena>` or the canonical next segment na
 - wood, stone and berries exist as world objects that may be harvested or ignored;
 - logs and stones use the same `DebrisRuntime`, HP, targeting outline, hit feedback, cooldown, energy and reward flow as every other location;
 - berries use the same resource pipeline without requiring a tool;
-- route transitions never subtract an estimated cost or reveal resource counts in text;
-- travel is forward-only: a chosen arena path or segment cannot be reversed;
-- every terminal arena exposes the white return teleport.
+- paths and transitions never subtract an estimated cost or reveal resource counts in text;
+- travel is forward-only: a chosen path or transition cannot be reversed;
+- every threshold exposes the white return teleport.
 
-`src/world/atollWorldLayout.js` owns the isolated transport-free collision space. `src/world/wildAtollDomain.js` generates the complete segment graph, route connections and deterministic common resource definitions. `src/world/wildAtollRuntime.js` owns transient traversal, exit presentation, resource registration, segment changes, terminal teleports and collapse return. Player-facing Atoll copy lives in the dedicated `atoll` localization namespace.
+`src/world/atollWorldLayout.js` owns the isolated transport-free collision space. `src/world/wildAtollDomain.js` generates the complete segment graph, path composition, transitions and deterministic common resource definitions. `src/world/wildAtollRuntime.js` owns transient traversal, exit presentation, resource registration, transitions, teleports and collapse return. Player-facing Atoll copy lives in the dedicated `atoll` localization namespace.
 
 ## Collapse return
 
@@ -94,20 +109,22 @@ Collapsing on the Atoll starts sleep immediately so movement stops, but visible 
 - eleven segments and eighty-eight unique arenas are generated;
 - every segment topology is `1/2/2/2/1`;
 - all internal paths advance exactly one arena level;
-- no non-terminal arena has a home teleport;
-- First Trails routes to Безмятежные Шхеры and Безмятежный Грот;
-- Безмятежные Шхеры routes to Лесистая Перейма and Дремучие Шхеры;
-- Дремучие Шхеры routes to Моту and Грозные Шхеры;
-- Безмятежный Грот routes to Теневая Перейма and Глубокий Грот;
-- Глубокий Грот routes to Голубая дыра and Реликтовый Грот;
+- every two-path arena contains one north exit and exactly one diagonal exit;
+- no non-threshold arena has a home teleport;
+- First Trails transitions to Безмятежные Шхеры and Безмятежный Грот;
+- Безмятежные Шхеры transitions to Лесистая Перейма and Дремучие Шхеры;
+- Дремучие Шхеры transitions to Моту and Грозные Шхеры;
+- Безмятежный Грот transitions to Теневая Перейма and Глубокий Грот;
+- Глубокий Грот transitions to Голубая дыра and Реликтовый Грот;
+- NPC, automation and T3 thresholds contain no onward transitions;
 - represented resources use the common resource owner and never overlap spawn corridors;
-- arena and segment transitions do not mutate needs directly;
+- paths and transitions do not mutate needs directly;
 - transient run state is not serialized;
 - expedition capacity remains slot-based.
 
 ## Current baseline
 
-The production slice contains the complete canonical route tree, ordinary common-resource harvesting, literary arena titles, short arena tips, white terminal teleports, collapse return, numbered combat self-use and expedition build grouping. Filling is intentionally provisional.
+The production slice contains the complete canonical route tree, ordinary common-resource harvesting, literary arena titles, composed path placement, short path and transition tips, white threshold teleports, collapse return, numbered combat self-use and expedition build grouping. Filling is intentionally provisional.
 
 ## Evidence
 
