@@ -14,6 +14,7 @@ export function createGameCanvasInputGuard(canvas, {
   };
 
   canvas?.addEventListener?.("contextmenu", preventContextMenu);
+  // Bubble after Phaser: the game consumes the key first, then the browser default is cancelled.
   windowRef?.addEventListener?.("keydown", preventBrowserShortcut);
   windowRef?.addEventListener?.("keyup", preventBrowserShortcut);
 
