@@ -12,8 +12,14 @@ import {
   normalizeLanguageCode,
 } from "./locales.js";
 
+const LOCALE_BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
+
 function baseUrl() {
   return import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+}
+
+function localeLoadPath() {
+  return `${baseUrl()}locales/{{lng}}/{{ns}}.json?v=${encodeURIComponent(LOCALE_BUILD_ID)}`;
 }
 
 function syncDocumentLocale(locale) {
@@ -41,7 +47,7 @@ export async function createLocalization(options = {}) {
     ns: LOCALIZATION_NAMESPACES,
     defaultNS: "common",
     fallbackNS: "common",
-    backend: { loadPath: `${baseUrl()}locales/{{lng}}/{{ns}}.json` },
+    backend: { loadPath: localeLoadPath() },
     detection: {
       order: ["localStorage"],
       lookupLocalStorage: STORAGE_KEY,

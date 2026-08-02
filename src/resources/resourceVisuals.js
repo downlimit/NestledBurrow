@@ -38,6 +38,15 @@ export function drawStone(graphics, progress = 0, size = "small", options = {}) 
   for (let index = 0; index < damage; index += 1) graphics.fillRect(5 + index * 2, 7 + (index % 2), 1, 3);
 }
 
+export function drawBerryBush(graphics, options = {}) {
+  const color = (value) => options.colorOverride ?? value;
+  graphics.fillStyle(color(0x234526), 1).fillRect(3, 7, 11, 7).fillRect(5, 4, 7, 9);
+  graphics.fillStyle(color(0x3f7040), 1).fillRect(2, 8, 4, 4).fillRect(10, 6, 5, 5).fillRect(6, 3, 5, 4);
+  graphics.fillStyle(color(0x7954a8), 1).fillRect(5, 8, 2, 2).fillRect(10, 10, 2, 2).fillRect(8, 5, 2, 2);
+  graphics.fillStyle(color(0xb99ad8), 1).fillRect(5, 8, 1, 1).fillRect(10, 10, 1, 1).fillRect(8, 5, 1, 1);
+  graphics.fillStyle(color(0x5b3824), 1).fillRect(8, 13, 2, 3);
+}
+
 export function drawResourceVisual(graphics, profile, progress = 0, options = {}) {
   if (profile.visual === "tree") {
     if (!graphics.spriteContainer) {
@@ -52,6 +61,7 @@ export function drawResourceVisual(graphics, profile, progress = 0, options = {}
   if (profile.visual === "log") return drawLog(graphics, progress, profile.size, options);
   if (profile.visual === "stone") return drawStone(graphics, progress, profile.size, options);
   if (profile.visual === "ruby") return drawRuby(graphics, progress, options);
+  if (profile.visual === "berry") return drawBerryBush(graphics, options);
   throw new Error(`Unknown resource visual: ${String(profile.visual)}`);
 }
 

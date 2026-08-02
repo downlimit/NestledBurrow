@@ -17,6 +17,7 @@
       "tools": "Tools",
       "ground": "Ground and paths",
       "walls": "Walls and corners",
+      "expedition": "Expedition",
       "furniture": "Furniture",
       "plants": "Plants"
     },
@@ -28,6 +29,7 @@
       "parquet": "Parquet",
       "carpet": "Carpet",
       "wall": "Wall",
+      "privacyScreen": "Field privacy screen",
       "bed": "Bed",
       "shower": "Shower",
       "toilet": "Toilet",
@@ -49,6 +51,7 @@
     "energyRestored": "Energy restored",
     "chop": "Chop",
     "mine": "Mine",
+    "gatherBerries": "Gather berries",
     "shower": "Use shower",
     "leaveShower": "Leave shower",
     "toilet": "Use toilet",
@@ -111,6 +114,46 @@
       "friedPotatoDish3": "Potato dish 3/4 — take",
       "friedPotatoDish4": "Potato dish 4/4 — take"
     }
+  },
+  "atoll": {
+    "arrival": "The first paths begin here.",
+    "leftRun": "You returned to Island Nest.",
+    "promptEnter": "SPACE - WILD ATOLL",
+    "segmentStarter": "THE FIRST PATHS",
+    "arenas": {
+      "root": "FRINGE",
+      "meadow": "MEADOW",
+      "stones": "STONES",
+      "pond": "POND",
+      "thicket": "THICKET",
+      "roots": "ROOTS",
+      "slope": "SCREE",
+      "edge": "PASS"
+    },
+    "paths": {
+      "meadow": "SPACE - TO MEADOW",
+      "stones": "SPACE - TO STONES",
+      "pond": "SPACE - TO POND",
+      "thicket": "SPACE - TO THICKET",
+      "roots": "SPACE - TO ROOTS",
+      "slope": "SPACE - TO SCREE",
+      "edge": "SPACE - TO PASS",
+      "forestT1": "SPACE - FOREST T1",
+      "mineT1": "SPACE - MINES T1",
+      "nest": "SPACE - TO NEST"
+    },
+    "segmentLocked": {
+      "forestT1": "The forest trail is still closed.",
+      "mineT1": "The mine descent is still closed."
+    }
+  },
+  "quickUse": {
+    "empty": "The slot is empty",
+    "unsupported": "This item cannot be used on the character",
+    "needFull": "The relevant need is already full",
+    "bucketEmpty": "The bucket is empty",
+    "ateRation": "Ration eaten: satiety restored",
+    "washed": "Bucket water used: lustre restored"
   },
   "progress": {
     "newGame": "New game",

@@ -11,14 +11,14 @@
 
 | Запрос или область | System-документ | Основные владельцы | Targeted checks |
 |---|---|---|---|
-| локации, переход Нора ↔ Гнездо, world bounds, location lifecycle | `systems/world-and-resources.md` + `systems/character-and-needs.md` | `src/world/worldLocationConfig.js`, `src/world/worldLocationCoordinator.js`, `src/world/worldLocationRuntime.js`, `src/world/worldPresentationRuntime.js`, `src/world/nestWorldLayout.js` | `check:task-059`, `check:task-065`, focused location Browser E2E |
+| локации, переход Нора ↔ Гнездо, world bounds, location lifecycle и explicit transport-free transitions | `systems/world-and-resources.md` + `systems/character-and-needs.md` | `src/world/worldLocationConfig.js`, `src/world/worldLocationCoordinator.js`, `src/world/worldLocationRuntime.js`, `src/world/worldPresentationRuntime.js`, `src/world/nestWorldLayout.js`, `src/world/atollWorldLayout.js` | `check:task-059`, `check:task-065`, focused location Browser E2E |
 | движение, joystick, камера, сон, потребности | `systems/character-and-needs.md` | `src/character/characterMotor.js`, `src/controls/input.js`, `src/controls/mobileJoystick.js`, `src/character/cameraFollowRuntime.js`, `src/interaction/interactionApproach.js`, `src/needs/needsDomain.js`, `src/needs/needsRuntime.js`, `src/needs/needsFlowRuntime.js`, `src/needs/interactionTimelineRuntime.js`, `src/needs/toiletAccidentTimelineRuntime.js`, `src/needs/needsInteractionCoordinator.js` | `check:input`, `check:interaction`, `check:movement`, `check:needs`, `check:task-061` |
-| Дикий Атолл, экспедиции, сегменты, пороги, события забега, подготовка и прогресс глубины | `systems/wild-atoll.md` | `WildAtollPrototype/` как standalone-макет; production owner ещё не создан | `check:docs` |
+| Дикий Атолл, полная схема Шхер/Гротов, NPC-переймы, Моту, Голубая дыра и сегменты T1-T3 | `systems/wild-atoll.md` | `src/world/atollWorldLayout.js`, `src/world/wildAtollDomain.js`, `src/world/wildAtollRuntime.js`; `WildAtollPrototype/` остаётся standalone design aid | `check:task-059`, `check:task-068`, `check:docs` |
 | ресурсы, добыча, world interactions, инвентарь, выброшенные предметы, огород, вода, растения | `systems/world-and-resources.md` | `src/interaction/interaction.js`, `src/interaction/interactionRuntime.js`, `src/interaction/worldInteractionCoordinator.js`, `src/resources/resourceDomain.js`, `src/resources/debrisRuntime.js`, `src/inventory/inventoryDomain.js`, `src/inventory/inventoryRuntime.js`, `src/resources/farmingDomain.js`, `src/resources/farmingRuntime.js` | `check:inventory`, `check:world`, `check:interaction`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-064` |
 | готовка, кухня, вывеска, гости, монеты | `systems/tavern-service.md` | `src/tavern/cookingDomain.js`, `src/tavern/kitchenInteractionRuntime.js`, `src/facilities/facilityRuntime.js`, `src/tavern/guestRuntime.js`, `src/tavern/tavernServiceRuntime.js`, `src/tavern/coinRuntime.js` | `check:cooking`, `check:guest`, `check:facilities`, `check:task-049` |
-| строительство, стены, перенос, коллайдеры, pivot, авторинг | `systems/build-and-authoring.md` | `src/build/worldBuildCoordinator.js`, `src/build/buildModeRuntime.js`, `src/build/buildWorldGeometry.js`, `src/build/editorAuthoringRuntime.js`, `src/build/assetProfiles.js`, `src/build/startingLayout.js` | `check:build-mode`, `check:authoring`, `check:task-044`, `check:task-062` |
+| строительство, стены, перенос, коллайдеры, pivot, авторинг | `systems/build-and-authoring.md` | `src/build/worldBuildCoordinator.js`, `src/build/buildModeRuntime.js`, `src/build/buildWorldGeometry.js`, `src/build/editorAuthoringRuntime.js`, `src/build/assetProfiles.js`, `src/build/startingLayout.js` | `check:build-mode`, `check:authoring`, `check:task-044`, `check:task-062`, `check:task-068` |
 | save, migration, NEW GAME, browser draft | `systems/persistence.md` | `src/session/gameSessionState.js`, `src/session/sessionPersistence.js`, `src/inventory/inventoryDomain.js`, `src/build/authoringBackup.js` | `check:inventory`, `check:progress`, `check:authoring`, `check:task-049`, `check:task-056` |
-| HUD, inventory/combat loadout presentation and drag, localization, audio, day/night, visual presentation | `systems/presentation.md` | `src/ui/gameHud.js`, `src/ui/presentationTuning.js`, `src/inventory/inventoryRuntime.js`, `src/combat/combatLoadoutRuntime.js`, `src/inventory/loadoutDragCoordinator.js`, `src/inventory/inventoryModeRuntime.js`, `src/inventory/inventoryGainPresentation.js`, `src/ui/transientMessageRuntime.js`, `src/ui/interactionHud.js`, `localization/`, `src/audio/audioRuntime.js` | `check:inventory`, `check:hud`, `check:task-053`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-049`, `check:visual` |
+| HUD, inventory/combat loadout presentation and drag, numbered self-use, localization, audio, day/night, visual presentation | `systems/presentation.md` | `src/ui/gameHud.js`, `src/ui/presentationTuning.js`, `src/inventory/inventoryRuntime.js`, `src/combat/combatLoadoutRuntime.js`, `src/inventory/combatQuickUse.js`, `src/inventory/loadoutDragCoordinator.js`, `src/inventory/inventoryModeRuntime.js`, `src/inventory/inventoryGainPresentation.js`, `src/ui/transientMessageRuntime.js`, `src/ui/interactionHud.js`, `localization/`, `src/audio/audioRuntime.js` | `check:inventory`, `check:hud`, `check:task-053`, `check:task-068`, `check:text-resolution`, `check:i18n`, `check:audio`, `check:task-049`, `check:visual` |
 
 ## Канонические адреса owners
 
@@ -29,12 +29,12 @@ Production-модули сгруппированы по игровому или 
 | персонажи, motor, controllers и character presentation | `src/character/` |
 | потребности и их timelines | `src/needs/` |
 | interaction selection, dialogue и world dispatch | `src/interaction/` |
-| layouts, locations и world presentation | `src/world/` |
+| layouts, locations, Дикий Атолл и world presentation | `src/world/` |
 | ресурсы, debris/beds, farming и merchant | `src/resources/` |
 | build mode, geometry и authoring | `src/build/` |
 | fixed facilities | `src/facilities/` |
 | cooking, guests, service, sign и coins | `src/tavern/` |
-| inventory state, world items и loadout drag | `src/inventory/` |
+| inventory state, quick-use, world items и loadout drag | `src/inventory/` |
 | melee и combat presentation | `src/combat/` |
 | player input adapters | `src/controls/` |
 | HUD и общие UI presenters | `src/ui/` |

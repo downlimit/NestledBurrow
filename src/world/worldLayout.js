@@ -13,6 +13,7 @@ import {
 } from "./worldConfig.js";
 import { PLACEMENT_CELL_SIZE } from "../resources/resourceConfig.js";
 import { applyColliderOffsets, wallColliderGroup } from "../build/buildWorldGeometry.js";
+import { createAtollWorldLayout } from "./atollWorldLayout.js";
 import { createNestWorldLayout } from "./nestWorldLayout.js";
 import { WORLD_IDS } from "./worldLocationConfig.js";
 
@@ -141,6 +142,7 @@ function getGrassFrame(x, y) {
 
 export function createWorldLayout(worldId = WORLD_IDS.village) {
   if (worldId === WORLD_IDS.nest) return createNestWorldLayout();
+  if (worldId === WORLD_IDS.atoll) return createAtollWorldLayout();
   if (worldId !== WORLD_IDS.village) throw new Error(`Unknown world layout: ${String(worldId)}`);
   const groundTiles = [];
   const houseFloorTiles = [];

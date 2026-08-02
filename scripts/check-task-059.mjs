@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createWorldLayout, cellKey } from "../src/world/worldLayout.js";
 import { collides } from "../src/character/movement.js";
 import {
+  ATOLL_WORLD_MODEL,
   NEST_ISLAND_MODEL,
   TRANSPORT_PROFILE,
   WORLD_IDS,
@@ -16,16 +17,24 @@ import { getResourceProfile } from "../src/resources/resourceDomain.js";
 import STARTING_LAYOUT_DEFAULT from "../src/build/startingLayoutDefault.js";
 import { STOVE_REPAIR_COST } from "../src/tavern/cookingDomain.js";
 
-assert.deepEqual([...WORLD_LOCATION_IDS].sort(), [WORLD_IDS.nest, WORLD_IDS.village], "only village and nest are registered");
+const NEST_RETURN_SPAWN_FIXTURE = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
+
+assert.deepEqual([...WORLD_LOCATION_IDS].sort(), [WORLD_IDS.atoll, WORLD_IDS.nest, WORLD_IDS.village], "village, Nest and isolated Atoll are registered");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.id, "village", "the existing village ID remains canonical");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.meleeWeapons, true, "village retains the shared weapon runtime");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.trainingDummy, true, "the training dummy remains village-owned");
 assert.equal(WORLD_LOCATION_DEFINITIONS.nest.capabilities.meleeWeapons, true, "Nest retains the shared weapon runtime");
 assert.equal(WORLD_LOCATION_DEFINITIONS.nest.capabilities.trainingDummy, false, "Nest excludes the village training dummy");
+assert.equal(WORLD_LOCATION_DEFINITIONS.atoll.capabilities.meleeWeapons, false, "Atoll arena resources use their own tool-gated interactions");
 assert.deepEqual(
   [WORLD_LOCATION_DEFINITIONS.nest.columns, WORLD_LOCATION_DEFINITIONS.nest.rows],
   [22, 16],
   "Nest bounds are 22x16 tiles",
+);
+assert.deepEqual(
+  [WORLD_LOCATION_DEFINITIONS.atoll.columns, WORLD_LOCATION_DEFINITIONS.atoll.rows],
+  [ATOLL_WORLD_MODEL.columns, ATOLL_WORLD_MODEL.rows],
+  "Atoll owns a separate arena-sized collision space",
 );
 assert.deepEqual(
   [TRANSPORT_PROFILE.footprint.widthTiles, TRANSPORT_PROFILE.footprint.heightTiles],
@@ -51,12 +60,13 @@ assert.deepEqual(
 const transitionPairs = Object.values(WORLD_LOCATION_DEFINITIONS).flatMap(({ id, transports }) => (
   transports.map(({ destinationWorldId }) => `${id}->${destinationWorldId}`)
 ));
-assert.deepEqual(transitionPairs.sort(), ["nest->village", "village->nest"], "transports form the village and nest pair");
-assert.equal(WORLD_LOCATION_DEFINITIONS.nest.futureExit.destinationWorldId, null, "the northern Nest dead end has no destination");
+assert.deepEqual(transitionPairs.sort(), ["nest->village", "village->nest"], "automatic transports remain the village and Nest pair");
+assert.equal(WORLD_LOCATION_DEFINITIONS.nest.futureExit.destinationWorldId, WORLD_IDS.atoll, "the northern Nest dead end is assigned to the explicit Atoll entrance");
+assert.equal(WORLD_LOCATION_DEFINITIONS.atoll.transports.length, 0, "Atoll arenas contain no persistent transport assets");
 
 const villageResources = getResourceObjectsForWorld(WORLD_IDS.village);
 const nestResources = getResourceObjectsForWorld(WORLD_IDS.nest);
-assert(RESOURCE_OBJECTS.every(({ worldId }) => worldId === WORLD_IDS.village || worldId === WORLD_IDS.nest), "every resource belongs to a registered world");
+assert(RESOURCE_OBJECTS.every(({ worldId }) => WORLD_LOCATION_IDS.includes(worldId)), "every canonical resource belongs to a registered world");
 assert.equal(villageResources.length, RESOURCE_OBJECTS.length - 7, "all existing resources remain village-owned");
 assert.equal(nestResources.filter(({ profileId }) => profileId === "tree-planted").length, 4, "Nest contains four gatherable trees");
 assert.equal(nestResources.filter(({ profileId }) => profileId === "stone-large").length, 1, "Nest contains one large stone");
@@ -150,6 +160,12 @@ for (const definition of nestResources) {
   nestResourceBounds.push({ id: definition.id, bounds });
 }
 
+const atollLayout = createPreparedLayout(WORLD_IDS.atoll);
+assert.equal(atollLayout.transitions.length, 0, "Atoll layout has no hidden or persistent lifts");
+assert.equal(atollLayout.groundTiles.length, ATOLL_WORLD_MODEL.columns * ATOLL_WORLD_MODEL.rows, "Atoll arena space is a clean rectangular field");
+assert.equal(collides(ATOLL_WORLD_MODEL.spawn, atollLayout, 8, 5), false, "Atoll entry spawn is collision-safe");
+assert.equal(collides({ x: 2, y: 2 }, atollLayout, 8, 5), true, "Atoll boundary prevents leaving the arena field");
+
 const sessionState = { currentWorldId: WORLD_IDS.village };
 const player = { motor: { position: { x: 0, y: 0 }, movement: null }, visual: { setPresentationPose() {} } };
 let activeLayout = null;
@@ -171,8 +187,17 @@ assert.equal(coordinator.update().status, "armed", "destination spawn releases t
 player.motor.position = center(activeLayout.transitions[0].triggerBounds);
 assert.equal(coordinator.update().worldId, WORLD_IDS.village, "the southern Nest transport returns to village");
 assert.equal(saveCount, 2, "return transition persists once without duplicate work");
+const explicitAtoll = coordinator.transitionTo(WORLD_IDS.atoll, ATOLL_WORLD_MODEL.spawn);
+assert.equal(explicitAtoll.worldId, WORLD_IDS.atoll, "the Nest entrance may explicitly enter the transport-free Atoll world");
+assert.equal(activeLayout.transitions.length, 0);
+assert.equal(coordinator.getState().transitionLocked, false, "explicit arena transitions do not create a hidden transport lock");
+assert.equal(saveCount, 3);
+const explicitNest = coordinator.transitionTo(WORLD_IDS.nest, NEST_RETURN_SPAWN_FIXTURE);
+assert.equal(explicitNest.worldId, WORLD_IDS.nest, "the edge arena may explicitly return to Nest");
+assert.deepEqual(player.motor.position, { x: NEST_RETURN_SPAWN_FIXTURE.x, y: NEST_RETURN_SPAWN_FIXTURE.y });
+assert.equal(saveCount, 4);
 
-console.log("Task #059 checks passed: registry, 22x16 Nest, paired reachable 2x2 transports, safe spawns, resources, island collision and transition lock");
+console.log("Task #059 checks passed: registry, isolated Atoll, paired reachable transports, explicit arena transitions, safe spawns and collision");
 
 function createPreparedLayout(worldId) {
   const state = { currentWorldId: worldId };
