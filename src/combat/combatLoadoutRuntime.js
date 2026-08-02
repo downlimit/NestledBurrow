@@ -1,5 +1,7 @@
 import { cloneInventoryItem } from "../inventory/inventoryDomain.js";
+import { useCombatNumberSlot } from "../inventory/combatQuickUse.js";
 import { FARMING_TEXTURE_KEY } from "../resources/farmingConfig.js";
+import { needMeterValues } from "../needs/needsFlowRuntime.js";
 import { HUD_COLORS, HUD_DEPTH, drawBitmapTextInto, isPointInRect, measureBitmapText } from "../ui/hud.js";
 import {
   inventorySlotLabelScreenPosition,
@@ -7,6 +9,7 @@ import {
   shouldRenderInventoryQuantity,
 } from "../inventory/inventoryRuntime.js";
 import { renderInventoryItem } from "../inventory/inventoryVisuals.js";
+import { createWildAtollRuntime } from "../world/wildAtollRuntime.js";
 
 export const COMBAT_ACTION_LABEL_BOTTOM_OVERFLOW = 2;
 
@@ -53,6 +56,10 @@ export function createCombatLoadoutRuntime(scene, {
   let destroyed = false;
   let presentationVisible = true;
   let dragEnabled = false;
+  const ownsWildAtollRuntime = !scene.wildAtollRuntime;
+  if (ownsWildAtollRuntime) {
+    scene.wildAtollRuntime = createWildAtollRuntime(scene, { localization: scene.localization });
+  }
 
   function gameplay() {
     return getGameplayState?.() ?? null;
@@ -82,6 +89,39 @@ export function createCombatLoadoutRuntime(scene, {
       dragCoordinator?.begin?.("combat", index, pointer, event);
     });
     return zone;
+  }
+
+  function quickUseEnabled() {
+    const mode = scene.gameHud?.getInventoryModeState?.();
+    return Boolean(mode)
+      && !mode.suppressed
+      && !mode.transitioning
+      && !mode.altDown
+      && mode.mode === "COMBAT";
+  }
+
+  function quickUse(slotIndex) {
+    if (!quickUseEnabled() || slotDefinitions[slotIndex]?.kind !== "number") return { status: "blocked", mutated: false };
+    const result = useCombatNumberSlot(gameplay(), slotIndex);
+    if (result.messageKey) scene.gameHud?.showTransientMessage?.(result.messageKey);
+    if (!result.mutated) return result;
+    scene.needsFlowRuntime?.reset?.(needMeterValues(gameplay()));
+    scene.syncPlayerEnergyTarget?.();
+    render();
+    scene.gameHud?.render?.();
+    scene.audioRuntime?.playEffect?.("inventory-change");
+    scene.saveSession?.();
+    return result;
+  }
+
+  function onNumberKey(event) {
+    if (destroyed || event?.repeat || isEditableTarget(event?.target)) return;
+    const match = /^(?:Digit|Numpad)([1-6])$/.exec(String(event?.code ?? ""));
+    if (!match) return;
+    const slotIndex = slotDefinitions.findIndex((slot) => slot.kind === "number" && slot.label === match[1]);
+    if (slotIndex < 0) return;
+    const result = quickUse(slotIndex);
+    if (result.status !== "blocked") event.preventDefault?.();
   }
 
   function render() {
@@ -172,6 +212,7 @@ export function createCombatLoadoutRuntime(scene, {
   }
 
   scene.events.on("update", update);
+  globalThis.window?.addEventListener?.("keydown", onNumberKey);
 
   const presentation = {
     getTransformTarget: () => presentationContainer,
@@ -207,6 +248,7 @@ export function createCombatLoadoutRuntime(scene, {
     presentation,
     slotAreas: slotDefinitions,
     onChange: render,
+    onClick: quickUse,
   });
 
   render();
@@ -214,6 +256,7 @@ export function createCombatLoadoutRuntime(scene, {
   return {
     render,
     presentation,
+    quickUse,
     getActionItem(actionId) {
       const index = slotDefinitions.findIndex((slot) => slot.kind === "action" && slot.id === actionId);
       return index >= 0 ? cloneInventoryItem(slots()[index]) : null;
@@ -238,6 +281,11 @@ export function createCombatLoadoutRuntime(scene, {
       destroyed = true;
       unregisterPanel?.();
       scene.events.off("update", update);
+      globalThis.window?.removeEventListener?.("keydown", onNumberKey);
+      if (ownsWildAtollRuntime) {
+        scene.wildAtollRuntime?.destroy?.();
+        scene.wildAtollRuntime = null;
+      }
       presentationContainer.destroy(true);
       labelGraphics.forEach((graphics) => graphics.destroy());
       quantityGraphics.forEach((graphics) => graphics.destroy());
@@ -288,4 +336,9 @@ function drawCompactCombatLabel(graphics, x, y, label) {
     }
     cursorX += 4;
   }
+}
+
+function isEditableTarget(target) {
+  const tag = target?.tagName?.toLowerCase?.();
+  return tag === "input" || tag === "textarea" || tag === "select" || Boolean(target?.isContentEditable);
 }
