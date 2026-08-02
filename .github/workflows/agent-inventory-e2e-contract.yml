@@ -1,0 +1,116 @@
+name: Update inventory E2E contract
+
+on:
+  push:
+    branches:
+      - agent/preserve-inventory-selection-wheel
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/preserve-inventory-selection-wheel
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Patch combat presentation and E2E contract
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              source = path.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected one match in {path}, found {count}: {old[:100]!r}")
+              path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+          runtime = Path("src/inventory/inventoryRuntime.js")
+          replace_once(
+              runtime,
+              '''  function worldPresentationActive() {
+            return !destroyed && !isSuppressed();
+          }''',
+              '''  function worldPresentationActive() {
+            return !destroyed && !isSuppressed() && !isCombatMode();
+          }''',
+          )
+          replace_once(
+              runtime,
+              '''    getSelectedItem: () => cloneInventoryItem(selectedIndex === null ? null : inventory()?.slots?.[selectedIndex]),''',
+              '''    getSelectedItem: () => cloneInventoryItem(
+                isCombatMode() || selectedIndex === null ? null : inventory()?.slots?.[selectedIndex],
+              ),''',
+          )
+
+          checks = Path("scripts/check-inventory.mjs")
+          replace_once(
+              checks,
+              '''assert(runtimeSource.includes("worldPresentationActive()"), "held world-space item visibility stays outside panel interactivity");''',
+              '''assert(runtimeSource.includes("worldPresentationActive()") && runtimeSource.includes("!isCombatMode()"), "held peaceful item stays selected but is hidden while combat mode owns presentation");''',
+          )
+
+          e2e = Path("tests/e2e/task-053-peaceful-combat-hud.spec.js")
+          replace_once(
+              e2e,
+              '''test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {''',
+              '''test("Alt tap preserves peaceful selection while hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {''',
+          )
+          replace_once(
+              e2e,
+              '''  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
+            await page.keyboard.press("Digit2");
+            await page.keyboard.press("KeyE");
+            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();''',
+              '''  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+            await page.keyboard.press("Digit2");
+            await page.keyboard.press("KeyE");
+            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+            await page.locator("canvas").hover();
+            await page.mouse.wheel(0, 120);
+            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);''',
+          )
+          replace_once(
+              e2e,
+              '''  await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
+          });''',
+              '''  await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+            await page.mouse.wheel(0, 120);
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(1);
+            await page.mouse.wheel(0, -120);
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+          });''',
+          )
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run project checks
+        run: npm run check
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run focused inventory E2E
+        run: npx playwright test tests/e2e/task-053-peaceful-combat-hud.spec.js --project=desktop-chromium
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/agent-inventory-e2e-contract.yml
+
+      - name: Commit verified behavior
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/inventory/inventoryRuntime.js scripts/check-inventory.mjs tests/e2e/task-053-peaceful-combat-hud.spec.js .github/workflows/agent-inventory-e2e-contract.yml
+          git commit -m "Preserve peaceful selection across combat mode"
+          git push origin HEAD:agent/preserve-inventory-selection-wheel
