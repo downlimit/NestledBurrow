@@ -105,14 +105,14 @@
       "coins": "монеты"
     },
     "servingStock": {
-      "lemonade1": "Лимонад 1/4 - забрать",
-      "lemonade2": "Лимонад 2/4 - забрать",
-      "lemonade3": "Лимонад 3/4 - забрать",
-      "lemonade4": "Лимонад 4/4 - забрать",
-      "friedPotatoDish1": "Картофель 1/4 - забрать",
-      "friedPotatoDish2": "Картофель 2/4 - забрать",
-      "friedPotatoDish3": "Картофель 3/4 - забрать",
-      "friedPotatoDish4": "Картофель 4/4 - забрать"
+      "lemonade1": "Лимонад 1/4 — забрать",
+      "lemonade2": "Лимонад 2/4 — забрать",
+      "lemonade3": "Лимонад 3/4 — забрать",
+      "lemonade4": "Лимонад 4/4 — забрать",
+      "friedPotatoDish1": "Картофель 1/4 — забрать",
+      "friedPotatoDish2": "Картофель 2/4 — забрать",
+      "friedPotatoDish3": "Картофель 3/4 — забрать",
+      "friedPotatoDish4": "Картофель 4/4 — забрать"
     }
   },
   "atoll": {
@@ -181,12 +181,12 @@
     "balance_many": "Монеты: {count}",
     "balance_other": "Монеты: {count}",
     "buy": "КУПИТЬ 1",
-    "buyPrice": "КУПИТЬ - {count}",
-    "buyPrice_one": "КУПИТЬ - {count}",
-    "buyPrice_few": "КУПИТЬ - {count}",
-    "buyPrice_many": "КУПИТЬ - {count}",
-    "buyPrice_other": "КУПИТЬ - {count}",
-    "exit": "SPACE - ЗАКРЫТЬ",
+    "buyPrice": "КУПИТЬ · {count}",
+    "buyPrice_one": "КУПИТЬ · {count}",
+    "buyPrice_few": "КУПИТЬ · {count}",
+    "buyPrice_many": "КУПИТЬ · {count}",
+    "buyPrice_other": "КУПИТЬ · {count}",
+    "exit": "ПРОБЕЛ - ЗАКРЫТЬ",
     "not-enough-coins": "Не хватает монет",
     "inventory-full": "Инвентарь заполнен"
   },
