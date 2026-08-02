@@ -73,6 +73,10 @@ assert(e2eBridge.includes("worldLocationRuntime?.getOwners?.()"));
 assert(!/scene\.(merchantRuntime|debrisRuntime|facilityRuntime|farmingRuntime|cookingRuntime|meleeRuntime|worldBuildCoordinator)/u.test(e2eBridge));
 assert.equal(Number(architectureCheck.match(/MAX_WORLD_SCENE_LINES = (\d+)/u)?.[1]), 1300);
 assert(main.split("\n").length <= 1300);
+assert(
+  main.indexOf("this.interactionRuntime?.destroy()") < main.indexOf("this.worldLocationRuntime?.destroy?.()"),
+  "scene shutdown must detach the interaction presenter before location candidate reset touches Phaser input",
+);
 
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.tavernService, true);
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.cooking, true);

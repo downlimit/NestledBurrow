@@ -882,13 +882,13 @@ class WorldScene extends Phaser.Scene {
     this.gameCanvasInputGuard = null;
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
+    this.interactionRuntime?.destroy();
     this.worldLocationRuntime?.destroy?.();
     this.worldLocationRuntime = null;
     this.worldPresentationRuntime?.destroy?.();
     this.worldPresentationRuntime = null;
     this.mobileJoystick?.destroy();
     this.mobileJoystick = null;
-    this.interactionRuntime?.destroy();
     this.interactionRuntime = null;
     this.worldInteractionCoordinator?.destroy?.();
     this.worldInteractionCoordinator = null;
