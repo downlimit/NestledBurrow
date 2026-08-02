@@ -149,10 +149,15 @@ const trunkClick = { worldX: 55, worldY: 103 };
 assert.equal(resolveColliderSelectionPointer([colliderEntry], selectionBounds, trunkClick), trunkClick, "direct collider hits keep normal editor behavior");
 
 function captureScene(cleared) {
+  const placedObjects = new Map([[plantObject.id, plantObject]]);
   return {
-    nextBuildObjectId: 9,
-    buildPlacedObjects: new Map([[plantObject.id, plantObject]]),
-    buildCellKey: ({ x, y }) => `${x},${y}`,
+    worldBuildCoordinator: {
+      getPlacedObjects: () => [...placedObjects.values()],
+      getPlacedObject: (id) => placedObjects.get(id) ?? null,
+      getNextBuildObjectId: () => 9,
+      getCellKey: ({ x, y }) => `${x},${y}`,
+      restoreBuildPlacedObject: () => true,
+    },
     floorSprites: new Map(),
     wallSprites: new Map(),
     worldLayout: {

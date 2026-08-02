@@ -357,6 +357,7 @@ assert.deepEqual([2, 2, 2, 2].map((amount, index) => aggregateTransientNumber(da
 }, 1000).amount), [2, 4, 6, 8]);
 
 const main = readFileSync("src/main.js", "utf8");
+const worldBuildCoordinator = readFileSync("src/worldBuildCoordinator.js", "utf8");
 const gameHud = readFileSync("src/gameHud.js", "utf8");
 const combatLoadout = readFileSync("src/combatLoadoutRuntime.js", "utf8");
 assert(main.includes("createMeleeRuntime(this"));
@@ -369,7 +370,9 @@ assert(main.includes("consumePointerAction") && main.includes('shiftPressed ? "s
 assert(main.includes("primary: Boolean(this.frameMeleeItem) && !this.suppressNextInteract"), "stable combat mode permits its resolved melee action");
 assert(main.includes("maxPresentationSpeed: this.meleeRuntime?.getCameraFollowSpeedLimit?.()"), "camera smoothing is enabled only by the active melee runtime");
 assert(main.includes("playEffect: (type) => this.audioRuntime?.playEffect?.(type)"), "melee hit timing routes synthetic SFX through the shared audio runtime");
-assert(main.includes("getBuildMoveTargetAt") && main.includes("moveBuildTarget") && main.includes("restoreBuildTarget"), "build move updates and undoes the dummy home anchor");
+assert(worldBuildCoordinator.includes("getBuildMoveTargetAt")
+  && worldBuildCoordinator.includes("moveBuildTarget")
+  && worldBuildCoordinator.includes("restoreBuildTarget"), "build move updates and undoes the dummy home anchor");
 assert(gameHud.includes("mode.mode !== INVENTORY_MODES.COMBAT"), "combat action lookup is disabled outside stable combat HUD mode");
 assert(combatLoadout.includes('slot.kind === "action" && slot.id === actionId'), "number slots cannot resolve as combat actions");
 assert(!readFileSync("src/meleeRuntime.js", "utf8").includes("addEventListener"));

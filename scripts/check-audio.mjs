@@ -108,7 +108,7 @@ effectRuntime.destroy();
 const audioRuntimeSource = readFileSync("src/audioRuntime.js", "utf8");
 assert(!audioRuntimeSource.includes("visibilitychange")); assert(!audioRuntimeSource.includes("blur"));
 const eventWiringSource = [
-  "src/main.js", "src/inventoryRuntime.js", "src/farmingRuntime.js",
+  "src/main.js", "src/worldBuildCoordinator.js", "src/inventoryRuntime.js", "src/farmingRuntime.js",
   "src/cookingRuntime.js", "src/merchantRuntime.js", "src/kitchenInteractionRuntime.js",
   "src/guestFeedback.js", "src/tavernServiceRuntime.js", "src/meleeRuntime.js",
 ].map((path) => readFileSync(path, "utf8")).join("\n");

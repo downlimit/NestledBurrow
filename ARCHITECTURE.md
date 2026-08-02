@@ -32,21 +32,22 @@
 
 В `src/main.js` нельзя добавлять новую domain logic, самостоятельную state machine, сериализацию, placement algorithm, editor workflow или крупную presentation subsystem.
 
-Для `src/main.js` действует жёсткий предел `2900` строк, который устанавливает `scripts/check-architecture-boundaries.mjs`. Текущий файл остаётся ниже него. Это предохранитель: следующая содержательная функция должна сопровождаться локальным выделением, чтобы composition root не рос дальше.
+Для `src/main.js` действует жёсткий предел `2400` строк, который устанавливает `scripts/check-architecture-boundaries.mjs`. Текущий файл остаётся ниже него. Это предохранитель: следующая содержательная функция должна сопровождаться локальным выделением, чтобы composition root не рос дальше.
 
 ## Следующие подтверждённые выделения
 
 ### Build и authoring
 
-Следующая задача, добавляющая build/authoring behavior, должна вынести соответствующую world-facing orchestration из `WorldScene` в отдельный coordinator/runtime. Предпочтительный owner связывает:
+`WorldBuildCoordinator` владеет player-facing world mutation и transient build-session state:
 
 - world sprites и topology;
 - placement/move/demolition;
 - profile collider и drag anchor;
 - facilities/resources/build objects;
-- authoring callbacks.
+- grouped undo, preview и demolition highlight;
+- публичный API для authoring и E2E bridge.
 
-`BuildModeRuntime` продолжает владеть UI/input state. `WorldScene` только создаёт coordinator и вызывает его update/cleanup.
+`BuildModeRuntime` продолжает владеть UI/input state и создаётся координатором на Phaser rendering host. Facilities, resources/beds, wells/farming, tavern sign и training dummy сохраняют собственные runtime states; координатор только маршрутизирует их мутации через явно переданные adapters. `WorldScene` создаёт координатор, передаёт layout, profiles, runtime owners и ограниченные callbacks, затем делегирует location cleanup. Authoring owners используют публичные методы координатора без доступа к его внутренним `Map`, undo stack и preview state.
 
 ### Tavern service
 

@@ -13,7 +13,7 @@ export function mountWorldLocation(scene) {
   }
   if (scene.worldLocationCoordinator.hasCapability("buildMode")) {
     scene.createMovementDebugPanel();
-    scene.createBuildMode();
+    scene.createBuildCoordinator();
   }
   scene.interactionRuntime?.resetCandidate?.();
   scene.syncGameplayHudVisibility();
@@ -24,12 +24,12 @@ export function renderWorldLocation(scene, { outdoorTextureKey, houseTextureKey,
   scene.groundSprites = new Map();
   scene.worldLayout.groundTiles.forEach((tile) => {
     const sprite = scene.addTile(tile, outdoorTextureKey, 0);
-    scene.groundSprites.set(scene.buildCellKey({ x: tile.x * tileSize, y: tile.y * tileSize }), { sprite, tile });
+    scene.groundSprites.set(worldCellKey({ x: tile.x * tileSize, y: tile.y * tileSize }), { sprite, tile });
   });
   scene.floorSprites = new Map();
   scene.worldLayout.houseFloorTiles.forEach((tile) => {
     const sprite = scene.addTile(tile, houseTextureKey, 20);
-    scene.floorSprites.set(scene.buildCellKey({ x: tile.x * tileSize, y: tile.y * tileSize }), { sprite, tile });
+    scene.floorSprites.set(worldCellKey({ x: tile.x * tileSize, y: tile.y * tileSize }), { sprite, tile });
   });
   scene.wallSprites = new Map();
   scene.worldLayout.houseWallTiles.forEach((tile) => scene.wallSprites.set(tile.id, scene.createCanonicalWallEntry(tile)));
@@ -46,19 +46,9 @@ export function destroyWorldLocation(scene) {
   scene.interactionRuntime?.resetCandidate?.();
   scene.movementDebugPanel?.destroy();
   scene.movementDebugPanel = null;
-  scene.buildMode?.destroy();
-  scene.buildMode = null;
   scene.worldBuildCoordinator?.destroy?.();
   scene.worldBuildCoordinator = null;
-  for (const object of scene.buildPlacedObjects?.values?.() ?? []) {
-    for (const sprite of object.sprites ?? []) sprite.destroy();
-    if (object.collider) scene.worldLayout?.clearWorldObjectCollider?.(object.id);
-  }
-  scene.buildPlacedObjects?.clear?.();
-  for (const sprite of scene.buildSurfaceVisuals?.values?.() ?? []) sprite.destroy();
-  scene.buildSurfaceVisuals?.clear?.();
-  for (const sprites of scene.buildWallJunctions?.values?.() ?? []) for (const sprite of sprites) sprite.destroy();
-  scene.buildWallJunctions?.clear?.();
+  scene.buildMode = null;
   scene.meleeRuntime?.destroy();
   scene.meleeRuntime = null;
   scene.cookingRuntime?.destroy();
@@ -104,4 +94,8 @@ function destroyRenderedWorld(scene) {
   scene.groundSprites?.clear?.();
   scene.floorSprites?.clear?.();
   scene.wallSprites?.clear?.();
+}
+
+function worldCellKey(point) {
+  return `${point.x},${point.y}`;
 }

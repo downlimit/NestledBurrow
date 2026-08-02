@@ -13,7 +13,7 @@ function delay(milliseconds) {
 function isAuthoringSceneReady(scene) {
   return Boolean(
     scene?.buildMode
-      && scene?.buildPlacedObjects
+      && scene?.worldBuildCoordinator?.getPlacedObjects
       && scene?.facilityRuntime
       && scene?.debrisRuntime
       && scene?.worldLayout,

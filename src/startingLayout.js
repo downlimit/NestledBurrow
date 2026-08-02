@@ -173,13 +173,14 @@ function recoverTemporaryStagingFacilities(layout) {
 }
 
 export function captureStartingLayout(scene) {
-  if (!scene?.buildPlacedObjects || !scene?.worldLayout) throw new Error("Build mode is not ready");
-  const canonicalFloorKeys = scene.worldLayout.houseFloorTiles.map((tile) => scene.buildCellKey({
+  const buildCoordinator = requireBuildCoordinator(scene);
+  if (!scene?.worldLayout) throw new Error("Build mode is not ready");
+  const canonicalFloorKeys = scene.worldLayout.houseFloorTiles.map((tile) => buildCoordinator.getCellKey({
     x: tile.x * TILE_SIZE,
     y: tile.y * TILE_SIZE,
   }));
   const canonicalWallIds = scene.worldLayout.houseWallTiles.map((tile) => tile.id);
-  const buildObjects = [...scene.buildPlacedObjects.values()]
+  const buildObjects = buildCoordinator.getPlacedObjects()
     .filter((object) => shouldCaptureBuildObject(scene, object))
     .map((object) => {
       const { sprites: _sprites, resourceDefinition: _resourceDefinition, resourceCleared: _resourceCleared, ...serializable } = object;
@@ -192,7 +193,7 @@ export function captureStartingLayout(scene) {
   }
   return normalizeStartingLayout({
     version: STARTING_LAYOUT_VERSION,
-    nextBuildObjectId: Number(scene.nextBuildObjectId) || 0,
+    nextBuildObjectId: Number(buildCoordinator.getNextBuildObjectId()) || 0,
     removedCanonicalFloors: canonicalFloorKeys.filter((key) => !scene.floorSprites.has(key)),
     removedCanonicalWalls: canonicalWallIds.filter((id) => !scene.wallSprites.has(id)),
     buildObjects,
@@ -254,12 +255,13 @@ export function loadStartingLayout(storage = globalThis.localStorage, projectDef
 }
 
 function removeCanonicalWalls(scene, removedIds) {
+  const buildCoordinator = requireBuildCoordinator(scene);
   for (const id of removedIds) {
     const entry = scene.wallSprites?.get?.(id);
     if (!entry) continue;
     const rawX = entry.tile.worldX + TILE_SIZE / 2;
     const rawY = entry.tile.worldY + TILE_SIZE / 2;
-    scene.demolishBuildObject?.({ x: entry.tile.worldX, y: entry.tile.worldY, rawX, rawY }, "wall");
+    buildCoordinator.demolishBuildObject({ x: entry.tile.worldX, y: entry.tile.worldY, rawX, rawY }, "wall");
   }
 }
 
@@ -305,9 +307,10 @@ function restoreBeds(scene, definitions) {
 
 export function applyStartingLayout(scene, value) {
   const layout = normalizeStartingLayout(value);
-  if (!scene?.buildPlacedObjects || !scene?.worldLayout) throw new Error("Build mode is not ready");
+  const buildCoordinator = requireBuildCoordinator(scene);
+  if (!scene?.worldLayout) throw new Error("Build mode is not ready");
 
-  for (const id of [...scene.buildPlacedObjects.keys()]) scene.removeBuildPlacedObjectById(id);
+  for (const object of buildCoordinator.getPlacedObjects()) buildCoordinator.removeBuildPlacedObjectById(object.id);
 
   for (const key of layout.removedCanonicalFloors) {
     const floor = scene.floorSprites?.get?.(key);
@@ -317,11 +320,11 @@ export function applyStartingLayout(scene, value) {
   removeCanonicalWalls(scene, layout.removedCanonicalWalls);
 
   for (const object of layout.buildObjects) {
-    if (!scene.restoreBuildPlacedObject(cloneJson(object))) {
+    if (!buildCoordinator.restoreBuildPlacedObject(cloneJson(object))) {
       throw new Error(`Failed to restore build object ${object.id}`);
     }
   }
-  scene.nextBuildObjectId = Math.max(Number(scene.nextBuildObjectId) || 0, layout.nextBuildObjectId);
+  buildCoordinator.setNextBuildObjectId(layout.nextBuildObjectId);
 
   restoreFacilities(scene, layout.facilities);
   const supportedFurnitureKinds = new Set(["training-dummy", TAVERN_SIGN_BUILD_KIND]);
@@ -340,4 +343,12 @@ export function applyStartingLayout(scene, value) {
   scene.interactionRuntime?.refresh?.();
   scene.clearBuildPreview?.();
   return layout;
+}
+
+function requireBuildCoordinator(scene) {
+  const coordinator = scene?.worldBuildCoordinator;
+  if (!coordinator?.getPlacedObjects || !coordinator?.restoreBuildPlacedObject) {
+    throw new Error("Build mode is not ready");
+  }
+  return coordinator;
 }
