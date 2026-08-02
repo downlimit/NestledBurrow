@@ -18,6 +18,8 @@
 - interaction selection остаётся детерминированным контрактом; collision-valid use position и visual aim position разделены, а общая extractable-группа ресурсов и растений ранжируется по направлению взгляда до локальной дистанции.
 - `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle.
 - Повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены.
+- Дикий Атолл разделяет детерминированные route/drop rules (`wildAtollDomain`) и transient world presentation/input (`wildAtollRuntime`); его первый slice не сериализуется и не меняет session schema.
+- Применение предметов из numbered combat slots разделяет UI activation (`combatLoadoutRuntime`) и мутацию item/needs (`combatQuickUse`).
 
 ## `src/main.js` — только composition root
 
@@ -71,6 +73,18 @@
 Facility runtime владеет объектом, collider и use lifecycle. Presentation pose не мутирует безопасную motor position. Camera получает presentation target через явный adapter. Sleep/wake и interaction candidate остаются отдельными контрактами.
 
 `InteractionApproachResolver` owns collision-valid perimeter use points and bounded route selection for every interaction candidate. `InteractionTimelineRuntime` owns transient enter/active/exit phases and pose interpolation. `ToiletAccidentTimelineRuntime` owns the unskippable shake/recovery sequence and puddle hook. `NeedsInteractionCoordinator` binds these phases to facility, sleep and protected-need outputs. `NeedsFlowRuntime` measures actual N/E/S/T/L/D value deltas for HUD direction and tier without action labels. These owners are not serialized; `WorldScene` only constructs them, delegates update and routes callbacks.
+
+### Combat loadout quick use
+
+`CombatLoadoutRuntime` owns only numbered-slot activation, pointer/keyboard gating, presentation refresh and feedback dispatch. `LoadoutDragCoordinator` decides click versus drag before forwarding activation. `combatQuickUse.js` owns supported item profiles and atomic mutation of the selected combat slot, bucket water and target need.
+
+Quick use is available only in stable `COMBAT`; Alt, panel transition, modal suppression and editable input disable it. Drag completion cannot also execute self-use. Adding an item profile must preserve the existing inventory item identity and define its exact consumption and need mutation in `combatQuickUse.js`.
+
+### Дикий Атолл: первый runtime slice
+
+`wildAtollDomain.js` owns deterministic route consequences, frame choice and grass-drop resolution. `wildAtollRuntime.js` owns one transient run while the player is in Island Nest: entry forecast, cave prompts, selected route, grass visuals/colliders, sword-reach selection and reward delivery.
+
+The slice deliberately reuses Island Nest and creates no new world ID, persistence field or final arena graph. It reads the current location/layout/player through narrow scene adapters, asks the existing needs owner whether a sword action is affordable, and sends ordinary inventory/world-item mutations through existing owners. Future multi-location arenas must move lifecycle composition into `WorldLocationRuntime`; they may not expand this transient prototype into a second location coordinator.
 
 ### World interaction execution
 
