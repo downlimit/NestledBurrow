@@ -4,8 +4,9 @@ import {
   createWildAtollArenaResources,
   getWildAtollArenaDefinition,
   getWildAtollExitPoint,
+  getWildAtollSegmentDefinition,
+  WILD_ATOLL_ALL_ARENAS,
   WILD_ATOLL_ARENAS,
-  WILD_ATOLL_STARTER_ARENAS,
 } from "./wildAtollDomain.js";
 import { ATOLL_WORLD_MODEL, WORLD_IDS } from "./worldLocationConfig.js";
 import {
@@ -95,9 +96,9 @@ export function createWildAtollRuntime(scene, {
     runActive = true;
     runSerial += 1;
     runSeed = `${Date.now()}-${runSerial}`;
-    clearKnownStarterResourceState();
+    clearKnownArenaResourceState();
     renderArena(WILD_ATOLL_ARENAS.root);
-    showMessage("hud:atoll.arrival");
+    showMessage("atoll:arrival");
   }
 
   function unmountCurrentWorld() {
@@ -122,7 +123,7 @@ export function createWildAtollRuntime(scene, {
 
   function leaveAtoll({ silent = false } = {}) {
     clearArenaPresentation({ removeResourceState: true });
-    clearKnownStarterResourceState();
+    clearKnownArenaResourceState();
     const result = transitionWorld(WORLD_IDS.nest, NEST_RETURN_SPAWN);
     if (!result?.transitioned) return false;
     mountedWorldId = null;
@@ -130,7 +131,7 @@ export function createWildAtollRuntime(scene, {
     arenaId = null;
     candidate = null;
     setTitlesVisible(false);
-    if (!silent) showMessage("hud:atoll.leftRun");
+    if (!silent) showMessage("atoll:leftRun");
     return true;
   }
 
@@ -178,10 +179,10 @@ export function createWildAtollRuntime(scene, {
     scene.interactionRuntime?.resetCandidate?.();
   }
 
-  function clearKnownStarterResourceState() {
+  function clearKnownArenaResourceState() {
     const nodes = scene.sessionState?.gameplay?.resourceNodes;
     if (!nodes) return;
-    for (const knownArenaId of WILD_ATOLL_STARTER_ARENAS) {
+    for (const knownArenaId of WILD_ATOLL_ALL_ARENAS) {
       const definitions = createWildAtollArenaResources("cleanup", "current", knownArenaId);
       for (const definition of definitions) delete nodes[definition.id];
     }
@@ -218,7 +219,8 @@ export function createWildAtollRuntime(scene, {
     }
     if (exit.kind === "teleport") return leaveAtoll();
     if (exit.kind === "segment") {
-      showMessage(exit.blockedMessageKey);
+      const nextSegment = getWildAtollSegmentDefinition(exit.targetSegmentId);
+      renderArena(nextSegment.entryArenaId);
       return true;
     }
     return false;
@@ -265,7 +267,7 @@ export function createWildAtollRuntime(scene, {
     if (mountedWorldId === WORLD_IDS.nest) {
       const distance = Math.hypot(NEST_ATOLL_ENTRANCE.x - position.x, NEST_ATOLL_ENTRANCE.y - position.y);
       return distance <= INTERACTION_RADIUS
-        ? { kind: "enter", id: "enter", labelKey: "hud:atoll.promptEnter", distance }
+        ? { kind: "enter", id: "enter", labelKey: "atoll:promptEnter", distance }
         : null;
     }
     if (mountedWorldId !== WORLD_IDS.atoll || !runActive) return null;
@@ -454,6 +456,7 @@ export function createWildAtollRuntime(scene, {
       active: runActive,
       runSeed,
       arenaId,
+      segmentId: arenaId ? getWildAtollArenaDefinition(arenaId).segmentId : null,
       candidateId: candidate?.id ?? null,
       availableExitIds: arenaId ? getWildAtollArenaDefinition(arenaId).exits.map((exit) => exit.id) : [],
       activeResourceIds: [...activeResourceIds],
