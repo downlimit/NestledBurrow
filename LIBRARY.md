@@ -44,6 +44,8 @@ Production-модули сгруппированы по игровому или 
 
 Существующие публичные каталоги `src/assets/` и `src/localization/` сохраняют свои контракты. Постоянную границу проверяет `check:source-layout`.
 
+Visual runtime binaries размещаются по правилам `ARTIST.md`, `ASSETS.md` и `BINARY_IMPORT.md`. Для project-authored assets Художник сначала определяет системного owner, затем проверяет существующую semantic folder под `public/assets/project/`; `asset-inbox/incoming` не является canonical owner.
+
 ## Межсистемные задачи
 
 Дополнительно открыть `ARCHITECTURE.md`, когда:
@@ -58,9 +60,10 @@ Production-модули сгруппированы по игровому или 
 ## Инструкционные документы
 
 - Лид: `PROJECT.md` + `LEAD.md`.
+- Художник: `PROJECT.md` + `ARTIST.md` + `ASSETS.md` + `BINARY_IMPORT.md`.
 - Прямая реализация/Codex: `AGENTS.md` + `AGENTS.override.md`.
 - Интегратор: `PROJECT.md` + `REVIEW.md`.
-- Бинарные assets: `ASSETS.md` + `BINARY_IMPORT.md`.
+- Бинарные assets вне Artist-route: `ASSETS.md` + `BINARY_IMPORT.md`.
 - Скоростной аудит: `FAST_LOOP.md` только при отдельной ретроспективе.
 - `tasks/*.md` читаются только когда конкретный файл назван в задаче.
 
