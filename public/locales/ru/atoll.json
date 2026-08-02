@@ -1,0 +1,167 @@
+{
+  "arrival": "Вы вошли в Дикий Атолл.",
+  "leftRun": "Вы вернулись в Островное Гнездо.",
+  "promptEnter": "SPACE - ДИКИЙ АТОЛЛ",
+  "segments": {
+    "starter": "ПЕРВЫЕ ТРОПЫ",
+    "forestT1": "ПОД СЕНЬЮ КРОН",
+    "mineT1": "ПОД КАМЕННЫМ НЕБОМ",
+    "forestGroveT2": "ГЛУХАЯ ЧАЩА",
+    "forestWetlandsT2": "СЫРЫЕ НИЗИНЫ",
+    "mineCrystalT2": "ХРУСТАЛЬНЫЕ ШТОЛЬНИ",
+    "mineDepthsT2": "НИЖНИЕ ВЫРАБОТКИ"
+  },
+  "segmentPaths": {
+    "forest-t1": "SPACE - В ЛЕС",
+    "mine-t1": "SPACE - В ШАХТЫ",
+    "forest-grove-t2": "SPACE - В ЧАЩУ",
+    "forest-wetlands-t2": "SPACE - В НИЗИНЫ",
+    "mine-crystal-t2": "SPACE - К КРИСТАЛЛАМ",
+    "mine-depths-t2": "SPACE - В ГЛУБИНУ"
+  },
+  "arenas": {
+    "starter": {
+      "root": "КРАЙ",
+      "left1": "ПОЛЯНА",
+      "right1": "КАМНИ",
+      "left2": "ПРУД",
+      "right2": "ЗАРОСЛИ",
+      "left3": "КОРНИ",
+      "right3": "ОСЫПЬ",
+      "edge": "ПЕРЕВАЛ"
+    },
+    "forest-t1": {
+      "root": "ОПУШКА",
+      "left1": "БЕРЕЗНЯК",
+      "right1": "ВАЛЕЖНИК",
+      "left2": "РУЧЕЙ",
+      "right2": "ПАПОРОТНИКИ",
+      "left3": "СТАРЫЕ КОРНИ",
+      "right3": "КАМЕННЫЙ СКЛОН",
+      "edge": "КРАЙ ЛЕСА"
+    },
+    "mine-t1": {
+      "root": "ВХОД",
+      "left1": "ШТОЛЬНЯ",
+      "right1": "ОСЫПЬ",
+      "left2": "СТАРЫЙ ЗАЛ",
+      "right2": "УЗКИЙ ХОД",
+      "left3": "НИЖНИЙ ХОД",
+      "right3": "ТРЕЩИНА",
+      "edge": "ГЛУБИНА"
+    },
+    "forest-grove-t2": {
+      "root": "ТЁМНАЯ ОПУШКА",
+      "left1": "СОСНЯК",
+      "right1": "БУРЕЛОМ",
+      "left2": "МХОВАЯ ЛОЖБИНА",
+      "right2": "ГУСТАЯ ЧАЩА",
+      "left3": "КОРНЕВОЙ ХОД",
+      "right3": "КАМЕННЫЙ РУЧЕЙ",
+      "edge": "ДАЛЬНЯЯ КРОМКА"
+    },
+    "forest-wetlands-t2": {
+      "root": "СЫРАЯ ПОЛЯНА",
+      "left1": "ТРОСТНИКИ",
+      "right1": "ТОПЬ",
+      "left2": "МЕЛКИЙ ПРУД",
+      "right2": "МОКРЫЕ КОРНИ",
+      "left3": "ОСТРОВОК",
+      "right3": "ГЛИНЯНЫЙ БЕРЕГ",
+      "edge": "КРАЙ НИЗИНЫ"
+    },
+    "mine-crystal-t2": {
+      "root": "БЛЕСК У ВХОДА",
+      "left1": "БЕЛАЯ ЖИЛА",
+      "right1": "СИНИЙ СКОЛ",
+      "left2": "ЗВОНКИЙ ЗАЛ",
+      "right2": "КРИСТАЛЬНЫЙ ХОД",
+      "left3": "РАЗЛОМ",
+      "right3": "КАМЕННЫЙ МОСТ",
+      "edge": "ДАЛЬНЯЯ ШТОЛЬНЯ"
+    },
+    "mine-depths-t2": {
+      "root": "НИЖНИЙ ВХОД",
+      "left1": "ТЁМНЫЙ ХОД",
+      "right1": "ОБВАЛ",
+      "left2": "ГЛУБОКИЙ ЗАЛ",
+      "right2": "УЗКАЯ ШАХТА",
+      "left3": "СТАРЫЙ ЗАБОЙ",
+      "right3": "ЧЁРНАЯ ТРЕЩИНА",
+      "edge": "НИЖНИЙ КРАЙ"
+    }
+  },
+  "paths": {
+    "nest": "SPACE - В ГНЕЗДО",
+    "starter": {
+      "root": "SPACE - НА КРАЙ",
+      "left1": "SPACE - К ПОЛЯНЕ",
+      "right1": "SPACE - К КАМНЯМ",
+      "left2": "SPACE - К ПРУДУ",
+      "right2": "SPACE - В ЗАРОСЛИ",
+      "left3": "SPACE - К КОРНЯМ",
+      "right3": "SPACE - К ОСЫПИ",
+      "edge": "SPACE - НА ПЕРЕВАЛ"
+    },
+    "forest-t1": {
+      "root": "SPACE - НА ОПУШКУ",
+      "left1": "SPACE - В БЕРЕЗНЯК",
+      "right1": "SPACE - К ВАЛЕЖНИКУ",
+      "left2": "SPACE - К РУЧЬЮ",
+      "right2": "SPACE - К ПАПОРОТНИКАМ",
+      "left3": "SPACE - К СТАРЫМ КОРНЯМ",
+      "right3": "SPACE - НА КАМЕННЫЙ СКЛОН",
+      "edge": "SPACE - К КРАЮ ЛЕСА"
+    },
+    "mine-t1": {
+      "root": "SPACE - КО ВХОДУ",
+      "left1": "SPACE - В ШТОЛЬНЮ",
+      "right1": "SPACE - К ОСЫПИ",
+      "left2": "SPACE - В СТАРЫЙ ЗАЛ",
+      "right2": "SPACE - В УЗКИЙ ХОД",
+      "left3": "SPACE - В НИЖНИЙ ХОД",
+      "right3": "SPACE - К ТРЕЩИНЕ",
+      "edge": "SPACE - В ГЛУБИНУ"
+    },
+    "forest-grove-t2": {
+      "root": "SPACE - НА ТЁМНУЮ ОПУШКУ",
+      "left1": "SPACE - В СОСНЯК",
+      "right1": "SPACE - К БУРЕЛОМУ",
+      "left2": "SPACE - В МХОВУЮ ЛОЖБИНУ",
+      "right2": "SPACE - В ГУСТУЮ ЧАЩУ",
+      "left3": "SPACE - В КОРНЕВОЙ ХОД",
+      "right3": "SPACE - К КАМЕННОМУ РУЧЬЮ",
+      "edge": "SPACE - К ДАЛЬНЕЙ КРОМКЕ"
+    },
+    "forest-wetlands-t2": {
+      "root": "SPACE - НА СЫРУЮ ПОЛЯНУ",
+      "left1": "SPACE - В ТРОСТНИКИ",
+      "right1": "SPACE - В ТОПЬ",
+      "left2": "SPACE - К МЕЛКОМУ ПРУДУ",
+      "right2": "SPACE - К МОКРЫМ КОРНЯМ",
+      "left3": "SPACE - НА ОСТРОВОК",
+      "right3": "SPACE - К ГЛИНЯНОМУ БЕРЕГУ",
+      "edge": "SPACE - К КРАЮ НИЗИНЫ"
+    },
+    "mine-crystal-t2": {
+      "root": "SPACE - К БЛЕСКУ У ВХОДА",
+      "left1": "SPACE - К БЕЛОЙ ЖИЛЕ",
+      "right1": "SPACE - К СИНЕМУ СКОЛУ",
+      "left2": "SPACE - В ЗВОНКИЙ ЗАЛ",
+      "right2": "SPACE - В КРИСТАЛЬНЫЙ ХОД",
+      "left3": "SPACE - К РАЗЛОМУ",
+      "right3": "SPACE - НА КАМЕННЫЙ МОСТ",
+      "edge": "SPACE - В ДАЛЬНЮЮ ШТОЛЬНЮ"
+    },
+    "mine-depths-t2": {
+      "root": "SPACE - К НИЖНЕМУ ВХОДУ",
+      "left1": "SPACE - В ТЁМНЫЙ ХОД",
+      "right1": "SPACE - К ОБВАЛУ",
+      "left2": "SPACE - В ГЛУБОКИЙ ЗАЛ",
+      "right2": "SPACE - В УЗКУЮ ШАХТУ",
+      "left3": "SPACE - К СТАРОМУ ЗАБОЮ",
+      "right3": "SPACE - К ЧЁРНОЙ ТРЕЩИНЕ",
+      "edge": "SPACE - К НИЖНЕМУ КРАЮ"
+    }
+  }
+}
