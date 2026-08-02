@@ -33,19 +33,13 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    id: "expedition",
+    id: "furniture",
     labelKey: "hud:buildMode.groups.expedition",
     items: Object.freeze([
       Object.freeze({ id: "privacy-screen", placement: "wall", dragPaint: false, labelKey: "hud:buildMode.assets.privacyScreen", textureKey: HOUSE_TEXTURE_KEY, frame: HOUSE_FRAMES.sideLeft }),
       Object.freeze({ id: "bed", placement: "bed", icon: "bed", labelKey: "hud:buildMode.assets.bed" }),
       Object.freeze({ id: "toilet", placement: "facility", facilityType: "toilet", icon: "toilet", labelKey: "hud:buildMode.assets.toilet" }),
       Object.freeze({ id: "table", placement: "facility", facilityType: "table", icon: "table", labelKey: "hud:buildMode.assets.table" }),
-    ]),
-  }),
-  Object.freeze({
-    id: "furniture",
-    labelKey: "hud:buildMode.groups.furniture",
-    items: Object.freeze([
       Object.freeze({ id: "shower", placement: "facility", facilityType: "shower", icon: "shower", labelKey: "hud:buildMode.assets.shower" }),
       Object.freeze({ id: "cutting-table", placement: "facility", facilityType: "cutting-table", icon: "cutting-table", labelKey: "hud:kitchen.facilities.cuttingTable" }),
       Object.freeze({ id: "gas-stove", placement: "facility", facilityType: "gas-stove", icon: "gas-stove", labelKey: "hud:kitchen.facilities.gasStove" }),
