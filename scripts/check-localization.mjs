@@ -58,6 +58,19 @@ for (const locale of SUPPORTED_LOCALES) {
     assert(!/^(?:hud:)?atoll\./.test(value), `${locale}/hud:atoll.${key} is player text, not a technical key`);
   }
 }
+const terminalNames = {
+  ru: { forest: "ОСТРОВНОЙ ПРИЧАЛ", grotto: "ТЕНЕВОЙ ПРИЧАЛ" },
+  en: { forest: "ISLAND JETTY", grotto: "SHADOW JETTY" },
+};
+for (const locale of SUPPORTED_LOCALES) {
+  const atoll = read(locale, "atoll");
+  assert.equal(atoll.arenas["forested-isthmus"].edge, terminalNames[locale].forest, `${locale} forest NPC threshold names the reached place`);
+  assert.equal(atoll.arenas["shadow-isthmus"].edge, terminalNames[locale].grotto, `${locale} grotto NPC threshold names the reached place`);
+  const serialized = JSON.stringify(atoll);
+  for (const misleading of ["ОСТРОВ ВПЕРЕДИ", "ОСТРОВ В ТЕНИ", "ISLAND AHEAD", "ISLAND IN SHADOW"]) {
+    assert(!serialized.includes(misleading), `${locale} Atoll copy does not describe a reached threshold as still ahead`);
+  }
+}
 for (const file of ["src/interaction/dialogueConfig.js", "src/interaction/interactionConfig.js", "src/interaction/interactionRuntime.js", "src/ui/interactionHud.js"]) {
   const text = readFileSync(file, "utf8");
   for (const literal of ["TALK", "NEXT", "CLOSE", "HELLO THERE", "THE VILLAGE IS QUIET", "SEE YOU AROUND", "HOME NPC"]) {
