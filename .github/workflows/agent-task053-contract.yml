@@ -1,0 +1,51 @@
+name: Update Task 053 inventory contract
+
+on:
+  push:
+    branches:
+      - agent/preserve-inventory-selection-wheel
+
+permissions:
+  contents: write
+
+jobs:
+  update-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/preserve-inventory-selection-wheel
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Update obsolete selection contract
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("scripts/check-task-053.mjs")
+          source = path.read_text(encoding="utf-8")
+          old = 'assert(hudSource.includes("inventoryHud?.clearSelection?.()"), "entering combat clears the peaceful tool selection and its target highlight");'
+          new = 'assert(!hudSource.includes("inventoryHud?.clearSelection?.()"), "combat mode preserves the peaceful selection and its target highlight");'
+          if source.count(old) != 1:
+              raise RuntimeError("Expected exactly one obsolete Task #053 selection assertion")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          Path(".github/workflows/agent-task053-contract.yml").unlink()
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Task 053
+        run: npm run check:task-053
+
+      - name: Commit updated contract
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/check-task-053.mjs .github/workflows/agent-task053-contract.yml
+          git commit -m "Update inventory mode selection contract"
+          git push origin HEAD:agent/preserve-inventory-selection-wheel
