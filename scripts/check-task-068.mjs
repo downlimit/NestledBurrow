@@ -20,6 +20,8 @@ import { getResourceProfile, resolveActionHp, resourceActionForTool } from "../s
 
 const runtimeSource = readFileSync("src/world/wildAtollRuntime.js", "utf8");
 const localesSource = readFileSync("src/localization/locales.js", "utf8");
+const wildAtollDoc = readFileSync("systems/wild-atoll.md", "utf8");
+const gameDoc = readFileSync("GAME.md", "utf8");
 const ruAtoll = JSON.parse(readFileSync("public/locales/ru/atoll.json", "utf8"));
 const enAtoll = JSON.parse(readFileSync("public/locales/en/atoll.json", "utf8"));
 
@@ -74,10 +76,57 @@ function gameplayFixture() {
         assert.equal(levelByArena.get(exit.targetArenaId), levelByArena.get(arenaId) + 1, `${arenaId} advances one arena level`);
       }
     }
+
+    const entryDirections = getWildAtollArenaDefinition(segment.entryArenaId).exits
+      .filter((exit) => exit.kind === "path")
+      .map((exit) => exit.direction);
+    assert.deepEqual(
+      entryDirections,
+      segment.routeComposition === "left" ? ["north-west", "north"] : ["north", "north-east"],
+      `${segmentId} entry paths follow its composition`,
+    );
+    assert.deepEqual(
+      getWildAtollArenaDefinition(segment.levels[1][0]).exits.map((exit) => exit.direction),
+      ["north", "north-east"],
+      `${segmentId} left arena opens straight and inward-right`,
+    );
+    assert.deepEqual(
+      getWildAtollArenaDefinition(segment.levels[1][1]).exits.map((exit) => exit.direction),
+      ["north-west", "north"],
+      `${segmentId} right arena opens inward-left and straight`,
+    );
+    assert.deepEqual(
+      getWildAtollArenaDefinition(segment.levels[2][0]).exits.map((exit) => exit.direction),
+      ["north", "north-east"],
+      `${segmentId} second left arena keeps the composition`,
+    );
+    assert.deepEqual(
+      getWildAtollArenaDefinition(segment.levels[2][1]).exits.map((exit) => exit.direction),
+      ["north-west", "north"],
+      `${segmentId} second right arena keeps the composition`,
+    );
+    for (const arenaId of segment.arenaIds) {
+      const pathDirections = getWildAtollArenaDefinition(arenaId).exits
+        .filter((exit) => exit.kind === "path")
+        .map((exit) => exit.direction);
+      if (pathDirections.length === 2) {
+        assert(pathDirections.includes("north"), `${arenaId} presents one straight path`);
+        assert.notDeepEqual(pathDirections, ["north-west", "north-east"], `${arenaId} does not use two mirrored diagonals`);
+      }
+    }
+
     const terminal = getWildAtollArenaDefinition(segment.terminalArenaId);
     assert.equal(terminal.terminal, true);
-    assert.equal(terminal.resources.length, 0, `${segmentId} terminal is reserved for route choice and return`);
+    assert.equal(terminal.resources.length, 0, `${segmentId} threshold is reserved for route choice and return`);
     assert.equal(terminal.exits.filter((exit) => exit.kind === "teleport" && exit.targetWorldId === WORLD_IDS.nest).length, 1);
+    const transitions = terminal.exits.filter((exit) => exit.kind === "segment");
+    if (transitions.length === 2) {
+      assert.deepEqual(
+        transitions.map((exit) => exit.direction),
+        entryDirections,
+        `${segmentId} threshold transitions follow the segment composition`,
+      );
+    }
     for (const arenaId of segment.arenaIds.filter((id) => id !== segment.terminalArenaId)) {
       assert.equal(getWildAtollArenaDefinition(arenaId).exits.some((exit) => exit.kind === "teleport"), false);
     }
@@ -118,6 +167,20 @@ function gameplayFixture() {
   assert.equal(ruAtoll.arenas["serene-grotto"].left2, "СВЕТЛЫЙ ЗАЛ", "T1 grotto copy stays harmless");
   assert.equal(ruAtoll.arenas["fearsome-skerries"].left1, "МЁРТВЫЕ СОСНЫ", "T3 forest copy signals danger");
   assert.equal(ruAtoll.arenas["relict-grotto"].left1, "ЗАЛ БЕЗ ЭХА", "T3 grotto copy stays mysterious");
+  assert.equal(ruAtoll.arenas["forested-isthmus"].edge, "ОСТРОВНОЙ ПРИЧАЛ", "forest NPC threshold names the reached destination");
+  assert.equal(ruAtoll.arenas["shadow-isthmus"].edge, "ТЕНЕВОЙ ПРИЧАЛ", "grotto NPC threshold names the reached destination");
+  assert.equal(enAtoll.arenas["forested-isthmus"].edge, "ISLAND JETTY");
+  assert.equal(enAtoll.arenas["shadow-isthmus"].edge, "SHADOW JETTY");
+  for (const misleading of ["ОСТРОВ ВПЕРЕДИ", "ОСТРОВ В ТЕНИ", "ISLAND AHEAD", "ISLAND IN SHADOW"]) {
+    assert(!JSON.stringify(ruAtoll).includes(misleading));
+    assert(!JSON.stringify(enAtoll).includes(misleading));
+  }
+  for (const term of ["path", "threshold", "transition", "teleport"]) {
+    assert(wildAtollDoc.includes(`**${term}**`), `Wild Atoll docs define ${term}`);
+  }
+  for (const term of ["Путь", "Порог", "Переход", "Телепорт"]) {
+    assert(gameDoc.includes(`**${term}**`), `GAME.md records ${term}`);
+  }
 }
 
 {
@@ -164,7 +227,7 @@ function gameplayFixture() {
   assert(runtimeSource.includes("registerResource"), "Atoll registers nodes with DebrisRuntime");
   assert(runtimeSource.includes("unregisterResource"), "Atoll removes transient nodes through DebrisRuntime");
   assert(!runtimeSource.includes("workResource("), "Atoll has no private resource-hit implementation");
-  assert(runtimeSource.includes("renderArena(nextSegment.entryArenaId)"), "segment exits enter the next segment");
+  assert(runtimeSource.includes("renderArena(nextSegment.entryArenaId)"), "segment transitions enter the next segment");
   assert(runtimeSource.includes("WILD_ATOLL_ALL_ARENAS"), "run cleanup covers every generated segment");
   assert(!runtimeSource.includes("blockedMessageKey"), "implemented segments are not represented by locked messages");
   assert(runtimeSource.includes("COLLAPSE_FADE_OUT_MS = 5000"));
