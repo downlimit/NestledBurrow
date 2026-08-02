@@ -20,6 +20,9 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 ## Invariants
 
 - logical viewport is `320×180`; visible strings exist in RU/EN and fit native/mobile layouts;
+- compact pixel-HUD copy uses the supported ASCII hyphen `-`, never typographic dash glyphs that render as `?`;
+- a missing localization entry fails closed: its technical key is never shown to the player;
+- arena/path labels have explicit text-length budgets and may reduce font size before clipping;
 - inventory/combat labels and quantities use project bitmap glyphs on whole pixels and remain scale `1` during panel transforms;
 - ten peaceful hit zones are at least `22×22` and exclude joystick input;
 - short physical Alt toggles stable `PEACEFUL`/`COMBAT`; held Alt exposes transient `LOADOUT_EDIT`;
@@ -38,7 +41,7 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 
 ## Current baseline
 
-Localized HUD, peaceful/combat/loadout-edit panels, persistent ten-slot combat loadout, two-way drag, six numbered self-use slots, ten-slot inventory, gain feedback, transient messages, needs, options, fullscreen, audio, mobile input, camera and day/night presentation are integrated. Current self-use profiles are cooked potato dish for satiety and bucket water for lustre.
+Localized HUD, peaceful/combat/loadout-edit panels, persistent ten-slot combat loadout, two-way drag, six numbered self-use slots, ten-slot inventory, gain feedback, transient messages, compact Atoll titles/path tips, needs, options, fullscreen, audio, mobile input, camera and day/night presentation are integrated. Current self-use profiles are cooked potato dish for satiety and bucket water for lustre.
 
 ## Not yet
 
