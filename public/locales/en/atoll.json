@@ -4,20 +4,28 @@
   "promptEnter": "SPACE - WILD ATOLL",
   "segments": {
     "starter": "FIRST TRAILS",
-    "forestT1": "BENEATH THE CANOPY",
-    "mineT1": "UNDER A STONE SKY",
-    "forestGroveT2": "DEEP WOODS",
-    "forestWetlandsT2": "WET LOWLANDS",
-    "mineCrystalT2": "CRYSTAL GALLERIES",
-    "mineDepthsT2": "LOWER WORKINGS"
+    "sereneSkerries": "SERENE SKERRIES",
+    "forestedIsthmus": "FORESTED ISTHMUS",
+    "deepSkerries": "DEEP SKERRIES",
+    "motu": "MOTU",
+    "fearsomeSkerries": "FEARSOME SKERRIES",
+    "sereneGrotto": "SERENE GROTTO",
+    "shadowIsthmus": "SHADOW ISTHMUS",
+    "deepGrotto": "DEEP GROTTO",
+    "blueHole": "BLUE HOLE",
+    "relictGrotto": "RELICT GROTTO"
   },
   "segmentPaths": {
-    "forest-t1": "SPACE - FOREST T1",
-    "mine-t1": "SPACE - MINES T1",
-    "forest-grove-t2": "SPACE - DEEP WOODS T2",
-    "forest-wetlands-t2": "SPACE - LOWLANDS T2",
-    "mine-crystal-t2": "SPACE - CRYSTALS T2",
-    "mine-depths-t2": "SPACE - DEPTHS T2"
+    "serene-skerries": "SPACE - SERENE SKERRIES",
+    "forested-isthmus": "SPACE - FORESTED ISTHMUS",
+    "deep-skerries": "SPACE - DEEP SKERRIES",
+    "motu": "SPACE - MOTU",
+    "fearsome-skerries": "SPACE - FEARSOME SKERRIES",
+    "serene-grotto": "SPACE - SERENE GROTTO",
+    "shadow-isthmus": "SPACE - SHADOW ISTHMUS",
+    "deep-grotto": "SPACE - DEEP GROTTO",
+    "blue-hole": "SPACE - BLUE HOLE",
+    "relict-grotto": "SPACE - RELICT GROTTO"
   },
   "arenas": {
     "starter": {
@@ -30,138 +38,218 @@
       "right3": "SCREE",
       "edge": "PASS"
     },
-    "forest-t1": {
-      "root": "FOREST EDGE",
-      "left1": "BIRCH GROVE",
-      "right1": "DEADFALL",
-      "left2": "STREAM",
+    "serene-skerries": {
+      "root": "QUIET VERGE",
+      "left1": "SUNLIT CLEARING",
+      "right1": "BIRCH SLOPE",
+      "left2": "BROOK",
       "right2": "FERNS",
-      "left3": "OLD ROOTS",
-      "right3": "STONE SLOPE",
-      "edge": "FAR EDGE"
+      "left3": "SOFT MOSS",
+      "right3": "SUNNY EDGE",
+      "edge": "FAR SHORE"
     },
-    "mine-t1": {
-      "root": "ENTRANCE",
-      "left1": "GALLERY",
-      "right1": "ROCKFALL",
-      "left2": "OLD HALL",
-      "right2": "NARROW PASS",
-      "left3": "LOWER PASS",
-      "right3": "FISSURE",
-      "edge": "DEPTHS"
+    "forested-isthmus": {
+      "root": "SANDY SPIT",
+      "left1": "QUIET SHORE",
+      "right1": "TRACKED PATH",
+      "left2": "SMOKE IN THE TREES",
+      "right2": "OLD JETTY",
+      "left3": "STRANGE LANTERN",
+      "right3": "LOW BRIDGE",
+      "edge": "ISLAND AHEAD"
     },
-    "forest-grove-t2": {
-      "root": "DARK EDGE",
-      "left1": "PINE GROVE",
+    "deep-skerries": {
+      "root": "SHADED VERGE",
+      "left1": "PINE RIDGE",
       "right1": "WINDFALL",
       "left2": "MOSSY HOLLOW",
-      "right2": "DEEP THICKET",
+      "right2": "DENSE WOODS",
       "left3": "ROOT PASS",
       "right3": "STONE BROOK",
-      "edge": "FAR BORDER"
+      "edge": "FAR EDGE"
     },
-    "forest-wetlands-t2": {
-      "root": "WET CLEARING",
-      "left1": "REEDS",
-      "right1": "BOG",
-      "left2": "SHALLOW POND",
-      "right2": "WET ROOTS",
-      "left3": "ISLET",
-      "right3": "CLAY BANK",
-      "edge": "LOWLAND EDGE"
+    "motu": {
+      "root": "MOTU SHORE",
+      "left1": "SOUL STONES",
+      "right1": "SILENT IDOLS",
+      "left2": "LIVING CRYSTAL",
+      "right2": "GARDEN OF SHARDS",
+      "left3": "GLOWING VEIN",
+      "right3": "STONE CIRCLE",
+      "edge": "HEART OF MOTU"
     },
-    "mine-crystal-t2": {
-      "root": "GLIMMERING ENTRY",
-      "left1": "WHITE VEIN",
-      "right1": "BLUE CHIP",
-      "left2": "RINGING HALL",
-      "right2": "CRYSTAL PASS",
-      "left3": "FAULT",
-      "right3": "STONE BRIDGE",
-      "edge": "FAR GALLERY"
+    "fearsome-skerries": {
+      "root": "STORM SHORE",
+      "left1": "DEAD PINES",
+      "right1": "TRACK WITHOUT BEAST",
+      "left2": "BLACK WINDFALL",
+      "right2": "WHISPERING WOODS",
+      "left3": "PREDATOR PATH",
+      "right3": "SILENT ROOTS",
+      "edge": "STORM EDGE"
     },
-    "mine-depths-t2": {
-      "root": "LOWER ENTRY",
-      "left1": "DARK PASS",
-      "right1": "CAVE-IN",
+    "serene-grotto": {
+      "root": "QUIET ENTRANCE",
+      "left1": "SANDY PASS",
+      "right1": "DRY GALLERY",
+      "left2": "BRIGHT HALL",
+      "right2": "STONE ARCH",
+      "left3": "SHALLOW DESCENT",
+      "right3": "QUIET FISSURE",
+      "edge": "FAR VAULT"
+    },
+    "shadow-isthmus": {
+      "root": "SHADOWED ENTRY",
+      "left1": "NARROW SPIT",
+      "right1": "TRACKS IN DUST",
+      "left2": "MUFFLED BELL",
+      "right2": "STRANGE FIRE",
+      "left3": "OLD WALKWAY",
+      "right3": "STONE JETTY",
+      "edge": "ISLAND IN SHADOW"
+    },
+    "deep-grotto": {
+      "root": "LOWER ENTRANCE",
+      "left1": "DARK GALLERY",
+      "right1": "OLD CAVE-IN",
       "left2": "DEEP HALL",
-      "right2": "NARROW SHAFT",
-      "left3": "OLD FACE",
-      "right3": "BLACK FISSURE",
-      "edge": "LOWER EDGE"
+      "right2": "NARROW PASS",
+      "left3": "LOWER DESCENT",
+      "right3": "COLD FISSURE",
+      "edge": "FAR VAULT"
+    },
+    "blue-hole": {
+      "root": "BLUE DESCENT",
+      "left1": "MAGNETIC VEIN",
+      "right1": "COPPER CHIME",
+      "left2": "BLACK ALLOY",
+      "right2": "SPARKING STONE",
+      "left3": "POLAR HALL",
+      "right3": "STORM FISSURE",
+      "edge": "HOLE FLOOR"
+    },
+    "relict-grotto": {
+      "root": "RELICT ENTRANCE",
+      "left1": "ECHOLESS HALL",
+      "right1": "BLIND VEIN",
+      "left2": "FORGOTTEN ALTAR",
+      "right2": "BREATHING STONE",
+      "left3": "TRACKLESS PASS",
+      "right3": "BLACK DROP",
+      "edge": "ANCIENT LIMIT"
     }
   },
   "paths": {
     "nest": "SPACE - TO THE NEST",
     "starter": {
-      "root": "SPACE - TO THE EDGE",
-      "left1": "SPACE - TO THE MEADOW",
-      "right1": "SPACE - TO THE STONES",
-      "left2": "SPACE - TO THE POND",
-      "right2": "SPACE - TO THE THICKET",
-      "left3": "SPACE - TO THE ROOTS",
-      "right3": "SPACE - TO THE SCREE",
-      "edge": "SPACE - TO THE PASS"
+      "root": "SPACE - EDGE",
+      "left1": "SPACE - MEADOW",
+      "right1": "SPACE - STONES",
+      "left2": "SPACE - POND",
+      "right2": "SPACE - THICKET",
+      "left3": "SPACE - ROOTS",
+      "right3": "SPACE - SCREE",
+      "edge": "SPACE - PASS"
     },
-    "forest-t1": {
-      "root": "SPACE - TO THE FOREST EDGE",
-      "left1": "SPACE - TO THE BIRCH GROVE",
-      "right1": "SPACE - TO THE DEADFALL",
-      "left2": "SPACE - TO THE STREAM",
-      "right2": "SPACE - TO THE FERNS",
-      "left3": "SPACE - TO THE OLD ROOTS",
-      "right3": "SPACE - TO THE STONE SLOPE",
-      "edge": "SPACE - TO THE FAR EDGE"
+    "serene-skerries": {
+      "root": "SPACE - QUIET VERGE",
+      "left1": "SPACE - SUNLIT CLEARING",
+      "right1": "SPACE - BIRCH SLOPE",
+      "left2": "SPACE - BROOK",
+      "right2": "SPACE - FERNS",
+      "left3": "SPACE - SOFT MOSS",
+      "right3": "SPACE - SUNNY EDGE",
+      "edge": "SPACE - FAR SHORE"
     },
-    "mine-t1": {
-      "root": "SPACE - TO THE ENTRANCE",
-      "left1": "SPACE - TO THE GALLERY",
-      "right1": "SPACE - TO THE ROCKFALL",
-      "left2": "SPACE - TO THE OLD HALL",
-      "right2": "SPACE - TO THE NARROW PASS",
-      "left3": "SPACE - TO THE LOWER PASS",
-      "right3": "SPACE - TO THE FISSURE",
-      "edge": "SPACE - INTO THE DEPTHS"
+    "forested-isthmus": {
+      "root": "SPACE - SANDY SPIT",
+      "left1": "SPACE - QUIET SHORE",
+      "right1": "SPACE - TRACKED PATH",
+      "left2": "SPACE - SMOKE IN THE TREES",
+      "right2": "SPACE - OLD JETTY",
+      "left3": "SPACE - STRANGE LANTERN",
+      "right3": "SPACE - LOW BRIDGE",
+      "edge": "SPACE - ISLAND AHEAD"
     },
-    "forest-grove-t2": {
-      "root": "SPACE - TO THE DARK EDGE",
-      "left1": "SPACE - TO THE PINE GROVE",
-      "right1": "SPACE - TO THE WINDFALL",
-      "left2": "SPACE - TO THE MOSSY HOLLOW",
-      "right2": "SPACE - TO THE DEEP THICKET",
-      "left3": "SPACE - TO THE ROOT PASS",
-      "right3": "SPACE - TO THE STONE BROOK",
-      "edge": "SPACE - TO THE FAR BORDER"
+    "deep-skerries": {
+      "root": "SPACE - SHADED VERGE",
+      "left1": "SPACE - PINE RIDGE",
+      "right1": "SPACE - WINDFALL",
+      "left2": "SPACE - MOSSY HOLLOW",
+      "right2": "SPACE - DENSE WOODS",
+      "left3": "SPACE - ROOT PASS",
+      "right3": "SPACE - STONE BROOK",
+      "edge": "SPACE - FAR EDGE"
     },
-    "forest-wetlands-t2": {
-      "root": "SPACE - TO THE WET CLEARING",
-      "left1": "SPACE - TO THE REEDS",
-      "right1": "SPACE - INTO THE BOG",
-      "left2": "SPACE - TO THE SHALLOW POND",
-      "right2": "SPACE - TO THE WET ROOTS",
-      "left3": "SPACE - TO THE ISLET",
-      "right3": "SPACE - TO THE CLAY BANK",
-      "edge": "SPACE - TO THE LOWLAND EDGE"
+    "motu": {
+      "root": "SPACE - MOTU SHORE",
+      "left1": "SPACE - SOUL STONES",
+      "right1": "SPACE - SILENT IDOLS",
+      "left2": "SPACE - LIVING CRYSTAL",
+      "right2": "SPACE - GARDEN OF SHARDS",
+      "left3": "SPACE - GLOWING VEIN",
+      "right3": "SPACE - STONE CIRCLE",
+      "edge": "SPACE - HEART OF MOTU"
     },
-    "mine-crystal-t2": {
-      "root": "SPACE - TO THE GLIMMERING ENTRY",
-      "left1": "SPACE - TO THE WHITE VEIN",
-      "right1": "SPACE - TO THE BLUE CHIP",
-      "left2": "SPACE - TO THE RINGING HALL",
-      "right2": "SPACE - TO THE CRYSTAL PASS",
-      "left3": "SPACE - TO THE FAULT",
-      "right3": "SPACE - TO THE STONE BRIDGE",
-      "edge": "SPACE - TO THE FAR GALLERY"
+    "fearsome-skerries": {
+      "root": "SPACE - STORM SHORE",
+      "left1": "SPACE - DEAD PINES",
+      "right1": "SPACE - TRACK WITHOUT BEAST",
+      "left2": "SPACE - BLACK WINDFALL",
+      "right2": "SPACE - WHISPERING WOODS",
+      "left3": "SPACE - PREDATOR PATH",
+      "right3": "SPACE - SILENT ROOTS",
+      "edge": "SPACE - STORM EDGE"
     },
-    "mine-depths-t2": {
-      "root": "SPACE - TO THE LOWER ENTRY",
-      "left1": "SPACE - TO THE DARK PASS",
-      "right1": "SPACE - TO THE CAVE-IN",
-      "left2": "SPACE - TO THE DEEP HALL",
-      "right2": "SPACE - TO THE NARROW SHAFT",
-      "left3": "SPACE - TO THE OLD FACE",
-      "right3": "SPACE - TO THE BLACK FISSURE",
-      "edge": "SPACE - TO THE LOWER EDGE"
+    "serene-grotto": {
+      "root": "SPACE - QUIET ENTRANCE",
+      "left1": "SPACE - SANDY PASS",
+      "right1": "SPACE - DRY GALLERY",
+      "left2": "SPACE - BRIGHT HALL",
+      "right2": "SPACE - STONE ARCH",
+      "left3": "SPACE - SHALLOW DESCENT",
+      "right3": "SPACE - QUIET FISSURE",
+      "edge": "SPACE - FAR VAULT"
+    },
+    "shadow-isthmus": {
+      "root": "SPACE - SHADOWED ENTRY",
+      "left1": "SPACE - NARROW SPIT",
+      "right1": "SPACE - TRACKS IN DUST",
+      "left2": "SPACE - MUFFLED BELL",
+      "right2": "SPACE - STRANGE FIRE",
+      "left3": "SPACE - OLD WALKWAY",
+      "right3": "SPACE - STONE JETTY",
+      "edge": "SPACE - ISLAND IN SHADOW"
+    },
+    "deep-grotto": {
+      "root": "SPACE - LOWER ENTRANCE",
+      "left1": "SPACE - DARK GALLERY",
+      "right1": "SPACE - OLD CAVE-IN",
+      "left2": "SPACE - DEEP HALL",
+      "right2": "SPACE - NARROW PASS",
+      "left3": "SPACE - LOWER DESCENT",
+      "right3": "SPACE - COLD FISSURE",
+      "edge": "SPACE - FAR VAULT"
+    },
+    "blue-hole": {
+      "root": "SPACE - BLUE DESCENT",
+      "left1": "SPACE - MAGNETIC VEIN",
+      "right1": "SPACE - COPPER CHIME",
+      "left2": "SPACE - BLACK ALLOY",
+      "right2": "SPACE - SPARKING STONE",
+      "left3": "SPACE - POLAR HALL",
+      "right3": "SPACE - STORM FISSURE",
+      "edge": "SPACE - HOLE FLOOR"
+    },
+    "relict-grotto": {
+      "root": "SPACE - RELICT ENTRANCE",
+      "left1": "SPACE - ECHOLESS HALL",
+      "right1": "SPACE - BLIND VEIN",
+      "left2": "SPACE - FORGOTTEN ALTAR",
+      "right2": "SPACE - BREATHING STONE",
+      "left3": "SPACE - TRACKLESS PASS",
+      "right3": "SPACE - BLACK DROP",
+      "edge": "SPACE - ANCIENT LIMIT"
     }
   }
 }
