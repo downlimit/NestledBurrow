@@ -2,6 +2,12 @@ import { addInventoryItem, createInventoryItem } from "../inventory/inventoryDom
 import { HUD_COLORS, HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import {
+  applyWildAtollRouteEntry,
+  resolveWildAtollGrassDrop,
+  wildAtollFrameIndex,
+  WILD_ATOLL_ROUTES,
+} from "./wildAtollDomain.js";
+import {
   HOUSE_FRAMES,
   HOUSE_TEXTURE_KEY,
   OUTDOOR_FRAMES,
@@ -9,12 +15,8 @@ import {
   TILE_SIZE,
 } from "./worldConfig.js";
 
-const ENTRY_ID = "entry";
-const ROUTE_MIST = "mist";
-const ROUTE_STONE = "stone";
 const INTERACTION_RADIUS = 28;
 const SWORD_REACH = 38;
-const DROP_CHANCE = 0.6;
 const GRASS_POSITIONS = Object.freeze([
   [5, 6], [7, 6], [9, 6], [12, 6], [14, 6], [16, 6],
   [6, 9], [8, 10], [10, 9], [12, 10], [14, 9], [16, 10],
@@ -63,7 +65,7 @@ export function createWildAtollRuntime(scene, {
 
   let active = false;
   let runSeed = "";
-  let routeId = ENTRY_ID;
+  let routeId = WILD_ATOLL_ROUTES.entry;
   let candidate = null;
   let visuals = [];
   let grass = new Map();
@@ -74,7 +76,7 @@ export function createWildAtollRuntime(scene, {
     active = true;
     runSerial += 1;
     runSeed = `${Date.now()}-${runSerial}`;
-    routeId = ENTRY_ID;
+    routeId = WILD_ATOLL_ROUTES.entry;
     candidate = null;
     clearArena();
     renderEntryArena();
@@ -113,14 +115,11 @@ export function createWildAtollRuntime(scene, {
     candidate = null;
     clearArena();
     visuals.push(...createCave(scene, ROUTE_RETURN_POINT.x, ROUTE_RETURN_POINT.y));
-    const gameplay = getGameplayState();
-    if (nextRouteId === ROUTE_MIST) {
-      gameplay.needs.lustre = Math.min(100, gameplay.needs.lustre + 20);
-      gameplay.currentEnergy = Math.max(0, gameplay.currentEnergy - 5);
+    applyWildAtollRouteEntry(getGameplayState(), nextRouteId);
+    if (nextRouteId === WILD_ATOLL_ROUTES.mist) {
       setTitle("hud:atoll.mistTitle");
       showMessage("hud:atoll.mistEntered");
     } else {
-      gameplay.currentEnergy = Math.max(0, gameplay.currentEnergy - 10);
       setTitle("hud:atoll.stoneTitle");
       showMessage("hud:atoll.stoneEntered");
     }
@@ -131,7 +130,7 @@ export function createWildAtollRuntime(scene, {
   }
 
   function returnToEntry() {
-    routeId = ENTRY_ID;
+    routeId = WILD_ATOLL_ROUTES.entry;
     candidate = null;
     clearArena();
     renderEntryArena();
@@ -146,10 +145,10 @@ export function createWildAtollRuntime(scene, {
       const id = `atoll-grass-${runSerial}-${index}`;
       const x = tileX * TILE_SIZE;
       const y = tileY * TILE_SIZE;
-      const frame = detailFrames[hashUnit(`${runSeed}:frame:${index}`) * detailFrames.length | 0];
+      const frame = detailFrames[wildAtollFrameIndex(runSeed, index, detailFrames.length)];
       const sprite = scene.add.image(x, y, OUTDOOR_TEXTURE_KEY, frame)
         .setOrigin(0)
-        .setTint(routeId === ROUTE_MIST ? 0xb8d9b0 : 0xc7b69b)
+        .setTint(routeId === WILD_ATOLL_ROUTES.mist ? 0xb8d9b0 : 0xc7b69b)
         .setDepth(560 + y + TILE_SIZE);
       const rect = Object.freeze({ left: x + 2, top: y + 4, right: x + 14, bottom: y + 15 });
       layout?.setWorldObjectCollider?.(id, rect, "atoll:grass", { atollGrass: true });
@@ -159,9 +158,10 @@ export function createWildAtollRuntime(scene, {
   }
 
   function cutGrass(actionId) {
-    if (!active || routeId === ENTRY_ID) return false;
+    if (!active || routeId === WILD_ATOLL_ROUTES.entry) return false;
     const item = scene.gameHud?.getCombatActionItem?.(actionId);
     if (item?.id !== "sword") return false;
+    if (scene.needsRuntime?.canPerformPhysicalAction?.("sword")?.allowed === false) return false;
     const player = getPlayerCharacter();
     const position = player?.motor?.position;
     const facing = player?.motor?.movement?.facingDirection;
@@ -191,9 +191,8 @@ export function createWildAtollRuntime(scene, {
   }
 
   function resolveGrassDrop(target) {
-    if (hashUnit(`${runSeed}:drop:${target.index}`) >= DROP_CHANCE) return;
-    const routeWoodChance = routeId === ROUTE_MIST ? 0.75 : 0.25;
-    const itemId = hashUnit(`${runSeed}:item:${target.index}`) < routeWoodChance ? "wood" : "stone";
+    const itemId = resolveWildAtollGrassDrop({ seed: runSeed, grassIndex: target.index, routeId });
+    if (!itemId) return;
     const gameplay = getGameplayState();
     const result = addInventoryItem(gameplay.inventory, createInventoryItem(itemId, 1));
     if (result.mutated) {
@@ -212,8 +211,8 @@ export function createWildAtollRuntime(scene, {
   function activateCandidate() {
     if (!candidate) return false;
     if (candidate.id === "forecast") readForecast();
-    else if (candidate.id === ROUTE_MIST) enterRoute(ROUTE_MIST);
-    else if (candidate.id === ROUTE_STONE) enterRoute(ROUTE_STONE);
+    else if (candidate.id === WILD_ATOLL_ROUTES.mist) enterRoute(WILD_ATOLL_ROUTES.mist);
+    else if (candidate.id === WILD_ATOLL_ROUTES.stone) enterRoute(WILD_ATOLL_ROUTES.stone);
     else if (candidate.id === "return") returnToEntry();
     return true;
   }
@@ -256,11 +255,11 @@ export function createWildAtollRuntime(scene, {
   function findCandidate() {
     const position = getPlayerCharacter()?.motor?.position;
     if (!position) return null;
-    const candidates = routeId === ENTRY_ID
+    const candidates = routeId === WILD_ATOLL_ROUTES.entry
       ? [
           { id: "forecast", point: ENTRY_POINTS.forecast, labelKey: "hud:atoll.promptForecast" },
-          { id: ROUTE_MIST, point: ENTRY_POINTS.mist, labelKey: "hud:atoll.promptMist" },
-          { id: ROUTE_STONE, point: ENTRY_POINTS.stone, labelKey: "hud:atoll.promptStone" },
+          { id: WILD_ATOLL_ROUTES.mist, point: ENTRY_POINTS.mist, labelKey: "hud:atoll.promptMist" },
+          { id: WILD_ATOLL_ROUTES.stone, point: ENTRY_POINTS.stone, labelKey: "hud:atoll.promptStone" },
         ]
       : [{ id: "return", point: ROUTE_RETURN_POINT, labelKey: "hud:atoll.promptReturn" }];
     return candidates
@@ -320,7 +319,9 @@ export function createWildAtollRuntime(scene, {
   scene.events.on("update", update);
   const unsubscribe = localization?.subscribe?.(() => {
     if (active) {
-      setTitle(routeId === ROUTE_MIST ? "hud:atoll.mistTitle" : routeId === ROUTE_STONE ? "hud:atoll.stoneTitle" : "hud:atoll.entryTitle");
+      setTitle(routeId === WILD_ATOLL_ROUTES.mist
+        ? "hud:atoll.mistTitle"
+        : routeId === WILD_ATOLL_ROUTES.stone ? "hud:atoll.stoneTitle" : "hud:atoll.entryTitle");
       renderPrompt();
     }
   });
@@ -336,7 +337,9 @@ export function createWildAtollRuntime(scene, {
       candidateId: candidate?.id ?? null,
     }),
     startRoute(route, { seed = `${Date.now()}` } = {}) {
-      if (route !== ROUTE_MIST && route !== ROUTE_STONE) throw new Error(`Unknown Wild Atoll route: ${route}`);
+      if (route !== WILD_ATOLL_ROUTES.mist && route !== WILD_ATOLL_ROUTES.stone) {
+        throw new Error(`Unknown Wild Atoll route: ${route}`);
+      }
       if (!active) beginRun();
       runSeed = String(seed);
       enterRoute(route);
@@ -371,13 +374,6 @@ function createCave(scene, centerX, topY) {
     textureKey,
     frame,
   ).setOrigin(0).setDepth(560 + topY + 2 * TILE_SIZE));
-}
-
-function hashUnit(text) {
-  let hash = 2166136261;
-  for (const char of String(text)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-  hash ^= hash >>> 16;
-  return (hash >>> 0) / 0x100000000;
 }
 
 function isEditableTarget(target) {
