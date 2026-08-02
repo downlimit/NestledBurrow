@@ -167,10 +167,29 @@ function gameplayFixture() {
   assert.equal(ruAtoll.arenas["serene-grotto"].left2, "СВЕТЛЫЙ ЗАЛ", "T1 grotto copy stays harmless");
   assert.equal(ruAtoll.arenas["fearsome-skerries"].left1, "МЁРТВЫЕ СОСНЫ", "T3 forest copy signals danger");
   assert.equal(ruAtoll.arenas["relict-grotto"].left1, "ЗАЛ БЕЗ ЭХА", "T3 grotto copy stays mysterious");
-  assert.equal(ruAtoll.arenas["forested-isthmus"].edge, "ОСТРОВНОЙ ПРИЧАЛ", "forest NPC threshold names the reached destination");
-  assert.equal(ruAtoll.arenas["shadow-isthmus"].edge, "ТЕНЕВОЙ ПРИЧАЛ", "grotto NPC threshold names the reached destination");
-  assert.equal(enAtoll.arenas["forested-isthmus"].edge, "ISLAND JETTY");
-  assert.equal(enAtoll.arenas["shadow-isthmus"].edge, "SHADOW JETTY");
+  assert.equal(ruAtoll.arenas["forested-isthmus"].root, "ЛЕСНАЯ ПЕРЕМЫЧКА");
+  assert.equal(ruAtoll.arenas["forested-isthmus"].right3, "УЗКАЯ ПЕРЕЙМА");
+  assert.equal(ruAtoll.arenas["forested-isthmus"].edge, "КОЧУЮЩИЙ ОСТРОВ", "forest NPC threshold is the reached island itself");
+  assert.equal(ruAtoll.arenas["shadow-isthmus"].root, "ТЕНЕВАЯ ПЕРЕМЫЧКА");
+  assert.equal(ruAtoll.arenas["shadow-isthmus"].right3, "РАЗОРВАННАЯ ПЕРЕЙМА");
+  assert.equal(ruAtoll.arenas["shadow-isthmus"].edge, "БЛУЖДАЮЩИЙ ОСТРОВ", "grotto NPC threshold is the reached island itself");
+  assert.equal(enAtoll.arenas["forested-isthmus"].edge, "ROVING ISLAND");
+  assert.equal(enAtoll.arenas["shadow-isthmus"].edge, "WANDERING ISLAND");
+
+  const ruNpcCopy = [
+    ...Object.values(ruAtoll.arenas["forested-isthmus"]),
+    ...Object.values(ruAtoll.arenas["shadow-isthmus"]),
+  ].join(" ");
+  const enNpcCopy = [
+    ...Object.values(enAtoll.arenas["forested-isthmus"]),
+    ...Object.values(enAtoll.arenas["shadow-isthmus"]),
+  ].join(" ");
+  for (const forbidden of ["СВАИ", "ПРИЧАЛ", "МОСТ", "БЕРЕГ", "КОСА"]) {
+    assert(!ruNpcCopy.includes(forbidden), `NPC Переймы avoid waterbound term ${forbidden}`);
+  }
+  for (const forbidden of ["PILINGS", "JETTY", "BRIDGE", "SHORE", "SPIT"]) {
+    assert(!enNpcCopy.includes(forbidden), `NPC isthmuses avoid waterbound term ${forbidden}`);
+  }
   for (const misleading of ["ОСТРОВ ВПЕРЕДИ", "ОСТРОВ В ТЕНИ", "ISLAND AHEAD", "ISLAND IN SHADOW"]) {
     assert(!JSON.stringify(ruAtoll).includes(misleading));
     assert(!JSON.stringify(enAtoll).includes(misleading));
