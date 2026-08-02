@@ -74,6 +74,9 @@ assert(mainSource.includes('import "@fontsource/pixelify-sans/cyrillic.css"'), "
 for (const forbidden of [".ttf", ".otf", ".woff", ".woff2"]) {
   assert(!mainSource.includes(`public/assets/fonts/pixelify-sans`) && !mainSource.includes(forbidden), `runtime does not reference committed font binary ${forbidden}`);
 }
+const localizationSource = readFileSync("src/localization/index.js", "utf8");
+assert(localizationSource.includes("VITE_BUILD_ID"), "locale requests are versioned by the current build");
+assert(localizationSource.includes("{{ns}}.json?v="), "locale backend bypasses stale preview caches");
 for (const locale of SUPPORTED_LOCALES) {
   const hud = read(locale, "hud");
   assert.equal(hud.language.current, locale.toUpperCase(), `${locale} language button exposes only current language code`);
