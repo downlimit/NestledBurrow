@@ -37,7 +37,7 @@ Island Nest
          └─ Реликтовый Грот -> teleport to Nest
 ```
 
-All canonical named segments are traversable. `Лесистая Перейма` and `Теневая Перейма` are terminal NPC segments. Their thresholds are the reached NPC-island destination and expose only the teleport to Island Nest. Actual random NPC selection, dialogue and island attachment are future encounter work.
+All canonical named segments are traversable. `Лесистая Перейма` and `Теневая Перейма` are terminal NPC segments. Their thresholds are the reached NPC islands themselves and expose only the teleport to Island Nest. Actual random NPC selection, dialogue and island attachment are future encounter work.
 
 ## Segment format
 
@@ -66,8 +66,9 @@ This keeps the route readable while preventing every arena from repeating the sa
 - T1 arena names are harmless and welcoming;
 - T2 names suggest denser forest or deeper stone without presenting the branch as terminal danger;
 - T3 names are mysterious and dangerous;
-- NPC-segment names hint at tracks, lights, smoke and inhabited structures;
-- an NPC threshold names the reached pier or landing rather than saying that an island is still ahead;
+- NPC-segment arenas use floating-island landforms: necks, spurs, ridges, verges, scree and broken isthmuses, alongside tracks, lights and smoke that hint at habitation;
+- the forest NPC threshold is the reached Roving Island; the grotto NPC threshold is the reached Wandering Island;
+- NPC-segment copy must not introduce sea piers, pilings, bridges or shores as if these were waterbound islands;
 - automation-segment names hint at soul stones, crystals, magnets, unusual metals and other future special materials.
 
 Path tips display only `SPACE - <next arena>`. Transition tips display the canonical next segment name. Teleport tips name Island Nest. All compact labels use the supported ASCII hyphen and remain within the HUD length budget.
