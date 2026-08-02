@@ -60,37 +60,108 @@ jobs:
           )
 
           e2e = Path("tests/e2e/task-053-peaceful-combat-hud.spec.js")
-          replace_once(
-              e2e,
-              '''test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {''',
-              '''test("Alt tap preserves peaceful selection while hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {''',
-          )
-          replace_once(
-              e2e,
-              '''  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
+          old_test = '''test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name.startsWith("mobile"), "Task #053 defines desktop physical Alt only");
+            await boot(page);
+
+            await expect.poll(() => inventoryMode(page)).toMatchObject({
+              mode: "PEACEFUL",
+              stableMode: "PEACEFUL",
+              transitioning: false,
+              earVisible: true,
+              peaceful: { scale: 1, alpha: 1, inputEnabled: true },
+              combat: { alpha: 0, inputEnabled: false },
+            });
+            expect((await inventoryMode(page)).combat.slots.map(({ label }) => label))
+              .toEqual(["SPACE", "LMB", "RMB", "SHIFT", "1", "2", "3", "4", "5", "6"]);
+
+            await page.keyboard.press("Digit1");
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+
+            await tapAlt(page);
+            await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
+              mode: "COMBAT",
+              stableMode: "COMBAT",
+              transitioning: false,
+              earVisible: false,
+              peaceful: { scale: 0.3, alpha: 0, inputEnabled: false },
+              combat: { scale: 1, alpha: 1, inputEnabled: true },
+            });
+            await expect.poll(() => interactionHud(page)).toMatchObject({
+              suppressed: true,
+              promptVisible: false,
+            });
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
             await page.keyboard.press("Digit2");
             await page.keyboard.press("KeyE");
-            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();''',
-              '''  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
+
+            await tapAlt(page);
+            await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
+              mode: "PEACEFUL",
+              stableMode: "PEACEFUL",
+              transitioning: false,
+              earVisible: true,
+              peaceful: { scale: 1, alpha: 1, inputEnabled: true },
+              combat: { alpha: 0 },
+            });
+            await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
+          });'''
+          new_test = '''test("Alt tap preserves peaceful selection while hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {
+            test.skip(testInfo.project.name.startsWith("mobile"), "Task #053 defines desktop physical Alt only");
+            await boot(page);
+
+            await expect.poll(() => inventoryMode(page)).toMatchObject({
+              mode: "PEACEFUL",
+              stableMode: "PEACEFUL",
+              transitioning: false,
+              earVisible: true,
+              peaceful: { scale: 1, alpha: 1, inputEnabled: true },
+              combat: { alpha: 0, inputEnabled: false },
+            });
+            expect((await inventoryMode(page)).combat.slots.map(({ label }) => label))
+              .toEqual(["SPACE", "LMB", "RMB", "SHIFT", "1", "2", "3", "4", "5", "6"]);
+
+            await page.keyboard.press("Digit1");
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+
+            await tapAlt(page);
+            await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
+              mode: "COMBAT",
+              stableMode: "COMBAT",
+              transitioning: false,
+              earVisible: false,
+              peaceful: { scale: 0.3, alpha: 0, inputEnabled: false },
+              combat: { scale: 1, alpha: 1, inputEnabled: true },
+            });
+            await expect.poll(() => interactionHud(page)).toMatchObject({
+              suppressed: true,
+              promptVisible: false,
+            });
+            await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
             await page.keyboard.press("Digit2");
             await page.keyboard.press("KeyE");
-            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
             await page.locator("canvas").hover();
             await page.mouse.wheel(0, 120);
-            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);''',
-          )
-          replace_once(
-              e2e,
-              '''  await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
-          });''',
-              '''  await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
+            expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+
+            await tapAlt(page);
+            await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
+              mode: "PEACEFUL",
+              stableMode: "PEACEFUL",
+              transitioning: false,
+              earVisible: true,
+              peaceful: { scale: 1, alpha: 1, inputEnabled: true },
+              combat: { alpha: 0 },
+            });
+            await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
             await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
             await page.mouse.wheel(0, 120);
             await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(1);
             await page.mouse.wheel(0, -120);
             await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
-          });''',
-          )
+          });'''
+          replace_once(e2e, old_test, new_test)
 
       - name: Install dependencies
         run: npm ci
