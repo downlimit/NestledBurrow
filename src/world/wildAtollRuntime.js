@@ -1,13 +1,11 @@
-import { addInventoryItem, createInventoryItem } from "../inventory/inventoryDomain.js";
-import { getResourceProfile } from "../resources/resourceDomain.js";
-import { drawResourceVisual } from "../resources/resourceVisuals.js";
 import { HUD_COLORS, HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import {
-  createWildAtollArenaNodes,
+  createWildAtollArenaResources,
   getWildAtollArenaDefinition,
   getWildAtollExitPoint,
   WILD_ATOLL_ARENAS,
+  WILD_ATOLL_STARTER_ARENAS,
 } from "./wildAtollDomain.js";
 import { ATOLL_WORLD_MODEL, WORLD_IDS } from "./worldLocationConfig.js";
 import {
@@ -22,24 +20,23 @@ const INTERACTION_RADIUS = 27;
 const NEST_ATOLL_ENTRANCE = Object.freeze({ x: 11 * TILE_SIZE, y: 6 * TILE_SIZE });
 const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
 const SOUTH_SPAWN = Object.freeze({ ...ATOLL_WORLD_MODEL.spawn });
-const NORTH_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 8 * TILE_SIZE, facing: { x: 0, y: 1 } });
-const TITLE_Y = 112;
-const PROMPT_RECT = Object.freeze({ x: 56, y: 130, width: 208, height: 20 });
+const SEGMENT_TITLE_Y = 17;
+const ARENA_TITLE_Y = 27;
+const TITLE_MAX_WIDTH = 224;
+const PROMPT_RECT = Object.freeze({ x: 62, y: 128, width: 196, height: 20 });
+const COLLAPSE_FADE_OUT_MS = 5000;
+const COLLAPSE_BLACK_HOLD_MS = 2000;
+const COLLAPSE_FADE_IN_MS = 3000;
+const COLLAPSE_SIMULATION_STEP_MS = 1000;
+const COLLAPSE_SIMULATION_MAX_STEPS = 360;
 
 export function createWildAtollRuntime(scene, {
   localization,
-  getGameplayState = () => scene.sessionState?.gameplay ?? null,
   getPlayerCharacter = () => scene.playerCharacter ?? null,
-  getWorldLayout = () => scene.worldLayout ?? null,
   getWorldId = () => scene.sessionState?.currentWorldId ?? null,
   transitionWorld = (worldId, spawn) => scene.worldLocationCoordinator?.transitionTo?.(worldId, spawn)
     ?? { status: "unavailable", transitioned: false },
-  renderHud = () => scene.gameHud?.render?.(),
-  notifyInventoryGain = (result) => scene.gameHud?.notifyInventoryGain?.(result),
-  spawnWorldItems = (itemId, quantity, origin) => scene.gameHud?.spawnWorldItems?.(itemId, quantity, origin),
   showMessage = (keyOrText, options) => scene.gameHud?.showTransientMessage?.(keyOrText, options),
-  saveSession = () => scene.saveSession?.(),
-  playEffect = (type) => scene.audioRuntime?.playEffect?.(type),
 } = {}) {
   const promptBackground = scene.add.graphics().setDepth(HUD_DEPTH + 34).setScrollFactor(0).setVisible(false);
   const promptText = createManagedText(scene, 0, 0, "", {
@@ -51,10 +48,20 @@ export function createWildAtollRuntime(scene, {
     .setDepth(HUD_DEPTH + 36)
     .setScrollFactor(0)
     .disableInteractive();
-  const titleText = createManagedText(scene, 0, TITLE_Y, "", {
+  const segmentTitleText = createManagedText(scene, 0, SEGMENT_TITLE_Y, "", {
+    fontSize: "7px",
+    color: "#d9cda9",
+  }).setDepth(HUD_DEPTH + 26).setScrollFactor(0).setVisible(false);
+  const arenaTitleText = createManagedText(scene, 0, ARENA_TITLE_Y, "", {
     fontSize: "8px",
     color: "#f2eadc",
-  }).setDepth(HUD_DEPTH + 20).setScrollFactor(0).setVisible(false);
+  }).setDepth(HUD_DEPTH + 27).setScrollFactor(0).setVisible(false);
+  const blackout = scene.add.rectangle(0, 0, 320, 180, 0x000000, 1)
+    .setOrigin(0)
+    .setScrollFactor(0)
+    .setDepth(HUD_DEPTH + 200)
+    .setAlpha(0)
+    .setVisible(false);
 
   let mountedWorldId = null;
   let runActive = false;
@@ -62,20 +69,24 @@ export function createWildAtollRuntime(scene, {
   let arenaId = null;
   let candidate = null;
   let arenaVisuals = [];
-  let activeNodeVisuals = new Map();
-  let runNodes = new Map();
+  let activeResourceIds = [];
   let destroyed = false;
   let runSerial = 0;
+  let collapseRecoveryActive = false;
+  let collapseDelay = null;
+
+  function debrisRuntime() {
+    return scene.worldLocationRuntime?.getOwners?.().debrisRuntime ?? scene.debrisRuntime ?? null;
+  }
 
   function mountNestEntrance() {
     mountedWorldId = WORLD_IDS.nest;
     runActive = false;
     arenaId = null;
     candidate = null;
-    runNodes.clear();
-    clearArenaPresentation();
+    clearArenaPresentation({ removeResourceState: true });
     arenaVisuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
-    titleText.setVisible(false);
+    setTitlesVisible(false);
   }
 
   function mountAtollRun() {
@@ -83,8 +94,8 @@ export function createWildAtollRuntime(scene, {
     runActive = true;
     runSerial += 1;
     runSeed = `${Date.now()}-${runSerial}`;
-    runNodes = new Map();
-    renderArena(WILD_ATOLL_ARENAS.edge, "south");
+    clearKnownStarterResourceState();
+    renderArena(WILD_ATOLL_ARENAS.root);
     showMessage("hud:atoll.arrival");
   }
 
@@ -93,177 +104,122 @@ export function createWildAtollRuntime(scene, {
     runActive = false;
     arenaId = null;
     candidate = null;
-    runNodes.clear();
-    clearArenaPresentation();
+    clearArenaPresentation({ removeResourceState: true });
     renderPrompt();
-    titleText.setVisible(false);
+    setTitlesVisible(false);
   }
 
   function enterAtoll() {
     const result = transitionWorld(WORLD_IDS.atoll, SOUTH_SPAWN);
     if (!result?.transitioned) return false;
-    clearArenaPresentation();
+    clearArenaPresentation({ removeResourceState: true });
     mountedWorldId = null;
     candidate = null;
-    titleText.setVisible(false);
+    setTitlesVisible(false);
     return true;
   }
 
-  function leaveAtoll() {
+  function leaveAtoll({ silent = false } = {}) {
+    clearArenaPresentation({ removeResourceState: true });
+    clearKnownStarterResourceState();
     const result = transitionWorld(WORLD_IDS.nest, NEST_RETURN_SPAWN);
     if (!result?.transitioned) return false;
-    clearArenaPresentation();
     mountedWorldId = null;
     runActive = false;
     arenaId = null;
     candidate = null;
-    runNodes.clear();
-    titleText.setVisible(false);
-    showMessage("hud:atoll.leftRun");
+    setTitlesVisible(false);
+    if (!silent) showMessage("hud:atoll.leftRun");
     return true;
   }
 
-  function renderArena(nextArenaId, entrySide) {
+  function renderArena(nextArenaId) {
     arenaId = nextArenaId;
     candidate = null;
-    clearArenaPresentation();
+    clearArenaPresentation({ removeResourceState: true });
     const definition = getWildAtollArenaDefinition(arenaId);
-    const nodes = nodesForArena(arenaId);
-    for (const node of nodes) {
-      if (!node.cleared) createNodeVisual(node);
-    }
+    registerArenaResources(definition);
     for (const exit of definition.exits) createExitVisual(exit);
-    setTitle(definition.titleKey);
-    setPlayerPosition(entrySide === "north" ? NORTH_SPAWN : SOUTH_SPAWN);
+    setTitles(definition.segmentKey, definition.arenaKey);
+    setPlayerPosition(SOUTH_SPAWN);
+    scene.interactionRuntime?.refresh?.();
   }
 
-  function nodesForArena(id) {
-    if (!runNodes.has(id)) runNodes.set(id, createWildAtollArenaNodes(runSeed, id));
-    return runNodes.get(id);
+  function registerArenaResources(definition) {
+    const owner = debrisRuntime();
+    if (!owner) return;
+    const resources = createWildAtollArenaResources(runSeed, "current", definition.id);
+    activeResourceIds = resources.map((resource) => resource.id);
+    for (const resource of resources) owner.registerResource?.(resource);
   }
 
-  function clearArenaPresentation() {
-    const layout = getWorldLayout();
-    for (const node of activeNodeVisuals.values()) layout?.clearWorldObjectCollider?.(node.colliderId);
-    activeNodeVisuals.clear();
+  function clearArenaPresentation({ removeResourceState = true } = {}) {
+    const owner = debrisRuntime();
+    for (const resourceId of activeResourceIds) {
+      if (owner?.getResourceDefinition?.(resourceId)) {
+        owner.unregisterResource?.(resourceId, { removeState: removeResourceState });
+      } else if (removeResourceState) {
+        delete scene.sessionState?.gameplay?.resourceNodes?.[resourceId];
+      }
+    }
+    activeResourceIds = [];
     for (const object of arenaVisuals) object.destroy?.();
     arenaVisuals = [];
+    scene.interactionRuntime?.resetCandidate?.();
+  }
+
+  function clearKnownStarterResourceState() {
+    const nodes = scene.sessionState?.gameplay?.resourceNodes;
+    if (!nodes) return;
+    for (const knownArenaId of WILD_ATOLL_STARTER_ARENAS) {
+      const definitions = createWildAtollArenaResources("cleanup", "current", knownArenaId);
+      for (const definition of definitions) delete nodes[definition.id];
+    }
   }
 
   function createExitVisual(exit) {
     const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
-    if (exit.cave) {
+    if (exit.kind === "segment") {
       arenaVisuals.push(...createCave(scene, point.x, point.y - TILE_SIZE));
       return;
     }
-    const marker = scene.add.graphics()
-      .setPosition(point.x - 10, point.y - 4)
-      .setDepth(555 + point.y);
+    if (exit.kind === "teleport") {
+      const glow = scene.add.graphics().setPosition(point.x, point.y).setDepth(570 + point.y);
+      glow.fillStyle(0xffffff, 0.16).fillCircle(0, 0, 8);
+      glow.fillStyle(0xeef8ff, 0.42).fillCircle(0, 0, 5);
+      glow.fillStyle(0xffffff, 1).fillCircle(0, 0, 2);
+      arenaVisuals.push(glow);
+      return;
+    }
+    const marker = scene.add.graphics().setPosition(point.x - 10, point.y - 4).setDepth(555 + point.y);
     marker.fillStyle(0x263b31, 0.92).fillRect(0, 0, 20, 8);
     marker.fillStyle(0x89b58b, 0.72).fillRect(2, 2, 16, 4);
     marker.fillStyle(0xd8cfaa, 0.75).fillRect(8, 1, 4, 6);
     arenaVisuals.push(marker);
   }
 
-  function createNodeVisual(node) {
-    const x = node.tileX * TILE_SIZE;
-    const y = node.tileY * TILE_SIZE;
-    const graphics = scene.add.graphics().setPosition(x, y).setDepth(560 + y + TILE_SIZE);
-    drawNode(graphics, node);
-    const colliderId = `${node.id}-${runSerial}`;
-    getWorldLayout()?.setWorldObjectCollider?.(colliderId, {
-      left: x + 2,
-      top: y + 5,
-      right: x + 14,
-      bottom: y + 15,
-    }, `atoll:${node.kind}`, { atollResource: true, nodeId: node.id });
-    const entry = { node, graphics, colliderId, x: x + 8, y: y + 9 };
-    activeNodeVisuals.set(node.id, entry);
-    arenaVisuals.push(graphics);
-  }
-
-  function drawNode(graphics, node) {
-    graphics.clear().setScale?.(1);
-    if (node.kind === "berry") {
-      drawBerryBush(graphics);
-      return;
-    }
-    drawResourceVisual(graphics, getResourceProfile(node.profileId), node.progress);
-  }
-
   function activateCandidate() {
-    if (!candidate) return false;
+    if (!candidate || collapseRecoveryActive) return false;
     if (candidate.kind === "enter") return enterAtoll();
-    if (candidate.kind === "resource") {
-      workResource(candidate.nodeId);
-      return true;
-    }
-    if (candidate.kind === "exit") return activateExit(candidate.exit);
-    return false;
+    if (candidate.kind !== "exit") return false;
+    return activateExit(candidate.exit);
   }
 
   function activateExit(exit) {
-    if (exit.target === "nest") return leaveAtoll();
-    const entrySide = exit.direction === "south" ? "north" : "south";
-    renderArena(exit.target, entrySide);
-    return true;
-  }
-
-  function workResource(nodeId) {
-    const visual = activeNodeVisuals.get(nodeId);
-    const node = visual?.node;
-    if (!node || node.cleared) return;
-    const selectedItem = scene.gameHud?.getSelectedInventoryItem?.() ?? null;
-    if (node.requiredTool && selectedItem?.id !== node.requiredTool) {
-      showMessage(node.requiredTool === "axe" ? "hud:atoll.needAxe" : "hud:atoll.needPickaxe");
-      return;
+    if (exit.kind === "path") {
+      renderArena(exit.targetArenaId);
+      return true;
     }
-    if (node.requiredTool) {
-      const preview = scene.needsRuntime?.canPerformPhysicalAction?.(node.requiredTool);
-      if (preview?.allowed === false) {
-        showMessage("hud:interaction.notEnoughEnergy");
-        return;
-      }
-      const spent = scene.needsRuntime?.recordPhysicalAction?.(node.requiredTool);
-      if (spent?.mutated === false) {
-        showMessage("hud:interaction.notEnoughEnergy");
-        return;
-      }
-      node.progress = Math.min(1, node.progress + 1 / node.hp);
-      playEffect(node.requiredTool === "axe" ? "chop" : "mine");
-      scene.syncPlayerEnergyTarget?.();
-      renderHud();
-      saveSession();
-      if (node.progress < 1) {
-        drawNode(visual.graphics, node);
-        return;
-      }
-    } else {
-      node.progress = 1;
-      playEffect("inventory-change");
+    if (exit.kind === "teleport") return leaveAtoll();
+    if (exit.kind === "segment") {
+      showMessage(exit.blockedMessageKey);
+      return true;
     }
-    clearResourceNode(node, visual);
-  }
-
-  function clearResourceNode(node, visual) {
-    node.cleared = true;
-    getWorldLayout()?.clearWorldObjectCollider?.(visual.colliderId);
-    activeNodeVisuals.delete(node.id);
-    visual.graphics.destroy();
-    arenaVisuals = arenaVisuals.filter((object) => object !== visual.graphics);
-    const gameplay = getGameplayState();
-    const result = addInventoryItem(gameplay.inventory, createInventoryItem(node.itemId, 1));
-    if (result.mutated) {
-      notifyInventoryGain(result);
-      renderHud();
-      saveSession();
-      return;
-    }
-    spawnWorldItems(node.itemId, 1, { x: visual.x, y: visual.y });
+    return false;
   }
 
   function onAction(actionId) {
-    if (!mountedWorldId || destroyed || actionId !== "space") return;
+    if (!mountedWorldId || destroyed || collapseRecoveryActive || actionId !== "space") return;
     if (candidate && activateCandidate()) scene.suppressNextInteract = true;
   }
 
@@ -280,7 +236,11 @@ export function createWildAtollRuntime(scene, {
       if (worldId === WORLD_IDS.nest) mountNestEntrance();
       else if (worldId === WORLD_IDS.atoll) mountAtollRun();
     }
-    if (!mountedWorldId) return;
+    if (!mountedWorldId || collapseRecoveryActive) {
+      candidate = null;
+      renderPrompt();
+      return;
+    }
     candidate = findCandidate();
     renderPrompt();
   }
@@ -296,43 +256,43 @@ export function createWildAtollRuntime(scene, {
     }
     if (mountedWorldId !== WORLD_IDS.atoll || !runActive) return null;
     const definition = getWildAtollArenaDefinition(arenaId);
-    const exits = definition.exits.map((exit) => {
-      const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
-      return {
-        kind: "exit",
-        id: `exit:${exit.id}`,
-        exit,
-        labelKey: exit.promptKey,
-        distance: Math.hypot(point.x - position.x, point.y - position.y),
-      };
-    });
-    const resources = [...activeNodeVisuals.values()].map((entry) => ({
-      kind: "resource",
-      id: `resource:${entry.node.id}`,
-      nodeId: entry.node.id,
-      labelKey: entry.node.promptKey,
-      distance: Math.hypot(entry.x - position.x, entry.y - position.y),
-    }));
-    return [...exits, ...resources]
+    return definition.exits
+      .map((exit) => {
+        const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
+        return {
+          kind: "exit",
+          id: `exit:${exit.id}`,
+          exit,
+          labelKey: exit.promptKey,
+          distance: Math.hypot(point.x - position.x, point.y - position.y),
+        };
+      })
       .filter((entry) => entry.distance <= INTERACTION_RADIUS)
       .sort((left, right) => left.distance - right.distance)[0] ?? null;
   }
 
   function renderPrompt() {
-    const visible = Boolean(mountedWorldId && candidate);
+    const value = candidate ? translate(candidate.labelKey) : "";
+    const visible = Boolean(mountedWorldId && candidate && value && !collapseRecoveryActive);
     promptBackground.clear().setVisible(visible);
     promptText.setVisible(visible);
     if (!visible) {
       promptZone.disableInteractive();
       return;
     }
-    const value = localization.t(candidate.labelKey);
     setManagedTextStyle(promptText, scene, {
       fontFamily: localization.getLocale().fontKey,
       fontSize: "8px",
       color: "#f2eadc",
     }).setText(value);
-    const width = Math.min(PROMPT_RECT.width, Math.max(96, Math.ceil(promptText.width) + 16));
+    if (promptText.width > PROMPT_RECT.width - 16) {
+      setManagedTextStyle(promptText, scene, {
+        fontFamily: localization.getLocale().fontKey,
+        fontSize: "7px",
+        color: "#f2eadc",
+      });
+    }
+    const width = Math.min(PROMPT_RECT.width, Math.max(88, Math.ceil(promptText.width) + 16));
     const x = Math.round((320 - width) / 2);
     promptBackground
       .fillStyle(HUD_COLORS.panel, 0.94).fillRect(x, PROMPT_RECT.y, width, PROMPT_RECT.height)
@@ -341,13 +301,42 @@ export function createWildAtollRuntime(scene, {
     promptZone.setPosition(x, PROMPT_RECT.y).setSize(width, PROMPT_RECT.height).setInteractive({ useHandCursor: true });
   }
 
-  function setTitle(key) {
-    const value = localization.t(key);
-    setManagedTextStyle(titleText, scene, {
+  function setTitles(segmentKey, arenaKey) {
+    const segmentText = translate(segmentKey);
+    const arenaText = translate(arenaKey);
+    setFittedTitle(segmentTitleText, segmentText, SEGMENT_TITLE_Y, 7, "#d9cda9");
+    setFittedTitle(arenaTitleText, arenaText, ARENA_TITLE_Y, 8, "#f2eadc");
+  }
+
+  function setFittedTitle(textObject, value, y, preferredSize, color) {
+    const visible = Boolean(value);
+    textObject.setVisible(visible);
+    if (!visible) return;
+    setManagedTextStyle(textObject, scene, {
       fontFamily: localization.getLocale().fontKey,
-      fontSize: "8px",
-      color: "#f2eadc",
-    }).setText(value).setPosition(Math.round((320 - titleText.width) / 2), TITLE_Y).setVisible(true);
+      fontSize: `${preferredSize}px`,
+      color,
+    }).setText(value);
+    if (textObject.width > TITLE_MAX_WIDTH) {
+      setManagedTextStyle(textObject, scene, {
+        fontFamily: localization.getLocale().fontKey,
+        fontSize: `${Math.max(6, preferredSize - 1)}px`,
+        color,
+      });
+    }
+    textObject.setPosition(Math.round((320 - textObject.width) / 2), y);
+  }
+
+  function setTitlesVisible(visible) {
+    segmentTitleText.setVisible(Boolean(visible));
+    arenaTitleText.setVisible(Boolean(visible));
+  }
+
+  function translate(key) {
+    if (!key) return "";
+    const value = String(localization.t(key) ?? "");
+    const namespaceFreeKey = key.includes(":") ? key.slice(key.indexOf(":") + 1) : key;
+    return value === key || value === namespaceFreeKey ? "" : value;
   }
 
   function setPlayerPosition(point) {
@@ -360,6 +349,57 @@ export function createWildAtollRuntime(scene, {
     scene.cameraRuntime?.reset?.(player.motor.position);
   }
 
+  function beginCollapseRecovery() {
+    if (destroyed || getWorldId() !== WORLD_IDS.atoll) return false;
+    if (collapseRecoveryActive) return true;
+    collapseRecoveryActive = true;
+    scene.atollCollapseTransitionActive = true;
+    candidate = null;
+    renderPrompt();
+    scene.interactionRuntime?.resetCandidate?.();
+    blackout.setVisible(true).setAlpha(0);
+    scene.tweens.add({
+      targets: blackout,
+      alpha: 1,
+      duration: COLLAPSE_FADE_OUT_MS,
+      ease: "Linear",
+      onComplete: completeCollapseBehindBlack,
+    });
+    return true;
+  }
+
+  function completeCollapseBehindBlack() {
+    if (destroyed || !collapseRecoveryActive) return;
+    scene.startSleeping?.({ exhausted: true });
+    let steps = 0;
+    while (scene.sleeping && steps < COLLAPSE_SIMULATION_MAX_STEPS) {
+      scene.updateGameplayTime?.(COLLAPSE_SIMULATION_STEP_MS);
+      steps += 1;
+    }
+    if (scene.sleeping) scene.wakeUp?.();
+    leaveAtoll({ silent: true });
+    collapseDelay = scene.time.delayedCall(COLLAPSE_BLACK_HOLD_MS, () => {
+      collapseDelay = null;
+      if (destroyed || !collapseRecoveryActive) return;
+      scene.tweens.add({
+        targets: blackout,
+        alpha: 0,
+        duration: COLLAPSE_FADE_IN_MS,
+        ease: "Linear",
+        onComplete: finishCollapseRecovery,
+      });
+    });
+  }
+
+  function finishCollapseRecovery() {
+    collapseRecoveryActive = false;
+    scene.atollCollapseTransitionActive = false;
+    blackout.setVisible(false).setAlpha(0);
+    scene.interactionRuntime?.refresh?.();
+    scene.gameHud?.render?.();
+    scene.saveSession?.();
+  }
+
   promptZone.on("pointerdown", (pointer, _x, _y, event) => {
     event?.stopPropagation?.();
     pointer?.event?.stopPropagation?.();
@@ -368,7 +408,10 @@ export function createWildAtollRuntime(scene, {
   globalThis.window?.addEventListener?.("keydown", onKeyboard);
   scene.events.on("update", update);
   const unsubscribe = localization?.subscribe?.(() => {
-    if (runActive && arenaId) setTitle(getWildAtollArenaDefinition(arenaId).titleKey);
+    if (runActive && arenaId) {
+      const definition = getWildAtollArenaDefinition(arenaId);
+      setTitles(definition.segmentKey, definition.arenaKey);
+    }
     renderPrompt();
   });
 
@@ -381,18 +424,26 @@ export function createWildAtollRuntime(scene, {
       runSeed,
       arenaId,
       candidateId: candidate?.id ?? null,
-      remainingNodes: runActive && arenaId ? nodesForArena(arenaId).filter((node) => !node.cleared).length : 0,
+      activeResourceIds: [...activeResourceIds],
+      collapseRecoveryActive,
     }),
     startArena(nextArenaId, { seed = `${Date.now()}` } = {}) {
+      if (getWorldId() !== WORLD_IDS.atoll) return { status: "wrong-world", started: false };
       mountedWorldId = WORLD_IDS.atoll;
       runActive = true;
       runSeed = String(seed);
-      runNodes = new Map();
-      renderArena(nextArenaId, "south");
+      renderArena(nextArenaId);
+      return { status: "started", started: true, arenaId: nextArenaId };
     },
+    beginCollapseRecovery,
+    isCollapseRecoveryActive: () => collapseRecoveryActive,
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      collapseDelay?.remove?.(false);
+      collapseDelay = null;
+      scene.tweens.killTweensOf(blackout);
+      scene.atollCollapseTransitionActive = false;
       unmountCurrentWorld();
       unsubscribe?.();
       scene.events.off("update", update);
@@ -400,7 +451,9 @@ export function createWildAtollRuntime(scene, {
       promptZone.destroy();
       promptBackground.destroy();
       promptText.destroy();
-      titleText.destroy();
+      segmentTitleText.destroy();
+      arenaTitleText.destroy();
+      blackout.destroy();
     },
   };
 }
@@ -419,14 +472,6 @@ function createCave(scene, centerX, topY) {
     textureKey,
     frame,
   ).setOrigin(0).setDepth(560 + topY + 2 * TILE_SIZE));
-}
-
-function drawBerryBush(graphics) {
-  graphics.fillStyle(0x234526, 1).fillRect(3, 7, 11, 7).fillRect(5, 4, 7, 9);
-  graphics.fillStyle(0x3f7040, 1).fillRect(2, 8, 4, 4).fillRect(10, 6, 5, 5).fillRect(6, 3, 5, 4);
-  graphics.fillStyle(0x7954a8, 1).fillRect(5, 8, 2, 2).fillRect(10, 10, 2, 2).fillRect(8, 5, 2, 2);
-  graphics.fillStyle(0xb99ad8, 1).fillRect(5, 8, 1, 1).fillRect(10, 10, 1, 1).fillRect(8, 5, 1, 1);
-  graphics.fillStyle(0x5b3824, 1).fillRect(8, 13, 2, 3);
 }
 
 function isEditableTarget(target) {
