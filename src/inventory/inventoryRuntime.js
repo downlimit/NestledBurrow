@@ -195,7 +195,7 @@ export function createInventoryRuntime(scene, options = {}) {
   }
 
   function worldPresentationActive() {
-    return !destroyed && !isSuppressed();
+    return !destroyed && !isSuppressed() && !isCombatMode();
   }
 
   function stop(pointer, event) {
@@ -753,7 +753,9 @@ export function createInventoryRuntime(scene, options = {}) {
       render();
       return true;
     },
-    getSelectedItem: () => cloneInventoryItem(selectedIndex === null ? null : inventory()?.slots?.[selectedIndex]),
+    getSelectedItem: () => cloneInventoryItem(
+      isCombatMode() || selectedIndex === null ? null : inventory()?.slots?.[selectedIndex],
+    ),
     spawnWorldItems,
     getState: () => ({
       selectedIndex,

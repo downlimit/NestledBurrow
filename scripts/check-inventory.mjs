@@ -251,7 +251,7 @@ assert(runtimeSource.includes('item.id === "water-bucket"') && runtimeSource.inc
 assert(runtimeSource.includes("presentationContainer") && runtimeSource.includes("setInputEnabled(value)"), "screen hotbar exposes the presentation-only transform/input adapter");
 assert(runtimeSource.includes('scene.input.on("wheel", handleWheel)') && runtimeSource.includes('scene.input.off("wheel", handleWheel)'), "peaceful inventory owns wheel cycling lifecycle");
 assert(!hudSource.includes("inventoryHud?.clearSelection?.()"), "combat mode preserves peaceful inventory selection");
-assert(runtimeSource.includes("worldPresentationActive()"), "held world-space item visibility stays outside panel interactivity");
+assert(runtimeSource.includes("worldPresentationActive()") && runtimeSource.includes("!isCombatMode()"), "held peaceful item stays selected but is hidden while combat mode owns presentation");
 assert(hudSource.includes("createInventoryRuntime(scene"));
 assert(hudSource.includes("presentation: inventoryHud.presentation"), "inventory gain cues share the hotbar transform");
 assert(!hudSource.includes("woodValueText"), "old resource text counters are removed");
