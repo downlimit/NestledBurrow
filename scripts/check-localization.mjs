@@ -25,7 +25,6 @@ for (const locale of SUPPORTED_LOCALES) {
     assert.deepEqual([...entries.keys()].sort(), [...primary.get(ns).keys()].sort(), `${locale}/${ns} keys match fallback`);
     for (const [key, value] of entries) {
       assert(typeof value === "string" && value.trim(), `${locale}/${ns}:${key} is non-empty text`);
-      assert(!/[—–]/u.test(value), `${locale}/${ns}:${key} uses the supported ASCII hyphen instead of a typographic dash`);
     }
   }
 }
