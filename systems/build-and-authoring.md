@@ -27,6 +27,7 @@ This system owns player-facing construction interactions and developer-facing ca
 
 ## Owners
 
+- world mutation and transient build-session state: `worldBuildCoordinator.js`;
 - UI/input lifecycle: `buildModeRuntime.js`;
 - catalog: `buildAssetCatalog.js`;
 - geometry/colliders: `buildWorldGeometry.js`, `colliderResize.js`;
@@ -35,6 +36,10 @@ This system owns player-facing construction interactions and developer-facing ca
 - starting baseline: `startingLayout.js`, `startingLayoutDefault.js`;
 - scene registry: `worldSceneRegistry.js`.
 
+`WorldBuildCoordinator` owns placed runtime objects, surfaces, walls, automatic junctions, previews, demolition highlighting, the active grouped action and undo history. It creates `BuildModeRuntime`, receives runtime owners and world callbacks as explicit dependencies, and routes facility, bed/resource, well/farming, tavern-sign and training-dummy mutations back to those owners. The Phaser scene is only its rendering host.
+
+`WorldScene` constructs the coordinator, passes layout/profile/runtime adapters, exposes its `BuildModeRuntime` for the surrounding input-suppression contract, and delegates location cleanup. Starting-layout and developer-authoring owners use the coordinator public API; they do not receive its internal maps, undo stack or preview state.
+
 ## Invariants
 
 - horizontal and vertical wall profile colliders are independent;
@@ -42,11 +47,11 @@ This system owns player-facing construction interactions and developer-facing ca
 - placement uses effective collider after profile offsets;
 - drag anchor affects grabbing/snap, not arbitrary visual drift;
 - developer authoring and gameplay persistence remain separate;
-- new world-facing orchestration must move into a coordinator; `src/main.js` may not grow beyond its architecture budget.
+- build orchestration remains in `WorldBuildCoordinator`; `src/main.js` may not grow beyond its architecture budget.
 
 ## Current baseline
 
-Walls, surfaces, furniture, facilities and trees support placement, move, demolition and undo. Asset profiles, collider editor, drag anchor, browser backup and canonical starting layout work. Authoring persistence has an end-to-end reload/`NEW GAME` regression.
+Walls, surfaces, furniture, facilities, plants, wells, the tavern sign and the training dummy preserve placement, move, demolition and grouped undo through `WorldBuildCoordinator`. Asset profiles, collider editor, drag anchor, browser backup and canonical starting layout remain in their authoring owners. Authoring persistence has an end-to-end reload/`NEW GAME` regression.
 
 ## Not yet
 
@@ -54,4 +59,4 @@ Rotation, gameplay persistence of construction, history/versioning, general map 
 
 ## Evidence
 
-`check:build-mode`, `check:authoring`, `check:task-044`, `authoring-persistence.spec.js`.
+`check:build-mode`, `check:authoring`, `check:task-044`, `check:task-062`, `authoring-persistence.spec.js`.

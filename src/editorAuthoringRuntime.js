@@ -120,6 +120,10 @@ export function attachEditorAuthoringRuntime(scene, {
   confirmColliderDraft = () => scene.confirmColliderDraft?.(),
 } = {}) {
   if (!scene?.worldLayout) throw new Error("World scene is unavailable");
+  const buildCoordinator = scene.worldBuildCoordinator;
+  if (!buildCoordinator?.getPlacedObjects || !buildCoordinator?.placeBuildAsset) {
+    throw new Error("World build coordinator is unavailable");
+  }
   const plants = new Map();
   const selectionBoundsById = new Map();
   let destroyed = false;
@@ -256,41 +260,43 @@ export function attachEditorAuthoringRuntime(scene, {
     scene.interactionRuntime?.refresh?.();
   }
 
-  const originalPlaceBuildAsset = scene.placeBuildAsset?.bind(scene);
+  const originalPlaceBuildAsset = buildCoordinator.placeBuildAsset?.bind(buildCoordinator);
   if (originalPlaceBuildAsset) {
-    scene.placeBuildAsset = (item, point, context) => {
+    buildCoordinator.placeBuildAsset = (item, point, context) => {
       const result = originalPlaceBuildAsset(item, point, context);
       if (result?.status === "placed" && item?.resourceProfileId === PLANTED_TREE_PROFILE_ID) {
-        registerPlant(scene.buildPlacedObjects.get(result.id));
+        registerPlant(buildCoordinator.getPlacedObject(result.id));
       }
       return result;
     };
   }
 
-  const originalRestoreBuildPlacedObject = scene.restoreBuildPlacedObject?.bind(scene);
+  const originalRestoreBuildPlacedObject = buildCoordinator.restoreBuildPlacedObject?.bind(buildCoordinator);
   if (originalRestoreBuildPlacedObject) {
-    scene.restoreBuildPlacedObject = (placed) => {
+    buildCoordinator.restoreBuildPlacedObject = (placed) => {
       const plant = isPlantedTreeObject(placed);
       const renderable = plant && placed.kind === "plant" ? { ...placed, kind: "tree" } : placed;
       const restored = originalRestoreBuildPlacedObject(renderable);
-      if (restored && plant) registerPlant(scene.buildPlacedObjects.get(placed.id));
+      if (restored && plant) registerPlant(buildCoordinator.getPlacedObject(placed.id));
       return restored;
     };
   }
 
-  const originalRemoveBuildPlacedObjectById = scene.removeBuildPlacedObjectById?.bind(scene);
+  const originalRemoveBuildPlacedObjectById = buildCoordinator.removeBuildPlacedObjectById?.bind(buildCoordinator);
   if (originalRemoveBuildPlacedObjectById) {
-    scene.removeBuildPlacedObjectById = (id) => {
-      const object = scene.buildPlacedObjects?.get?.(id);
+    buildCoordinator.removeBuildPlacedObjectById = (id) => {
+      const object = buildCoordinator.getPlacedObject(id);
       const removed = originalRemoveBuildPlacedObjectById(id);
       if (object) unregisterPlant(object);
       return removed;
     };
   }
 
-  const originalDemolitionType = scene.getBuildObjectDemolitionType?.bind(scene);
+  const originalDemolitionType = buildCoordinator.getBuildObjectDemolitionType?.bind(buildCoordinator);
   if (originalDemolitionType) {
-    scene.getBuildObjectDemolitionType = (object) => isPlantedTreeObject(object) ? "plant" : originalDemolitionType(object);
+    buildCoordinator.getBuildObjectDemolitionType = (object) => (
+      isPlantedTreeObject(object) ? "plant" : originalDemolitionType(object)
+    );
   }
 
   const originalBeginColliderEditPointer = scene.beginColliderEditPointer?.bind(scene);
@@ -302,7 +308,7 @@ export function attachEditorAuthoringRuntime(scene, {
     ));
   }
 
-  for (const object of scene.buildPlacedObjects?.values?.() ?? []) registerPlant(object);
+  for (const object of buildCoordinator.getPlacedObjects()) registerPlant(object);
   for (const profileKey of Object.keys(scene.assetProfiles ?? {})) {
     applyProfileVisualOffset(profileKey, profileVisualOffset(profileKey));
   }
@@ -345,8 +351,8 @@ export function attachEditorAuthoringRuntime(scene, {
       const layout = loadStartingLayout(storage, STARTING_LAYOUT_DEFAULT);
       if (layout) return applyStartingLayout(scene, layout);
       for (const object of STARTER_TREE_OBJECTS) {
-        if (scene.buildPlacedObjects.has(object.id)) continue;
-        if (!scene.restoreBuildPlacedObject(JSON.parse(JSON.stringify(object)))) {
+        if (buildCoordinator.getPlacedObject(object.id)) continue;
+        if (!buildCoordinator.restoreBuildPlacedObject(JSON.parse(JSON.stringify(object)))) {
           throw new Error(`Failed to restore starter plant ${object.id}`);
         }
       }

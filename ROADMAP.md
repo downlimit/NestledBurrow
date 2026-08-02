@@ -20,9 +20,9 @@ Task #001 — Первая расчистка участка (PR #81)
 
 ### Task #062 — Вынести build orchestration из WorldScene
 
-**Статус:** `Подготовлено`.
+**Статус:** `Выполнено`.
 
-**Результат:** Перенести player-facing размещение, перемещение, снос, preview и grouped undo построек из `WorldScene` в явный world-build coordinator, сохранив существующее поведение и оставив `BuildModeRuntime` владельцем UI/input lifecycle.
+**Результат:** Player-facing размещение, перемещение, снос, preview и grouped undo построек перенесены из `WorldScene` в `WorldBuildCoordinator`; `BuildModeRuntime` сохранил UI/input lifecycle, а runtime owners объектов — собственные состояния и мутации.
 
 ## Следующий продуктовый вопрос
 

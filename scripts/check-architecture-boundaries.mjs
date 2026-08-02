@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 const main = readFileSync("src/main.js", "utf8").replace(/\r\n/g, "\n");
 const lineCount = main.split("\n").length;
-const MAX_WORLD_SCENE_LINES = 2900;
+const MAX_WORLD_SCENE_LINES = 2400;
 
 assert(
   lineCount <= MAX_WORLD_SCENE_LINES,
@@ -30,9 +30,9 @@ assert(!source["editorAuthoringRuntime.js"].includes("scene.runWorldObjectIntera
 assert(source["debrisRuntime.js"].includes("registerResource(definition,"), "the resource owner must accept authored and location-defined instances");
 assert(source["main.js"].includes("debrisRuntime?.getResourceDefinition"), "all resource interactions must resolve through the active resource owner");
 assert(source["facilityRuntime.js"].includes("drawFacility(graphics, facility.facilityType)"), "facility runtime and previews must share one presentation adapter");
-assert(source["main.js"].includes("createWellPresentation(this, point"), "well runtime and previews must share one presentation adapter");
-assert(source["main.js"].includes("tavernSignRuntime?.getBuildMoveTargetAt")
-  && source["main.js"].includes("tavernSignRuntime?.moveBuildTarget"), "build mode must delegate tavern-sign movement to its runtime owner");
+assert(source["worldBuildCoordinator.js"].includes("createWellPresentation(this.renderingHost, point"), "well runtime and previews must share one presentation adapter");
+assert(source["worldBuildCoordinator.js"].includes("tavernSignRuntime?.getBuildMoveTargetAt")
+  && source["worldBuildCoordinator.js"].includes("tavernSignRuntime?.moveBuildTarget"), "build mode must delegate tavern-sign movement to its runtime owner");
 assert(source["guestRuntime.js"].includes("getSignPoint()"), "guest routing must resolve the tavern sign's live runtime position");
 assert(source["startingLayout.js"].includes("tavernSignRuntime?.getStartingLayoutFurniture")
   && source["startingLayout.js"].includes("tavernSignRuntime?.restoreStartingLayoutFurniture"), "the tavern sign must share canonical furniture persistence");

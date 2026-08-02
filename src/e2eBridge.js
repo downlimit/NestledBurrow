@@ -97,21 +97,16 @@ export function installWorldE2EBridge(scene) {
       return result;
     },
     dropInventorySlot: (index) => scene.gameHud?.dropInventorySlot?.(index),
-    placeWell: (point) => {
-      const result = scene.worldBuildCoordinator?.place?.({ placement: "well" }, point);
-      scene.interactionRuntime?.refresh?.();
-      if (result?.status === "placed") scene.saveSession();
-      return result;
-    },
-    getBuildModeState: () => scene.buildMode?.getState?.() ?? null,
-    toggleBuildMode: () => scene.buildMode?.toggle?.(),
+    placeWell: (point) => scene.worldBuildCoordinator?.place?.({ placement: "well" }, point),
+    getBuildModeState: () => scene.worldBuildCoordinator?.getBuildModeRuntime?.()?.getState?.() ?? null,
+    toggleBuildMode: () => scene.worldBuildCoordinator?.getBuildModeRuntime?.()?.toggle?.(),
     moveTavernSign: ({ x, y }) => {
       const state = scene.tavernSignRuntime?.getState?.();
-      const target = state ? scene.tavernSignRuntime?.getBuildMoveTargetAt?.(state.position) : null;
+      const target = state ? scene.worldBuildCoordinator?.getMoveTargetAt?.(state.position) : null;
       if (!target) return { status: "ignored" };
-      scene.beginBuildAction?.();
-      const result = scene.applyBuildMove?.(target, { x: Number(x), y: Number(y) });
-      scene.endBuildAction?.();
+      scene.worldBuildCoordinator?.beginBuildAction?.();
+      const result = scene.worldBuildCoordinator?.applyBuildMove?.(target, { x: Number(x), y: Number(y) });
+      scene.worldBuildCoordinator?.endBuildAction?.();
       return result;
     },
     getHudState: () => ({

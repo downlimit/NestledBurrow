@@ -157,7 +157,11 @@ const visualCollider = { left: 100, right: 148, top: 200, bottom: 216 };
 const visualScene = {
   assetProfiles: visualProfiles,
   colliderOverrides: {},
-  buildPlacedObjects: new Map(),
+  worldBuildCoordinator: {
+    getPlacedObjects: () => [],
+    getPlacedObject: () => null,
+    placeBuildAsset: () => ({ status: "ignored" }),
+  },
   sessionState: { gameplay: { resourceNodes: {} } },
   worldLayout: {
     setColliderOverride() {},
