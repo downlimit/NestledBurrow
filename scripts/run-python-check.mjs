@@ -1,4 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -42,7 +44,7 @@ function collectPythonExecutables(root, depth = 2) {
       continue;
     }
     if (!entry.isDirectory() || depth === 0) continue;
-    if (depth === 2 || /python|runtime|embed|tools|versions/iu.test(entry.name)) {
+    if (depth === 2 || /python|runtime|codex|dependencies|embed|tools|versions/iu.test(entry.name)) {
       collectPythonExecutables(path, depth - 1);
     }
   }
@@ -63,9 +65,10 @@ if (process.platform === "win32") {
     process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Programs", "Python"),
     process.env.USERPROFILE && join(process.env.USERPROFILE, ".pyenv", "pyenv-win", "versions"),
     process.env.USERPROFILE && join(process.env.USERPROFILE, "scoop", "apps", "python"),
+    process.env.USERPROFILE && join(process.env.USERPROFILE, ".cache", "codex-runtimes"),
     process.env.ProgramFiles && join(process.env.ProgramFiles, "Python"),
   ]) {
-    collectPythonExecutables(root);
+    collectPythonExecutables(root, root?.includes("codex-runtimes") ? 5 : 2);
   }
 } else {
   addCandidate("python3", [], "python3 on PATH");
@@ -96,6 +99,17 @@ if (!selected) {
 const result = spawnSync(selected.command, [...selected.prefixArgs, ...checkArgs], {
   stdio: "inherit",
   windowsHide: true,
+  env: {
+    ...process.env,
+    NESTLEDBURROW_ARTIFACT_DIR:
+      process.env.NESTLEDBURROW_ARTIFACT_DIR ??
+      join(
+        tmpdir(),
+        "NestledBurrow",
+        "check-artifacts",
+        createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12),
+      ),
+  },
 });
 
 if (result.error) {

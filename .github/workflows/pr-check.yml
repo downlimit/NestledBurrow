@@ -28,6 +28,8 @@ jobs:
       full_validation: ${{ steps.classify.outputs.full_validation }}
       browser: ${{ steps.classify.outputs.browser }}
       preview: ${{ steps.classify.outputs.preview }}
+      auto_merge: ${{ steps.classify.outputs.auto_merge }}
+      metadata_valid: ${{ steps.classify.outputs.metadata_valid }}
 
     steps:
       - name: Checkout repository
@@ -37,7 +39,9 @@ jobs:
 
       - name: Classify changed paths
         id: classify
-        run: node scripts/classify-pr-scope.mjs --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/classify-pr-scope.mjs --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}" --body-env PR_BODY
 
       - name: Verify scope classifier
         run: node scripts/check-pr-scope.mjs
@@ -78,6 +82,8 @@ jobs:
 
       - name: Run project checks
         if: needs.scope.outputs.full_validation == 'true'
+        env:
+          NESTLEDBURROW_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
         run: npm run check
 
       - name: Run metadata checks

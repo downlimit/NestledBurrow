@@ -1,5 +1,13 @@
 <!-- Keep routine PR reports short. Delete optional lines that do not apply. -->
 
+<!-- nestled-burrow-delivery:v1
+player-visible: choose
+preview-acceptance: choose
+auto-merge: choose
+-->
+
+<!-- Replace every choose value. Invalid or incomplete metadata falls back to path-based preview routing. -->
+
 # Task
 
 Task: `Task #<number> — <human-readable result>`

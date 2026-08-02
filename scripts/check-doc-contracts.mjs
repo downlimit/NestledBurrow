@@ -73,6 +73,12 @@ requireText(agents, [
   "Codex never generates",
   "missing, mismatched or undecodable required binary is a blocker",
   "Image generation was not invoked.",
+  "npm run codex:preflight",
+  "npm run codex:impact",
+  "npm run codex:validate",
+  "nestled-burrow-delivery:v1",
+  "native auto-merge through the connector",
+  "npm run delivery:timing",
 ], "AGENTS.md");
 
 const forbiddenImagePermission = "Codex image generation explicitly allowed";
@@ -147,15 +153,15 @@ requireText(taskTemplate, [
   "One Ready PR",
 ], "tasks/TEMPLATE.md");
 requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
-requireText(prTemplate, ["# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
+requireText(prTemplate, ["nestled-burrow-delivery:v1", "player-visible: choose", "preview-acceptance: choose", "auto-merge: choose", "# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
 
 assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI may run for an explicitly requested Draft");
-requireText(prWorkflow, ["Classify Scope", "needs: scope", "Run metadata checks"], "PR workflow");
+requireText(prWorkflow, ["Classify Scope", "PR_BODY", "metadata_valid", "needs: scope", "Run metadata checks"], "PR workflow");
 
 requireText(focusedE2E, ["mkdtempSync", "tmpdir()", "PW_OUTPUT_DIR", "PW_REPORT_DIR"], "focused E2E");
 requireText(managedPreview, ["tmpdir()", "task-preview.json", "smokeCanvas", "detached: true"], "managed preview");
-requireText(pythonLauncher, ["NESTLEDBURROW_PYTHON", "python_embed", "No usable Python 3 runtime was found"], "Python launcher");
-requireText(packageJson, ['"check:architecture": "node scripts/check-architecture-boundaries.mjs"'], "package.json");
+requireText(pythonLauncher, ["NESTLEDBURROW_PYTHON", "NESTLEDBURROW_ARTIFACT_DIR", "codex-runtimes", "python_embed", "No usable Python 3 runtime was found"], "Python launcher");
+requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"codex:validate"', '"delivery:timing"', '"check:task-063"', '"check:architecture": "node scripts/check-architecture-boundaries.mjs"'], "package.json");
 
 for (const [label, text, limit] of [
   ["PROJECT.md", project, 7000],

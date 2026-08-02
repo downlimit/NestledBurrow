@@ -41,6 +41,14 @@ const isPreviewRelevant = (path) =>
   !path.startsWith(".github/workflows/") &&
   path !== "requirements-dev.txt";
 
+const isBrowserRelevant = (path) =>
+  path.startsWith("src/") ||
+  path.startsWith("e2e/") ||
+  path.startsWith("public/") ||
+  path === "index.html" ||
+  path === "vite.config.js" ||
+  path.endsWith(".css");
+
 export function classifyPaths(paths) {
   const normalized = paths.filter(Boolean).map(normalize);
   if (normalized.some(isStrict)) return "strict";
@@ -51,6 +59,70 @@ export function classifyPaths(paths) {
 
 export function requiresPreview(paths) {
   return paths.filter(Boolean).map(normalize).some(isPreviewRelevant);
+}
+
+export function requiresBrowser(paths) {
+  return paths.filter(Boolean).map(normalize).some(isBrowserRelevant);
+}
+
+const DELIVERY_FIELDS = new Set(["player-visible", "preview-acceptance", "auto-merge"]);
+
+export function parseDeliveryMetadata(body = "") {
+  const block = body.match(/<!--\s*nestled-burrow-delivery:v1([\s\S]*?)-->/iu);
+  if (!block) return { present: false, valid: true, values: {}, errors: [] };
+
+  const values = {};
+  const errors = [];
+  for (const rawLine of block[1].split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const match = line.match(/^([a-z-]+):\s*([a-z-]+)$/iu);
+    if (!match || !DELIVERY_FIELDS.has(match[1].toLowerCase())) {
+      errors.push(`unsupported metadata line: ${line}`);
+      continue;
+    }
+    const field = match[1].toLowerCase();
+    if (values[field]) errors.push(`duplicate metadata field: ${field}`);
+    values[field] = match[2].toLowerCase();
+  }
+
+  const allowed = {
+    "player-visible": new Set(["yes", "no"]),
+    "preview-acceptance": new Set(["required", "not-required"]),
+    "auto-merge": new Set(["yes", "no"]),
+  };
+  for (const field of DELIVERY_FIELDS) {
+    if (!values[field]) errors.push(`missing metadata field: ${field}`);
+    else if (!allowed[field].has(values[field])) errors.push(`invalid ${field}: ${values[field]}`);
+  }
+
+  return { present: true, valid: errors.length === 0, values, errors };
+}
+
+export function classifyPullRequest(paths, body = "") {
+  const lane = classifyPaths(paths);
+  const metadata = parseDeliveryMetadata(body);
+  let preview = requiresPreview(paths);
+  if (metadata.present && metadata.valid) {
+    const visible = metadata.values["player-visible"] === "yes";
+    const acceptanceRequired = metadata.values["preview-acceptance"] === "required";
+    preview = visible || acceptanceRequired;
+  }
+
+  return {
+    lane,
+    fullValidation: lane === "runtime" || lane === "strict",
+    browser: requiresBrowser(paths),
+    preview,
+    autoMerge:
+      metadata.present &&
+      metadata.valid &&
+      metadata.values["auto-merge"] === "yes" &&
+      metadata.values["preview-acceptance"] === "not-required" &&
+      metadata.values["player-visible"] === "no" &&
+      !preview,
+    metadata,
+  };
 }
 
 function readArgument(name) {
@@ -70,14 +142,19 @@ function runCli() {
   if (!base || !head) throw new Error("usage: node scripts/classify-pr-scope.mjs --base <sha> --head <sha>");
 
   const paths = changedPaths(base, head);
-  const lane = classifyPaths(paths);
+  const bodyEnv = readArgument("--body-env");
+  const classification = classifyPullRequest(paths, bodyEnv ? process.env[bodyEnv] ?? "" : "");
+  const { lane, metadata } = classification;
   const output = [
     `lane=${lane}`,
-    `full_validation=${lane === "runtime" || lane === "strict"}`,
-    `browser=${lane === "runtime" || lane === "strict"}`,
-    `preview=${requiresPreview(paths)}`,
+    `full_validation=${classification.fullValidation}`,
+    `browser=${classification.browser}`,
+    `preview=${classification.preview}`,
+    `auto_merge=${classification.autoMerge}`,
+    `metadata_valid=${metadata.valid}`,
   ].join("\n");
   console.log(`PR scope: ${lane} (${paths.length} changed path${paths.length === 1 ? "" : "s"})`);
+  if (!metadata.valid) console.warn(`Delivery metadata ignored: ${metadata.errors.join("; ")}`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${output}\n`);
   else console.log(output);
 }
