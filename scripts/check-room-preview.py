@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
+ARTIFACT_DIR = Path(os.environ.get("NESTLEDBURROW_ARTIFACT_DIR", ROOT / "artifacts"))
 TILE_SIZE = 16
 GAME_WIDTH = 320
 GAME_HEIGHT = 180
@@ -28,10 +30,10 @@ PLAYER_PATH = ASSET_ROOT / "kenney" / "player" / "tile_0267.png"
 NPC_PATH = PLAYER_PATH
 
 OUTPUTS = {
-    "worldOverview": ROOT / "artifacts" / "world-overview.png",
-    "cameraIndoor": ROOT / "artifacts" / "camera-indoor.png",
-    "cameraOutdoor": ROOT / "artifacts" / "camera-outdoor.png",
-    "topWallDetail": ROOT / "artifacts" / "top-wall-detail.png",
+    "worldOverview": ARTIFACT_DIR / "world-overview.png",
+    "cameraIndoor": ARTIFACT_DIR / "camera-indoor.png",
+    "cameraOutdoor": ARTIFACT_DIR / "camera-outdoor.png",
+    "topWallDetail": ARTIFACT_DIR / "top-wall-detail.png",
 }
 
 OUTDOOR_FRAMES = {

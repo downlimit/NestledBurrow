@@ -14,15 +14,15 @@ Task #001 — Первая расчистка участка (PR #81)
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #063`.
+**Следующий свободный номер:** `Task #064`.
 
 ## Сейчас
 
-### Task #062 — Вынести build orchestration из WorldScene
+### Task #063 — Ускорить Codex delivery loop
 
 **Статус:** `Выполнено`.
 
-**Результат:** Player-facing размещение, перемещение, снос, preview и grouped undo построек перенесены из `WorldScene` в `WorldBuildCoordinator`; `BuildModeRuntime` сохранил UI/input lifecycle, а runtime owners объектов — собственные состояния и мутации.
+**Результат:** Добавлены единый preflight, owner-impact scan, лестница локальных проверок, fail-safe PR metadata для CI/preview routing, connector-first native auto-merge route и замер времени delivery-фаз. Python-артефакты локальных проверок вынесены в OS temp.
 
 ## Следующий продуктовый вопрос
 

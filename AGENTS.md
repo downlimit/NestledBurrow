@@ -22,7 +22,7 @@ Read:
 
 Do not read `PROJECT.md`, `LEAD.md`, full `GAME.md`, full `ROADMAP.md`, `FAST_LOOP.md`, every `systems/*.md` or historical `tasks/*.md` unless the task explicitly changes their facts. Expand context only after finding a real dependency.
 
-Before editing: fetch, branch from supplied Base SHA/current `origin/main`, inspect owner and consumers, preserve unrelated work. Use one isolated normal-permission worktree when needed.
+Before editing: fetch, branch from supplied Base SHA/current `origin/main`, preserve unrelated work, then run `npm run codex:preflight -- --base <sha> --install` in the isolated normal-permission worktree. For owner or coordinator refactors, run `npm run codex:impact -- --source <owner-path>` before edits and inspect importers plus contract checks.
 
 When resuming accepted local work, reread current `origin/main:AGENTS.md`, fetch and make the accepted commit a descendant of current `origin/main` before first push/PR. Never spend CI on a knowingly stale head.
 
@@ -62,6 +62,8 @@ Use one strong proof per material risk. A successful proof remains valid until r
 
 **Strict publication:** run `npm run check` once plus only missing task-specific proof. Local E2E is exceptional; full E2E belongs to PR CI.
 
+Use `npm run codex:validate -- --base <sha> --task <number>` for the local syntax/task/direct-check ladder. Add `--full` exactly once for Strict work. The ladder discovers source-address contract checks; do not rerun successful levels manually.
+
 Environment:
 
 - install dependencies only when missing/changed;
@@ -87,11 +89,13 @@ Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and
 
 ## GitHub
 
-Prefer the connector. Create one non-draft PR after acceptance/local validation. Wait for final-head CI; repair deterministic failures in the same branch/PR.
+Prefer the connector. Fill the `nestled-burrow-delivery:v1` PR metadata with explicit values; incomplete metadata falls back to path-based preview routing. Create one non-draft PR after acceptance/local validation, enable native auto-merge through the connector when metadata permits it, verify the exact PR head SHA, then use one bounded final-head CI wait.
 
 Before repair, wait until every job for current head is terminal and collect failures in one pass. Load only failing steps. Poll at least 45 seconds apart; prefer auto-merge and one bounded wait.
 
 After green CI, merge and update local `main` unless prohibited. Never create review requests, issues, replacement PRs or extra branches without request.
+
+For the next three delivered tasks, record phase evidence with `npm run delivery:timing -- start <task>` and marks for `implementation`, `local-validation`, `git-github`, `remote-ci` and `cleanup`. The state lives in OS temp and must stay out of commits.
 
 ## Special
 

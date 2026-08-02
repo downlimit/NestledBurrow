@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
+ARTIFACT_DIR = Path(os.environ.get("NESTLEDBURROW_ARTIFACT_DIR", ROOT / "artifacts"))
 BUILDER = ROOT / "scripts/build-character-diagonals.py"
 KENNEY_ROOT = Path("public/assets/third-party/kenney")
 OUTPUTS = {
@@ -109,10 +111,10 @@ def main() -> None:
             )
 
         source_contact = validation_root / "artifacts/character-diagonal-contact-sheet.png"
-        target_contact = ROOT / "artifacts/character-diagonal-contact-sheet.png"
+        target_contact = ARTIFACT_DIR / "character-diagonal-contact-sheet.png"
         target_contact.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_contact, target_contact)
-        print(f"Character diagonal audit passed; contact sheet: {target_contact.relative_to(ROOT)}")
+        print(f"Character diagonal audit passed; contact sheet: {target_contact}")
 
 
 if __name__ == "__main__":
