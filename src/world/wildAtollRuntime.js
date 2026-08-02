@@ -65,6 +65,7 @@ export function createWildAtollRuntime(scene, {
     .setVisible(false);
 
   let mountedWorldId = null;
+  let observedWorldId = null;
   let runActive = false;
   let runSeed = "";
   let arenaId = null;
@@ -163,7 +164,7 @@ export function createWildAtollRuntime(scene, {
     scene.interactionRuntime?.refresh?.();
   }
 
-  function clearArenaPresentation({ removeResourceState = true } = {}) {
+  function clearArenaPresentation({ removeResourceState = true, resetCandidate = true } = {}) {
     const owner = debrisRuntime();
     for (const resourceId of activeResourceIds) {
       if (owner?.getResourceDefinition?.(resourceId)) {
@@ -176,7 +177,7 @@ export function createWildAtollRuntime(scene, {
     activeResourceIds = [];
     for (const object of arenaVisuals) object.destroy?.();
     arenaVisuals = [];
-    scene.interactionRuntime?.resetCandidate?.();
+    if (resetCandidate) scene.interactionRuntime?.resetCandidate?.();
   }
 
   function clearKnownArenaResourceState() {
@@ -239,7 +240,8 @@ export function createWildAtollRuntime(scene, {
   function update() {
     if (destroyed) return;
     const worldId = getWorldId();
-    if (worldId !== mountedWorldId) {
+    if (worldId !== observedWorldId) {
+      observedWorldId = worldId;
       unmountCurrentWorld();
       if (worldId === WORLD_IDS.nest) mountNestEntrance();
       else if (worldId === WORLD_IDS.atoll) mountAtollRun();
@@ -252,7 +254,8 @@ export function createWildAtollRuntime(scene, {
       && Number(scene.sessionState?.gameplay?.currentEnergy) <= 0) {
       beginCollapseRecovery();
     }
-    if (!mountedWorldId || collapseRecoveryActive) {
+    const supportedWorld = mountedWorldId === WORLD_IDS.nest || mountedWorldId === WORLD_IDS.atoll;
+    if (!supportedWorld || collapseRecoveryActive) {
       candidate = null;
       renderPrompt();
       return;
@@ -288,6 +291,7 @@ export function createWildAtollRuntime(scene, {
   }
 
   function renderPrompt() {
+    if (destroyed) return;
     const value = candidate ? translate(candidate.labelKey) : "";
     const visible = Boolean(mountedWorldId && candidate && value && !collapseRecoveryActive);
     promptBackground.clear().setVisible(visible);
@@ -464,6 +468,7 @@ export function createWildAtollRuntime(scene, {
     }),
     startArena(nextArenaId, { seed = `${Date.now()}` } = {}) {
       if (getWorldId() !== WORLD_IDS.atoll) return { status: "wrong-world", started: false };
+      observedWorldId = WORLD_IDS.atoll;
       mountedWorldId = WORLD_IDS.atoll;
       runActive = true;
       runSeed = String(seed);
@@ -475,15 +480,20 @@ export function createWildAtollRuntime(scene, {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      unsubscribe?.();
+      scene.events.off("update", update);
+      globalThis.window?.removeEventListener?.("keydown", onKeyboard);
       restoreSleepTimeScale();
       collapseDelay?.remove?.(false);
       collapseDelay = null;
       scene.tweens.killTweensOf(blackout);
       scene.atollCollapseTransitionActive = false;
-      unmountCurrentWorld();
-      unsubscribe?.();
-      scene.events.off("update", update);
-      globalThis.window?.removeEventListener?.("keydown", onKeyboard);
+      clearArenaPresentation({ removeResourceState: true, resetCandidate: false });
+      observedWorldId = null;
+      mountedWorldId = null;
+      runActive = false;
+      arenaId = null;
+      candidate = null;
       promptZone.destroy();
       promptBackground.destroy();
       promptText.destroy();
