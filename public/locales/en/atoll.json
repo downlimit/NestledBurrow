@@ -53,10 +53,10 @@
       "left1": "QUIET SHORE",
       "right1": "TRACKED PATH",
       "left2": "SMOKE IN THE TREES",
-      "right2": "OLD JETTY",
+      "right2": "OLD PILINGS",
       "left3": "STRANGE LANTERN",
       "right3": "LOW BRIDGE",
-      "edge": "ISLAND AHEAD"
+      "edge": "ISLAND JETTY"
     },
     "deep-skerries": {
       "root": "SHADED VERGE",
@@ -105,8 +105,8 @@
       "left2": "MUFFLED BELL",
       "right2": "STRANGE FIRE",
       "left3": "OLD WALKWAY",
-      "right3": "STONE JETTY",
-      "edge": "ISLAND IN SHADOW"
+      "right3": "STONE PILINGS",
+      "edge": "SHADOW JETTY"
     },
     "deep-grotto": {
       "root": "LOWER ENTRANCE",
@@ -166,10 +166,10 @@
       "left1": "SPACE - QUIET SHORE",
       "right1": "SPACE - TRACKED PATH",
       "left2": "SPACE - SMOKE IN THE TREES",
-      "right2": "SPACE - OLD JETTY",
+      "right2": "SPACE - OLD PILINGS",
       "left3": "SPACE - STRANGE LANTERN",
       "right3": "SPACE - LOW BRIDGE",
-      "edge": "SPACE - ISLAND AHEAD"
+      "edge": "SPACE - ISLAND JETTY"
     },
     "deep-skerries": {
       "root": "SPACE - SHADED VERGE",
@@ -218,8 +218,8 @@
       "left2": "SPACE - MUFFLED BELL",
       "right2": "SPACE - STRANGE FIRE",
       "left3": "SPACE - OLD WALKWAY",
-      "right3": "SPACE - STONE JETTY",
-      "edge": "SPACE - ISLAND IN SHADOW"
+      "right3": "SPACE - STONE PILINGS",
+      "edge": "SPACE - SHADOW JETTY"
     },
     "deep-grotto": {
       "root": "SPACE - LOWER ENTRANCE",
