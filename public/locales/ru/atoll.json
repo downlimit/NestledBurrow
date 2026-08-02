@@ -4,20 +4,28 @@
   "promptEnter": "SPACE - ДИКИЙ АТОЛЛ",
   "segments": {
     "starter": "ПЕРВЫЕ ТРОПЫ",
-    "forestT1": "ПОД СЕНЬЮ КРОН",
-    "mineT1": "ПОД КАМЕННЫМ НЕБОМ",
-    "forestGroveT2": "ГЛУХАЯ ЧАЩА",
-    "forestWetlandsT2": "СЫРЫЕ НИЗИНЫ",
-    "mineCrystalT2": "ХРУСТАЛЬНЫЕ ШТОЛЬНИ",
-    "mineDepthsT2": "НИЖНИЕ ВЫРАБОТКИ"
+    "sereneSkerries": "БЕЗМЯТЕЖНЫЕ ШХЕРЫ",
+    "forestedIsthmus": "ЛЕСИСТАЯ ПЕРЕЙМА",
+    "deepSkerries": "ДРЕМУЧИЕ ШХЕРЫ",
+    "motu": "МОТУ",
+    "fearsomeSkerries": "ГРОЗНЫЕ ШХЕРЫ",
+    "sereneGrotto": "БЕЗМЯТЕЖНЫЙ ГРОТ",
+    "shadowIsthmus": "ТЕНЕВАЯ ПЕРЕЙМА",
+    "deepGrotto": "ГЛУБОКИЙ ГРОТ",
+    "blueHole": "ГОЛУБАЯ ДЫРА",
+    "relictGrotto": "РЕЛИКТОВЫЙ ГРОТ"
   },
   "segmentPaths": {
-    "forest-t1": "SPACE - В ЛЕС",
-    "mine-t1": "SPACE - В ШАХТЫ",
-    "forest-grove-t2": "SPACE - В ЧАЩУ",
-    "forest-wetlands-t2": "SPACE - В НИЗИНЫ",
-    "mine-crystal-t2": "SPACE - К КРИСТАЛЛАМ",
-    "mine-depths-t2": "SPACE - В ГЛУБИНУ"
+    "serene-skerries": "SPACE - В БЕЗМЯТЕЖНЫЕ ШХЕРЫ",
+    "forested-isthmus": "SPACE - НА ЛЕСИСТУЮ ПЕРЕЙМУ",
+    "deep-skerries": "SPACE - В ДРЕМУЧИЕ ШХЕРЫ",
+    "motu": "SPACE - В МОТУ",
+    "fearsome-skerries": "SPACE - В ГРОЗНЫЕ ШХЕРЫ",
+    "serene-grotto": "SPACE - В БЕЗМЯТЕЖНЫЙ ГРОТ",
+    "shadow-isthmus": "SPACE - НА ТЕНЕВУЮ ПЕРЕЙМУ",
+    "deep-grotto": "SPACE - В ГЛУБОКИЙ ГРОТ",
+    "blue-hole": "SPACE - В ГОЛУБУЮ ДЫРУ",
+    "relict-grotto": "SPACE - В РЕЛИКТОВЫЙ ГРОТ"
   },
   "arenas": {
     "starter": {
@@ -30,29 +38,29 @@
       "right3": "ОСЫПЬ",
       "edge": "ПЕРЕВАЛ"
     },
-    "forest-t1": {
-      "root": "ОПУШКА",
-      "left1": "БЕРЕЗНЯК",
-      "right1": "ВАЛЕЖНИК",
+    "serene-skerries": {
+      "root": "ТИХАЯ ОПУШКА",
+      "left1": "СВЕТЛАЯ ПОЛЯНА",
+      "right1": "БЕРЁЗОВЫЙ СКЛОН",
       "left2": "РУЧЕЙ",
       "right2": "ПАПОРОТНИКИ",
-      "left3": "СТАРЫЕ КОРНИ",
-      "right3": "КАМЕННЫЙ СКЛОН",
-      "edge": "КРАЙ ЛЕСА"
+      "left3": "МЯГКИЙ МОХ",
+      "right3": "СОЛНЕЧНАЯ КРОМКА",
+      "edge": "ДАЛЬНИЙ БЕРЕГ"
     },
-    "mine-t1": {
-      "root": "ВХОД",
-      "left1": "ШТОЛЬНЯ",
-      "right1": "ОСЫПЬ",
-      "left2": "СТАРЫЙ ЗАЛ",
-      "right2": "УЗКИЙ ХОД",
-      "left3": "НИЖНИЙ ХОД",
-      "right3": "ТРЕЩИНА",
-      "edge": "ГЛУБИНА"
+    "forested-isthmus": {
+      "root": "ПЕСЧАНАЯ КОСА",
+      "left1": "ТИХИЙ БЕРЕГ",
+      "right1": "ТРОПА СЛЕДОВ",
+      "left2": "ДЫМ В КРОНАХ",
+      "right2": "СТАРЫЙ ПРИЧАЛ",
+      "left3": "ЧУЖОЙ ФОНАРЬ",
+      "right3": "НИЗКИЙ МОСТ",
+      "edge": "ОСТРОВ ВПЕРЕДИ"
     },
-    "forest-grove-t2": {
-      "root": "ТЁМНАЯ ОПУШКА",
-      "left1": "СОСНЯК",
+    "deep-skerries": {
+      "root": "ЗАТЕНЁННАЯ ОПУШКА",
+      "left1": "СОСНОВАЯ ГРЯДА",
       "right1": "БУРЕЛОМ",
       "left2": "МХОВАЯ ЛОЖБИНА",
       "right2": "ГУСТАЯ ЧАЩА",
@@ -60,108 +68,188 @@
       "right3": "КАМЕННЫЙ РУЧЕЙ",
       "edge": "ДАЛЬНЯЯ КРОМКА"
     },
-    "forest-wetlands-t2": {
-      "root": "СЫРАЯ ПОЛЯНА",
-      "left1": "ТРОСТНИКИ",
-      "right1": "ТОПЬ",
-      "left2": "МЕЛКИЙ ПРУД",
-      "right2": "МОКРЫЕ КОРНИ",
-      "left3": "ОСТРОВОК",
-      "right3": "ГЛИНЯНЫЙ БЕРЕГ",
-      "edge": "КРАЙ НИЗИНЫ"
+    "motu": {
+      "root": "БЕРЕГ МОТУ",
+      "left1": "КАМНИ ДУШ",
+      "right1": "ТИХИЕ ИДОЛЫ",
+      "left2": "ЖИВОЙ КРИСТАЛЛ",
+      "right2": "САД ОБЛОМКОВ",
+      "left3": "СВЕТЯЩАЯСЯ ЖИЛА",
+      "right3": "КРУГ КАМНЕЙ",
+      "edge": "СЕРДЦЕ МОТУ"
     },
-    "mine-crystal-t2": {
-      "root": "БЛЕСК У ВХОДА",
-      "left1": "БЕЛАЯ ЖИЛА",
-      "right1": "СИНИЙ СКОЛ",
-      "left2": "ЗВОНКИЙ ЗАЛ",
-      "right2": "КРИСТАЛЬНЫЙ ХОД",
-      "left3": "РАЗЛОМ",
-      "right3": "КАМЕННЫЙ МОСТ",
-      "edge": "ДАЛЬНЯЯ ШТОЛЬНЯ"
+    "fearsome-skerries": {
+      "root": "ГРОЗОВОЙ БЕРЕГ",
+      "left1": "МЁРТВЫЕ СОСНЫ",
+      "right1": "СЛЕД БЕЗ ЗВЕРЯ",
+      "left2": "ЧЁРНЫЙ БУРЕЛОМ",
+      "right2": "ШЕПОЧУЩАЯ ЧАЩА",
+      "left3": "ХИЩНАЯ ТРОПА",
+      "right3": "БЕЗМОЛВНЫЕ КОРНИ",
+      "edge": "КРАЙ БУРИ"
     },
-    "mine-depths-t2": {
+    "serene-grotto": {
+      "root": "ТИХИЙ ВХОД",
+      "left1": "ПЕСЧАНЫЙ ХОД",
+      "right1": "СУХАЯ ГАЛЕРЕЯ",
+      "left2": "СВЕТЛЫЙ ЗАЛ",
+      "right2": "КАМЕННАЯ АРКА",
+      "left3": "НЕГЛУБОКИЙ СПУСК",
+      "right3": "ТИХАЯ ТРЕЩИНА",
+      "edge": "ДАЛЬНИЙ СВОД"
+    },
+    "shadow-isthmus": {
+      "root": "ТЕНЕВОЙ ВХОД",
+      "left1": "УЗКАЯ КОСА",
+      "right1": "СЛЕДЫ В ПЫЛИ",
+      "left2": "ГЛУХОЙ ЗВОН",
+      "right2": "ЧУЖОЙ ОГОНЬ",
+      "left3": "СТАРЫЙ НАСТИЛ",
+      "right3": "КАМЕННЫЙ ПРИЧАЛ",
+      "edge": "ОСТРОВ В ТЕНИ"
+    },
+    "deep-grotto": {
       "root": "НИЖНИЙ ВХОД",
-      "left1": "ТЁМНЫЙ ХОД",
-      "right1": "ОБВАЛ",
+      "left1": "ТЁМНАЯ ГАЛЕРЕЯ",
+      "right1": "СТАРЫЙ ОБВАЛ",
       "left2": "ГЛУБОКИЙ ЗАЛ",
-      "right2": "УЗКАЯ ШАХТА",
-      "left3": "СТАРЫЙ ЗАБОЙ",
-      "right3": "ЧЁРНАЯ ТРЕЩИНА",
-      "edge": "НИЖНИЙ КРАЙ"
+      "right2": "УЗКИЙ ХОД",
+      "left3": "НИЖНИЙ СПУСК",
+      "right3": "ХОЛОДНАЯ ТРЕЩИНА",
+      "edge": "ДАЛЬНИЙ СВОД"
+    },
+    "blue-hole": {
+      "root": "СИНИЙ СПУСК",
+      "left1": "МАГНИТНАЯ ЖИЛА",
+      "right1": "МЕДНЫЙ ЗВОН",
+      "left2": "ЧЁРНЫЙ СПЛАВ",
+      "right2": "ИСКРЯЩИЙСЯ КАМЕНЬ",
+      "left3": "ПОЛЮСНЫЙ ЗАЛ",
+      "right3": "ГРОЗОВАЯ ТРЕЩИНА",
+      "edge": "ДНО ДЫРЫ"
+    },
+    "relict-grotto": {
+      "root": "РЕЛИКТОВЫЙ ВХОД",
+      "left1": "ЗАЛ БЕЗ ЭХА",
+      "right1": "СЛЕПАЯ ЖИЛА",
+      "left2": "НЕЧЕЙ АЛТАРЬ",
+      "right2": "ДЫШАЩИЙ КАМЕНЬ",
+      "left3": "ХОД БЕЗ СЛЕДОВ",
+      "right3": "ЧЁРНЫЙ ПРОВАЛ",
+      "edge": "ДРЕВНИЙ ПРЕДЕЛ"
     }
   },
   "paths": {
     "nest": "SPACE - В ГНЕЗДО",
     "starter": {
-      "root": "SPACE - НА КРАЙ",
-      "left1": "SPACE - К ПОЛЯНЕ",
-      "right1": "SPACE - К КАМНЯМ",
-      "left2": "SPACE - К ПРУДУ",
-      "right2": "SPACE - В ЗАРОСЛИ",
-      "left3": "SPACE - К КОРНЯМ",
-      "right3": "SPACE - К ОСЫПИ",
-      "edge": "SPACE - НА ПЕРЕВАЛ"
+      "root": "SPACE - КРАЙ",
+      "left1": "SPACE - ПОЛЯНА",
+      "right1": "SPACE - КАМНИ",
+      "left2": "SPACE - ПРУД",
+      "right2": "SPACE - ЗАРОСЛИ",
+      "left3": "SPACE - КОРНИ",
+      "right3": "SPACE - ОСЫПЬ",
+      "edge": "SPACE - ПЕРЕВАЛ"
     },
-    "forest-t1": {
-      "root": "SPACE - НА ОПУШКУ",
-      "left1": "SPACE - В БЕРЕЗНЯК",
-      "right1": "SPACE - К ВАЛЕЖНИКУ",
-      "left2": "SPACE - К РУЧЬЮ",
-      "right2": "SPACE - К ПАПОРОТНИКАМ",
-      "left3": "SPACE - К СТАРЫМ КОРНЯМ",
-      "right3": "SPACE - НА КАМЕННЫЙ СКЛОН",
-      "edge": "SPACE - К КРАЮ ЛЕСА"
+    "serene-skerries": {
+      "root": "SPACE - ТИХАЯ ОПУШКА",
+      "left1": "SPACE - СВЕТЛАЯ ПОЛЯНА",
+      "right1": "SPACE - БЕРЁЗОВЫЙ СКЛОН",
+      "left2": "SPACE - РУЧЕЙ",
+      "right2": "SPACE - ПАПОРОТНИКИ",
+      "left3": "SPACE - МЯГКИЙ МОХ",
+      "right3": "SPACE - СОЛНЕЧНАЯ КРОМКА",
+      "edge": "SPACE - ДАЛЬНИЙ БЕРЕГ"
     },
-    "mine-t1": {
-      "root": "SPACE - КО ВХОДУ",
-      "left1": "SPACE - В ШТОЛЬНЮ",
-      "right1": "SPACE - К ОСЫПИ",
-      "left2": "SPACE - В СТАРЫЙ ЗАЛ",
-      "right2": "SPACE - В УЗКИЙ ХОД",
-      "left3": "SPACE - В НИЖНИЙ ХОД",
-      "right3": "SPACE - К ТРЕЩИНЕ",
-      "edge": "SPACE - В ГЛУБИНУ"
+    "forested-isthmus": {
+      "root": "SPACE - ПЕСЧАНАЯ КОСА",
+      "left1": "SPACE - ТИХИЙ БЕРЕГ",
+      "right1": "SPACE - ТРОПА СЛЕДОВ",
+      "left2": "SPACE - ДЫМ В КРОНАХ",
+      "right2": "SPACE - СТАРЫЙ ПРИЧАЛ",
+      "left3": "SPACE - ЧУЖОЙ ФОНАРЬ",
+      "right3": "SPACE - НИЗКИЙ МОСТ",
+      "edge": "SPACE - ОСТРОВ ВПЕРЕДИ"
     },
-    "forest-grove-t2": {
-      "root": "SPACE - НА ТЁМНУЮ ОПУШКУ",
-      "left1": "SPACE - В СОСНЯК",
-      "right1": "SPACE - К БУРЕЛОМУ",
-      "left2": "SPACE - В МХОВУЮ ЛОЖБИНУ",
-      "right2": "SPACE - В ГУСТУЮ ЧАЩУ",
-      "left3": "SPACE - В КОРНЕВОЙ ХОД",
-      "right3": "SPACE - К КАМЕННОМУ РУЧЬЮ",
-      "edge": "SPACE - К ДАЛЬНЕЙ КРОМКЕ"
+    "deep-skerries": {
+      "root": "SPACE - ЗАТЕНЁННАЯ ОПУШКА",
+      "left1": "SPACE - СОСНОВАЯ ГРЯДА",
+      "right1": "SPACE - БУРЕЛОМ",
+      "left2": "SPACE - МХОВАЯ ЛОЖБИНА",
+      "right2": "SPACE - ГУСТАЯ ЧАЩА",
+      "left3": "SPACE - КОРНЕВОЙ ХОД",
+      "right3": "SPACE - КАМЕННЫЙ РУЧЕЙ",
+      "edge": "SPACE - ДАЛЬНЯЯ КРОМКА"
     },
-    "forest-wetlands-t2": {
-      "root": "SPACE - НА СЫРУЮ ПОЛЯНУ",
-      "left1": "SPACE - В ТРОСТНИКИ",
-      "right1": "SPACE - В ТОПЬ",
-      "left2": "SPACE - К МЕЛКОМУ ПРУДУ",
-      "right2": "SPACE - К МОКРЫМ КОРНЯМ",
-      "left3": "SPACE - НА ОСТРОВОК",
-      "right3": "SPACE - К ГЛИНЯНОМУ БЕРЕГУ",
-      "edge": "SPACE - К КРАЮ НИЗИНЫ"
+    "motu": {
+      "root": "SPACE - БЕРЕГ МОТУ",
+      "left1": "SPACE - КАМНИ ДУШ",
+      "right1": "SPACE - ТИХИЕ ИДОЛЫ",
+      "left2": "SPACE - ЖИВОЙ КРИСТАЛЛ",
+      "right2": "SPACE - САД ОБЛОМКОВ",
+      "left3": "SPACE - СВЕТЯЩАЯСЯ ЖИЛА",
+      "right3": "SPACE - КРУГ КАМНЕЙ",
+      "edge": "SPACE - СЕРДЦЕ МОТУ"
     },
-    "mine-crystal-t2": {
-      "root": "SPACE - К БЛЕСКУ У ВХОДА",
-      "left1": "SPACE - К БЕЛОЙ ЖИЛЕ",
-      "right1": "SPACE - К СИНЕМУ СКОЛУ",
-      "left2": "SPACE - В ЗВОНКИЙ ЗАЛ",
-      "right2": "SPACE - В КРИСТАЛЬНЫЙ ХОД",
-      "left3": "SPACE - К РАЗЛОМУ",
-      "right3": "SPACE - НА КАМЕННЫЙ МОСТ",
-      "edge": "SPACE - В ДАЛЬНЮЮ ШТОЛЬНЮ"
+    "fearsome-skerries": {
+      "root": "SPACE - ГРОЗОВОЙ БЕРЕГ",
+      "left1": "SPACE - МЁРТВЫЕ СОСНЫ",
+      "right1": "SPACE - СЛЕД БЕЗ ЗВЕРЯ",
+      "left2": "SPACE - ЧЁРНЫЙ БУРЕЛОМ",
+      "right2": "SPACE - ШЕПОЧУЩАЯ ЧАЩА",
+      "left3": "SPACE - ХИЩНАЯ ТРОПА",
+      "right3": "SPACE - БЕЗМОЛВНЫЕ КОРНИ",
+      "edge": "SPACE - КРАЙ БУРИ"
     },
-    "mine-depths-t2": {
-      "root": "SPACE - К НИЖНЕМУ ВХОДУ",
-      "left1": "SPACE - В ТЁМНЫЙ ХОД",
-      "right1": "SPACE - К ОБВАЛУ",
-      "left2": "SPACE - В ГЛУБОКИЙ ЗАЛ",
-      "right2": "SPACE - В УЗКУЮ ШАХТУ",
-      "left3": "SPACE - К СТАРОМУ ЗАБОЮ",
-      "right3": "SPACE - К ЧЁРНОЙ ТРЕЩИНЕ",
-      "edge": "SPACE - К НИЖНЕМУ КРАЮ"
+    "serene-grotto": {
+      "root": "SPACE - ТИХИЙ ВХОД",
+      "left1": "SPACE - ПЕСЧАНЫЙ ХОД",
+      "right1": "SPACE - СУХАЯ ГАЛЕРЕЯ",
+      "left2": "SPACE - СВЕТЛЫЙ ЗАЛ",
+      "right2": "SPACE - КАМЕННАЯ АРКА",
+      "left3": "SPACE - НЕГЛУБОКИЙ СПУСК",
+      "right3": "SPACE - ТИХАЯ ТРЕЩИНА",
+      "edge": "SPACE - ДАЛЬНИЙ СВОД"
+    },
+    "shadow-isthmus": {
+      "root": "SPACE - ТЕНЕВОЙ ВХОД",
+      "left1": "SPACE - УЗКАЯ КОСА",
+      "right1": "SPACE - СЛЕДЫ В ПЫЛИ",
+      "left2": "SPACE - ГЛУХОЙ ЗВОН",
+      "right2": "SPACE - ЧУЖОЙ ОГОНЬ",
+      "left3": "SPACE - СТАРЫЙ НАСТИЛ",
+      "right3": "SPACE - КАМЕННЫЙ ПРИЧАЛ",
+      "edge": "SPACE - ОСТРОВ В ТЕНИ"
+    },
+    "deep-grotto": {
+      "root": "SPACE - НИЖНИЙ ВХОД",
+      "left1": "SPACE - ТЁМНАЯ ГАЛЕРЕЯ",
+      "right1": "SPACE - СТАРЫЙ ОБВАЛ",
+      "left2": "SPACE - ГЛУБОКИЙ ЗАЛ",
+      "right2": "SPACE - УЗКИЙ ХОД",
+      "left3": "SPACE - НИЖНИЙ СПУСК",
+      "right3": "SPACE - ХОЛОДНАЯ ТРЕЩИНА",
+      "edge": "SPACE - ДАЛЬНИЙ СВОД"
+    },
+    "blue-hole": {
+      "root": "SPACE - СИНИЙ СПУСК",
+      "left1": "SPACE - МАГНИТНАЯ ЖИЛА",
+      "right1": "SPACE - МЕДНЫЙ ЗВОН",
+      "left2": "SPACE - ЧЁРНЫЙ СПЛАВ",
+      "right2": "SPACE - ИСКРЯЩИЙСЯ КАМЕНЬ",
+      "left3": "SPACE - ПОЛЮСНЫЙ ЗАЛ",
+      "right3": "SPACE - ГРОЗОВАЯ ТРЕЩИНА",
+      "edge": "SPACE - ДНО ДЫРЫ"
+    },
+    "relict-grotto": {
+      "root": "SPACE - РЕЛИКТОВЫЙ ВХОД",
+      "left1": "SPACE - ЗАЛ БЕЗ ЭХА",
+      "right1": "SPACE - СЛЕПАЯ ЖИЛА",
+      "left2": "SPACE - НЕЧЕЙ АЛТАРЬ",
+      "right2": "SPACE - ДЫШАЩИЙ КАМЕНЬ",
+      "left3": "SPACE - ХОД БЕЗ СЛЕДОВ",
+      "right3": "SPACE - ЧЁРНЫЙ ПРОВАЛ",
+      "edge": "SPACE - ДРЕВНИЙ ПРЕДЕЛ"
     }
   }
 }
