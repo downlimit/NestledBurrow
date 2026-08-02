@@ -1,0 +1,167 @@
+{
+  "arrival": "You entered the Wild Atoll.",
+  "leftRun": "You returned to the Island Nest.",
+  "promptEnter": "SPACE - WILD ATOLL",
+  "segments": {
+    "starter": "FIRST TRAILS",
+    "forestT1": "BENEATH THE CANOPY",
+    "mineT1": "UNDER A STONE SKY",
+    "forestGroveT2": "DEEP WOODS",
+    "forestWetlandsT2": "WET LOWLANDS",
+    "mineCrystalT2": "CRYSTAL GALLERIES",
+    "mineDepthsT2": "LOWER WORKINGS"
+  },
+  "segmentPaths": {
+    "forest-t1": "SPACE - FOREST T1",
+    "mine-t1": "SPACE - MINES T1",
+    "forest-grove-t2": "SPACE - DEEP WOODS T2",
+    "forest-wetlands-t2": "SPACE - LOWLANDS T2",
+    "mine-crystal-t2": "SPACE - CRYSTALS T2",
+    "mine-depths-t2": "SPACE - DEPTHS T2"
+  },
+  "arenas": {
+    "starter": {
+      "root": "EDGE",
+      "left1": "MEADOW",
+      "right1": "STONES",
+      "left2": "POND",
+      "right2": "THICKET",
+      "left3": "ROOTS",
+      "right3": "SCREE",
+      "edge": "PASS"
+    },
+    "forest-t1": {
+      "root": "FOREST EDGE",
+      "left1": "BIRCH GROVE",
+      "right1": "DEADFALL",
+      "left2": "STREAM",
+      "right2": "FERNS",
+      "left3": "OLD ROOTS",
+      "right3": "STONE SLOPE",
+      "edge": "FAR EDGE"
+    },
+    "mine-t1": {
+      "root": "ENTRANCE",
+      "left1": "GALLERY",
+      "right1": "ROCKFALL",
+      "left2": "OLD HALL",
+      "right2": "NARROW PASS",
+      "left3": "LOWER PASS",
+      "right3": "FISSURE",
+      "edge": "DEPTHS"
+    },
+    "forest-grove-t2": {
+      "root": "DARK EDGE",
+      "left1": "PINE GROVE",
+      "right1": "WINDFALL",
+      "left2": "MOSSY HOLLOW",
+      "right2": "DEEP THICKET",
+      "left3": "ROOT PASS",
+      "right3": "STONE BROOK",
+      "edge": "FAR BORDER"
+    },
+    "forest-wetlands-t2": {
+      "root": "WET CLEARING",
+      "left1": "REEDS",
+      "right1": "BOG",
+      "left2": "SHALLOW POND",
+      "right2": "WET ROOTS",
+      "left3": "ISLET",
+      "right3": "CLAY BANK",
+      "edge": "LOWLAND EDGE"
+    },
+    "mine-crystal-t2": {
+      "root": "GLIMMERING ENTRY",
+      "left1": "WHITE VEIN",
+      "right1": "BLUE CHIP",
+      "left2": "RINGING HALL",
+      "right2": "CRYSTAL PASS",
+      "left3": "FAULT",
+      "right3": "STONE BRIDGE",
+      "edge": "FAR GALLERY"
+    },
+    "mine-depths-t2": {
+      "root": "LOWER ENTRY",
+      "left1": "DARK PASS",
+      "right1": "CAVE-IN",
+      "left2": "DEEP HALL",
+      "right2": "NARROW SHAFT",
+      "left3": "OLD FACE",
+      "right3": "BLACK FISSURE",
+      "edge": "LOWER EDGE"
+    }
+  },
+  "paths": {
+    "nest": "SPACE - TO THE NEST",
+    "starter": {
+      "root": "SPACE - TO THE EDGE",
+      "left1": "SPACE - TO THE MEADOW",
+      "right1": "SPACE - TO THE STONES",
+      "left2": "SPACE - TO THE POND",
+      "right2": "SPACE - TO THE THICKET",
+      "left3": "SPACE - TO THE ROOTS",
+      "right3": "SPACE - TO THE SCREE",
+      "edge": "SPACE - TO THE PASS"
+    },
+    "forest-t1": {
+      "root": "SPACE - TO THE FOREST EDGE",
+      "left1": "SPACE - TO THE BIRCH GROVE",
+      "right1": "SPACE - TO THE DEADFALL",
+      "left2": "SPACE - TO THE STREAM",
+      "right2": "SPACE - TO THE FERNS",
+      "left3": "SPACE - TO THE OLD ROOTS",
+      "right3": "SPACE - TO THE STONE SLOPE",
+      "edge": "SPACE - TO THE FAR EDGE"
+    },
+    "mine-t1": {
+      "root": "SPACE - TO THE ENTRANCE",
+      "left1": "SPACE - TO THE GALLERY",
+      "right1": "SPACE - TO THE ROCKFALL",
+      "left2": "SPACE - TO THE OLD HALL",
+      "right2": "SPACE - TO THE NARROW PASS",
+      "left3": "SPACE - TO THE LOWER PASS",
+      "right3": "SPACE - TO THE FISSURE",
+      "edge": "SPACE - INTO THE DEPTHS"
+    },
+    "forest-grove-t2": {
+      "root": "SPACE - TO THE DARK EDGE",
+      "left1": "SPACE - TO THE PINE GROVE",
+      "right1": "SPACE - TO THE WINDFALL",
+      "left2": "SPACE - TO THE MOSSY HOLLOW",
+      "right2": "SPACE - TO THE DEEP THICKET",
+      "left3": "SPACE - TO THE ROOT PASS",
+      "right3": "SPACE - TO THE STONE BROOK",
+      "edge": "SPACE - TO THE FAR BORDER"
+    },
+    "forest-wetlands-t2": {
+      "root": "SPACE - TO THE WET CLEARING",
+      "left1": "SPACE - TO THE REEDS",
+      "right1": "SPACE - INTO THE BOG",
+      "left2": "SPACE - TO THE SHALLOW POND",
+      "right2": "SPACE - TO THE WET ROOTS",
+      "left3": "SPACE - TO THE ISLET",
+      "right3": "SPACE - TO THE CLAY BANK",
+      "edge": "SPACE - TO THE LOWLAND EDGE"
+    },
+    "mine-crystal-t2": {
+      "root": "SPACE - TO THE GLIMMERING ENTRY",
+      "left1": "SPACE - TO THE WHITE VEIN",
+      "right1": "SPACE - TO THE BLUE CHIP",
+      "left2": "SPACE - TO THE RINGING HALL",
+      "right2": "SPACE - TO THE CRYSTAL PASS",
+      "left3": "SPACE - TO THE FAULT",
+      "right3": "SPACE - TO THE STONE BRIDGE",
+      "edge": "SPACE - TO THE FAR GALLERY"
+    },
+    "mine-depths-t2": {
+      "root": "SPACE - TO THE LOWER ENTRY",
+      "left1": "SPACE - TO THE DARK PASS",
+      "right1": "SPACE - TO THE CAVE-IN",
+      "left2": "SPACE - TO THE DEEP HALL",
+      "right2": "SPACE - TO THE NARROW SHAFT",
+      "left3": "SPACE - TO THE OLD FACE",
+      "right3": "SPACE - TO THE BLACK FISSURE",
+      "edge": "SPACE - TO THE LOWER EDGE"
+    }
+  }
+}
