@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,11 +57,11 @@ function main() {
   const paths = changedPaths(base);
   const packageScripts = JSON.parse(readFileSync("package.json", "utf8")).scripts;
   const referencedChecks = paths
-    .filter((path) => path.startsWith("src/"))
+    .filter((path) => path.startsWith("src/") && existsSync(path))
     .flatMap((path) => analyzeSource(path).checks);
 
   run("git", ["diff", "--check", base]);
-  for (const path of paths.filter((path) => [".js", ".mjs"].includes(extname(path)))) {
+  for (const path of paths.filter((path) => existsSync(path) && [".js", ".mjs"].includes(extname(path)))) {
     run(process.execPath, ["--check", path]);
   }
   const selected = selectValidationScripts(paths, task, packageScripts, referencedChecks);

@@ -196,7 +196,9 @@ assert(dragSource.includes("releasePanelAt") && modeSource.includes("stableMode:
 assert(modeSource.includes("interactionBlocked: !state.suppressed") && modeSource.includes("state.mode !== INVENTORY_MODES.PEACEFUL"), "mode owner separates Alt/combat interaction blocking from modal suppression");
 assert(hudSource.includes("isInventoryInteractionBlocked: () => inventoryModeHud.getState().interactionBlocked"), "GameHud exposes the canonical interaction block from the mode owner");
 assert(hudSource.includes("inventoryHud?.clearSelection?.()"), "entering combat clears the peaceful tool selection and its target highlight");
-assert(hudSource.includes("getGameplayState?.()?.sleeping") && hudSource.includes("scene.facilityRuntime?.isUsing?.()") && hudSource.includes("scene.cookingRuntime?.isActive?.()"), "peaceful-only sleep, facility use and cooking suppress combat inventory switching");
+assert(hudSource.includes("getGameplayState?.()?.sleeping")
+  && hudSource.includes("getLocationOwners().facilityRuntime?.isUsing?.()")
+  && hudSource.includes("getLocationOwners().cookingRuntime?.isActive?.()"), "peaceful-only sleep, facility use and cooking suppress combat inventory switching");
 assert(mainSource.includes('"inventory-action-blocked"') && mainSource.includes("isInventoryInteractionBlocked"), "interaction HUD is hidden whenever inventory mode blocks interaction");
 assert(mainSource.includes("interactionBlocked || this.suppressNextInteract"), "frame input ignores interaction while Alt or combat mode blocks it");
 assert(!persistenceSource.includes("LOADOUT_EDIT") && !persistenceSource.includes("inventoryMode"), "UI mode remains transient and outside save data");

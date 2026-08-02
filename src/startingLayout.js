@@ -174,6 +174,8 @@ function recoverTemporaryStagingFacilities(layout) {
 
 export function captureStartingLayout(scene) {
   const buildCoordinator = requireBuildCoordinator(scene);
+  const owners = getLocationOwners(scene);
+  const presentation = getPresentationRegistries(scene);
   if (!scene?.worldLayout) throw new Error("Build mode is not ready");
   const canonicalFloorKeys = scene.worldLayout.houseFloorTiles.map((tile) => buildCoordinator.getCellKey({
     x: tile.x * TILE_SIZE,
@@ -186,7 +188,7 @@ export function captureStartingLayout(scene) {
       const { sprites: _sprites, resourceDefinition: _resourceDefinition, resourceCleared: _resourceCleared, ...serializable } = object;
       return cloneJson(serializable);
     });
-  const facilities = scene.facilityRuntime?.getDefinitions?.() ?? [];
+  const facilities = owners.facilityRuntime?.getDefinitions?.() ?? [];
   const stagedFacility = facilities.find(isTemporaryStagingFacility);
   if (stagedFacility) {
     throw new Error(`Facility ${stagedFacility.id} remains in a temporary staging position`);
@@ -194,15 +196,15 @@ export function captureStartingLayout(scene) {
   return normalizeStartingLayout({
     version: STARTING_LAYOUT_VERSION,
     nextBuildObjectId: Number(buildCoordinator.getNextBuildObjectId()) || 0,
-    removedCanonicalFloors: canonicalFloorKeys.filter((key) => !scene.floorSprites.has(key)),
-    removedCanonicalWalls: canonicalWallIds.filter((id) => !scene.wallSprites.has(id)),
+    removedCanonicalFloors: canonicalFloorKeys.filter((key) => !presentation.floorSprites.has(key)),
+    removedCanonicalWalls: canonicalWallIds.filter((id) => !presentation.wallSprites.has(id)),
     buildObjects,
     facilities,
     furniture: [
-      ...(scene.meleeRuntime?.getStartingLayoutFurniture?.() ?? []),
-      ...(scene.tavernSignRuntime?.getStartingLayoutFurniture?.() ?? []),
+      ...(owners.meleeRuntime?.getStartingLayoutFurniture?.() ?? []),
+      ...(owners.tavernSignRuntime?.getStartingLayoutFurniture?.() ?? []),
     ],
-    beds: scene.debrisRuntime?.getBedDefinitions?.() ?? [],
+    beds: owners.debrisRuntime?.getBedDefinitions?.() ?? [],
   });
 }
 
@@ -256,8 +258,9 @@ export function loadStartingLayout(storage = globalThis.localStorage, projectDef
 
 function removeCanonicalWalls(scene, removedIds) {
   const buildCoordinator = requireBuildCoordinator(scene);
+  const { wallSprites } = getPresentationRegistries(scene);
   for (const id of removedIds) {
-    const entry = scene.wallSprites?.get?.(id);
+    const entry = wallSprites.get(id);
     if (!entry) continue;
     const rawX = entry.tile.worldX + TILE_SIZE / 2;
     const rawY = entry.tile.worldY + TILE_SIZE / 2;
@@ -266,7 +269,7 @@ function removeCanonicalWalls(scene, removedIds) {
 }
 
 function restoreFacilities(scene, definitions) {
-  const runtime = scene.facilityRuntime;
+  const runtime = getLocationOwners(scene).facilityRuntime;
   if (!runtime) return;
   const desiredIds = new Set(definitions.map((definition) => definition.id));
   const currentDefinitions = runtime.getDefinitions();
@@ -297,7 +300,7 @@ function restoreFacilities(scene, definitions) {
 }
 
 function restoreBeds(scene, definitions) {
-  const runtime = scene.debrisRuntime;
+  const runtime = getLocationOwners(scene).debrisRuntime;
   if (!runtime) return;
   for (const current of runtime.getBedDefinitions()) runtime.removeBed(current.id);
   for (const definition of definitions) {
@@ -308,14 +311,16 @@ function restoreBeds(scene, definitions) {
 export function applyStartingLayout(scene, value) {
   const layout = normalizeStartingLayout(value);
   const buildCoordinator = requireBuildCoordinator(scene);
+  const owners = getLocationOwners(scene);
+  const presentation = getPresentationRegistries(scene);
   if (!scene?.worldLayout) throw new Error("Build mode is not ready");
 
   for (const object of buildCoordinator.getPlacedObjects()) buildCoordinator.removeBuildPlacedObjectById(object.id);
 
   for (const key of layout.removedCanonicalFloors) {
-    const floor = scene.floorSprites?.get?.(key);
+    const floor = presentation.floorSprites.get(key);
     floor?.sprite?.destroy?.();
-    scene.floorSprites?.delete?.(key);
+    presentation.floorSprites.delete(key);
   }
   removeCanonicalWalls(scene, layout.removedCanonicalWalls);
 
@@ -331,24 +336,34 @@ export function applyStartingLayout(scene, value) {
   const unsupportedFurniture = layout.furniture.filter((definition) => !supportedFurnitureKinds.has(definition.kind));
   if (unsupportedFurniture.length) throw new Error(`Unsupported starting furniture ${unsupportedFurniture[0].id}`);
   const meleeFurniture = layout.furniture.filter(({ kind }) => kind === "training-dummy");
-  if (meleeFurniture.length && !scene.meleeRuntime?.restoreStartingLayoutFurniture?.(meleeFurniture)) {
+  if (meleeFurniture.length && !owners.meleeRuntime?.restoreStartingLayoutFurniture?.(meleeFurniture)) {
     throw new Error("Failed to restore starting furniture");
   }
   const tavernSignFurniture = layout.furniture.filter(({ kind }) => kind === TAVERN_SIGN_BUILD_KIND);
-  if (tavernSignFurniture.length && !scene.tavernSignRuntime?.restoreStartingLayoutFurniture?.(tavernSignFurniture)) {
+  if (tavernSignFurniture.length && !owners.tavernSignRuntime?.restoreStartingLayoutFurniture?.(tavernSignFurniture)) {
     throw new Error("Failed to restore starting tavern sign");
   }
   restoreBeds(scene, layout.beds);
-  scene.facilityRuntime?.syncKitchenVisuals?.();
+  owners.facilityRuntime?.syncKitchenVisuals?.();
   scene.interactionRuntime?.refresh?.();
-  scene.clearBuildPreview?.();
+  buildCoordinator.clearBuildPreview?.();
   return layout;
 }
 
 function requireBuildCoordinator(scene) {
-  const coordinator = scene?.worldBuildCoordinator;
+  const coordinator = getLocationOwners(scene).worldBuildCoordinator;
   if (!coordinator?.getPlacedObjects || !coordinator?.restoreBuildPlacedObject) {
     throw new Error("Build mode is not ready");
   }
   return coordinator;
+}
+
+function getLocationOwners(scene) {
+  return scene?.worldLocationRuntime?.getOwners?.() ?? {};
+}
+
+function getPresentationRegistries(scene) {
+  const registries = scene?.worldPresentationRuntime?.getBuildSurfaceRegistries?.();
+  if (!registries) throw new Error("World presentation is not ready");
+  return registries;
 }

@@ -129,6 +129,7 @@ export function createGameHud(scene, options) {
     playEffect = () => {},
     audioSettings,
     getGameplayState = () => null,
+    getLocationOwners = () => ({}),
     isCoarsePointer = () => false,
   } = options;
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
@@ -174,11 +175,11 @@ export function createGameHud(scene, options) {
     || optionsOpen
     || gameplayOverlayActive
     || Boolean(scene.interactionRuntime?.isDialogueActive?.())
-    || Boolean(scene.merchantRuntime?.isActive?.())
-    || Boolean(scene.buildMode?.isActive?.())
+    || Boolean(getLocationOwners().merchantRuntime?.isActive?.())
+    || Boolean(getLocationOwners().buildModeRuntime?.isActive?.())
     || Boolean(getGameplayState?.()?.sleeping)
-    || Boolean(scene.facilityRuntime?.isUsing?.())
-    || Boolean(scene.cookingRuntime?.isActive?.());
+    || Boolean(getLocationOwners().facilityRuntime?.isUsing?.())
+    || Boolean(getLocationOwners().cookingRuntime?.isActive?.());
   const transientMessages = createTransientMessageRuntime(scene, { localization });
   const throwAimIndicator = createThrowAimIndicator(scene, {
     getPlayerCharacter: () => scene.playerCharacter ?? null,
@@ -212,7 +213,7 @@ export function createGameHud(scene, options) {
     playEffect,
     onInventoryGain: (result) => inventoryGainPresentation?.notify?.(result),
     isSlotItemHidden: (slotIndex, itemId) => inventoryGainPresentation?.isSlotPending?.(slotIndex, itemId) ?? false,
-    isHeldItemSuppressed: () => Boolean(scene.meleeRuntime?.isAttacking?.()),
+    isHeldItemSuppressed: () => Boolean(getLocationOwners().meleeRuntime?.isAttacking?.()),
     setThrowAimTarget: (target) => {
       if (target) throwAimIndicator.show(target);
       else throwAimIndicator.hide();

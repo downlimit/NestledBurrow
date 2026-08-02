@@ -11,6 +11,7 @@ import { needMeterValues } from "./needsFlowRuntime.js";
 
 export function installWorldE2EBridge(scene) {
   if (!import.meta.env.VITE_E2E) return null;
+  const getLocationOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
   const bridge = {
     getSession: () => clone(scene.sessionState),
     getLanguage: () => scene.localization.getLanguage(),
@@ -54,11 +55,11 @@ export function installWorldE2EBridge(scene) {
       } : null,
       home: {
         npcCount: (scene.characterSystem?.values?.() ?? []).filter(({ id }) => id !== scene.sessionState.playerId).length,
-        facilityCount: scene.facilityRuntime?.getDefinitions?.().length ?? 0,
-        tavernPresent: Boolean(scene.tavernSignRuntime),
-        farmingPresent: Boolean(scene.farmingRuntime),
-        buildModePresent: Boolean(scene.buildMode),
-        bedPresent: Boolean(scene.debrisRuntime?.getBedDefinition?.()),
+        facilityCount: getLocationOwners().facilityRuntime?.getDefinitions?.().length ?? 0,
+        tavernPresent: Boolean(getLocationOwners().tavernSignRuntime),
+        farmingPresent: Boolean(getLocationOwners().farmingRuntime),
+        buildModePresent: Boolean(getLocationOwners().buildModeRuntime),
+        bedPresent: Boolean(getLocationOwners().debrisRuntime?.getBedDefinition?.()),
       },
     }),
     saveSession: () => scene.saveSession(),
@@ -68,10 +69,10 @@ export function installWorldE2EBridge(scene) {
       dialogue: { ...scene.sessionState.dialogue },
     }),
     getInteractionHudState: () => scene.interactionHud?.getPresentationState?.(),
-    getMerchantState: () => scene.merchantRuntime?.getState?.() ?? null,
-    getFarmingState: () => scene.farmingRuntime?.getState?.() ?? null,
-    setFarmingWeather: (segments) => scene.farmingRuntime?.setWeatherSegments?.(segments),
-    setFarmingRandomValue: (value) => scene.farmingRuntime?.setRng?.(() => Number(value)),
+    getMerchantState: () => getLocationOwners().merchantRuntime?.getState?.() ?? null,
+    getFarmingState: () => getLocationOwners().farmingRuntime?.getState?.() ?? null,
+    setFarmingWeather: (segments) => getLocationOwners().farmingRuntime?.setWeatherSegments?.(segments),
+    setFarmingRandomValue: (value) => getLocationOwners().farmingRuntime?.setRng?.(() => Number(value)),
     setCoins: (value) => {
       scene.sessionState.gameplay.coins = Math.max(0, Math.floor(Number(value) || 0));
       scene.gameHud?.render?.();
@@ -97,16 +98,17 @@ export function installWorldE2EBridge(scene) {
       return result;
     },
     dropInventorySlot: (index) => scene.gameHud?.dropInventorySlot?.(index),
-    placeWell: (point) => scene.worldBuildCoordinator?.place?.({ placement: "well" }, point),
-    getBuildModeState: () => scene.worldBuildCoordinator?.getBuildModeRuntime?.()?.getState?.() ?? null,
-    toggleBuildMode: () => scene.worldBuildCoordinator?.getBuildModeRuntime?.()?.toggle?.(),
+    placeWell: (point) => getLocationOwners().worldBuildCoordinator?.place?.({ placement: "well" }, point),
+    getBuildModeState: () => getLocationOwners().buildModeRuntime?.getState?.() ?? null,
+    toggleBuildMode: () => getLocationOwners().buildModeRuntime?.toggle?.(),
     moveTavernSign: ({ x, y }) => {
-      const state = scene.tavernSignRuntime?.getState?.();
-      const target = state ? scene.worldBuildCoordinator?.getMoveTargetAt?.(state.position) : null;
+      const owners = getLocationOwners();
+      const state = owners.tavernSignRuntime?.getState?.();
+      const target = state ? owners.worldBuildCoordinator?.getMoveTargetAt?.(state.position) : null;
       if (!target) return { status: "ignored" };
-      scene.worldBuildCoordinator?.beginBuildAction?.();
-      const result = scene.worldBuildCoordinator?.applyBuildMove?.(target, { x: Number(x), y: Number(y) });
-      scene.worldBuildCoordinator?.endBuildAction?.();
+      owners.worldBuildCoordinator?.beginBuildAction?.();
+      const result = owners.worldBuildCoordinator?.applyBuildMove?.(target, { x: Number(x), y: Number(y) });
+      owners.worldBuildCoordinator?.endBuildAction?.();
       return result;
     },
     getHudState: () => ({
@@ -123,58 +125,59 @@ export function installWorldE2EBridge(scene) {
       lastEffectType: scene.audioRuntime?.lastEffectType ?? null,
       playCount: scene.audioRuntime?.effectPlayCount ?? 0,
     }),
-    getMeleeState: () => scene.meleeRuntime?.getState?.() ?? null,
+    getMeleeState: () => getLocationOwners().meleeRuntime?.getState?.() ?? null,
     interact: () => {
       scene.frameActions = Object.freeze({ interact: true, primary: false, secondary: false });
       scene.interactionRuntime?.update({ actions: scene.frameActions });
     },
     completeInteractionApproach: () => {
-      const point = scene.needsInteractionCoordinator?.getApproachPoint?.();
+      const needsInteractionCoordinator = getLocationOwners().needsInteractionCoordinator;
+      const point = needsInteractionCoordinator?.getApproachPoint?.();
       if (!point) return false;
       const player = scene.characterSystem.require(scene.sessionState.playerId);
       player.motor.position = { ...point };
       player.motor.movement = createMovementState();
-      scene.needsInteractionCoordinator.update(0);
+      needsInteractionCoordinator.update(0);
       return true;
     },
     expireHitCooldown: () => scene.worldInteractionCoordinator?.expireResourceCooldown?.(),
     getDebrisState: () => ({
-      present: scene.debrisRuntime?.isPresent?.() ?? false,
+      present: getLocationOwners().debrisRuntime?.isPresent?.() ?? false,
       definition: scene.worldLayout?.resourceDefinitions?.[0] ?? RESOURCE_OBJECTS.find((item) => item.id === DEFAULT_RESOURCE_ID),
       definitions: scene.worldLayout?.resourceDefinitions ?? [],
-      plantedTrees: scene.movementDebugPanel?.authoringRuntime?.getPlantDefinitions?.() ?? [],
-      bed: scene.debrisRuntime?.getBedDefinition?.() ?? null,
-      beds: scene.debrisRuntime?.getBedDefinitions?.() ?? [],
+      plantedTrees: getLocationOwners().movementDebugPanel?.authoringRuntime?.getPlantDefinitions?.() ?? [],
+      bed: getLocationOwners().debrisRuntime?.getBedDefinition?.() ?? null,
+      beds: getLocationOwners().debrisRuntime?.getBedDefinitions?.() ?? [],
       wakeTile: BED_WAKE_TILE,
     }),
     getFacilityState: () => ({
-      definitions: scene.facilityRuntime?.getDefinitions?.() ?? FACILITIES,
-      activeId: scene.facilityRuntime?.getActiveId?.() ?? null,
-      visuals: scene.facilityRuntime?.getVisualStates?.() ?? {},
-      servingTableVisuals: scene.facilityRuntime?.getServingTableVisualStates?.() ?? {},
+      definitions: getLocationOwners().facilityRuntime?.getDefinitions?.() ?? FACILITIES,
+      activeId: getLocationOwners().facilityRuntime?.getActiveId?.() ?? null,
+      visuals: getLocationOwners().facilityRuntime?.getVisualStates?.() ?? {},
+      servingTableVisuals: getLocationOwners().facilityRuntime?.getServingTableVisualStates?.() ?? {},
     }),
-    getCookingState: () => scene.cookingRuntime?.getState?.() ?? null,
+    getCookingState: () => getLocationOwners().cookingRuntime?.getState?.() ?? null,
     getTavernState: () => ({
       open: scene.sessionState.gameplay.tavernOpen,
-      sign: scene.tavernSignRuntime?.getState?.(),
-      guest: scene.tavernServiceRuntime?.guestRuntime?.getState?.(),
-      service: scene.tavernServiceRuntime?.getState?.(),
+      sign: getLocationOwners().tavernSignRuntime?.getState?.(),
+      guest: getLocationOwners().guestRuntime?.getState?.(),
+      service: getLocationOwners().tavernServiceRuntime?.getState?.(),
     }),
-    getCoinState: () => scene.coinRuntime?.getState?.() ?? [],
+    getCoinState: () => getLocationOwners().coinRuntime?.getState?.() ?? [],
     addFacility: ({ facilityType, x, y } = {}) => {
-      const facility = scene.facilityRuntime?.add?.(facilityType, { x: Number(x), y: Number(y) }) ?? null;
+      const facility = getLocationOwners().facilityRuntime?.add?.(facilityType, { x: Number(x), y: Number(y) }) ?? null;
       scene.interactionRuntime?.refresh?.();
       return facility;
     },
-    forceGuestSpawn: () => scene.tavernServiceRuntime?.guestRuntime?.forceSpawn?.(),
-    setGuestRandomValue: (value) => scene.tavernServiceRuntime?.guestRuntime?.setRandomSource?.(() => Number(value)),
+    forceGuestSpawn: () => getLocationOwners().guestRuntime?.forceSpawn?.(),
+    setGuestRandomValue: (value) => getLocationOwners().guestRuntime?.setRandomSource?.(() => Number(value)),
     setServingDish: (present) => {
       scene.sessionState.gameplay.kitchen.servingTables[DEFAULT_SERVING_TABLE_ID] = {
         itemId: present ? "fried-potato-dish" : null,
         quantity: present ? 1 : 0,
         reservations: [],
       };
-      scene.facilityRuntime?.syncKitchenVisuals?.();
+      getLocationOwners().facilityRuntime?.syncKitchenVisuals?.();
     },
     setServingStock: ({ itemId = null, quantity = 0, servingTableId = DEFAULT_SERVING_TABLE_ID } = {}) => {
       scene.sessionState.gameplay.kitchen.servingTables[servingTableId] = {
@@ -182,18 +185,18 @@ export function installWorldE2EBridge(scene) {
         quantity: Math.max(0, Math.min(1, Math.floor(Number(quantity) || 0))),
         reservations: [],
       };
-      scene.facilityRuntime?.syncKitchenVisuals?.();
+      getLocationOwners().facilityRuntime?.syncKitchenVisuals?.();
       scene.interactionRuntime?.refresh?.();
     },
     setFarmWater: (value) => {
       scene.sessionState.gameplay.farm.waterBucket.currentWater = Math.max(0, Math.min(8, Math.floor(Number(value) || 0)));
       scene.gameHud?.render?.();
     },
-    purchaseSeed: (itemId) => scene.merchantRuntime?.purchase?.(itemId),
-    attemptCooking: () => scene.cookingRuntime?.attempt?.(),
-    completeCooking: () => scene.cookingRuntime?.completeForTest?.(),
-    alignCookingMarker: () => scene.cookingRuntime?.alignMarkerForTest?.(),
-    missCookingMarker: () => scene.cookingRuntime?.missMarkerForTest?.(),
+    purchaseSeed: (itemId) => getLocationOwners().merchantRuntime?.purchase?.(itemId),
+    attemptCooking: () => getLocationOwners().cookingRuntime?.attempt?.(),
+    completeCooking: () => getLocationOwners().cookingRuntime?.completeForTest?.(),
+    alignCookingMarker: () => getLocationOwners().cookingRuntime?.alignMarkerForTest?.(),
+    missCookingMarker: () => getLocationOwners().cookingRuntime?.missMarkerForTest?.(),
     newGame: () => scene.startNewGame(),
     getNeedsState: () => ({
       values: clone(scene.sessionState.gameplay.needs),
@@ -249,17 +252,16 @@ export function installWorldE2EBridge(scene) {
     },
     advanceGameplayTime: (milliseconds) => {
       const deltaMs = Math.max(0, Number(milliseconds) || 0);
-      scene.needsInteractionCoordinator?.update?.(deltaMs);
-      scene.updateGameplayTime(deltaMs);
+      scene.worldLocationRuntime?.updateRealTime?.(deltaMs);
     },
     getRuntimeState: () => ({
       sleeping: scene.sleeping,
       exhaustedSleeping: scene.exhaustedSleeping,
-      cookingActive: scene.cookingRuntime?.isActive?.() ?? false,
+      cookingActive: getLocationOwners().cookingRuntime?.isActive?.() ?? false,
       timeScale: scene.simulationScale,
       selectedTimeScale: scene.playerTimeScale,
       needsRuntime: clone(scene.needsRuntime?.getState?.() ?? {}),
-      interactionTimeline: clone(scene.needsInteractionCoordinator?.getState?.() ?? {}),
+      interactionTimeline: clone(getLocationOwners().needsInteractionCoordinator?.getState?.() ?? {}),
     }),
     setWorldTimeSeconds: (value) => {
       const seconds = Math.max(0, Number(value) || 0);
@@ -275,7 +277,7 @@ export function installWorldE2EBridge(scene) {
     }),
     getResourceState: () => clone(scene.sessionState.gameplay),
     getResourceNodeState: (id) => clone(scene.sessionState.gameplay.resourceNodes[id]),
-    getResourceVisualState: (id) => scene.debrisRuntime?.getVisualState?.(id) ?? null,
+    getResourceVisualState: (id) => getLocationOwners().debrisRuntime?.getVisualState?.(id) ?? null,
     getResourceCollider: (id) => scene.worldLayout?.getResourceCollider?.(id) ?? null,
     getCharacterSnapshot: (id) => scene.characterSystem.has(id) ? scene.characterSystem.getSnapshot(id) : null,
     getPlayerMovementState: () => ({
@@ -303,11 +305,12 @@ export function installWorldE2EBridge(scene) {
 }
 
 function placePlayerNear(scene, entityId) {
-  const resource = scene.debrisRuntime?.getResourceDefinitions?.().find((item) => item.id === entityId);
-  const facility = scene.facilityRuntime?.getDefinition?.(entityId);
-  const bed = scene.debrisRuntime?.getBedDefinition?.(entityId);
-  const well = scene.worldBuildCoordinator?.getWellState?.().find((item) => item.id === entityId);
-  const sign = entityId === TAVERN_SIGN.id ? { position: scene.tavernSignRuntime?.getState?.().interactionPosition } : null;
+  const owners = scene.worldLocationRuntime?.getOwners?.() ?? {};
+  const resource = owners.debrisRuntime?.getResourceDefinitions?.().find((item) => item.id === entityId);
+  const facility = owners.facilityRuntime?.getDefinition?.(entityId);
+  const bed = owners.debrisRuntime?.getBedDefinition?.(entityId);
+  const well = owners.worldBuildCoordinator?.getWellState?.().find((item) => item.id === entityId);
+  const sign = entityId === TAVERN_SIGN.id ? { position: owners.tavernSignRuntime?.getState?.().interactionPosition } : null;
   const target = resource
     ? { position: resource.position }
     : bed ? { position: bed.position }
