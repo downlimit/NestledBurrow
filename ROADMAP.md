@@ -14,15 +14,15 @@ Task #001 — Первая расчистка участка (PR #81)
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #064`.
+**Следующий свободный номер:** `Task #065`.
 
 ## Сейчас
 
-### Task #063 — Ускорить Codex delivery loop
+### Task #064 — Вынести world interaction dispatch из WorldScene
 
-**Статус:** `Выполнено`.
+**Статус:** `Подготовлено`.
 
-**Результат:** Добавлены единый preflight, owner-impact scan, лестница локальных проверок, fail-safe PR metadata для CI/preview routing, connector-first native auto-merge route и замер времени delivery-фаз. Python-артефакты локальных проверок вынесены в OS temp.
+**Результат:** Перенести детерминированное исполнение недиалоговых взаимодействий и transient resource-action state из `WorldScene` в явный `WorldInteractionCoordinator`, сохранив `InteractionRuntime` владельцем targeting/dialogue lifecycle, а специализированные runtime-системы — владельцами своих мутаций.
 
 ## Следующий продуктовый вопрос
 
