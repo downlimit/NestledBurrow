@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { createInventoryItem } from "../src/inventory/inventoryDomain.js";
 import { useCombatNumberSlot } from "../src/inventory/combatQuickUse.js";
 import {
-  applyWildAtollRouteEntry,
-  resolveWildAtollGrassDrop,
-  WILD_ATOLL_ROUTES,
+  createWildAtollArenaNodes,
+  getWildAtollArenaDefinition,
+  WILD_ATOLL_ARENAS,
+  WILD_ATOLL_STARTER_PATH,
 } from "../src/world/wildAtollDomain.js";
 
 function gameplayFixture() {
@@ -42,37 +44,32 @@ function gameplayFixture() {
 }
 
 {
-  const mist = gameplayFixture();
-  const mistResult = applyWildAtollRouteEntry(mist, WILD_ATOLL_ROUTES.mist);
-  assert.deepEqual(mistResult, { routeId: "mist", lustreDelta: 20, energyDelta: -5 });
-  assert.equal(mist.needs.lustre, 55);
-  assert.equal(mist.currentEnergy, 75);
-
-  const stone = gameplayFixture();
-  const stoneResult = applyWildAtollRouteEntry(stone, WILD_ATOLL_ROUTES.stone);
-  assert.deepEqual(stoneResult, { routeId: "stone", lustreDelta: 0, energyDelta: -10 });
-  assert.equal(stone.currentEnergy, 70);
+  assert.deepEqual(WILD_ATOLL_STARTER_PATH, ["edge", "grove", "fork"]);
+  const edge = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.edge);
+  const grove = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.grove);
+  const fork = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.fork);
+  assert.equal(edge.exits.filter((exit) => exit.target === "nest").length, 1, "only the edge arena returns to the Nest");
+  assert.equal(grove.exits.some((exit) => exit.target === "nest"), false);
+  assert.equal(fork.exits.filter((exit) => exit.cave).length, 2, "the starter fork exposes exactly two lifts");
+  assert.deepEqual(fork.exits.filter((exit) => exit.cave).map((exit) => exit.target), ["forest", "mine"]);
 }
 
 {
-  const summarize = (routeId) => {
-    const counts = { wood: 0, stone: 0, empty: 0 };
-    for (let index = 0; index < 1000; index += 1) {
-      const item = resolveWildAtollGrassDrop({ seed: "task-068", grassIndex: index, routeId });
-      counts[item ?? "empty"] += 1;
-    }
-    return counts;
-  };
-  const mist = summarize(WILD_ATOLL_ROUTES.mist);
-  const stone = summarize(WILD_ATOLL_ROUTES.stone);
-  assert.ok(mist.wood > mist.stone, JSON.stringify(mist));
-  assert.ok(stone.stone > stone.wood, JSON.stringify(stone));
-  assert.ok(mist.empty > 300 && mist.empty < 500, JSON.stringify(mist));
-  assert.ok(stone.empty > 300 && stone.empty < 500, JSON.stringify(stone));
-  assert.equal(
-    resolveWildAtollGrassDrop({ seed: "task-068", grassIndex: 17, routeId: WILD_ATOLL_ROUTES.mist }),
-    resolveWildAtollGrassDrop({ seed: "task-068", grassIndex: 17, routeId: WILD_ATOLL_ROUTES.mist }),
-  );
+  const first = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.edge);
+  const repeated = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.edge);
+  assert.deepEqual(first, repeated, "arena resource placement is deterministic for one run seed");
+  assert.deepEqual(first.map((node) => node.kind).sort(), ["berry", "log", "stone"]);
+  assert.equal(first.find((node) => node.kind === "log").requiredTool, "axe");
+  assert.equal(first.find((node) => node.kind === "stone").requiredTool, "pickaxe");
+  assert.equal(first.find((node) => node.kind === "berry").requiredTool, null);
+  assert.equal(createInventoryItem("berry").kind, "loot", "berries remain ordinary forward-compatible inventory loot");
+}
+
+{
+  const forest = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.forest);
+  const mine = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.mine);
+  assert.ok(forest.filter((node) => node.kind === "log").length > forest.filter((node) => node.kind === "stone").length);
+  assert.ok(mine.filter((node) => node.kind === "stone").length > mine.filter((node) => node.kind === "log").length);
 }
 
 console.log("Task #068 contracts OK");
