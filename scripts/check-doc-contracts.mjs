@@ -8,6 +8,7 @@ const requireText = (text, tokens, label) => {
 
 const project = read("PROJECT.md");
 const lead = read("LEAD.md");
+const artist = read("ARTIST.md");
 const agents = read("AGENTS.md");
 const override = read("AGENTS.override.md");
 const review = read("REVIEW.md");
@@ -39,6 +40,8 @@ requireText(project, [
   "## Режимы запроса Лиду",
   "### Прямая реализация чатом",
   "AGENTS.md",
+  "ARTIST.md",
+  "ты художник",
   "один-два релевантных system-документа",
 ], "PROJECT.md");
 
@@ -51,12 +54,30 @@ requireText(lead, [
   "Draft PR до приёмки",
   "src/main.js",
   "Codex никогда не генерирует",
-  "Lead asset-preparation route",
-  "задача заблокирована",
+  "отдельной роли Художника",
+  "code-only integration task",
   "визуальная «пиксельность» не является доказательством native asset",
-  "запрещено уменьшать, нарезать или выдавать за runtime spritesheet",
-  "nearest-neighbor contact sheet",
+  "точной native frame grid",
+  "integer nearest-neighbor preview",
 ], "LEAD.md");
+
+requireText(artist, [
+  "<!-- audience: artist-chat -->",
+  "## Обязательный контекст",
+  "## Stage 0 — repository and art-direction preflight",
+  "## Stage 1 — pseudo-pixel concept variants",
+  "## Stage 2 — pre-downscale preparation",
+  "## Stage 3 — honest native downscale",
+  "## Stage 4 — native cleanup and visual proof",
+  "TILE_SIZE",
+  "src/world/worldConfig.js",
+  "Stardew Valley",
+  "public/assets/project/<owner>/",
+  "NestledBurrow_<SemanticName>.png",
+  "asset-inbox/incoming",
+  "SHA-256",
+  "code-only integration task",
+], "ARTIST.md");
 
 requireText(agents, [
   "<!-- audience: codex -->",
@@ -83,6 +104,7 @@ requireText(agents, [
 
 const forbiddenImagePermission = "Codex image generation explicitly allowed";
 assert(!lead.includes(forbiddenImagePermission), "LEAD.md must not contain a prompt-level Codex image-generation bypass");
+assert(!artist.includes(forbiddenImagePermission), "ARTIST.md must not contain a Codex image-generation bypass");
 assert(!agents.includes(forbiddenImagePermission), "AGENTS.md must not contain a prompt-level Codex image-generation bypass");
 assert(!taskTemplate.includes(forbiddenImagePermission), "tasks/TEMPLATE.md must not contain a prompt-level Codex image-generation bypass");
 
@@ -125,6 +147,8 @@ requireText(library, [
   "Обычная задача читает один system-документ",
   "## Маршруты",
   "## Межсистемные задачи",
+  "Художник: `PROJECT.md` + `ARTIST.md`",
+  "public/assets/project/",
 ], "LIBRARY.md");
 
 requireText(architecture, [
@@ -169,13 +193,14 @@ requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"codex:validat
 for (const [label, text, limit] of [
   ["PROJECT.md", project, 7000],
   ["LEAD.md", lead, 7500],
+  ["ARTIST.md", artist, 10000],
   ["AGENTS.md", agents, 11000],
   ["REVIEW.md", review, 5000],
   ["GAME.md", game, 7000],
   ["ROADMAP.md", roadmap, 4500],
-  ["LIBRARY.md", library, 6500],
+  ["LIBRARY.md", library, 7000],
 ]) {
   assert(text.length <= limit, `${label} exceeds context budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: role routing, focused system context, active-only roadmap, composition-root guard, Lead-owned binary delivery and native pixel-art preflight are enforced");
+console.log("documentation contracts passed: Lead, Artist, Codex and Integrator routing, focused system context, active-only roadmap, composition-root guard and native asset delivery are enforced");
