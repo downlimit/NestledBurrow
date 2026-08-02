@@ -10,7 +10,7 @@ A **segment** is a literary named zone containing connected arenas. An **arena**
 
 A **path** connects two arenas inside one segment. A **threshold** is the final arena of a segment. A **transition** is an onward transport on a threshold that enters another segment. A **teleport** returns the player from a threshold to Island Nest.
 
-Segment names establish place and mood; arena names and path tips stay short and practical. A threshold name describes the place already reached, never a destination still supposedly ahead.
+Segment names establish place and mood; arena names and path tips stay short and practical. A threshold name describes the place already reached.
 
 ## Product loop
 
@@ -52,13 +52,13 @@ Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -
 
 ## Path composition
 
-A two-path arena never presents two mirrored diagonal exits. It presents one straight northern path plus one diagonal path:
+A two-path arena presents one straight northern path plus one diagonal path:
 
 - a left-side arena uses north and north-east;
 - a right-side arena uses north-west and north;
 - the entry arena and threshold transitions use north plus the diagonal selected by that segment's composition.
 
-This keeps the route readable while preventing every arena from repeating the same north-west/north-east fork.
+This keeps the route readable and varies the composition between arenas.
 
 ## Arena naming and mood
 
@@ -68,7 +68,6 @@ This keeps the route readable while preventing every arena from repeating the sa
 - T3 names are mysterious and dangerous;
 - NPC-segment arenas use floating-island landforms: necks, spurs, ridges, verges, scree and broken isthmuses, alongside tracks, lights and smoke that hint at habitation;
 - the forest NPC threshold is the reached Roving Island; the grotto NPC threshold is the reached Wandering Island;
-- NPC-segment copy must not introduce sea piers, pilings, bridges or shores as if these were waterbound islands;
 - automation-segment names hint at soul stones, crystals, magnets, unusual metals and other future special materials.
 
 Path tips display only `SPACE - <next arena>`. Transition tips display the canonical next segment name. Teleport tips name Island Nest. All compact labels use the supported ASCII hyphen and remain within the HUD length budget.
