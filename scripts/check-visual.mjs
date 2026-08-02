@@ -9,14 +9,14 @@ import {
   PLAYER_FRAMES,
   PLAYER_IDLE_FRAME_INDEX,
   PLAYER_WALK_FRAME_SEQUENCE,
-} from "../src/visualConfig.js";
+} from "../src/character/visualConfig.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   CHARACTER_VISUAL_PROFILES,
   getCharacterVisualProfile,
-} from "../src/characterVisualProfiles.js";
-import { ACTOR_PROFILE_IDS } from "../src/actorProfiles.js";
-import { NPCS } from "../src/npcConfig.js";
+} from "../src/character/characterVisualProfiles.js";
+import { ACTOR_PROFILE_IDS } from "../src/character/actorProfiles.js";
+import { NPCS } from "../src/character/npcConfig.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
@@ -25,15 +25,15 @@ import {
   OUTDOOR_IMAGE_PATH,
   TILE_SIZE,
   TREES_IMAGE_PATH,
-} from "../src/worldConfig.js";
+} from "../src/world/worldConfig.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
-const cameraFollowSource = fs.readFileSync(path.join(root, "src/cameraFollowRuntime.js"), "utf8");
-const visualConfigSource = fs.readFileSync(path.join(root, "src/visualConfig.js"), "utf8");
-const visualProfilesSource = fs.readFileSync(path.join(root, "src/characterVisualProfiles.js"), "utf8");
-const characterVisualSource = fs.readFileSync(path.join(root, "src/characterVisual.js"), "utf8");
-const npcConfigSource = fs.readFileSync(path.join(root, "src/npcConfig.js"), "utf8");
+const cameraFollowSource = fs.readFileSync(path.join(root, "src/character/cameraFollowRuntime.js"), "utf8");
+const visualConfigSource = fs.readFileSync(path.join(root, "src/character/visualConfig.js"), "utf8");
+const visualProfilesSource = fs.readFileSync(path.join(root, "src/character/characterVisualProfiles.js"), "utf8");
+const characterVisualSource = fs.readFileSync(path.join(root, "src/character/characterVisual.js"), "utf8");
+const npcConfigSource = fs.readFileSync(path.join(root, "src/character/npcConfig.js"), "utf8");
 const roomPreviewSource = fs.readFileSync(path.join(root, "scripts/check-room-preview.py"), "utf8");
 const assetRoot = path.join(root, "public", BASIC_VILLAGE_ASSET_PATH);
 const playerDirectory = path.join(root, "public/assets/third-party/kenney/player");

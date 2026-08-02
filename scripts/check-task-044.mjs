@@ -4,8 +4,8 @@ import {
   ASSET_PROFILES_VERSION,
   normalizeAssetProfiles,
   saveAssetProfiles,
-} from "../src/assetProfiles.js";
-import { AUTHORING_BACKUP_VERSION, normalizeAuthoringBackup } from "../src/authoringBackup.js";
+} from "../src/build/assetProfiles.js";
+import { AUTHORING_BACKUP_VERSION, normalizeAuthoringBackup } from "../src/build/authoringBackup.js";
 import {
   WALL_COLLIDER_GROUPS,
   applyColliderOffsets,
@@ -17,11 +17,11 @@ import {
   placementMidpointOffset,
   resolvePlacementDrag,
   snapPlacementPoint,
-} from "../src/buildWorldGeometry.js";
-import { createFacilityRuntime } from "../src/facilityRuntime.js";
-import { attachEditorAuthoringRuntime } from "../src/editorAuthoringRuntime.js";
-import { createWorldLayout } from "../src/worldLayout.js";
-import { TILE_SIZE } from "../src/worldConfig.js";
+} from "../src/build/buildWorldGeometry.js";
+import { createFacilityRuntime } from "../src/facilities/facilityRuntime.js";
+import { attachEditorAuthoringRuntime } from "../src/build/editorAuthoringRuntime.js";
+import { createWorldLayout } from "../src/world/worldLayout.js";
+import { TILE_SIZE } from "../src/world/worldConfig.js";
 
 const legacyWall = { left: -1, right: 2, top: 3, bottom: -4 };
 const migratedWalls = migrateDirectionalWallOverrides({

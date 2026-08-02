@@ -7,19 +7,19 @@ import {
   lustreMovementMultiplier,
   physicalActionEnergyCost,
   toiletRunningSpeedMultiplier,
-} from "../src/needsDomain.js";
-import { createNeedsFlowRuntime, measuredNeedFlow, NEED_FLOW_NORMALIZATION } from "../src/needsFlowRuntime.js";
-import { createNeedsRuntime } from "../src/needsRuntime.js";
-import { createMeleeCombatState } from "../src/meleeDomain.js";
-import { requestEnergyBackedMeleeAttack } from "../src/meleeRuntime.js";
-import { createInteractionTimelineRuntime, INTERACTION_PHASE, INTERACTION_TIMELINE_PROFILES } from "../src/interactionTimelineRuntime.js";
-import { createNeedsInteractionCoordinator } from "../src/needsInteractionCoordinator.js";
-import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
+} from "../src/needs/needsDomain.js";
+import { createNeedsFlowRuntime, measuredNeedFlow, NEED_FLOW_NORMALIZATION } from "../src/needs/needsFlowRuntime.js";
+import { createNeedsRuntime } from "../src/needs/needsRuntime.js";
+import { createMeleeCombatState } from "../src/combat/meleeDomain.js";
+import { requestEnergyBackedMeleeAttack } from "../src/combat/meleeRuntime.js";
+import { createInteractionTimelineRuntime, INTERACTION_PHASE, INTERACTION_TIMELINE_PROFILES } from "../src/needs/interactionTimelineRuntime.js";
+import { createNeedsInteractionCoordinator } from "../src/needs/needsInteractionCoordinator.js";
+import { DEFAULT_GAMEPLAY_TUNING } from "../src/resources/resourceConfig.js";
 import {
   createToiletAccidentTimelineRuntime,
   TOILET_ACCIDENT_PHASE,
   TOILET_ACCIDENT_TIMELINE_TUNING,
-} from "../src/toiletAccidentTimelineRuntime.js";
+} from "../src/needs/toiletAccidentTimelineRuntime.js";
 
 const tuning = DEFAULT_GAMEPLAY_TUNING.needs;
 const close = (actual, expected, message) => assert(Math.abs(actual - expected) < 1e-9, `${message}: ${actual} !== ${expected}`);

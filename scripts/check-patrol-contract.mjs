@@ -3,8 +3,8 @@ import {
   PATROL_MODE_PING_PONG,
   createIdleController,
   createPatrolController,
-} from "../src/controllers.js";
-import { NPCS } from "../src/npcConfig.js";
+} from "../src/character/controllers.js";
+import { NPCS } from "../src/character/npcConfig.js";
 
 assert.equal(NPCS.length, 1, "obsolete street and neighbor patrol actors are removed");
 assert.equal(NPCS[0].id, "seed-merchant");

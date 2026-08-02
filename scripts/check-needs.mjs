@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { FACILITIES } from "../src/facilityConfig.js";
-import { DEFAULT_NEEDS, NEED_IDS, NEED_SYMBOLS, applyNeedsUpdate, computeNeedRates, normalizeNeeds } from "../src/needsDomain.js";
-import { DEFAULT_GAMEPLAY_TUNING } from "../src/resourceConfig.js";
+import { FACILITIES } from "../src/facilities/facilityConfig.js";
+import { DEFAULT_NEEDS, NEED_IDS, NEED_SYMBOLS, applyNeedsUpdate, computeNeedRates, normalizeNeeds } from "../src/needs/needsDomain.js";
+import { DEFAULT_GAMEPLAY_TUNING } from "../src/resources/resourceConfig.js";
 
 const tuning = DEFAULT_GAMEPLAY_TUNING.needs;
 assert(Object.isFrozen(tuning) && Object.isFrozen(tuning.toolCosts), "needs tuning is immutable");

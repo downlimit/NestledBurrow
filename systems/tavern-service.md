@@ -13,15 +13,15 @@ lemon + bucket water → juicer → serving table → takeout guest → 2 coins
 
 ## Owners
 
-- kitchen state/rules: `cookingDomain.js`;
-- minigame/presentation: `cookingRuntime.js`;
-- fixed kitchen interaction delegation: `kitchenInteractionRuntime.js`;
-- facilities: `facilityConfig.js`, `facilityRuntime.js`;
-- sign: `tavernSignRuntime.js`, `guestConfig.js`;
-- guest flow/pathing: `guestRuntime.js`, `guestController.js`, `gridPathfinder.js`;
-- scheduling and orchestration: `tavernServiceDomain.js`, `tavernServiceRuntime.js`;
-- guest reaction/carried-item presentation: `guestFeedback.js`;
-- payment: `coinRuntime.js`;
+- kitchen state/rules: `src/tavern/cookingDomain.js`;
+- minigame/presentation: `src/tavern/cookingRuntime.js`;
+- fixed kitchen interaction delegation: `src/tavern/kitchenInteractionRuntime.js`;
+- facilities: `src/facilities/facilityConfig.js`, `src/facilities/facilityRuntime.js`;
+- sign: `src/tavern/tavernSignRuntime.js`, `src/tavern/guestConfig.js`;
+- guest flow/pathing: `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`;
+- scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
+- guest reaction/carried-item presentation: `src/tavern/guestFeedback.js`;
+- payment: `src/tavern/coinRuntime.js`;
 - `WorldScene` composes owners and delegates updates and callbacks.
 
 ## Invariants

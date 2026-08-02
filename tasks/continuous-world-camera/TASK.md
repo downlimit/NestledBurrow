@@ -11,8 +11,8 @@ Read before editing:
 - `AGENTS.md`
 - `ASSETS.md`
 - `src/main.js`
-- `src/input.js`
-- `src/visualConfig.js`
+- `src/controls/input.js`
+- `src/character/visualConfig.js`
 - `src/roomLayout.js`
 - `src/kenneyRoomConfig.json`
 - `scripts/audit-spritesheet.py`
@@ -228,9 +228,9 @@ Rename `RoomScene` to a name that reflects the continuous world, such as `WorldS
 
 Suggested compact separation:
 
-- `src/worldConfig.js` — logical resolution, tile size, world dimensions and semantic asset names;
-- `src/worldLayout.js` — outdoor fill, house placement, doorway and blocked cells;
-- `src/movement.js` — pure foot-box collision and axis-separated movement;
+- `src/world/worldConfig.js` — logical resolution, tile size, world dimensions and semantic asset names;
+- `src/world/worldLayout.js` — outdoor fill, house placement, doorway and blocked cells;
+- `src/character/movement.js` — pure foot-box collision and axis-separated movement;
 - `src/main.js` — Phaser loading, rendering, camera, input and animation glue.
 
 Names may differ, but do not keep the whole world and collision implementation inside one large `create()` or `update()` method.

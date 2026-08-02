@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CameraFollowRuntime, cameraFollowStep, normalizeCameraTuning } from "../src/cameraFollowRuntime.js";
-import { JOYSTICK, clampJoystickCenter } from "../src/input.js";
-import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
+import { CameraFollowRuntime, cameraFollowStep, normalizeCameraTuning } from "../src/character/cameraFollowRuntime.js";
+import { JOYSTICK, clampJoystickCenter } from "../src/controls/input.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
 
 assert.equal(JOYSTICK.sprintRadius, 54.45, "mobile sprint threshold is enlarged by a further 10 percent to 54.45 logical pixels");
 assert.deepEqual(clampJoystickCenter(0, 0), { x: 0, y: 0 });
@@ -59,10 +59,10 @@ assert.deepEqual({ x: cameraTarget.x, y: cameraTarget.y }, { x: 10, y: 21 }, "ca
 cameraRuntime.update({ presentationPosition: { x: 11.6, y: 21.6 }, speed: 0, deltaMs: 16 });
 assert(Number.isInteger(cameraTarget.x) && Number.isInteger(cameraTarget.y), "camera follow target remains pixel-aligned while moving");
 cameraRuntime.destroy();
-const interactionHud = readFileSync("src/interactionHud.js", "utf8");
+const interactionHud = readFileSync("src/ui/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");
-const characterVisual = readFileSync("src/characterVisual.js", "utf8");
-const gameHud = readFileSync("src/gameHud.js", "utf8");
+const characterVisual = readFileSync("src/character/characterVisual.js", "utf8");
+const gameHud = readFileSync("src/ui/gameHud.js", "utf8");
 assert(interactionHud.includes("isInteractHeld()"), "mobile interaction exposes held state");
 assert(main.includes("mobileHeldResourceInteract") && main.includes("RESOURCE_INTERACTION_KIND"), "held mobile interaction repeats only repeatable resources");
 assert(main.includes("(this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()"), "keyboard and mobile sprint share one running state while Shift can own a combat action");

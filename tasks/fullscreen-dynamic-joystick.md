@@ -19,7 +19,7 @@
 - `REVIEW.md`
 - `index.html`
 - `src/main.js`
-- `src/input.js`
+- `src/controls/input.js`
 - `src/style.css`
 - `scripts/check-input.mjs`
 - `scripts/check-visual.mjs`
@@ -52,7 +52,7 @@
 - Нажатие кнопки не должно активировать динамический joystick.
 - UI не должен менять логическое разрешение 320×180 или масштаб world art.
 
-Желательно вынести работу с Fullscreen API в небольшой чистый модуль, например `src/fullscreen.js`, чтобы поведение можно было тестировать с mock document/element без Phaser.
+Желательно вынести работу с Fullscreen API в небольшой чистый модуль, например `src/ui/fullscreen.js`, чтобы поведение можно было тестировать с mock document/element без Phaser.
 
 ## 2. Динамический джойстик
 

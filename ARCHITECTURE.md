@@ -34,6 +34,17 @@
 
 Для `src/main.js` действует жёсткий предел `1300` строк, который устанавливает `scripts/check-architecture-boundaries.mjs`. Текущий файл остаётся ниже него. Это предохранитель: следующая содержательная функция должна сопровождаться локальным выделением, чтобы composition root не рос дальше.
 
+## Физическая граница `src/`
+
+Системный owner задаёт физический адрес production-модуля. Domain, runtime, config и presentation одного подтверждённого владельца располагаются рядом в owner-каталоге:
+
+- `src/character/`, `src/needs/`, `src/interaction/`, `src/world/`;
+- `src/resources/`, `src/build/`, `src/facilities/`, `src/tavern/`;
+- `src/inventory/`, `src/combat/`, `src/controls/`, `src/ui/`;
+- `src/session/`, `src/audio/`, `src/devtools/`.
+
+В корне `src/` разрешены `src/main.js` и `src/style.css`. Публичные контракты `src/assets/` и `src/localization/` сохраняются. Generic-каталоги `common`, `shared`, `misc`, `utils`, `core`, `runtime`, `domain` и `config`, а также новые barrel `index.js`, запрещены проверкой `check:source-layout`. Architecture scanner рекурсивно индексирует production JS по полному repository-relative path.
+
 ## Следующие подтверждённые выделения
 
 ### Build и authoring
@@ -51,7 +62,7 @@
 
 ### Tavern service
 
-`TavernServiceRuntime` координирует persisted multi-guest service и value-bearing coin runtime. `KitchenInteractionRuntime` делегирует fixed-facility mutations соответствующим domain/runtime owners. Расписание волн принадлежит `tavernServiceDomain.js`, маршруты и состояние визита — `guestRuntime.js`, рецепты/stock/reservations — `cookingDomain.js`, а `WorldScene` только связывает owners и callbacks.
+`TavernServiceRuntime` координирует persisted multi-guest service и value-bearing coin runtime. `KitchenInteractionRuntime` делегирует fixed-facility mutations соответствующим domain/runtime owners. Расписание волн принадлежит `src/tavern/tavernServiceDomain.js`, маршруты и состояние визита — `src/tavern/guestRuntime.js`, рецепты/stock/reservations — `src/tavern/cookingDomain.js`, а `WorldScene` только связывает owners и callbacks.
 
 Следующее расширение очереди, меню, staff или нескольких service stations развивает эти owners и не возвращает orchestration в `WorldScene`.
 
@@ -69,11 +80,11 @@ Facility runtime владеет объектом, collider и use lifecycle. Pre
 
 ### Локации мира
 
-`worldLocationConfig.js` задаёт постоянные ID, capabilities, транспорты и spawn-контракты. `WorldLocationCoordinator` выбирает активный layout, синхронизирует `sessionState.currentWorldId`, управляет transition lock и вызывает публичный location lifecycle.
+`src/world/worldLocationConfig.js` задаёт постоянные ID, capabilities, транспорты и spawn-контракты. `WorldLocationCoordinator` выбирает активный layout, синхронизирует `sessionState.currentWorldId`, управляет transition lock и вызывает публичный location lifecycle.
 
 `WorldLocationRuntime` один раз создаётся на scene/session, получает явные dependencies и factories, затем владеет location-scoped owners, capability-driven mount/unmount, frame-action/realtime/world-step порядком, candidate consumers и transition guard. Его `getOwners()` возвращает read-only snapshot с именованными полями; string service locator и поиск по полям `WorldScene` запрещены. `WorldPresentationRuntime` отдельно владеет terrain/floor/wall/supplement/decoration/transport sprites и surface registries. Presentation монтируется первой и уничтожается последней; interaction unbind и candidate reset происходят до teardown owners. `WorldScene` создаёт эти два владельца, передаёт adapters/callbacks и делегирует lifecycle.
 
-Геометрия Гнезда формируется в `nestWorldLayout.js` из одной модели острова для terrain render и collision. Домашний authoring остаётся привязан к capability `buildMode` локации `village`.
+Геометрия Гнезда формируется в `src/world/nestWorldLayout.js` из одной модели острова для terrain render и collision. Домашний authoring остаётся привязан к capability `buildMode` локации `village`.
 
 ## Запрещённые преждевременные решения
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createManagedText, getIntegerTextResolution, getUnsupportedGlyphs, refreshSceneTextResolution, refreshTextResolution, withTextResolution } from "../src/textResolution.js";
+import { createManagedText, getIntegerTextResolution, getUnsupportedGlyphs, refreshSceneTextResolution, refreshTextResolution, withTextResolution } from "../src/ui/textResolution.js";
 
 const scene = { scale: { zoom: 4.8 } };
 assert.equal(getIntegerTextResolution(scene), 4, "text render resolution follows integer game display zoom");
@@ -11,7 +11,7 @@ refreshTextResolution(text, scene);
 assert.equal(text.resolution, 4, "existing text object resolution is refreshed");
 assert.equal(updated, 1, "text texture/metrics are updated after resolution changes");
 
-const helper = readFileSync("src/textResolution.js", "utf8");
+const helper = readFileSync("src/ui/textResolution.js", "utf8");
 for (const locale of ["en", "ru"]) {
   const buildMode = JSON.parse(readFileSync(`public/locales/${locale}/hud.json`, "utf8")).buildMode;
   for (const value of [buildMode.title, ...Object.values(buildMode.groups), ...Object.values(buildMode.assets)]) {
@@ -105,10 +105,10 @@ for (const sample of [
   assert.equal(pixelText.text, sample, `${sample} source casing is preserved on the text object`);
 }
 
-const gameHud = readFileSync("src/gameHud.js", "utf8");
-const interactionHud = readFileSync("src/interactionHud.js", "utf8");
+const gameHud = readFileSync("src/ui/gameHud.js", "utf8");
+const interactionHud = readFileSync("src/ui/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");
-const guestFeedback = readFileSync("src/guestFeedback.js", "utf8");
+const guestFeedback = readFileSync("src/tavern/guestFeedback.js", "utf8");
 assert(gameHud.includes("createManagedText"), "HUD text surfaces use shared text resolution contract");
 assert(interactionHud.includes("createManagedText"), "dialogue and interaction text surfaces use shared text resolution contract");
 assert(guestFeedback.includes("const reaction = createManagedText"), "guest reactions use the shared pixel text renderer");

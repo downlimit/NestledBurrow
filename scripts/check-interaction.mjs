@@ -12,10 +12,10 @@ import {
   setSessionFlag,
   startDialogue,
   SESSION_STATE_VERSION,
-} from "../src/gameSessionState.js";
-import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction.js";
-import { createInteractionApproachResolver, hasDirectInteractionReach, perimeterInteractionPoints } from "../src/interactionApproach.js";
-import { EXTRACTABLE_TARGETING_GROUP, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
+} from "../src/session/gameSessionState.js";
+import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction/interaction.js";
+import { createInteractionApproachResolver, hasDirectInteractionReach, perimeterInteractionPoints } from "../src/interaction/interactionApproach.js";
+import { EXTRACTABLE_TARGETING_GROUP, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
 
 function assertPlainSerializable(value, label) {
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(value))), JSON.stringify(value), `${label} survives JSON round-trip`);

@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import {
   AUTHORING_BACKUP_VERSION,
   normalizeAuthoringBackup,
-} from "../src/authoringBackup.js";
+} from "../src/build/authoringBackup.js";
 import {
   DEFAULT_ASSET_PROFILES,
   migrateLegacyColliderOverrides,
   normalizeAssetProfiles,
-} from "../src/assetProfiles.js";
+} from "../src/build/assetProfiles.js";
 
 const profiles = normalizeAssetProfiles({
   "facility:table": { colliderOffsets: { left: -2, right: 1, top: 0, bottom: 0 }, visualOffset: { x: 3, y: -1 } },

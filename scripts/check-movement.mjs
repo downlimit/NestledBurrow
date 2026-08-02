@@ -8,9 +8,9 @@ import {
   movementSpeed,
   stepCharacterMovement,
   stepSpeedMultiplier,
-} from "../src/characterMovement.js";
-import { getActorProfile } from "../src/actorProfiles.js";
-import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "../src/movementConfig.js";
+} from "../src/character/characterMovement.js";
+import { getActorProfile } from "../src/character/actorProfiles.js";
+import { DEFAULT_MOVEMENT_CONFIG, sanitizeMovementConfig } from "../src/character/movementConfig.js";
 
 const config = { ...DEFAULT_MOVEMENT_CONFIG };
 const close = (a, b, epsilon = 0.001) => Math.abs(a - b) <= epsilon;

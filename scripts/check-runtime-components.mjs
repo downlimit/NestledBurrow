@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
-import { MobileJoystick } from "../src/mobileJoystick.js";
+import { MobileJoystick } from "../src/controls/mobileJoystick.js";
 import {
   MOVEMENT_STORAGE_KEY,
   MovementDebugPanel,
   loadMovementDebugConfig,
-} from "../src/movementDebugPanel.js";
-import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "../src/movementConfig.js";
-import { GAME_HEIGHT, GAME_WIDTH } from "../src/worldConfig.js";
-import { COLLIDER_DEBUG_STORAGE_KEY, loadColliderDebugOverrides, saveColliderDebugOverrides } from "../src/colliderDebugOverrides.js";
-import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "../src/colliderResize.js";
+} from "../src/devtools/movementDebugPanel.js";
+import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "../src/character/movementConfig.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
+import { COLLIDER_DEBUG_STORAGE_KEY, loadColliderDebugOverrides, saveColliderDebugOverrides } from "../src/build/colliderDebugOverrides.js";
+import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "../src/build/colliderResize.js";
 
 class EventTargetStub {
   constructor() {

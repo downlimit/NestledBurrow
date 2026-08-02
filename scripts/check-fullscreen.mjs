@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isFullscreenActive, isFullscreenSupported, toggleFullscreen } from "../src/fullscreen.js";
+import { isFullscreenActive, isFullscreenSupported, toggleFullscreen } from "../src/ui/fullscreen.js";
 
 let requested = 0;
 let exited = 0;

@@ -4,7 +4,7 @@ import {
   createAuthoringBackup,
   createAuthoringBackupSource,
   restoreAuthoringBackup,
-} from "../src/authoringBackup.js";
+} from "../src/build/authoringBackup.js";
 import {
   COLLIDER_DEBUG_STORAGE_KEY,
   COLLIDER_DEFAULTS_SAVE_ENDPOINT,
@@ -13,14 +13,14 @@ import {
   normalizeColliderOverrides,
   saveColliderDebugOverrides,
   saveColliderDebugOverridesToProject,
-} from "../src/colliderDebugOverrides.js";
+} from "../src/build/colliderDebugOverrides.js";
 import {
   PLANTED_TREE_PROFILE_ID,
   applyPlantedTreeWork,
   createPlantedTreeDefinition,
   resolveColliderSelectionPointer,
-} from "../src/editorAuthoringRuntime.js";
-import { createFreshInventory, getInventoryQuantity } from "../src/inventoryDomain.js";
+} from "../src/build/editorAuthoringRuntime.js";
+import { createFreshInventory, getInventoryQuantity } from "../src/inventory/inventoryDomain.js";
 import {
   STARTING_LAYOUT_STORAGE_KEY,
   STARTING_LAYOUT_VERSION,
@@ -29,9 +29,9 @@ import {
   loadStartingLayout,
   normalizeStartingLayout,
   saveStartingLayoutToProject,
-} from "../src/startingLayout.js";
-import STARTING_LAYOUT_DEFAULT from "../src/startingLayoutDefault.js";
-import { getResourceProfile } from "../src/resourceDomain.js";
+} from "../src/build/startingLayout.js";
+import STARTING_LAYOUT_DEFAULT from "../src/build/startingLayoutDefault.js";
+import { getResourceProfile } from "../src/resources/resourceDomain.js";
 
 function createStorage() {
   return {

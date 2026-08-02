@@ -7,14 +7,14 @@ import {
   interactServingTable,
   normalizeKitchenState,
   reserveServingItem,
-} from "../src/cookingDomain.js";
-import { addInventoryItem, createFreshInventory, createInventoryItem, getInventoryQuantity } from "../src/inventoryDomain.js";
-import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
+} from "../src/tavern/cookingDomain.js";
+import { addInventoryItem, createFreshInventory, createInventoryItem, getInventoryQuantity } from "../src/inventory/inventoryDomain.js";
+import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
 import {
   deserializeSessionEnvelope,
   SAVE_SCHEMA_VERSION,
   serializeSessionEnvelope,
-} from "../src/sessionPersistence.js";
+} from "../src/session/sessionPersistence.js";
 
 const leftId = "serving-left";
 const rightId = "serving-right";
@@ -64,10 +64,10 @@ assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "lemonade")
 assert.equal(SESSION_STATE_VERSION, 12);
 assert.equal(SAVE_SCHEMA_VERSION, 12);
 
-const guestSource = readFileSync("src/guestRuntime.js", "utf8");
+const guestSource = readFileSync("src/tavern/guestRuntime.js", "utf8");
 assert(guestSource.includes("servingTableId"));
 assert(guestSource.includes("diningTableId"));
-const facilitySource = readFileSync("src/facilityRuntime.js", "utf8");
+const facilitySource = readFileSync("src/facilities/facilityRuntime.js", "utf8");
 assert(facilitySource.includes("const platedDishVisuals = new Map()"));
 
 const trustedWorktree = `safe.directory=${process.cwd().replaceAll("\\", "/")}`;

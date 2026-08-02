@@ -17,7 +17,7 @@ import {
   resolveMeleeActionItem,
   SWORD_ATTACK_TIME_SCALE,
   TRAINING_DUMMY,
-} from "../src/meleeConfig.js";
+} from "../src/combat/meleeConfig.js";
 import {
   advanceMeleeCombat,
   applyTrainingDummyDamage,
@@ -33,7 +33,7 @@ import {
   resolveAutoTargetDirection,
   queryMeleeTargets,
   requestMeleeAttack,
-} from "../src/meleeDomain.js";
+} from "../src/combat/meleeDomain.js";
 import {
   dashDistanceForInterval,
   HELD_WEAPON_SCALE,
@@ -42,19 +42,19 @@ import {
   meleeSectorPoints,
   SWORD_CAMERA_MAX_FOLLOW_SPEED,
   SWORD_SWING_VISUAL_SPEED_MULTIPLIER,
-} from "../src/meleeRuntime.js";
-import { cameraFollowStep } from "../src/cameraFollowRuntime.js";
+} from "../src/combat/meleeRuntime.js";
+import { cameraFollowStep } from "../src/character/cameraFollowRuntime.js";
 import {
   INVENTORY_ITEM_IDS,
   INVENTORY_TOOL_IDS,
   createInventoryItem,
   inventoryStackLimit,
-} from "../src/inventoryDomain.js";
-import { inventoryItemAsset } from "../src/inventoryVisuals.js";
-import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/gameSessionState.js";
-import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
-import { SAVE_SCHEMA_VERSION, deserializeSessionEnvelope, serializeSessionEnvelope } from "../src/sessionPersistence.js";
-import { aggregateTransientNumber } from "../src/transientNumberPresentation.js";
+} from "../src/inventory/inventoryDomain.js";
+import { inventoryItemAsset } from "../src/inventory/inventoryVisuals.js";
+import { createFreshGameSessionState, hitResourceNode, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
+import { DEFAULT_GAMEPLAY_TUNING, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
+import { SAVE_SCHEMA_VERSION, deserializeSessionEnvelope, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
+import { aggregateTransientNumber } from "../src/ui/transientNumberPresentation.js";
 
 const sword = getMeleeWeaponProfile("sword");
 const axe = getMeleeWeaponProfile("battle-axe");
@@ -357,10 +357,10 @@ assert.deepEqual([2, 2, 2, 2].map((amount, index) => aggregateTransientNumber(da
 }, 1000).amount), [2, 4, 6, 8]);
 
 const main = readFileSync("src/main.js", "utf8");
-const locationRuntime = readFileSync("src/worldLocationRuntime.js", "utf8");
-const worldBuildCoordinator = readFileSync("src/worldBuildCoordinator.js", "utf8");
-const gameHud = readFileSync("src/gameHud.js", "utf8");
-const combatLoadout = readFileSync("src/combatLoadoutRuntime.js", "utf8");
+const locationRuntime = readFileSync("src/world/worldLocationRuntime.js", "utf8");
+const worldBuildCoordinator = readFileSync("src/build/worldBuildCoordinator.js", "utf8");
+const gameHud = readFileSync("src/ui/gameHud.js", "utf8");
+const combatLoadout = readFileSync("src/combat/combatLoadoutRuntime.js", "utf8");
 assert(locationRuntime.includes("melee: createMeleeRuntime") && locationRuntime.includes("this.factories.melee(this.renderingHost"));
 assert(main.includes("getControllerMoveDirection: () => this.getControllerMoveDirection()"));
 assert(locationRuntime.includes("this.owners.meleeRuntime?.beforeCharacterUpdate?.(deltaMs)"));
@@ -377,8 +377,8 @@ assert(worldBuildCoordinator.includes("getBuildMoveTargetAt")
   && worldBuildCoordinator.includes("restoreBuildTarget"), "build move updates and undoes the dummy home anchor");
 assert(gameHud.includes("mode.mode !== INVENTORY_MODES.COMBAT"), "combat action lookup is disabled outside stable combat HUD mode");
 assert(combatLoadout.includes('slot.kind === "action" && slot.id === actionId'), "number slots cannot resolve as combat actions");
-assert(!readFileSync("src/meleeRuntime.js", "utf8").includes("addEventListener"));
-const meleeRuntime = readFileSync("src/meleeRuntime.js", "utf8");
+assert(!readFileSync("src/combat/meleeRuntime.js", "utf8").includes("addEventListener"));
+const meleeRuntime = readFileSync("src/combat/meleeRuntime.js", "utf8");
 assert(meleeRuntime.includes("getStartingLayoutFurniture") && meleeRuntime.includes("restoreStartingLayoutFurniture"), "training dummy is canonical-layout furniture");
 assert(meleeRuntime.includes('result.status === "started" || result.status === "switched"'), "switching weapons immediately starts the new presentation");
 assert(meleeRuntime.includes("activeTrails") && meleeRuntime.includes("meleeBodyCenter(getPlayerCharacter()?.motor?.position)"), "melee shapes follow the player's body center");
@@ -393,7 +393,7 @@ assert(meleeRuntime.includes('startsWith("resource:log-")') && meleeRuntime.incl
 assert(meleeRuntime.includes("index * MELEE_HIT_SOUND_STAGGER_MS"), "multiple hit sounds from one swing use the shared stagger interval");
 assert(meleeRuntime.includes('hitEffect: "training-dummy-hit"') && meleeRuntime.includes("target.hitEffect ?? combatEffect"), "training dummy routes its own impact sound through the shared stagger queue");
 assert(locationRuntime.includes("damageLog: (resourceId, multiplier)") && meleeRuntime.includes("profile.resourceDamageMultiplier"), "battle axe resource damage routes only through log damage");
-const persistence = readFileSync("src/sessionPersistence.js", "utf8");
+const persistence = readFileSync("src/session/sessionPersistence.js", "utf8");
 assert(!persistence.includes('"sword"') && !persistence.includes('"battle-axe"'), "save migration does not inject melee weapons");
 
 const trustedWorktree = `safe.directory=${process.cwd().replaceAll("\\", "/")}`;

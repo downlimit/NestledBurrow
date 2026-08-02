@@ -1,20 +1,20 @@
 import assert from "node:assert/strict";
-import { createWorldLayout, cellKey } from "../src/worldLayout.js";
-import { collides } from "../src/movement.js";
+import { createWorldLayout, cellKey } from "../src/world/worldLayout.js";
+import { collides } from "../src/character/movement.js";
 import {
   NEST_ISLAND_MODEL,
   TRANSPORT_PROFILE,
   WORLD_IDS,
   WORLD_LOCATION_DEFINITIONS,
   WORLD_LOCATION_IDS,
-} from "../src/worldLocationConfig.js";
-import { createWorldLocationCoordinator } from "../src/worldLocationCoordinator.js";
-import { getResourceObjectsForWorld, RESOURCE_OBJECTS } from "../src/resourceConfig.js";
-import { OUTDOOR_FRAMES, TILE_SIZE } from "../src/worldConfig.js";
-import { createPlantedTreeDefinition } from "../src/editorAuthoringRuntime.js";
-import { getResourceProfile } from "../src/resourceDomain.js";
-import STARTING_LAYOUT_DEFAULT from "../src/startingLayoutDefault.js";
-import { STOVE_REPAIR_COST } from "../src/cookingDomain.js";
+} from "../src/world/worldLocationConfig.js";
+import { createWorldLocationCoordinator } from "../src/world/worldLocationCoordinator.js";
+import { getResourceObjectsForWorld, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
+import { OUTDOOR_FRAMES, TILE_SIZE } from "../src/world/worldConfig.js";
+import { createPlantedTreeDefinition } from "../src/build/editorAuthoringRuntime.js";
+import { getResourceProfile } from "../src/resources/resourceDomain.js";
+import STARTING_LAYOUT_DEFAULT from "../src/build/startingLayoutDefault.js";
+import { STOVE_REPAIR_COST } from "../src/tavern/cookingDomain.js";
 
 assert.deepEqual([...WORLD_LOCATION_IDS].sort(), [WORLD_IDS.nest, WORLD_IDS.village], "only village and nest are registered");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.id, "village", "the existing village ID remains canonical");

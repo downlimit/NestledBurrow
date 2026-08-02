@@ -1,22 +1,22 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { CharacterSystem } from "../src/characterSystem.js";
-import { createCoinRuntime } from "../src/coinRuntime.js";
+import { CharacterSystem } from "../src/character/characterSystem.js";
+import { createCoinRuntime } from "../src/tavern/coinRuntime.js";
 import {
   consumeServingReservation,
   getAvailableServingPortions,
   normalizeKitchenState,
   releaseServingReservation,
   reserveServingItem,
-} from "../src/cookingDomain.js";
-import { createGuestController } from "../src/guestController.js";
-import { GUEST_STATES, createGuestRuntime } from "../src/guestRuntime.js";
-import { TAVERN_SIGN, TAVERN_SIGN_BUILD_KIND } from "../src/guestConfig.js";
-import { createActorNavigation, createActorWalkability, findGridPath } from "../src/gridPathfinder.js";
-import { createFreshGameSessionState } from "../src/gameSessionState.js";
-import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/sessionPersistence.js";
-import { createTavernSignRuntime } from "../src/tavernSignRuntime.js";
+} from "../src/tavern/cookingDomain.js";
+import { createGuestController } from "../src/tavern/guestController.js";
+import { GUEST_STATES, createGuestRuntime } from "../src/tavern/guestRuntime.js";
+import { TAVERN_SIGN, TAVERN_SIGN_BUILD_KIND } from "../src/tavern/guestConfig.js";
+import { createActorNavigation, createActorWalkability, findGridPath } from "../src/tavern/gridPathfinder.js";
+import { createFreshGameSessionState } from "../src/session/gameSessionState.js";
+import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/session/sessionPersistence.js";
+import { createTavernSignRuntime } from "../src/tavern/tavernSignRuntime.js";
 
 const bounds = { left: 0, top: 0, right: 160, bottom: 160 };
 const clearPath = findGridPath({ start: { x: 8, y: 14 }, goal: { x: 72, y: 78 }, bounds, isWalkable: () => true });

@@ -20,21 +20,21 @@ This system owns player-facing construction interactions and developer-facing ca
 - collider and layout drafts can live in browser storage;
 - a versioned backup moves drafts between browsers;
 - local dev endpoints may write checked-in defaults;
-- the generated starting-layout module owns only the canonical default value; fallback fixtures stay in `startingLayout.js` so repeated saves cannot remove required exports;
+- the generated starting-layout module owns only the canonical default value; fallback fixtures stay in `src/build/startingLayout.js` so repeated saves cannot remove required exports;
 - temporary facility staging coordinates fail closed during capture, are removed from legacy browser drafts, and are never promoted into the canonical layout;
 - static GitHub Pages cannot commit the repository;
 - `NEW GAME` restores the authored starting baseline, not arbitrary runtime edits.
 
 ## Owners
 
-- world mutation and transient build-session state: `worldBuildCoordinator.js`;
-- UI/input lifecycle: `buildModeRuntime.js`;
-- catalog: `buildAssetCatalog.js`;
-- geometry/colliders: `buildWorldGeometry.js`, `colliderResize.js`;
-- profiles: `assetProfiles.js`, `colliderDefaults.js`;
-- authoring: `editorAuthoringRuntime.js`, `editorAuthoringBootstrap.js`, `authoringBackup.js`;
-- starting baseline: `startingLayout.js`, `startingLayoutDefault.js`;
-- scene registry: `worldSceneRegistry.js`.
+- world mutation and transient build-session state: `src/build/worldBuildCoordinator.js`;
+- UI/input lifecycle: `src/build/buildModeRuntime.js`;
+- catalog: `src/build/buildAssetCatalog.js`;
+- geometry/colliders: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`;
+- profiles: `src/build/assetProfiles.js`, `src/build/colliderDefaults.js`;
+- authoring: `src/build/editorAuthoringRuntime.js`, `src/build/editorAuthoringBootstrap.js`, `src/build/authoringBackup.js`;
+- starting baseline: `src/build/startingLayout.js`, `src/build/startingLayoutDefault.js`;
+- scene registry: `src/build/worldSceneRegistry.js`.
 
 `WorldBuildCoordinator` owns placed runtime objects, surfaces, walls, automatic junctions, previews, demolition highlighting, the active grouped action and undo history. It creates `BuildModeRuntime`, receives runtime owners and world callbacks as explicit dependencies, and routes facility, bed/resource, well/farming, tavern-sign and training-dummy mutations back to those owners. The Phaser scene is only its rendering host.
 

@@ -2,16 +2,16 @@ import Phaser from "phaser";
 import "@fontsource/pixelify-sans/latin.css";
 import "@fontsource/pixelify-sans/cyrillic.css";
 import "./style.css";
-import { clampVectorLength, isPlayerMovementSuppressed } from "./input.js";
-import { getFootBox } from "./movement.js";
-import { createMovementState, createRuntimeMovementConfig, energyTargetSpeedMultiplier } from "./characterMovement.js";
+import { clampVectorLength, isPlayerMovementSuppressed } from "./controls/input.js";
+import { getFootBox } from "./character/movement.js";
+import { createMovementState, createRuntimeMovementConfig, energyTargetSpeedMultiplier } from "./character/characterMovement.js";
 import {
   ACTOR_PROFILE_IDS,
   getActorProfile,
-} from "./actorProfiles.js";
-import { createCharacter } from "./character.js";
-import { createCharacterSystem } from "./characterSystem.js";
-import { createPlayerController } from "./controllers.js";
+} from "./character/actorProfiles.js";
+import { createCharacter } from "./character/character.js";
+import { createCharacterSystem } from "./character/characterSystem.js";
+import { createPlayerController } from "./character/controllers.js";
 import {
   BASIC_VILLAGE_ASSET_PATH,
   GAME_HEIGHT,
@@ -23,61 +23,61 @@ import {
   TILE_SIZE,
   TREES_IMAGE_PATH,
   TREES_TEXTURE_KEY,
-} from "./worldConfig.js";
-import { createWorldLayout } from "./worldLayout.js";
-import { WORLD_IDS } from "./worldLocationConfig.js";
-import { createWorldLocationCoordinator } from "./worldLocationCoordinator.js";
-import { createWorldLocationRuntime } from "./worldLocationRuntime.js";
-import { createWorldPresentationRuntime } from "./worldPresentationRuntime.js";
-import { NPCS } from "./npcConfig.js";
-import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState } from "./gameSessionState.js";
-import { dayNightMultiplyColor, formatClock } from "./gameClock.js";
-import { getDialogueDefinition } from "./dialogueConfig.js";
-import { INTERACTION_DEFINITIONS } from "./interactionConfig.js";
-import { createInteractionRuntime } from "./interactionRuntime.js";
-import { createWorldInteractionCoordinator } from "./worldInteractionCoordinator.js";
-import { createInteractionApproachResolver } from "./interactionApproach.js";
-import { createInteractionHud } from "./interactionHud.js";
-import { createGameHud } from "./gameHud.js";
-import { createSessionPersistence } from "./sessionPersistence.js";
+} from "./world/worldConfig.js";
+import { createWorldLayout } from "./world/worldLayout.js";
+import { WORLD_IDS } from "./world/worldLocationConfig.js";
+import { createWorldLocationCoordinator } from "./world/worldLocationCoordinator.js";
+import { createWorldLocationRuntime } from "./world/worldLocationRuntime.js";
+import { createWorldPresentationRuntime } from "./world/worldPresentationRuntime.js";
+import { NPCS } from "./character/npcConfig.js";
+import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState } from "./session/gameSessionState.js";
+import { dayNightMultiplyColor, formatClock } from "./session/gameClock.js";
+import { getDialogueDefinition } from "./interaction/dialogueConfig.js";
+import { INTERACTION_DEFINITIONS } from "./interaction/interactionConfig.js";
+import { createInteractionRuntime } from "./interaction/interactionRuntime.js";
+import { createWorldInteractionCoordinator } from "./interaction/worldInteractionCoordinator.js";
+import { createInteractionApproachResolver } from "./interaction/interactionApproach.js";
+import { createInteractionHud } from "./ui/interactionHud.js";
+import { createGameHud } from "./ui/gameHud.js";
+import { createSessionPersistence } from "./session/sessionPersistence.js";
 import { createLocalization } from "./localization/index.js";
 import { PIXELIFY_FONT_KEY } from "./localization/font.js";
-import { createAudioSettingsStore } from "./audioSettings.js";
-import { PhaserAudioRuntime, preloadMusicPlaylist } from "./audioRuntime.js";
-import { HUD_DEPTH } from "./hud.js";
-import { createMobileJoystick } from "./mobileJoystick.js";
-import { loadMovementDebugConfig } from "./movementDebugPanel.js";
-import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./colliderDebugOverrides.js";
-import { loadAssetProfiles, saveAssetProfiles } from "./assetProfiles.js";
-import { migrateDirectionalWallOverrides } from "./buildWorldGeometry.js";
-import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./colliderResize.js";
-import { BED_OBJECT, BED_WAKE_TILE } from "./debrisConfig.js";
-import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resourceConfig.js";
-import { FACILITIES, preloadFacilityAssets } from "./facilityConfig.js";
-import { createNeedsRuntime } from "./needsRuntime.js";
-import { createNeedsFlowRuntime, needMeterValues } from "./needsFlowRuntime.js";
-import { loadGameplayDebugTuning } from "./gameplayDebugTuning.js";
-import { CameraFollowRuntime } from "./cameraFollowRuntime.js";
-import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET } from "./guestConfig.js";
+import { createAudioSettingsStore } from "./audio/audioSettings.js";
+import { PhaserAudioRuntime, preloadMusicPlaylist } from "./audio/audioRuntime.js";
+import { HUD_DEPTH } from "./ui/hud.js";
+import { createMobileJoystick } from "./controls/mobileJoystick.js";
+import { loadMovementDebugConfig } from "./devtools/movementDebugPanel.js";
+import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./build/colliderDebugOverrides.js";
+import { loadAssetProfiles, saveAssetProfiles } from "./build/assetProfiles.js";
+import { migrateDirectionalWallOverrides } from "./build/buildWorldGeometry.js";
+import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./build/colliderResize.js";
+import { BED_OBJECT, BED_WAKE_TILE } from "./resources/debrisConfig.js";
+import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resources/resourceConfig.js";
+import { FACILITIES, preloadFacilityAssets } from "./facilities/facilityConfig.js";
+import { createNeedsRuntime } from "./needs/needsRuntime.js";
+import { createNeedsFlowRuntime, needMeterValues } from "./needs/needsFlowRuntime.js";
+import { loadGameplayDebugTuning } from "./devtools/gameplayDebugTuning.js";
+import { CameraFollowRuntime } from "./character/cameraFollowRuntime.js";
+import { GUEST_CONFIG, TAVERN_SIGN, TAVERN_SIGN_ASSET } from "./tavern/guestConfig.js";
 import {
   CHARACTER_VISUAL_PROFILE_IDS,
   getCharacterVisualProfile,
   toPhaserFrame,
-} from "./characterVisualProfiles.js";
-import { preloadFarmingAssets } from "./farmingConfig.js";
-import { preloadLemonadeAssets } from "./lemonadeConfig.js";
-import { installWorldE2EBridge } from "./e2eBridge.js";
-import { UiVisibilityCoordinator } from "./uiVisibilityCoordinator.js";
-import { createGameCanvasInputGuard } from "./gameCanvasInputGuard.js";
+} from "./character/characterVisualProfiles.js";
+import { preloadFarmingAssets } from "./resources/farmingConfig.js";
+import { preloadLemonadeAssets } from "./tavern/lemonadeConfig.js";
+import { installWorldE2EBridge } from "./devtools/e2eBridge.js";
+import { UiVisibilityCoordinator } from "./ui/uiVisibilityCoordinator.js";
+import { createGameCanvasInputGuard } from "./controls/gameCanvasInputGuard.js";
 import {
   createMeleeStartingWorldItems,
   isMeleeWeaponId,
   preloadMeleeAssets,
   resolveMeleeActionItem,
   TRAINING_DUMMY,
-} from "./meleeConfig.js";
-import { loadStartingLayout } from "./startingLayout.js";
-import STARTING_LAYOUT_DEFAULT from "./startingLayoutDefault.js";
+} from "./combat/meleeConfig.js";
+import { loadStartingLayout } from "./build/startingLayout.js";
+import STARTING_LAYOUT_DEFAULT from "./build/startingLayoutDefault.js";
 
 const BUILD_ID = import.meta.env.VITE_BUILD_ID ?? "local";
 const VILLAGE_ASSET_URL = `${import.meta.env.BASE_URL}${BASIC_VILLAGE_ASSET_PATH}`;
