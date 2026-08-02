@@ -16,7 +16,7 @@ import {
   TILE_SIZE,
 } from "./worldConfig.js";
 
-const INTERACTION_RADIUS = 27;
+const INTERACTION_RADIUS = 44;
 const NEST_ATOLL_ENTRANCE = Object.freeze({ x: 11 * TILE_SIZE, y: 6 * TILE_SIZE });
 const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
 const SOUTH_SPAWN = Object.freeze({ ...ATOLL_WORLD_MODEL.spawn });
@@ -201,11 +201,7 @@ export function createWildAtollRuntime(scene, {
       arenaVisuals.push(glow);
       return;
     }
-    const marker = scene.add.graphics().setPosition(point.x - 10, point.y - 4).setDepth(555 + point.y);
-    marker.fillStyle(0x263b31, 0.92).fillRect(0, 0, 20, 8);
-    marker.fillStyle(0x89b58b, 0.72).fillRect(2, 2, 16, 4);
-    marker.fillStyle(0xd8cfaa, 0.75).fillRect(8, 1, 4, 6);
-    arenaVisuals.push(marker);
+    arenaVisuals.push(...createTrailExit(scene, point.x, point.y));
   }
 
   function activateCandidate() {
@@ -459,6 +455,7 @@ export function createWildAtollRuntime(scene, {
       runSeed,
       arenaId,
       candidateId: candidate?.id ?? null,
+      availableExitIds: arenaId ? getWildAtollArenaDefinition(arenaId).exits.map((exit) => exit.id) : [],
       activeResourceIds: [...activeResourceIds],
       collapseRecoveryActive,
     }),
@@ -492,6 +489,21 @@ export function createWildAtollRuntime(scene, {
       blackout.destroy();
     },
   };
+}
+
+function createTrailExit(scene, centerX, centerY) {
+  const ground = scene.add.graphics().setPosition(centerX, centerY).setDepth(555 + centerY);
+  ground.fillStyle(0x2a211b, 0.92).fillRect(-18, -7, 36, 14);
+  ground.fillStyle(0x735a3d, 1).fillRect(-14, -5, 28, 10);
+  ground.fillStyle(0xb9a06a, 0.9).fillRect(-3, -6, 6, 12);
+  ground.lineStyle(1, 0xd8cfaa, 0.75).strokeRect(-18.5, -7.5, 37, 15);
+  const leftPost = scene.add.graphics().setPosition(centerX - 22, centerY).setDepth(556 + centerY);
+  leftPost.fillStyle(0x3c3328, 1).fillRect(-2, -10, 4, 20);
+  leftPost.fillStyle(0xa18c67, 1).fillRect(-3, -10, 6, 4);
+  const rightPost = scene.add.graphics().setPosition(centerX + 22, centerY).setDepth(556 + centerY);
+  rightPost.fillStyle(0x3c3328, 1).fillRect(-2, -10, 4, 20);
+  rightPost.fillStyle(0xa18c67, 1).fillRect(-3, -10, 6, 4);
+  return [ground, leftPost, rightPost];
 }
 
 function createCave(scene, centerX, topY) {
