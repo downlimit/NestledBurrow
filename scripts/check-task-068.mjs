@@ -56,9 +56,9 @@ function gameplayFixture() {
 
 {
   assert.deepEqual(WILD_ATOLL_STARTER_LEVELS.map((level) => level.length), [1, 2, 2, 2, 1]);
-  assert.equal(WILD_ATOLL_SEGMENT_IDS.length, 7, "starter, two T1 and four T2 segments exist");
-  assert.equal(WILD_ATOLL_ALL_ARENAS.length, 56, "every segment contains eight arenas");
-  assert.equal(new Set(WILD_ATOLL_ALL_ARENAS).size, 56, "all arena IDs are unique");
+  assert.equal(WILD_ATOLL_SEGMENT_IDS.length, 11, "the complete canonical route tree exists");
+  assert.equal(WILD_ATOLL_ALL_ARENAS.length, 88, "every segment contains eight arenas");
+  assert.equal(new Set(WILD_ATOLL_ALL_ARENAS).size, 88, "all arena IDs are unique");
 
   for (const segmentId of WILD_ATOLL_SEGMENT_IDS) {
     const segment = getWildAtollSegmentDefinition(segmentId);
@@ -83,24 +83,41 @@ function gameplayFixture() {
     }
   }
 
-  assert.deepEqual(getWildAtollSegmentDefinition(WILD_ATOLL_SEGMENTS.starter).nextSegmentIds, [
-    WILD_ATOLL_SEGMENTS.forestT1,
-    WILD_ATOLL_SEGMENTS.mineT1,
+  const expectedTopology = new Map([
+    [WILD_ATOLL_SEGMENTS.starter, [WILD_ATOLL_SEGMENTS.sereneSkerries, WILD_ATOLL_SEGMENTS.sereneGrotto]],
+    [WILD_ATOLL_SEGMENTS.sereneSkerries, [WILD_ATOLL_SEGMENTS.forestedIsthmus, WILD_ATOLL_SEGMENTS.deepSkerries]],
+    [WILD_ATOLL_SEGMENTS.forestedIsthmus, []],
+    [WILD_ATOLL_SEGMENTS.deepSkerries, [WILD_ATOLL_SEGMENTS.motu, WILD_ATOLL_SEGMENTS.fearsomeSkerries]],
+    [WILD_ATOLL_SEGMENTS.motu, []],
+    [WILD_ATOLL_SEGMENTS.fearsomeSkerries, []],
+    [WILD_ATOLL_SEGMENTS.sereneGrotto, [WILD_ATOLL_SEGMENTS.shadowIsthmus, WILD_ATOLL_SEGMENTS.deepGrotto]],
+    [WILD_ATOLL_SEGMENTS.shadowIsthmus, []],
+    [WILD_ATOLL_SEGMENTS.deepGrotto, [WILD_ATOLL_SEGMENTS.blueHole, WILD_ATOLL_SEGMENTS.relictGrotto]],
+    [WILD_ATOLL_SEGMENTS.blueHole, []],
+    [WILD_ATOLL_SEGMENTS.relictGrotto, []],
   ]);
-  assert.deepEqual(getWildAtollSegmentDefinition(WILD_ATOLL_SEGMENTS.forestT1).nextSegmentIds, [
-    WILD_ATOLL_SEGMENTS.forestGroveT2,
-    WILD_ATOLL_SEGMENTS.forestWetlandsT2,
-  ]);
-  assert.deepEqual(getWildAtollSegmentDefinition(WILD_ATOLL_SEGMENTS.mineT1).nextSegmentIds, [
-    WILD_ATOLL_SEGMENTS.mineCrystalT2,
-    WILD_ATOLL_SEGMENTS.mineDepthsT2,
-  ]);
-  for (const segmentId of [
-    WILD_ATOLL_SEGMENTS.forestGroveT2,
-    WILD_ATOLL_SEGMENTS.forestWetlandsT2,
-    WILD_ATOLL_SEGMENTS.mineCrystalT2,
-    WILD_ATOLL_SEGMENTS.mineDepthsT2,
-  ]) assert.deepEqual(getWildAtollSegmentDefinition(segmentId).nextSegmentIds, []);
+  assert.deepEqual(WILD_ATOLL_SEGMENT_IDS, [...expectedTopology.keys()]);
+  for (const [segmentId, nextSegmentIds] of expectedTopology) {
+    assert.deepEqual(getWildAtollSegmentDefinition(segmentId).nextSegmentIds, nextSegmentIds, `${segmentId} keeps the canonical onward routes`);
+  }
+
+  assert.deepEqual(ruAtoll.segments, {
+    starter: "ПЕРВЫЕ ТРОПЫ",
+    sereneSkerries: "БЕЗМЯТЕЖНЫЕ ШХЕРЫ",
+    forestedIsthmus: "ЛЕСИСТАЯ ПЕРЕЙМА",
+    deepSkerries: "ДРЕМУЧИЕ ШХЕРЫ",
+    motu: "МОТУ",
+    fearsomeSkerries: "ГРОЗНЫЕ ШХЕРЫ",
+    sereneGrotto: "БЕЗМЯТЕЖНЫЙ ГРОТ",
+    shadowIsthmus: "ТЕНЕВАЯ ПЕРЕЙМА",
+    deepGrotto: "ГЛУБОКИЙ ГРОТ",
+    blueHole: "ГОЛУБАЯ ДЫРА",
+    relictGrotto: "РЕЛИКТОВЫЙ ГРОТ",
+  });
+  assert.equal(ruAtoll.arenas["serene-skerries"].left1, "СВЕТЛАЯ ПОЛЯНА", "T1 copy stays harmless");
+  assert.equal(ruAtoll.arenas["serene-grotto"].left2, "СВЕТЛЫЙ ЗАЛ", "T1 grotto copy stays harmless");
+  assert.equal(ruAtoll.arenas["fearsome-skerries"].left1, "МЁРТВЫЕ СОСНЫ", "T3 forest copy signals danger");
+  assert.equal(ruAtoll.arenas["relict-grotto"].left1, "ЗАЛ БЕЗ ЭХА", "T3 grotto copy stays mysterious");
 }
 
 {
