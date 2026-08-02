@@ -1,0 +1,1 @@
+Trigger final validation for the inventory selection and wheel behavior.
