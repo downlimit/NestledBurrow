@@ -195,7 +195,7 @@ assert(dragSource.includes("onAimTarget(pointer)") && hudSource.includes("throwA
 assert(dragSource.includes("releasePanelAt") && modeSource.includes("stableMode: releaseMode"), "a successful transfer activates the panel under the Alt-release pointer");
 assert(modeSource.includes("interactionBlocked: !state.suppressed") && modeSource.includes("state.mode !== INVENTORY_MODES.PEACEFUL"), "mode owner separates Alt/combat interaction blocking from modal suppression");
 assert(hudSource.includes("isInventoryInteractionBlocked: () => inventoryModeHud.getState().interactionBlocked"), "GameHud exposes the canonical interaction block from the mode owner");
-assert(hudSource.includes("inventoryHud?.clearSelection?.()"), "entering combat clears the peaceful tool selection and its target highlight");
+assert(!hudSource.includes("inventoryHud?.clearSelection?.()"), "combat mode preserves the peaceful selection and its target highlight");
 assert(hudSource.includes("getGameplayState?.()?.sleeping")
   && hudSource.includes("getLocationOwners().facilityRuntime?.isUsing?.()")
   && hudSource.includes("getLocationOwners().cookingRuntime?.isActive?.()"), "peaceful-only sleep, facility use and cooking suppress combat inventory switching");

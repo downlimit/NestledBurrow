@@ -42,7 +42,7 @@ async function transformedSlotPoint(page, panelState, slot) {
   });
 }
 
-test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {
+test("Alt tap preserves peaceful selection while hidden inventory shortcuts stay inactive", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "Task #053 defines desktop physical Alt only");
   await boot(page);
 
@@ -73,10 +73,12 @@ test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inacti
     suppressed: true,
     promptVisible: false,
   });
-  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
   await page.keyboard.press("Digit2");
   await page.keyboard.press("KeyE");
-  expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBeNull();
+  await page.locator("canvas").hover();
+  await page.mouse.wheel(0, 120);
+  expect((await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
 
   await tapAlt(page);
   await expect.poll(() => inventoryMode(page), { timeout: 1500 }).toMatchObject({
@@ -88,6 +90,11 @@ test("Alt tap toggles peaceful/combat and hidden inventory shortcuts stay inacti
     combat: { alpha: 0 },
   });
   await expect.poll(() => interactionHud(page)).toMatchObject({ suppressed: false });
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(1);
+  await page.mouse.wheel(0, -120);
+  await expect.poll(async () => (await bridge(page, "getHudState")).resources.inventory.selectedIndex).toBe(0);
 });
 
 test("held Alt is transient, releases to its origin, and blur cannot latch loadout edit", async ({ page }, testInfo) => {

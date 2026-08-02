@@ -73,6 +73,14 @@ export function inventoryCycleDirectionFromKeyboardEvent(event) {
   return 0;
 }
 
+export function inventoryCycleDirectionFromWheelEvent(event) {
+  if (!event || isEditableTarget(event.target)) return 0;
+  const deltaY = Number(event.deltaY) || 0;
+  if (deltaY > 0) return 1;
+  if (deltaY < 0) return -1;
+  return 0;
+}
+
 export function inventoryCycleIndex(slots, baseIndex, direction) {
   const step = direction < 0 ? -1 : 1;
   const base = Number.isInteger(baseIndex) ? baseIndex : step > 0 ? -1 : 0;
@@ -187,7 +195,7 @@ export function createInventoryRuntime(scene, options = {}) {
   }
 
   function worldPresentationActive() {
-    return !destroyed && !isSuppressed();
+    return !destroyed && !isSuppressed() && !isCombatMode();
   }
 
   function stop(pointer, event) {
@@ -269,6 +277,22 @@ export function createInventoryRuntime(scene, options = {}) {
     dragGraphics.clear().setVisible(false);
     dragImage.setVisible(false);
     setThrowAimTarget(null);
+  }
+
+  function handleWheel(pointer, _gameObjects, _deltaX, deltaY) {
+    const direction = inventoryCycleDirectionFromWheelEvent({
+      deltaY,
+      target: pointer?.event?.target,
+    });
+    if (direction === 0 || !active()) return;
+    const next = inventoryCycleIndex(inventory()?.slots, selectedIndex ?? lastSelectedIndex, direction);
+    if (next === null) return;
+    pointer?.event?.preventDefault?.();
+    pointer?.event?.stopPropagation?.();
+    setSelection(next);
+    lastSelectedIndex = next;
+    selectedAtMs = scene.time.now;
+    render();
   }
 
   function handleKeyDown(event) {
@@ -655,6 +679,7 @@ export function createInventoryRuntime(scene, options = {}) {
   scene.input.on("pointermove", handlePointerMove);
   scene.input.on("pointerup", handlePointerUp);
   scene.input.on("pointercancel", handlePointerCancel);
+  scene.input.on("wheel", handleWheel);
   scene.input.keyboard?.on?.("keydown", handleKeyDown);
   scene.events.on("update", update);
 
@@ -728,7 +753,9 @@ export function createInventoryRuntime(scene, options = {}) {
       render();
       return true;
     },
-    getSelectedItem: () => cloneInventoryItem(selectedIndex === null ? null : inventory()?.slots?.[selectedIndex]),
+    getSelectedItem: () => cloneInventoryItem(
+      isCombatMode() || selectedIndex === null ? null : inventory()?.slots?.[selectedIndex],
+    ),
     spawnWorldItems,
     getState: () => ({
       selectedIndex,
@@ -770,6 +797,7 @@ export function createInventoryRuntime(scene, options = {}) {
       scene.input.off("pointermove", handlePointerMove);
       scene.input.off("pointerup", handlePointerUp);
       scene.input.off("pointercancel", handlePointerCancel);
+      scene.input.off("wheel", handleWheel);
       scene.input.keyboard?.off?.("keydown", handleKeyDown);
       scene.events.off("update", update);
       unregisterLoadoutPanel?.();

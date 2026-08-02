@@ -30,6 +30,7 @@ import {
   INVENTORY_WATER_BAR_HEIGHT,
   INVENTORY_WATER_BAR_WIDTH,
   inventoryCycleDirectionFromKeyboardEvent,
+  inventoryCycleDirectionFromWheelEvent,
   inventoryCycleIndex,
   inventoryIndexFromKeyboardEvent,
   inventorySlotIndexAt,
@@ -178,6 +179,10 @@ assert.equal(inventoryIndexFromKeyboardEvent({ code: "Digit4", target: { tagName
 assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE" }), 1);
 assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyQ" }), -1);
 assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE", repeat: true }), 0);
+assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: 120 }), 1);
+assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: -120 }), -1);
+assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: 0 }), 0);
+assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: 120, target: { tagName: "INPUT" } }), 0);
 assert.equal(inventoryCycleIndex(newGameInventory.slots, null, 1), 0);
 assert.equal(inventoryCycleIndex(newGameInventory.slots, 2, 1), 3);
 assert.equal(inventoryCycleIndex(newGameInventory.slots, 0, -1), 4);
@@ -244,7 +249,9 @@ assert(runtimeSource.includes("TOOL_VISIBLE_MS = 1000") && runtimeSource.include
 assert(runtimeSource.includes("drawBitmapTextInto"), "slot labels use crisp project bitmap glyphs");
 assert(runtimeSource.includes('item.id === "water-bucket"') && runtimeSource.includes("renderWaterBar(rect)"), "bucket fill renders vertically inside its own slot");
 assert(runtimeSource.includes("presentationContainer") && runtimeSource.includes("setInputEnabled(value)"), "screen hotbar exposes the presentation-only transform/input adapter");
-assert(runtimeSource.includes("worldPresentationActive()"), "held world-space item visibility stays outside panel interactivity");
+assert(runtimeSource.includes('scene.input.on("wheel", handleWheel)') && runtimeSource.includes('scene.input.off("wheel", handleWheel)'), "peaceful inventory owns wheel cycling lifecycle");
+assert(!hudSource.includes("inventoryHud?.clearSelection?.()"), "combat mode preserves peaceful inventory selection");
+assert(runtimeSource.includes("worldPresentationActive()") && runtimeSource.includes("!isCombatMode()"), "held peaceful item stays selected but is hidden while combat mode owns presentation");
 assert(hudSource.includes("createInventoryRuntime(scene"));
 assert(hudSource.includes("presentation: inventoryHud.presentation"), "inventory gain cues share the hotbar transform");
 assert(!hudSource.includes("woodValueText"), "old resource text counters are removed");
