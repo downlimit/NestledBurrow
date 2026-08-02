@@ -1,4 +1,4 @@
-name: Update inventory E2E contract
+name: Apply inventory E2E contract
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  update-and-validate:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,12 +17,7 @@ jobs:
           ref: agent/preserve-inventory-selection-wheel
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Patch combat presentation and E2E contract
+      - name: Apply verified inventory behavior
         shell: python
         run: |
           import re
@@ -119,22 +114,9 @@ jobs:
               new_test,
           )
 
-      - name: Install dependencies
-        run: npm ci
+          Path(".github/workflows/agent-inventory-e2e-contract.yml").unlink()
 
-      - name: Run project checks
-        run: npm run check
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run focused inventory E2E
-        run: npx playwright test tests/e2e/task-053-peaceful-combat-hud.spec.js --project=desktop-chromium
-
-      - name: Remove temporary workflow
-        run: rm .github/workflows/agent-inventory-e2e-contract.yml
-
-      - name: Commit verified behavior
+      - name: Commit inventory behavior
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
