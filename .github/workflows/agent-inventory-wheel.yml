@@ -1,0 +1,161 @@
+name: Apply inventory selection and wheel fix
+
+on:
+  push:
+    branches:
+      - agent/preserve-inventory-selection-wheel
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/preserve-inventory-selection-wheel
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Patch inventory behavior and checks
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              source = path.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected one match in {path}, found {count}: {old[:80]!r}")
+              path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+          runtime = Path("src/inventory/inventoryRuntime.js")
+          replace_once(
+              runtime,
+              '''export function inventoryCycleDirectionFromKeyboardEvent(event) {
+            if (!event || event.repeat || isEditableTarget(event.target)) return 0;
+            if (event.code === "KeyE") return 1;
+            if (event.code === "KeyQ") return -1;
+            return 0;
+          }
+
+          export function inventoryCycleIndex''',
+              '''export function inventoryCycleDirectionFromKeyboardEvent(event) {
+            if (!event || event.repeat || isEditableTarget(event.target)) return 0;
+            if (event.code === "KeyE") return 1;
+            if (event.code === "KeyQ") return -1;
+            return 0;
+          }
+
+          export function inventoryCycleDirectionFromWheelEvent(event) {
+            if (!event || isEditableTarget(event.target)) return 0;
+            const deltaY = Number(event.deltaY) || 0;
+            if (deltaY > 0) return 1;
+            if (deltaY < 0) return -1;
+            return 0;
+          }
+
+          export function inventoryCycleIndex''',
+          )
+          replace_once(
+              runtime,
+              '''  function handleKeyDown(event) {''',
+              '''  function handleWheel(pointer, _gameObjects, _deltaX, deltaY) {
+              const direction = inventoryCycleDirectionFromWheelEvent({
+                deltaY,
+                target: pointer?.event?.target,
+              });
+              if (direction === 0 || !active()) return;
+              const next = inventoryCycleIndex(inventory()?.slots, selectedIndex ?? lastSelectedIndex, direction);
+              if (next === null) return;
+              pointer?.event?.preventDefault?.();
+              pointer?.event?.stopPropagation?.();
+              setSelection(next);
+              lastSelectedIndex = next;
+              selectedAtMs = scene.time.now;
+              render();
+            }
+
+            function handleKeyDown(event) {''',
+          )
+          replace_once(
+              runtime,
+              '''  scene.input.on("pointercancel", handlePointerCancel);
+            scene.input.keyboard?.on?.("keydown", handleKeyDown);''',
+              '''  scene.input.on("pointercancel", handlePointerCancel);
+            scene.input.on("wheel", handleWheel);
+            scene.input.keyboard?.on?.("keydown", handleKeyDown);''',
+          )
+          replace_once(
+              runtime,
+              '''      scene.input.off("pointercancel", handlePointerCancel);
+                scene.input.keyboard?.off?.("keydown", handleKeyDown);''',
+              '''      scene.input.off("pointercancel", handlePointerCancel);
+                scene.input.off("wheel", handleWheel);
+                scene.input.keyboard?.off?.("keydown", handleKeyDown);''',
+          )
+
+          hud = Path("src/ui/gameHud.js")
+          replace_once(
+              hud,
+              '''    onStateChange: () => {
+                const mode = inventoryModeHud?.getState?.();
+                if (mode?.stableMode === INVENTORY_MODES.COMBAT && !mode.altDown) inventoryHud?.clearSelection?.();
+                scene.syncGameplayHudVisibility?.();''',
+              '''    onStateChange: () => {
+                scene.syncGameplayHudVisibility?.();''',
+          )
+
+          checks = Path("scripts/check-inventory.mjs")
+          replace_once(
+              checks,
+              '''  inventoryCycleDirectionFromKeyboardEvent,
+            inventoryCycleIndex,''',
+              '''  inventoryCycleDirectionFromKeyboardEvent,
+            inventoryCycleDirectionFromWheelEvent,
+            inventoryCycleIndex,''',
+          )
+          replace_once(
+              checks,
+              '''assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE", repeat: true }), 0);
+          assert.equal(inventoryCycleIndex(newGameInventory.slots, null, 1), 0);''',
+              '''assert.equal(inventoryCycleDirectionFromKeyboardEvent({ code: "KeyE", repeat: true }), 0);
+          assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: 120 }), 1);
+          assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: -120 }), -1);
+          assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: 0 }), 0);
+          assert.equal(inventoryCycleDirectionFromWheelEvent({ deltaY: 120, target: { tagName: "INPUT" } }), 0);
+          assert.equal(inventoryCycleIndex(newGameInventory.slots, null, 1), 0);''',
+          )
+          replace_once(
+              checks,
+              '''assert(runtimeSource.includes("presentationContainer") && runtimeSource.includes("setInputEnabled(value)"), "screen hotbar exposes the presentation-only transform/input adapter");
+          assert(runtimeSource.includes("worldPresentationActive()"), "held world-space item visibility stays outside panel interactivity");''',
+              '''assert(runtimeSource.includes("presentationContainer") && runtimeSource.includes("setInputEnabled(value)"), "screen hotbar exposes the presentation-only transform/input adapter");
+          assert(runtimeSource.includes('scene.input.on("wheel", handleWheel)') && runtimeSource.includes('scene.input.off("wheel", handleWheel)'), "peaceful inventory owns wheel cycling lifecycle");
+          assert(!hudSource.includes("inventoryHud?.clearSelection?.()"), "combat mode preserves peaceful inventory selection");
+          assert(runtimeSource.includes("worldPresentationActive()"), "held world-space item visibility stays outside panel interactivity");''',
+          )
+
+          Path(".github/workflows/agent-inventory-wheel.yml").unlink()
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate inventory behavior
+        run: npm run check:inventory
+
+      - name: Validate production build
+        run: npm run build
+
+      - name: Commit applied fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/inventory/inventoryRuntime.js src/ui/gameHud.js scripts/check-inventory.mjs .github/workflows/agent-inventory-wheel.yml
+          git commit -m "Preserve peaceful inventory selection and add wheel cycling"
+          git push origin HEAD:agent/preserve-inventory-selection-wheel
