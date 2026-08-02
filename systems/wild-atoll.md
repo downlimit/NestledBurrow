@@ -62,6 +62,19 @@ Challenge comes from concrete causes and consequences, not abstract labels such 
 
 Needs determine current opportunity value; they do not replace events with generic percentage penalties. Useful low-need situations should normally be created/crossed during the run, exploited, then resolved, so entering nearly empty is not optimal.
 
+## First production slice
+
+The Phaser runtime currently treats Island Nest as the entry clearing of one transient prototype run:
+
+- a forecast point exposes the concrete costs and resource bias of both available roads;
+- cave prompts select Misty Grove or Stony Passage without leaving the current world lifecycle;
+- route entry applies visible need consequences: Misty Grove restores up to `20 L` and costs `5 E`; Stony Passage costs `10 E`;
+- route grass is generated from a run seed, blocks movement and is removed only by an affordable sword action;
+- every grass cell has a deterministic `60%` drop attempt; Misty Grove resolves successful drops as `75% wood / 25% stone`, while Stony Passage reverses that ratio;
+- the route return cave restores the entry clearing, while leaving Island Nest ends the transient run and creates a fresh seed on the next visit.
+
+`src/world/wildAtollDomain.js` owns deterministic route/drop rules. `src/world/wildAtollRuntime.js` owns transient entry/route state, cave prompts, grass presentation/colliders and inventory delivery. This slice deliberately reuses Island Nest instead of introducing the final multi-location arena graph.
+
 ## Inventory and preparation
 
 - `10` peaceful slots + `6` numbered combat slots; no weight system.
@@ -69,28 +82,31 @@ Needs determine current opportunity value; they do not replace events with gener
 - A weapon may be stored elsewhere but cannot attack until equipped in an action slot.
 - Axe, pickaxe, hoe, bucket, food, bait, mixtures, repair materials and findings compete for ordinary capacity.
 - Stack limits and item roles create preparation decisions.
+- In stable combat mode, number slots `1–6` can apply supported items directly to the character. The current prototype profiles are cooked potato dish → `+25 S`, and one bucket-water unit → `+20 L`.
 
 ## Prototype
 
-`WildAtollPrototype/index.html` is a dependency-free standalone logic prototype. It is a design aid, not Phaser runtime architecture and not authoritative balance. Topology, slot model and event philosophy follow this document; prices/probabilities may change freely.
+`WildAtollPrototype/index.html` remains a dependency-free standalone logic prototype. It is a design aid, not Phaser runtime architecture and not authoritative balance. Topology, slot model and event philosophy follow this document; prices/probabilities may change freely.
 
 ## Invariants
 
-- first-run access cannot skip persistent depth progression;
+- first-run access cannot skip persistent depth progression once the full graph exists;
 - terminal branches always return to the Nest;
 - only dedicated NPC segments attach islands;
 - events have visible causes and durable/local consequences;
 - needs change decision value without becoming six bars to keep green;
-- expedition capacity is slot-based, never weight-based.
+- expedition capacity is slot-based, never weight-based;
+- transient prototype grass and route state are not serialized;
+- sword energy affordability is checked by the existing needs owner before grass removal.
 
 ## Current baseline
 
-The production game has no Wild Atoll runtime yet. The standalone prototype demonstrates route generation, persistent platform repair, slot pressure, N/E/S/T/L/D feedback and plan-changing encounters.
+The production game contains the first in-world route-choice and grass-harvest slice described above. It proves forecast-driven road choice, need consequences, deterministic resource bias, sword exploration and quick-use preparation. It does not yet implement the persistent threshold graph, regenerated multi-arena segments, NPC routes or terminal branches.
 
 ## Evidence
 
-`check:docs`; standalone `WildAtollPrototype/app.js` syntax check; PR browser/static preview. Production checks will be added with the first runtime slice.
+`check:task-068`, `check:inventory`, `check:hud`, `check:build-mode`, `check:i18n`; standalone `WildAtollPrototype/app.js` syntax check; managed game preview.
 
 ## Not fixed
 
-Exact platform costs/work time, T2/T3 mine profiles, encounter weights, final stack limits/reward economy, production owners and persistence schema.
+Exact platform costs/work time, T2/T3 mine profiles, encounter weights, final stack limits/reward economy, persistent run schema, final arena layout, whistle behavior, and native assets for additional expedition objects.
