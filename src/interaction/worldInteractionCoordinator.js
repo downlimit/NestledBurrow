@@ -178,7 +178,10 @@ export function createWorldInteractionCoordinator({
     if (!action) return { status: "wrong-tool", mutated: false };
     const energyBefore = sessionState.gameplay.currentEnergy;
     const needsRuntime = getNeedsRuntime();
-    const physicalAction = needsRuntime.canPerformPhysicalAction(profile.requiredTool);
+    const physicalAction = profile.requiredTool == null
+      ? { allowed: true, cost: 0 }
+      : needsRuntime?.canPerformPhysicalAction?.(profile.requiredTool) ?? { allowed: true, cost: 0 };
+    if (!physicalAction.allowed) return { status: "insufficient-energy", mutated: false };
     const result = hitResourceDefinition(sessionState, definition, {
       action,
       damage: tuning.axeDamage,
@@ -187,7 +190,9 @@ export function createWorldInteractionCoordinator({
     });
     if (!result.mutated) return result;
 
-    needsRuntime.recordPhysicalAction(profile.requiredTool, { energyAlreadySpent: true });
+    if (profile.requiredTool != null) {
+      needsRuntime?.recordPhysicalAction?.(profile.requiredTool, { energyAlreadySpent: true });
+    }
     lastSuccessfulHitAtMs = hitAtMs;
     activeResourceProfileId = profile.id;
     triggerCooldownFeedback();
