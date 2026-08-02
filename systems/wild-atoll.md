@@ -52,7 +52,7 @@ edge clearing -> quiet grove -> fork
 - No arena transition applies a scripted need delta.
 - Arena titles render below the top HUD and above the lower interaction/hotbar region.
 
-`src/world/wildAtollDomain.js` owns topology and deterministic resource placement. `src/world/wildAtollRuntime.js` owns transient arena state, transitions, world visuals/colliders, tool-gated harvesting and reward delivery. The slice still reuses the Nest location lifecycle and does not serialize run state.
+`src/world/atollWorldLayout.js` owns a transport-free rectangular collision space. `src/world/wildAtollDomain.js` owns topology and deterministic resource placement. `src/world/wildAtollRuntime.js` owns the Nest entrance, transient arena state, internal transitions, world visuals/colliders, tool-gated harvesting and reward delivery. Entry and edge return use explicit `WorldLocationCoordinator.transitionTo` calls; no persistent lift is present beneath the arena presentation. The current arena/resource state is not serialized.
 
 ## Inventory and preparation
 
@@ -71,16 +71,17 @@ edge clearing -> quiet grove -> fork
 - resource colliders never overlap arena spawn points;
 - arena resource state persists within one run and resets between runs;
 - route transitions do not mutate needs directly;
+- Atoll arena layout contains no static transport visuals or triggers;
 - transient run state is not serialized;
 - expedition capacity remains slot-based.
 
 ## Current baseline
 
-The production game contains the corrected starter path, two-way traversal, native wood/stone/berry harvesting, the Forest/Mines fork, numbered combat self-use and the expedition build grouping. Persistent thresholds, regenerated multi-arena segments, NPC routes and terminal branches remain future work.
+The production game contains the corrected starter path in an isolated Atoll world, two-way traversal, native wood/stone/berry harvesting, the Forest/Mines fork, numbered combat self-use and the expedition build grouping. Persistent thresholds, regenerated multi-arena segments, NPC routes and terminal branches remain future work.
 
 ## Evidence
 
-`check:task-068`, `check:inventory`, `check:hud`, `check:build-mode`, `check:i18n`, Browser E2E and managed game preview.
+`check:task-059`, `check:task-068`, `check:inventory`, `check:hud`, `check:build-mode`, `check:i18n`, Browser E2E and managed game preview.
 
 ## Not fixed
 
