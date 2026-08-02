@@ -9,6 +9,7 @@ import {
   getWildAtollExitPoint,
   WILD_ATOLL_ARENAS,
 } from "./wildAtollDomain.js";
+import { ATOLL_WORLD_MODEL, WORLD_IDS } from "./worldLocationConfig.js";
 import {
   HOUSE_FRAMES,
   HOUSE_TEXTURE_KEY,
@@ -17,12 +18,11 @@ import {
   TILE_SIZE,
 } from "./worldConfig.js";
 
-const NEST_PHASE = "nest";
 const INTERACTION_RADIUS = 27;
 const NEST_ATOLL_ENTRANCE = Object.freeze({ x: 11 * TILE_SIZE, y: 6 * TILE_SIZE });
-const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE });
-const SOUTH_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 14 * TILE_SIZE });
-const NORTH_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 8 * TILE_SIZE });
+const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
+const SOUTH_SPAWN = Object.freeze({ ...ATOLL_WORLD_MODEL.spawn });
+const NORTH_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 8 * TILE_SIZE, facing: { x: 0, y: 1 } });
 const TITLE_Y = 112;
 const PROMPT_RECT = Object.freeze({ x: 56, y: 130, width: 208, height: 20 });
 
@@ -32,6 +32,8 @@ export function createWildAtollRuntime(scene, {
   getPlayerCharacter = () => scene.playerCharacter ?? null,
   getWorldLayout = () => scene.worldLayout ?? null,
   getWorldId = () => scene.sessionState?.currentWorldId ?? null,
+  transitionWorld = (worldId, spawn) => scene.worldLocationCoordinator?.transitionTo?.(worldId, spawn)
+    ?? { status: "unavailable", transitioned: false },
   renderHud = () => scene.gameHud?.render?.(),
   notifyInventoryGain = (result) => scene.gameHud?.notifyInventoryGain?.(result),
   spawnWorldItems = (itemId, quantity, origin) => scene.gameHud?.spawnWorldItems?.(itemId, quantity, origin),
@@ -54,10 +56,10 @@ export function createWildAtollRuntime(scene, {
     color: "#f2eadc",
   }).setDepth(HUD_DEPTH + 20).setScrollFactor(0).setVisible(false);
 
-  let mountedInNest = false;
+  let mountedWorldId = null;
   let runActive = false;
   let runSeed = "";
-  let arenaId = NEST_PHASE;
+  let arenaId = null;
   let candidate = null;
   let arenaVisuals = [];
   let activeNodeVisuals = new Map();
@@ -66,27 +68,18 @@ export function createWildAtollRuntime(scene, {
   let runSerial = 0;
 
   function mountNestEntrance() {
-    mountedInNest = true;
+    mountedWorldId = WORLD_IDS.nest;
     runActive = false;
-    arenaId = NEST_PHASE;
+    arenaId = null;
     candidate = null;
+    runNodes.clear();
     clearArenaPresentation();
     arenaVisuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
     titleText.setVisible(false);
   }
 
-  function unmountNest() {
-    mountedInNest = false;
-    runActive = false;
-    arenaId = NEST_PHASE;
-    candidate = null;
-    runNodes.clear();
-    clearArenaPresentation();
-    renderPrompt();
-    titleText.setVisible(false);
-  }
-
-  function beginRun() {
+  function mountAtollRun() {
+    mountedWorldId = WORLD_IDS.atoll;
     runActive = true;
     runSerial += 1;
     runSeed = `${Date.now()}-${runSerial}`;
@@ -95,16 +88,39 @@ export function createWildAtollRuntime(scene, {
     showMessage("hud:atoll.arrival");
   }
 
-  function leaveRun() {
+  function unmountCurrentWorld() {
+    mountedWorldId = null;
     runActive = false;
-    arenaId = NEST_PHASE;
+    arenaId = null;
     candidate = null;
     runNodes.clear();
     clearArenaPresentation();
-    arenaVisuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
+    renderPrompt();
     titleText.setVisible(false);
-    setPlayerPosition(NEST_RETURN_SPAWN);
+  }
+
+  function enterAtoll() {
+    const result = transitionWorld(WORLD_IDS.atoll, SOUTH_SPAWN);
+    if (!result?.transitioned) return false;
+    clearArenaPresentation();
+    mountedWorldId = null;
+    candidate = null;
+    titleText.setVisible(false);
+    return true;
+  }
+
+  function leaveAtoll() {
+    const result = transitionWorld(WORLD_IDS.nest, NEST_RETURN_SPAWN);
+    if (!result?.transitioned) return false;
+    clearArenaPresentation();
+    mountedWorldId = null;
+    runActive = false;
+    arenaId = null;
+    candidate = null;
+    runNodes.clear();
+    titleText.setVisible(false);
     showMessage("hud:atoll.leftRun");
+    return true;
   }
 
   function renderArena(nextArenaId, entrySide) {
@@ -177,28 +193,20 @@ export function createWildAtollRuntime(scene, {
 
   function activateCandidate() {
     if (!candidate) return false;
-    if (candidate.kind === "enter") {
-      beginRun();
-      return true;
-    }
+    if (candidate.kind === "enter") return enterAtoll();
     if (candidate.kind === "resource") {
       workResource(candidate.nodeId);
       return true;
     }
-    if (candidate.kind === "exit") {
-      activateExit(candidate.exit);
-      return true;
-    }
+    if (candidate.kind === "exit") return activateExit(candidate.exit);
     return false;
   }
 
   function activateExit(exit) {
-    if (exit.target === "nest") {
-      leaveRun();
-      return;
-    }
+    if (exit.target === "nest") return leaveAtoll();
     const entrySide = exit.direction === "south" ? "north" : "south";
     renderArena(exit.target, entrySide);
+    return true;
   }
 
   function workResource(nodeId) {
@@ -255,7 +263,7 @@ export function createWildAtollRuntime(scene, {
   }
 
   function onAction(actionId) {
-    if (!mountedInNest || destroyed || actionId !== "space") return;
+    if (!mountedWorldId || destroyed || actionId !== "space") return;
     if (candidate && activateCandidate()) scene.suppressNextInteract = true;
   }
 
@@ -266,10 +274,13 @@ export function createWildAtollRuntime(scene, {
 
   function update() {
     if (destroyed) return;
-    const inNest = getWorldId() === "nest";
-    if (inNest && !mountedInNest) mountNestEntrance();
-    else if (!inNest && mountedInNest) unmountNest();
-    if (!mountedInNest) return;
+    const worldId = getWorldId();
+    if (worldId !== mountedWorldId) {
+      unmountCurrentWorld();
+      if (worldId === WORLD_IDS.nest) mountNestEntrance();
+      else if (worldId === WORLD_IDS.atoll) mountAtollRun();
+    }
+    if (!mountedWorldId) return;
     candidate = findCandidate();
     renderPrompt();
   }
@@ -277,12 +288,13 @@ export function createWildAtollRuntime(scene, {
   function findCandidate() {
     const position = getPlayerCharacter()?.motor?.position;
     if (!position) return null;
-    if (!runActive) {
+    if (mountedWorldId === WORLD_IDS.nest) {
       const distance = Math.hypot(NEST_ATOLL_ENTRANCE.x - position.x, NEST_ATOLL_ENTRANCE.y - position.y);
       return distance <= INTERACTION_RADIUS
         ? { kind: "enter", id: "enter", labelKey: "hud:atoll.promptEnter", distance }
         : null;
     }
+    if (mountedWorldId !== WORLD_IDS.atoll || !runActive) return null;
     const definition = getWildAtollArenaDefinition(arenaId);
     const exits = definition.exits.map((exit) => {
       const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
@@ -307,7 +319,7 @@ export function createWildAtollRuntime(scene, {
   }
 
   function renderPrompt() {
-    const visible = mountedInNest && Boolean(candidate);
+    const visible = Boolean(mountedWorldId && candidate);
     promptBackground.clear().setVisible(visible);
     promptText.setVisible(visible);
     if (!visible) {
@@ -344,6 +356,7 @@ export function createWildAtollRuntime(scene, {
     player.motor.position = { x: point.x, y: point.y };
     player.motor.movement.velocity.x = 0;
     player.motor.movement.velocity.y = 0;
+    if (point.facing) player.motor.movement.facingDirection = { ...point.facing };
     scene.cameraRuntime?.reset?.(player.motor.position);
   }
 
@@ -355,7 +368,7 @@ export function createWildAtollRuntime(scene, {
   globalThis.window?.addEventListener?.("keydown", onKeyboard);
   scene.events.on("update", update);
   const unsubscribe = localization?.subscribe?.(() => {
-    if (runActive) setTitle(getWildAtollArenaDefinition(arenaId).titleKey);
+    if (runActive && arenaId) setTitle(getWildAtollArenaDefinition(arenaId).titleKey);
     renderPrompt();
   });
 
@@ -363,15 +376,15 @@ export function createWildAtollRuntime(scene, {
 
   return {
     getState: () => ({
-      mountedInNest,
+      mountedWorldId,
       active: runActive,
       runSeed,
       arenaId,
       candidateId: candidate?.id ?? null,
-      remainingNodes: runActive ? nodesForArena(arenaId).filter((node) => !node.cleared).length : 0,
+      remainingNodes: runActive && arenaId ? nodesForArena(arenaId).filter((node) => !node.cleared).length : 0,
     }),
     startArena(nextArenaId, { seed = `${Date.now()}` } = {}) {
-      if (!mountedInNest) mountNestEntrance();
+      mountedWorldId = WORLD_IDS.atoll;
       runActive = true;
       runSeed = String(seed);
       runNodes = new Map();
@@ -380,7 +393,7 @@ export function createWildAtollRuntime(scene, {
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      unmountNest();
+      unmountCurrentWorld();
       unsubscribe?.();
       scene.events.off("update", update);
       globalThis.window?.removeEventListener?.("keydown", onKeyboard);
