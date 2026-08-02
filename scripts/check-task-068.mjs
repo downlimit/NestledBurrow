@@ -4,15 +4,17 @@ import { collides } from "../src/character/movement.js";
 import { createInventoryItem } from "../src/inventory/inventoryDomain.js";
 import { useCombatNumberSlot } from "../src/inventory/combatQuickUse.js";
 import {
-  createWildAtollArenaNodes,
+  createWildAtollArenaResources,
   getWildAtollArenaDefinition,
   WILD_ATOLL_ARENAS,
-  WILD_ATOLL_STARTER_PATH,
+  WILD_ATOLL_SEGMENTS,
+  WILD_ATOLL_STARTER_ARENAS,
+  WILD_ATOLL_STARTER_LEVELS,
 } from "../src/world/wildAtollDomain.js";
 import { createWorldLayout } from "../src/world/worldLayout.js";
 import { createWorldLocationCoordinator } from "../src/world/worldLocationCoordinator.js";
 import { ATOLL_WORLD_MODEL, WORLD_IDS } from "../src/world/worldLocationConfig.js";
-import { TILE_SIZE } from "../src/world/worldConfig.js";
+import { getResourceProfile, resolveActionHp, resourceActionForTool } from "../src/resources/resourceDomain.js";
 
 const runtimeSource = readFileSync("src/world/wildAtollRuntime.js", "utf8");
 const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
@@ -34,52 +36,71 @@ function gameplayFixture() {
 
 {
   const gameplay = gameplayFixture();
-  const ration = useCombatNumberSlot(gameplay, 4);
-  assert.equal(ration.status, "used");
+  assert.equal(useCombatNumberSlot(gameplay, 4).status, "used");
   assert.equal(gameplay.needs.satiety, 65);
   assert.equal(gameplay.combatLoadout.slots[4].quantity, 1);
-  const wash = useCombatNumberSlot(gameplay, 5);
-  assert.equal(wash.status, "used");
+  assert.equal(useCombatNumberSlot(gameplay, 5).status, "used");
   assert.equal(gameplay.needs.lustre, 55);
   assert.equal(gameplay.farm.waterBucket.currentWater, 1);
-  assert.equal(gameplay.combatLoadout.slots[5].id, "water-bucket");
 }
 
 {
   const gameplay = gameplayFixture();
   gameplay.needs.lustre = 100;
-  const result = useCombatNumberSlot(gameplay, 5);
-  assert.equal(result.status, "need-full");
+  assert.equal(useCombatNumberSlot(gameplay, 5).status, "need-full");
   assert.equal(gameplay.farm.waterBucket.currentWater, 2);
 }
 
 {
-  assert.deepEqual(WILD_ATOLL_STARTER_PATH, ["edge", "grove", "fork"]);
-  const edge = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.edge);
-  const grove = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.grove);
-  const fork = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.fork);
-  assert.equal(edge.exits.filter((exit) => exit.target === "nest").length, 1, "only the edge arena returns to the Nest");
-  assert.equal(grove.exits.some((exit) => exit.target === "nest"), false);
-  assert.equal(fork.exits.filter((exit) => exit.cave).length, 2, "the starter fork exposes exactly two lifts");
-  assert.deepEqual(fork.exits.filter((exit) => exit.cave).map((exit) => exit.target), ["forest", "mine"]);
+  assert.deepEqual(WILD_ATOLL_STARTER_LEVELS.map((level) => level.length), [1, 2, 2, 2, 1]);
+  assert.equal(WILD_ATOLL_STARTER_ARENAS.length, 8, "starter segment contains eight arenas");
+  assert.equal(new Set(WILD_ATOLL_STARTER_ARENAS).size, 8, "starter arena IDs are unique");
+  const levelByArena = new Map(WILD_ATOLL_STARTER_LEVELS.flatMap((level, levelIndex) => (
+    level.map((arenaId) => [arenaId, levelIndex])
+  )));
+  for (const arenaId of WILD_ATOLL_STARTER_ARENAS) {
+    const definition = getWildAtollArenaDefinition(arenaId);
+    assert.equal(definition.segmentId, WILD_ATOLL_SEGMENTS.starter);
+    for (const exit of definition.exits.filter((entry) => entry.kind === "path")) {
+      assert.equal(
+        levelByArena.get(exit.targetArenaId),
+        levelByArena.get(arenaId) + 1,
+        `${arenaId} advances exactly one arena level`,
+      );
+    }
+  }
+  const terminal = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.edge);
+  assert.equal(terminal.terminal, true);
+  assert.equal(terminal.resources.length, 0, "terminal arena is a decision/return arena without resource clutter");
+  assert.deepEqual(
+    terminal.exits.filter((exit) => exit.kind === "segment").map((exit) => exit.targetSegmentId),
+    [WILD_ATOLL_SEGMENTS.forestT1, WILD_ATOLL_SEGMENTS.mineT1],
+  );
+  assert.equal(terminal.exits.filter((exit) => exit.kind === "teleport" && exit.targetWorldId === WORLD_IDS.nest).length, 1);
+  for (const arenaId of WILD_ATOLL_STARTER_ARENAS.filter((id) => id !== WILD_ATOLL_ARENAS.edge)) {
+    assert.equal(getWildAtollArenaDefinition(arenaId).exits.some((exit) => exit.kind === "teleport"), false);
+  }
 }
 
 {
-  const first = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.edge);
-  const repeated = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.edge);
-  assert.deepEqual(first, repeated, "arena resource placement is deterministic for one run seed");
-  assert.deepEqual(first.map((node) => node.kind).sort(), ["berry", "log", "stone"]);
-  assert.equal(first.find((node) => node.kind === "log").requiredTool, "axe");
-  assert.equal(first.find((node) => node.kind === "stone").requiredTool, "pickaxe");
-  assert.equal(first.find((node) => node.kind === "berry").requiredTool, null);
-  assert.equal(createInventoryItem("berry").kind, "loot", "berries remain ordinary forward-compatible inventory loot");
-}
+  const first = createWildAtollArenaResources("task-068", "run", WILD_ATOLL_ARENAS.root);
+  const repeated = createWildAtollArenaResources("task-068", "run", WILD_ATOLL_ARENAS.root);
+  assert.deepEqual(first, repeated, "resource placement is deterministic for one run seed");
+  assert.deepEqual(first.map((definition) => definition.profileId).sort(), ["berry-bush", "log-small", "stone-small"]);
+  assert(first.every((definition) => definition.kind === "work-resource"), "Atoll uses ordinary resource interaction definitions");
+  assert.equal(first.find((definition) => definition.profileId === "log-small").prompt, "hud:interaction.chop");
+  assert.equal(first.find((definition) => definition.profileId === "stone-small").prompt, "hud:interaction.mine");
+  assert.equal(first.find((definition) => definition.profileId === "berry-bush").prompt, "hud:interaction.gatherBerries");
+  assert.equal(createInventoryItem("berry").kind, "loot");
 
-{
-  const forest = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.forest);
-  const mine = createWildAtollArenaNodes("task-068", WILD_ATOLL_ARENAS.mine);
-  assert.ok(forest.filter((node) => node.kind === "log").length > forest.filter((node) => node.kind === "stone").length);
-  assert.ok(mine.filter((node) => node.kind === "stone").length > mine.filter((node) => node.kind === "log").length);
+  const log = getResourceProfile("log-small");
+  const stone = getResourceProfile("stone-small");
+  const berries = getResourceProfile("berry-bush");
+  assert.equal(resolveActionHp(log, "chop", { smallLogChopHp: 7 }), 7, "Atoll log keeps common log HP");
+  assert.equal(resolveActionHp(stone, "mine", {}), 7, "Atoll stone keeps common stone HP");
+  assert.equal(resourceActionForTool(log, "axe"), "chop");
+  assert.equal(resourceActionForTool(stone, "pickaxe"), "mine");
+  assert.equal(resourceActionForTool(berries, null), "gather");
 }
 
 {
@@ -88,26 +109,44 @@ function gameplayFixture() {
     createLayout: (worldId) => createWorldLayout(worldId),
   });
   const layout = coordinator.createInitialLayout();
-  assert.equal(layout.transitions.length, 0, "Atoll has no persistent transport assets beneath arena presentation");
-  assert.equal(collides(ATOLL_WORLD_MODEL.spawn, layout, 8, 5), false, "entry spawn is collision-safe");
-  for (const arenaId of Object.values(WILD_ATOLL_ARENAS)) {
-    for (const node of createWildAtollArenaNodes("task-068", arenaId)) {
-      const point = { x: node.tileX * TILE_SIZE + 8, y: node.tileY * TILE_SIZE + 9 };
-      assert.equal(collides(point, layout, 8, 5), false, `${arenaId}:${node.index} starts on walkable arena terrain`);
-      assert.ok(Math.hypot(point.x - ATOLL_WORLD_MODEL.spawn.x, point.y - ATOLL_WORLD_MODEL.spawn.y) > 16, `${arenaId}:${node.index} does not trap the entry spawn`);
+  assert.equal(layout.transitions.length, 0, "Atoll world has no hidden persistent transport assets");
+  assert.equal(collides(ATOLL_WORLD_MODEL.spawn, layout, 8, 5), false, "arena entry spawn is collision-safe");
+  for (const arenaId of WILD_ATOLL_STARTER_ARENAS) {
+    for (const definition of createWildAtollArenaResources("task-068", "run", arenaId)) {
+      assert.equal(collides(definition.position, layout, 8, 5), false, `${definition.id} starts on walkable terrain`);
+      assert.ok(
+        Math.hypot(definition.position.x - ATOLL_WORLD_MODEL.spawn.x, definition.position.y - ATOLL_WORLD_MODEL.spawn.y) > 20,
+        `${definition.id} leaves the entry spawn clear`,
+      );
     }
   }
 }
 
 {
-  assert(runtimeSource.includes("const TITLE_Y = 112"), "arena title stays below the top HUD controls");
-  assert(runtimeSource.includes("WORLD_IDS.atoll"), "arena runtime mounts in the isolated Atoll world");
-  assert(!runtimeSource.includes("forecast"), "forecast marker and abstract arena forecast are removed");
+  assert(runtimeSource.includes("registerResource"), "Atoll registers nodes with DebrisRuntime");
+  assert(runtimeSource.includes("unregisterResource"), "Atoll removes transient nodes through DebrisRuntime");
+  assert(!runtimeSource.includes("workResource("), "Atoll has no private resource-hit implementation");
+  assert(runtimeSource.includes("COLLAPSE_FADE_OUT_MS = 5000"));
+  assert(runtimeSource.includes("COLLAPSE_FADE_IN_MS = 3000"));
+  assert(runtimeSource.includes("beginCollapseRecovery"));
+  assert(runtimeSource.includes("value === key || value === namespaceFreeKey"), "technical localization keys fail closed");
+  assert(!runtimeSource.toLowerCase().includes("forecast"));
   for (const [locale, atoll] of [["ru", ruHud.atoll], ["en", enHud.atoll]]) {
-    for (const [key, value] of Object.entries(atoll)) {
-      assert(!/[—–?]/u.test(value), `${locale} Atoll label ${key} uses only supported glyphs`);
+    for (const [key, value] of flatten(atoll)) {
+      assert(!/[—–?]/u.test(value), `${locale} Atoll label ${key} uses supported punctuation`);
+      assert(value.length <= 40, `${locale} Atoll label ${key} fits the compact HUD budget`);
+      assert(!/^(?:hud:)?atoll\./.test(value), `${locale} Atoll label ${key} is not a technical key`);
     }
   }
 }
 
 console.log("Task #068 contracts OK");
+
+function flatten(value, prefix = "") {
+  return Object.entries(value).flatMap(([key, entry]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    return entry && typeof entry === "object" && !Array.isArray(entry)
+      ? flatten(entry, path)
+      : [[path, String(entry)]];
+  });
+}
