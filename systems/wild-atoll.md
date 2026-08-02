@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Owns repeatable expeditions connecting home preparation, compact arenas, route discovery and persistent access to deeper segments.
+Owns repeatable expeditions connecting home preparation, compact arenas, route discovery and access to deeper segments.
 
 ## Terms
 
-A **segment** is a literary named zone containing roughly `6-8` connected arenas. An **arena** is one compact playable location inside that segment. Segment names establish place and mood; arena names and exit tips stay short and practical.
+A **segment** is a literary named zone containing connected arenas. An **arena** is one compact playable location inside that segment. Segment names establish place and mood; arena names and exit tips stay short and practical.
 
 ## Product loop
 
@@ -16,43 +16,44 @@ home preparation -> Atoll run -> materials/discoveries -> tavern and island deve
 
 Food, tools, consumables, information and relationships prepared at home must alter expedition options. Coins prove the tavern works as a business; Atoll materials enable physical development.
 
-## Long-term topology
+## Implemented topology
 
 ```text
 Island Nest
-└─ starter segment
-   ├─ Forest T1 -> Forest T2 -> Forest T3 / automation branch
-   └─ Mines T1 -> Mines T2 -> Mines T3 / automation branch
+└─ First Trails
+   ├─ Beneath the Canopy T1
+   │  ├─ Deep Woods T2
+   │  └─ Wet Lowlands T2
+   └─ Under a Stone Sky T1
+      ├─ Crystal Galleries T2
+      └─ Lower Workings T2
 ```
 
-T1, T2 and later resource segments use the same approximate arena count. The starter is shorter only because it is a warm-up. NPC segments remain separate terminal routes; only their island owners may attach an island to the Enclave.
+The starter, both T1 branches and all four currently planned T2 branches are traversable. T3, automation and NPC routes are not generated yet.
+
+## Segment format
+
+Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -> 2 -> 1` graph. Cross-links allow routes to reconverge without creating a back exit.
+
+- the first seven arenas contain a lightweight mixture of ordinary resource nodes;
+- the final arena may contain no resources;
+- the final arena always contains a white teleport to Island Nest;
+- starter and T1 terminal arenas also contain two onward segment entrances;
+- T2 terminal arenas currently end the implemented route and offer the home teleport;
+- entering another segment resets the player to that segment's entry arena while preserving the same transient run.
 
 ## Arena contract
 
 - movement and work spend energy through existing movement/needs owners;
-- wood, stone, berries and later rewards exist as world objects that may be harvested or ignored;
+- wood, stone and berries exist as world objects that may be harvested or ignored;
 - logs and stones use the same `DebrisRuntime`, HP, targeting outline, hit feedback, cooldown, energy and reward flow as every other location;
+- berries use the same resource pipeline without requiring a tool;
 - route transitions never subtract an estimated cost or reveal resource counts in text;
 - exits identify only the next arena or segment with a short interaction tip;
-- travel within a segment is forward-only: a chosen path cannot be reversed;
-- each completed segment ends in a terminal arena that may omit resources and offers onward routes plus a white return teleport to Island Nest.
+- travel is forward-only: a chosen arena path or segment cannot be reversed;
+- every terminal arena exposes the white return teleport.
 
-## First production slice
-
-The starter segment contains eight arenas in a one-way `1 -> 2 -> 2 -> 2 -> 1` graph. Cross-links allow different forward routes to reconverge without permitting backtracking.
-
-```text
-Fringe
-├─ Meadow ─┬─ Pond ───┬─ Roots ─┐
-└─ Stones ─┴─ Thicket ┴─ Scree ─┴─ Pass
-                                      ├─ Forest T1 entrance
-                                      ├─ Mines T1 entrance
-                                      └─ white teleport -> Island Nest
-```
-
-The first seven arenas contain small deterministic mixtures of ordinary logs, stones and berry bushes. The Pass is the terminal decision arena and contains no required resources. Forest T1 and Mines T1 entrances are visible and named, while their internal arena graphs remain outside this slice.
-
-`src/world/atollWorldLayout.js` owns the isolated transport-free collision space. `src/world/wildAtollDomain.js` owns segment topology and deterministic common resource definitions. `src/world/wildAtollRuntime.js` owns transient arena choice, short exit presentation, registration of resources with `DebrisRuntime`, the terminal teleport and collapse return.
+`src/world/atollWorldLayout.js` owns the isolated transport-free collision space. `src/world/wildAtollDomain.js` generates all seven segment graphs, route connections and deterministic common resource definitions. `src/world/wildAtollRuntime.js` owns transient traversal, exit presentation, resource registration, segment changes, terminal teleports and collapse return. Player-facing Atoll copy lives in the dedicated `atoll` localization namespace.
 
 ## Collapse return
 
@@ -68,18 +69,21 @@ Collapsing on the Atoll starts sleep immediately so movement stops, but visible 
 
 ## Invariants
 
-- starter topology is `1/2/2/2/1` and contains eight unique arenas;
-- all internal paths advance exactly one level; no arena has a back exit;
-- only the terminal starter arena has its Nest teleport;
-- terminal arena exposes exactly Forest T1, Mines T1 and home return;
+- seven segments and fifty-six unique arenas are generated;
+- every segment topology is `1/2/2/2/1`;
+- all internal paths advance exactly one arena level;
+- no non-terminal arena has a home teleport;
+- starter routes to Forest T1 and Mines T1;
+- Forest T1 routes to Deep Woods T2 and Wet Lowlands T2;
+- Mines T1 routes to Crystal Galleries T2 and Lower Workings T2;
 - represented resources use the common resource owner and never overlap spawn corridors;
-- arena transitions do not mutate needs directly;
+- arena and segment transitions do not mutate needs directly;
 - transient run state is not serialized;
 - expedition capacity remains slot-based.
 
 ## Current baseline
 
-The production slice contains the one-way starter segment, its physical common resources, its terminal Forest/Mines entrances, white home teleport, collapse return, numbered combat self-use and expedition build grouping. Forest T1/Mines T1 internals, T2 routes, persistent thresholds, NPC routes and terminal branches remain future work.
+The production slice contains the complete route tree through T2, common resource harvesting, literary segment titles, short arena tips, white terminal teleports, collapse return, numbered combat self-use and expedition build grouping. Filling is intentionally provisional and reuses simple wood/stone/berry profiles.
 
 ## Evidence
 
@@ -87,4 +91,4 @@ The production slice contains the one-way starter segment, its physical common r
 
 ## Not fixed
 
-Persistent run schema, threshold repair, T1/T2 arena content, encounters, final reward economy, final arena art/layout, whistle behavior and native assets for additional expedition props.
+Persistent run schema, threshold repair, T3 and automation routes, NPC routes, encounters, final reward economy, final arena art/layout, whistle behavior and native assets for additional expedition props.
