@@ -14,14 +14,14 @@ export function createGameCanvasInputGuard(canvas, {
   };
 
   canvas?.addEventListener?.("contextmenu", preventContextMenu);
-  windowRef?.addEventListener?.("keydown", preventBrowserShortcut, true);
-  windowRef?.addEventListener?.("keyup", preventBrowserShortcut, true);
+  windowRef?.addEventListener?.("keydown", preventBrowserShortcut);
+  windowRef?.addEventListener?.("keyup", preventBrowserShortcut);
 
   return {
     destroy() {
       canvas?.removeEventListener?.("contextmenu", preventContextMenu);
-      windowRef?.removeEventListener?.("keydown", preventBrowserShortcut, true);
-      windowRef?.removeEventListener?.("keyup", preventBrowserShortcut, true);
+      windowRef?.removeEventListener?.("keydown", preventBrowserShortcut);
+      windowRef?.removeEventListener?.("keyup", preventBrowserShortcut);
     },
   };
 }
