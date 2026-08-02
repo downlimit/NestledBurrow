@@ -32,7 +32,7 @@
 
 В `src/main.js` нельзя добавлять новую domain logic, самостоятельную state machine, сериализацию, placement algorithm, editor workflow или крупную presentation subsystem.
 
-Для `src/main.js` действует жёсткий предел `2400` строк, который устанавливает `scripts/check-architecture-boundaries.mjs`. Текущий файл остаётся ниже него. Это предохранитель: следующая содержательная функция должна сопровождаться локальным выделением, чтобы composition root не рос дальше.
+Для `src/main.js` действует жёсткий предел `1520` строк, который устанавливает `scripts/check-architecture-boundaries.mjs`. Текущий файл остаётся ниже него. Это предохранитель: следующая содержательная функция должна сопровождаться локальным выделением, чтобы composition root не рос дальше.
 
 ## Следующие подтверждённые выделения
 
@@ -60,6 +60,12 @@
 Facility runtime владеет объектом, collider и use lifecycle. Presentation pose не мутирует безопасную motor position. Camera получает presentation target через явный adapter. Sleep/wake и interaction candidate остаются отдельными контрактами.
 
 `InteractionApproachResolver` owns collision-valid perimeter use points and bounded route selection for every interaction candidate. `InteractionTimelineRuntime` owns transient enter/active/exit phases and pose interpolation. `ToiletAccidentTimelineRuntime` owns the unskippable shake/recovery sequence and puddle hook. `NeedsInteractionCoordinator` binds these phases to facility, sleep and protected-need outputs. `NeedsFlowRuntime` measures actual N/E/S/T/L/D value deltas for HUD direction and tier without action labels. These owners are not serialized; `WorldScene` only constructs them, delegates update and routes callbacks.
+
+### World interaction execution
+
+`InteractionRuntime` владеет candidate targeting, facing/approach selection, dialogue lifecycle и presenter protocol. `WorldInteractionCoordinator` агрегирует static world definitions, применяет общие availability gates и детерминированно исполняет недиалоговые действия в порядке merchant, farming, tavern sign, facility, bed, busy gate, exhausted wake, resource.
+
+Координатор хранит только transient resource cooldown/activity state и делегирует мутации существующим merchant, farming, kitchen, needs, facility, debris и tavern-sign owners. Location lifecycle явно rebind-ит эти owners после mount и отвязывает до teardown. `WorldScene` создаёт coordinator один раз на scene/session, передаёт ограниченные callbacks, подключает его к `InteractionRuntime` и читает cooldown/activity snapshots.
 
 ### Локации мира
 

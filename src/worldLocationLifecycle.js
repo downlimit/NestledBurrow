@@ -15,6 +15,16 @@ export function mountWorldLocation(scene) {
     scene.createMovementDebugPanel();
     scene.createBuildCoordinator();
   }
+  scene.worldInteractionCoordinator?.rebindLocationOwners?.({
+    merchantRuntime: scene.merchantRuntime,
+    farmingRuntime: scene.farmingRuntime,
+    tavernSignRuntime: scene.tavernSignRuntime,
+    facilityRuntime: scene.facilityRuntime,
+    kitchenInteractionRuntime: scene.kitchenInteractionRuntime,
+    needsInteractionCoordinator: scene.needsInteractionCoordinator,
+    cookingRuntime: scene.cookingRuntime,
+    debrisRuntime: scene.debrisRuntime,
+  });
   scene.interactionRuntime?.resetCandidate?.();
   scene.syncGameplayHudVisibility();
 }
@@ -44,6 +54,7 @@ export function renderWorldLocation(scene, { outdoorTextureKey, houseTextureKey,
 
 export function destroyWorldLocation(scene) {
   scene.interactionRuntime?.resetCandidate?.();
+  scene.worldInteractionCoordinator?.unbindLocationOwners?.();
   scene.movementDebugPanel?.destroy();
   scene.movementDebugPanel = null;
   scene.worldBuildCoordinator?.destroy?.();

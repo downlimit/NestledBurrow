@@ -35,9 +35,13 @@ const runtime = createInteractionRuntime({
   characterSystem: { has(id) { return snapshots.has(id); }, getSnapshot(id) { return snapshots.get(id); } },
   interactionDefinitions: INTERACTION_DEFINITIONS,
   getDialogueDefinition,
-  runWorldObjectInteraction(candidate) {
-    interactions.push(candidate);
-    return { status: "merchant-opened", mutated: false };
+  worldInteractionCoordinator: {
+    getStaticInteractionDefinitions: () => [],
+    isInteractionAllowed: () => true,
+    handle(candidate) {
+      interactions.push(candidate);
+      return { status: "merchant-opened", mutated: false };
+    },
   },
   presenter,
 });
@@ -51,17 +55,20 @@ const wakeRuntime = createInteractionRuntime({
   sessionState: createFreshGameSessionState(),
   characterSystem: { has(id) { return snapshots.has(id); }, getSnapshot(id) { return snapshots.get(id); } },
   interactionDefinitions: [],
-  getStaticInteractionDefinitions: () => [{
-    id: "wake", entityId: "wake", roomId: "world", kind: "wake-exhausted",
-    position: { x: 0, y: 0 }, radius: 24, priority: 100, requiresFacing: false,
-    facingDotThreshold: -1, prompt: "hud:interaction.wake", payload: {},
-  }],
-  runWorldObjectInteraction: () => ({
-    status: "wake-failed",
-    messageKey: "hud:interaction.wakeFailed",
-    transientMessageShown: true,
-    mutated: false,
-  }),
+  worldInteractionCoordinator: {
+    getStaticInteractionDefinitions: () => [{
+      id: "wake", entityId: "wake", roomId: "world", kind: "wake-exhausted",
+      position: { x: 0, y: 0 }, radius: 24, priority: 100, requiresFacing: false,
+      facingDotThreshold: -1, prompt: "hud:interaction.wake", payload: {},
+    }],
+    isInteractionAllowed: () => true,
+    handle: () => ({
+      status: "wake-failed",
+      messageKey: "hud:interaction.wakeFailed",
+      transientMessageShown: true,
+      mutated: false,
+    }),
+  },
   presenter,
 });
 wakeRuntime.update({ actions: { interact: true } });

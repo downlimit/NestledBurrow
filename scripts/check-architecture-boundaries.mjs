@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 const main = readFileSync("src/main.js", "utf8").replace(/\r\n/g, "\n");
 const lineCount = main.split("\n").length;
-const MAX_WORLD_SCENE_LINES = 2400;
+const MAX_WORLD_SCENE_LINES = 1520;
 
 assert(
   lineCount <= MAX_WORLD_SCENE_LINES,
@@ -28,7 +28,7 @@ assert(!source["editorAuthoringRuntime.js"].includes("scene.add.image"), "author
 assert(source["editorAuthoringRuntime.js"].includes("debrisRuntime?.registerResource"), "authoring trees must enter the shared resource owner");
 assert(!source["editorAuthoringRuntime.js"].includes("scene.runWorldObjectInteraction ="), "authoring cannot replace shared resource hit resolution");
 assert(source["debrisRuntime.js"].includes("registerResource(definition,"), "the resource owner must accept authored and location-defined instances");
-assert(source["main.js"].includes("debrisRuntime?.getResourceDefinition"), "all resource interactions must resolve through the active resource owner");
+assert(source["worldInteractionCoordinator.js"].includes("debrisRuntime?.getResourceDefinition"), "all resource interactions must resolve through the active resource owner");
 assert(source["facilityRuntime.js"].includes("drawFacility(graphics, facility.facilityType)"), "facility runtime and previews must share one presentation adapter");
 assert(source["worldBuildCoordinator.js"].includes("createWellPresentation(this.renderingHost, point"), "well runtime and previews must share one presentation adapter");
 assert(source["worldBuildCoordinator.js"].includes("tavernSignRuntime?.getBuildMoveTargetAt")
