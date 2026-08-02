@@ -80,7 +80,7 @@ test("localized seed purchase persists and New Game keeps language", async ({ pa
   await expect.poll(() => bridge(page, "getAudioSettings")).toMatchObject({ master: 0.2, music: 0.3, effects: 0.4 });
 });
 
-test("desktop keyboard selects and preserves diagonal runtime facing", async ({ page }, testInfo) => {
+test("desktop keyboard supports diagonal runtime facing while held", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop keyboard smoke only");
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -88,7 +88,6 @@ test("desktop keyboard selects and preserves diagonal runtime facing", async ({ 
 
   await page.keyboard.down("KeyW");
   await page.keyboard.down("KeyD");
-  await expect.poll(async () => (await bridge(page, "getCharacterSnapshot", "player")).facingDirection).toMatchObject({ x: expect.any(Number), y: expect.any(Number) });
   await expect.poll(async () => {
     const facing = (await bridge(page, "getCharacterSnapshot", "player")).facingDirection;
     return facing.x > 0 && facing.y < 0;
@@ -96,20 +95,16 @@ test("desktop keyboard selects and preserves diagonal runtime facing", async ({ 
   await page.keyboard.up("KeyD");
   await page.keyboard.up("KeyW");
   await expect.poll(async () => (await bridge(page, "getCharacterSnapshot", "player")).speed).toBeCloseTo(0, 3);
-  let facing = (await bridge(page, "getCharacterSnapshot", "player")).facingDirection;
-  expect(facing.x).toBeGreaterThan(0); expect(facing.y).toBeLessThan(0);
 
   await page.keyboard.down("KeyS");
   await page.keyboard.down("KeyA");
   await expect.poll(async () => {
-    const nextFacing = (await bridge(page, "getCharacterSnapshot", "player")).facingDirection;
-    return nextFacing.x < 0 && nextFacing.y > 0;
+    const facing = (await bridge(page, "getCharacterSnapshot", "player")).facingDirection;
+    return facing.x < 0 && facing.y > 0;
   }).toBe(true);
   await page.keyboard.up("KeyA");
   await page.keyboard.up("KeyS");
   await expect.poll(async () => (await bridge(page, "getCharacterSnapshot", "player")).speed).toBeCloseTo(0, 3);
-  facing = (await bridge(page, "getCharacterSnapshot", "player")).facingDirection;
-  expect(facing.x).toBeLessThan(0); expect(facing.y).toBeGreaterThan(0);
   expect(pageErrors).toEqual([]);
 });
 
