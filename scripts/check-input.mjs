@@ -9,6 +9,7 @@ import {
   isPlayerMovementSuppressed,
   isTouchJoystickSupported,
 } from "../src/controls/input.js";
+import { createGameCanvasInputGuard, shouldPreventGameBrowserShortcut } from "../src/controls/gameCanvasInputGuard.js";
 import { MobileJoystick } from "../src/controls/mobileJoystick.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
 
@@ -133,6 +134,47 @@ function createGraphicStub() {
     destroy() { this.destroyed = true; },
   };
 }
+
+function keyboardEvent(code, target = { tagName: "CANVAS" }) {
+  let prevented = false;
+  return {
+    code,
+    target,
+    preventDefault() { prevented = true; },
+    get prevented() { return prevented; },
+  };
+}
+
+assert.equal(shouldPreventGameBrowserShortcut(keyboardEvent("AltLeft")), true, "physical Alt is captured");
+assert.equal(shouldPreventGameBrowserShortcut(keyboardEvent("KeyD")), true, "Alt combinations cannot focus the address bar");
+assert.equal(shouldPreventGameBrowserShortcut(keyboardEvent("Tab")), true, "Tab remains inside the game");
+assert.equal(shouldPreventGameBrowserShortcut(keyboardEvent("F11")), false, "F11 remains a browser fullscreen shortcut");
+assert.equal(
+  shouldPreventGameBrowserShortcut(keyboardEvent("KeyA", { tagName: "INPUT" })),
+  false,
+  "editable controls keep native keyboard input",
+);
+
+const guardCanvas = new EventTargetStub();
+const guardWindow = new EventTargetStub();
+const inputGuard = createGameCanvasInputGuard(guardCanvas, { windowRef: guardWindow });
+const tabDown = keyboardEvent("Tab");
+guardWindow.emit("keydown", tabDown);
+assert.equal(tabDown.prevented, true, "keydown browser defaults are prevented");
+const movementUp = keyboardEvent("KeyD");
+guardWindow.emit("keyup", movementUp);
+assert.equal(movementUp.prevented, true, "keyup browser defaults are prevented");
+const fullscreenDown = keyboardEvent("F11");
+guardWindow.emit("keydown", fullscreenDown);
+assert.equal(fullscreenDown.prevented, false, "F11 passes through the installed guard");
+const editableDown = keyboardEvent("Tab", { tagName: "TEXTAREA" });
+guardWindow.emit("keydown", editableDown);
+assert.equal(editableDown.prevented, false, "editable targets pass through the installed guard");
+const contextMenu = keyboardEvent("ContextMenu");
+guardCanvas.emit("contextmenu", contextMenu);
+assert.equal(contextMenu.prevented, true, "canvas context menu remains disabled");
+inputGuard.destroy();
+assert.equal(guardCanvas.count() + guardWindow.count(), 0, "input guard removes every listener");
 
 const canvas = new EventTargetStub();
 canvas.getBoundingClientRect = () => ({
