@@ -105,14 +105,14 @@
       "coins": "coins"
     },
     "servingStock": {
-      "lemonade1": "Lemonade 1/4 - take",
-      "lemonade2": "Lemonade 2/4 - take",
-      "lemonade3": "Lemonade 3/4 - take",
-      "lemonade4": "Lemonade 4/4 - take",
-      "friedPotatoDish1": "Potato dish 1/4 - take",
-      "friedPotatoDish2": "Potato dish 2/4 - take",
-      "friedPotatoDish3": "Potato dish 3/4 - take",
-      "friedPotatoDish4": "Potato dish 4/4 - take"
+      "lemonade1": "Lemonade 1/4 — take",
+      "lemonade2": "Lemonade 2/4 — take",
+      "lemonade3": "Lemonade 3/4 — take",
+      "lemonade4": "Lemonade 4/4 — take",
+      "friedPotatoDish1": "Potato dish 1/4 — take",
+      "friedPotatoDish2": "Potato dish 2/4 — take",
+      "friedPotatoDish3": "Potato dish 3/4 — take",
+      "friedPotatoDish4": "Potato dish 4/4 — take"
     }
   },
   "atoll": {
@@ -181,11 +181,11 @@
     "balance_many": "Coins: {count}",
     "balance_other": "Coins: {count}",
     "buy": "BUY 1",
-    "buyPrice": "BUY - {count}",
-    "buyPrice_one": "BUY - {count}",
-    "buyPrice_few": "BUY - {count}",
-    "buyPrice_many": "BUY - {count}",
-    "buyPrice_other": "BUY - {count}",
+    "buyPrice": "BUY · {count}",
+    "buyPrice_one": "BUY · {count}",
+    "buyPrice_few": "BUY · {count}",
+    "buyPrice_many": "BUY · {count}",
+    "buyPrice_other": "BUY · {count}",
     "exit": "SPACE - CLOSE",
     "not-enough-coins": "Not enough coins",
     "inventory-full": "Inventory is full"
