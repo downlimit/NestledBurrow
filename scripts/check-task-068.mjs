@@ -6,6 +6,7 @@ import { useCombatNumberSlot } from "../src/inventory/combatQuickUse.js";
 import {
   createWildAtollArenaResources,
   getWildAtollArenaDefinition,
+  getWildAtollExitPoint,
   WILD_ATOLL_ARENAS,
   WILD_ATOLL_SEGMENTS,
   WILD_ATOLL_STARTER_ARENAS,
@@ -15,6 +16,7 @@ import { createWorldLayout } from "../src/world/worldLayout.js";
 import { createWorldLocationCoordinator } from "../src/world/worldLocationCoordinator.js";
 import { ATOLL_WORLD_MODEL, WORLD_IDS } from "../src/world/worldLocationConfig.js";
 import { getResourceProfile, resolveActionHp, resourceActionForTool } from "../src/resources/resourceDomain.js";
+import { TILE_SIZE } from "../src/world/worldConfig.js";
 
 const runtimeSource = readFileSync("src/world/wildAtollRuntime.js", "utf8");
 const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
@@ -69,6 +71,13 @@ function gameplayFixture() {
       );
     }
   }
+  const root = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.root);
+  const rootPaths = root.exits.filter((exit) => exit.kind === "path");
+  assert.deepEqual(rootPaths.map((exit) => exit.targetArenaId), [WILD_ATOLL_ARENAS.meadow, WILD_ATOLL_ARENAS.stones]);
+  const rootPoints = rootPaths.map((exit) => getWildAtollExitPoint(exit.direction, TILE_SIZE));
+  assert(rootPoints.every((point) => point.y < ATOLL_WORLD_MODEL.spawn.y), "both second-arena exits are north of the entry spawn");
+  assert(Math.abs(rootPoints[0].x - rootPoints[1].x) > 2 * 44, "starter choices have separate interaction zones");
+
   const terminal = getWildAtollArenaDefinition(WILD_ATOLL_ARENAS.edge);
   assert.equal(terminal.terminal, true);
   assert.equal(terminal.resources.length, 0, "terminal arena is a decision/return arena without resource clutter");
@@ -126,6 +135,9 @@ function gameplayFixture() {
   assert(runtimeSource.includes("registerResource"), "Atoll registers nodes with DebrisRuntime");
   assert(runtimeSource.includes("unregisterResource"), "Atoll removes transient nodes through DebrisRuntime");
   assert(!runtimeSource.includes("workResource("), "Atoll has no private resource-hit implementation");
+  assert(runtimeSource.includes("const INTERACTION_RADIUS = 44"), "starter exits have a usable interaction radius");
+  assert(runtimeSource.includes("createTrailExit"), "ordinary arena exits are visibly represented");
+  assert(runtimeSource.includes("availableExitIds"), "preview diagnostics expose current arena choices");
   assert(runtimeSource.includes("COLLAPSE_FADE_OUT_MS = 5000"));
   assert(runtimeSource.includes("COLLAPSE_FADE_IN_MS = 3000"));
   assert(runtimeSource.includes("beginCollapseRecovery"));
