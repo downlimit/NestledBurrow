@@ -17,6 +17,8 @@ import { getResourceProfile } from "../src/resources/resourceDomain.js";
 import STARTING_LAYOUT_DEFAULT from "../src/build/startingLayoutDefault.js";
 import { STOVE_REPAIR_COST } from "../src/tavern/cookingDomain.js";
 
+const NEST_RETURN_SPAWN_FIXTURE = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
+
 assert.deepEqual([...WORLD_LOCATION_IDS].sort(), [WORLD_IDS.atoll, WORLD_IDS.nest, WORLD_IDS.village], "village, Nest and isolated Atoll are registered");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.id, "village", "the existing village ID remains canonical");
 assert.equal(WORLD_LOCATION_DEFINITIONS.village.capabilities.meleeWeapons, true, "village retains the shared weapon runtime");
@@ -196,8 +198,6 @@ assert.deepEqual(player.motor.position, { x: NEST_RETURN_SPAWN_FIXTURE.x, y: NES
 assert.equal(saveCount, 4);
 
 console.log("Task #059 checks passed: registry, isolated Atoll, paired reachable transports, explicit arena transitions, safe spawns and collision");
-
-const NEST_RETURN_SPAWN_FIXTURE = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
 
 function createPreparedLayout(worldId) {
   const state = { currentWorldId: worldId };
