@@ -15,11 +15,11 @@
 - session save JSON-safe и versioned;
 - developer authoring отделён от gameplay save;
 - HUD, camera, audio и build UI имеют lifecycle owners;
-- interaction selection остаётся детерминированным контрактом; collision-valid use position и visual aim position разделены, а общая extractable-группа ресурсов и растений ранжируется по направлению взгляда до локальной дистанции.
-- `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle.
-- Повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены.
-- Дикий Атолл имеет отдельный transport-free world layout (`src/world/atollWorldLayout.js`), topology/resource-placement rules (`src/world/wildAtollDomain.js`) и transient arena presentation/input (`src/world/wildAtollRuntime.js`); его arena state не сериализуется.
-- Применение предметов из numbered combat slots разделяет UI activation (`src/combat/combatLoadoutRuntime.js`) и мутацию item/needs (`src/inventory/combatQuickUse.js`).
+- interaction selection остаётся детерминированным контрактом; collision-valid use position и visual aim position разделены, а общая extractable-группа ресурсов и растений ранжируется по направлению взгляда до локальной дистанции;
+- `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle;
+- повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены;
+- Дикий Атолл имеет отдельный transport-free world layout (`src/world/atollWorldLayout.js`), topology/resource-placement rules (`src/world/wildAtollDomain.js`) и transient arena presentation/input (`src/world/wildAtollRuntime.js`); его arena state не сериализуется;
+- применение предметов из numbered combat slots разделяет UI activation (`src/combat/combatLoadoutRuntime.js`) и мутацию item/needs (`src/inventory/combatQuickUse.js`).
 
 ## `src/main.js` — только composition root
 
@@ -82,9 +82,11 @@ Quick use is available only in stable `COMBAT`; Alt, panel transition, modal sup
 
 ### Дикий Атолл: первый runtime slice
 
-`src/world/atollWorldLayout.js` owns a rectangular collision environment with blocked outer boundary and no static transports. `src/world/wildAtollDomain.js` owns starter topology, exit semantics and deterministic placement of actual resource nodes. `src/world/wildAtollRuntime.js` owns the northern Nest entrance and one transient run inside `WORLD_IDS.atoll`: three starter arenas, exactly two cave exits at the Forest/Mines fork, local node state, world visuals/colliders, tool-gated harvesting and reward delivery.
+`src/world/atollWorldLayout.js` owns a rectangular collision environment with blocked outer boundary and no static transports. `src/world/wildAtollDomain.js` owns segment/arena identity, the forward-only `1/2/2/2/1` starter graph, exit semantics and deterministic definitions for actual resources. `src/world/wildAtollRuntime.js` owns the northern Nest entrance and one transient run inside `WORLD_IDS.atoll`: arena choice, short path presentation, terminal Forest/Mines entrances, the white Nest teleport and blackout return after collapse.
 
-Nest entry and edge return call `WorldLocationCoordinator.transitionTo` with explicit safe spawns. That method reuses the canonical location lifecycle without requiring a paired persistent transport or creating a hidden transition lock. Internal arena transitions remain inside the Atoll runtime. The runtime uses peaceful inventory selection for axe/pickaxe gating, asks the existing needs owner to price and record physical work, and sends ordinary inventory/world-item mutations through existing owners. Arena transitions do not mutate needs directly. Future multi-location segments extend the registered location/lifecycle model and do not create a second coordinator.
+Atoll logs, stones and berries are registered with the location `DebrisRuntime`. Target selection, outline, HP, cooldown, hit feedback, energy pricing, inventory reward and teardown remain in the same resource/interaction owners used in the Burrow and Nest. `wildAtollRuntime` may register/unregister transient definitions; it may not implement its own resource-hit loop.
+
+Nest entry and terminal return call `WorldLocationCoordinator.transitionTo` with explicit safe spawns. Internal arena movement is one-way transient topology, not a location transition and not persisted. Collapse begins ordinary exhausted sleep at visible scale `1`, then simulates the remaining ordinary clock/needs progression behind black before returning to Nest. Future T1/T2 segments extend the same graph/resource boundaries and do not create a second location coordinator.
 
 ### World interaction execution
 
