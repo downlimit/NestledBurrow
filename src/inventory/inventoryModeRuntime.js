@@ -394,8 +394,8 @@ export function createInventoryModeRuntime(scene, {
     getState: () => ({
       ...state,
       transitioning,
-      interactionBlocked: !scene.exhaustedSleeping
-        && !state.suppressed
+      interactionBlocked: !state.suppressed
+        && !scene.exhaustedSleeping
         && (transitioning || state.altDown || state.mode !== INVENTORY_MODES.PEACEFUL),
       holdThresholdMs: ALT_HOLD_THRESHOLD_MS,
       transitionMs: INVENTORY_MODE_TRANSITION_MS,
