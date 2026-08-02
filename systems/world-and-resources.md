@@ -11,6 +11,8 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - paired `2x2` transports connect the Burrow and Island Nest;
 - explicit safe-spawn transitions connect the Nest entrance and transport-free Atoll arenas;
 - axe, pickaxe, hoe and bucket have strict actions; mismatched tools cannot mutate targets;
+- logs and stones keep the same HP, outline, cooldown, hit feedback, energy and reward flow in every location;
+- tool-free berries still use the common resource definition, targeting, inventory and teardown pipeline;
 - resource removal clears presentation and collision, then delivers its reward atomically;
 - ten inventory slots hold tools and stackable loot; world drops remain pickable;
 - the canonical well refills the eight-use bucket;
@@ -20,11 +22,11 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 - location registry/lifecycle/presentation: `src/world/worldLocationConfig.js`, `src/world/worldLocationCoordinator.js`, `src/world/worldLocationRuntime.js`, `src/world/worldPresentationRuntime.js`;
 - layouts: `src/world/worldLayout.js`, `src/world/nestWorldLayout.js`, `src/world/atollWorldLayout.js`, `src/world/worldConfig.js`;
-- resource rules/instances/visuals: `src/resources/resourceDomain.js`, `src/resources/resourceConfig.js`, `src/resources/debrisRuntime.js`, `src/resources/resourceVisuals.js`;
+- resource rules/definitions/instances/visuals: `src/resources/resourceDomain.js`, `src/resources/resourceConfig.js`, `src/resources/debrisRuntime.js`, `src/resources/resourceVisuals.js`;
 - inventory: `src/inventory/inventoryDomain.js`, `src/inventory/inventoryRuntime.js`;
 - farming: `src/resources/farmingDomain.js`, `src/resources/farmingRuntime.js`, `src/resources/farmingConfig.js`;
 - interaction dispatch: `src/interaction/interactionRuntime.js`, `src/interaction/worldInteractionCoordinator.js`;
-- Atoll-local arena resources: `systems/wild-atoll.md`;
+- Atoll topology and transient resource registration: `systems/wild-atoll.md`;
 - build and persistence: `systems/build-and-authoring.md`, `systems/persistence.md`.
 
 ## Invariants
@@ -32,6 +34,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - registered world IDs are `village`, `nest` and `atoll`; unknown saved IDs resolve to `village`;
 - paired transports retain destination locks; explicit `transitionTo` runs the canonical lifecycle without a hidden transport or lock;
 - every canonical resource has one `worldId`; only active-location resources mount;
+- transient Atoll definitions may register with `DebrisRuntime` but may not duplicate resource work logic;
 - location teardown unbinds interactions before destroying owners and presentation; mount reverses that order;
 - inventory has exactly ten slots; a fresh game owns one axe, pickaxe, hoe and bucket;
 - migration restores missing tools without duplication;
@@ -42,7 +45,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 ## Current baseline
 
-The Burrow is `64x48`. Island Nest is a `22x16` oval island with its village transport, northern Atoll entrance, four trees and three stones. The Atoll is a separate `22x18` bounded layout with no static transports; its transient arena topology and resources belong to the Atoll runtime. Canonical world-resource progress persists through travel and reload, while a new Atoll run resets transient arena state. The inventory supports reorder, stacking, throwing and pickup; potato and lemon crops persist their farming state.
+The Burrow is `64x48`. Island Nest is a `22x16` oval island with its village transport, northern Atoll entrance, four trees and three stones. The Atoll is a separate `22x18` bounded layout with no static transports. Its arena topology is transient, while its logs, stones and berries are ordinary `DebrisRuntime` resources registered for the active arena and removed on forward travel. Canonical world-resource progress persists through travel and reload; a new Atoll run resets transient arena state. The inventory supports reorder, stacking, throwing and pickup; potato and lemon crops persist their farming state.
 
 ## Not yet
 
