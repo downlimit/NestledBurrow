@@ -148,6 +148,7 @@ test("running, exhaustion sleep and wake-up share the energy-flow contract", asy
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: null, arrows: 0 } } });
 
   await bridge(page, "setEnergy", 25);
+  await bridge(page, "setPlayerMotion", { moving: true, running: false });
   await page.keyboard.down("ArrowRight");
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 2 } } });
   await page.keyboard.down("Shift");
@@ -160,6 +161,7 @@ test("running, exhaustion sleep and wake-up share the energy-flow contract", asy
   await page.keyboard.up("Shift");
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("sprint-off");
   await page.keyboard.up("ArrowRight");
+  await bridge(page, "setPlayerMotion", { moving: false, running: false });
 
   await bridge(page, "setEnergy", 0);
   await bridge(page, "advanceGameplayTime", 16);

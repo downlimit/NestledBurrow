@@ -47,6 +47,7 @@
     "hit": "Hit",
     "sleep": "Sleep",
     "wake": "Wake up",
+    "tryWake": "Try to wake up",
     "wakeFailed": "Could not wake up",
     "energyRestored": "Energy restored",
     "chop": "Chop",
@@ -216,7 +217,7 @@
     "toiletAccidentWitnessed": "An awkward accident happened in front of others.",
     "urgentLongAction": "Use the toilet before starting a long task.",
     "novelty": {
-      "tooltip": "Novelty - fresh, enjoyable experiences. Repeated labour lowers it; new events restore it."
+      "tooltip": "Novelty - fresh, enjoyable experiences. Repeated labour lowers it; new events restore."
     },
     "energy": {
       "tooltip": "Energy - the reserve of strength for movement, work, and other actions."

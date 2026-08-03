@@ -5,6 +5,7 @@ import { hitResourceDefinition } from "../session/gameSessionState.js";
 import { TAVERN_SIGN_KIND } from "../tavern/guestConfig.js";
 import { RESOURCE_INTERACTION_KIND } from "../resources/resourceConfig.js";
 import { getResourceProfile, resourceActionForTool, resourceEffectType } from "../resources/resourceDomain.js";
+import { WORLD_IDS } from "../world/worldLocationConfig.js";
 
 const IGNORED = Object.freeze({ status: "ignored", mutated: false });
 
@@ -33,6 +34,7 @@ export function createWorldInteractionCoordinator({
   let destroyed = false;
   let locationOwners = emptyLocationOwners();
   let lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY;
+  let lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
   let activeResourceProfileId = null;
 
   function rebindLocationOwners(next = {}) {
@@ -54,13 +56,20 @@ export function createWorldInteractionCoordinator({
 
   function getStaticInteractionDefinitions() {
     if (destroyed) return [];
-    const wake = isSleeping() && !isExhaustedSleeping() ? getSleepingWakeInteraction() : null;
+    const sleeping = isSleeping();
+    const exhausted = sleeping && isExhaustedSleeping();
+    if (!exhausted) lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
+    const wake = sleeping && !exhausted ? getSleepingWakeInteraction() : null;
+    const exhaustedWake = exhausted && sessionState.currentWorldId !== WORLD_IDS.atoll
+      ? createExhaustedWakeInteraction(getSleepingWakeInteraction(), sessionState.currentWorldId)
+      : null;
     return [
       ...(locationOwners.debrisRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.facilityRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.farmingRuntime?.getInteractionDefinitions?.() ?? []),
       ...(wake ? [wake] : []),
+      ...(exhaustedWake ? [exhaustedWake] : []),
     ];
   }
 
@@ -161,7 +170,21 @@ export function createWorldInteractionCoordinator({
   }
 
   function handleExhaustedWake(candidate) {
-    return candidate.kind === "wake-exhausted" ? tryWakeFromExhaustion(getWakeRandom()) : IGNORED;
+    if (candidate.kind !== "wake-exhausted" || sessionState.currentWorldId === WORLD_IDS.atoll) return IGNORED;
+    const cooldownMs = Math.max(0, Number(getGameplayTuning()?.exhaustionWakeCooldownSeconds) || 0) * 1000;
+    const attemptAtMs = now();
+    if (attemptAtMs - lastWakeAttemptAtMs < cooldownMs) return { status: "cooldown", mutated: false };
+    lastWakeAttemptAtMs = attemptAtMs;
+    const random = getWakeRandom();
+    const roll = typeof random === "function" ? Number(random()) : Number.NaN;
+    if (Number.isFinite(roll) && roll < wakeProbability(sessionState.gameplay)) {
+      const result = getNeedsRuntime()?.wakeFromCollapse?.() ?? IGNORED;
+      if (isHandled(result)) {
+        lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
+        return result;
+      }
+    }
+    return tryWakeFromExhaustion(random);
   }
 
   function handleResource(candidate) {
@@ -249,9 +272,31 @@ export function createWorldInteractionCoordinator({
       destroyed = true;
       unbindLocationOwners();
       lastSuccessfulHitAtMs = Number.NEGATIVE_INFINITY;
+      lastWakeAttemptAtMs = Number.NEGATIVE_INFINITY;
       activeResourceProfileId = null;
     },
   });
+}
+
+function wakeProbability(gameplay) {
+  const maximumEnergy = Number(gameplay?.maximumEnergy) || 0;
+  const fraction = maximumEnergy > 0 ? Number(gameplay?.currentEnergy) / maximumEnergy : 0;
+  if (fraction < 0.05) return 0.1;
+  if (fraction < 0.1) return 0.66;
+  return fraction > 0.25 ? 1 : 0.66;
+}
+
+function createExhaustedWakeInteraction(base, worldId) {
+  if (!base) return null;
+  return {
+    ...base,
+    id: "wake-exhausted-player",
+    entityId: "wake-exhausted-player",
+    roomId: worldId ?? "world",
+    kind: "wake-exhausted",
+    prompt: "hud:interaction.tryWake",
+    payload: {},
+  };
 }
 
 function isHandled(result) {

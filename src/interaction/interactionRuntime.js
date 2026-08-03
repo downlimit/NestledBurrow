@@ -150,8 +150,13 @@ export function createInteractionRuntime({
     },
     refresh() {
       if (destroyed) return;
-      if (isSessionDialogueActive(sessionState)) showCurrentDialogueLine();
-      else if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
+      if (isSessionDialogueActive(sessionState)) {
+        showCurrentDialogueLine();
+        return;
+      }
+      currentCandidate = findCandidate();
+      if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
+      else presenter?.hidePrompt?.();
     },
     resetCandidate() {
       currentCandidate = null;

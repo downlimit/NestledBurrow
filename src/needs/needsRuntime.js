@@ -103,6 +103,16 @@ export function createNeedsRuntime({
     return snapshot(events, normalizedActivity);
   }
 
+  function wakeFromCollapse() {
+    collapseElapsedGameHours = 0;
+    gameplay().currentEnergy = Math.max(
+      gameplay().currentEnergy,
+      Math.max(1, Number(tuning.collapse.wakeEnergy) || 0),
+    );
+    onWake({ collapsed: true, manual: true });
+    return { status: "awake", mutated: true, energy: gameplay().currentEnergy };
+  }
+
   function getPhysicalActionCost(toolId) {
     const baseCost = tuning.toolCosts[toolId] ?? 0;
     return physicalActionEnergyCost(baseCost, needs(), {
@@ -253,6 +263,7 @@ export function createNeedsRuntime({
 
   return Object.freeze({
     update,
+    wakeFromCollapse,
     getState,
     getFlow: () => flow,
     getPhysicalActionCost,
