@@ -218,3 +218,17 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
   - SHA-256: `d57a2d04ec511f007c1b947ec5623eaf7e6c13458ab86a0b065ab1a51be06715`;
   - Git blob: `29b9a2f42cee1e57bc1f51b1effe994e1aa4fc48`.
 - **Integrity check:** `scripts/check-task-049.mjs` validates geometry, exact hashes, semantic frame order and confirms that Task #049 changes no tracked binary.
+
+## Project-authored tall grass
+
+- **Provenance:** project-authored native pixel sprite prepared by the Artist from the user-approved pseudo-pixel concept through direct controlled pixel-level authoring on the exact native RGBA grid. The runtime binary was not produced by image generation or by simple downscaling of the concept.
+- **Visual acceptance:** the user approved the native sprite on 2026-08-03.
+- **Runtime file:** `public/assets/project/resources/NestledBurrow_TallGrass.png`.
+- **Runtime role:** one-cell tall-grass resource intended to be cut with the sword.
+- **Native size:** `24×32` RGBA PNG.
+- **World footprint:** `1×1` tile; base width `16 px`; bottom-center anchor `{x: 12, y: 31}`.
+- **Alpha contract:** clean transparent canvas with only intentional semi-transparent edge pixels.
+- **Byte length:** `747`.
+- **SHA-256:** `6079ffcf633c3a89debb88aa8a8375abcc3120a5346fde99a030801862ea18f8`.
+- **Git blob SHA:** `5e7b7052e675f788d5f42153b8893560d0e714af`.
+- **Delivery:** immutable Artist-owned runtime input; later code integration must consume these exact bytes and must not regenerate, redraw, resample, recolor, recompress or replace the PNG.
