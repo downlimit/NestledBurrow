@@ -19,7 +19,7 @@
 → Stage 1: ровно 3 pseudo-pixel concept variants
 → пользователь выбирает один вариант или даёт feedback
 → Stage 2: cleanup выбранного варианта
-→ Stage 3: honest native production
+→ Stage 3: honest native production без новой генерации
 → Stage 4: native proof and user approval
 → repository delivery
 ```
@@ -125,8 +125,9 @@ Production mode затем определяется текущей стадие�
 - «Нужен спрайт высокой травы. Её можно будет срубать мечом» → Stage 1, три concept-варианта с учётом игровой функции.
 - «Покажи пять вариантов высокой травы» → Stage 1, пять concept-вариантов.
 - «Третий вариант ок» → Stage 2 выбранного третьего concept.
-- «Сделай из него нейтив» → Stage 2–4.
-- «В игре выглядит плохо, сделай новую итерацию; полупрозрачность допустима» → Stage 2–4 existing native asset.
+- «Сделай из него нейтив» → Stage 2–4 без image generation.
+- «Сгенерируй ещё одну художественную версию выбранного варианта перед нейтивом» → image generation разрешена только потому, что пользователь прямо её запросил; результат остаётся source artwork и затем проходит Stage 2–4.
+- «В игре выглядит плохо, сделай новую итерацию; полупрозрачность допустима» → Stage 2–4 existing native asset без новой генерации.
 - «Это 16×16 или псевдопиксельарт?» → Discussion mode, только текстовый ответ.
 - «Почему всего один вариант?» → Discussion mode, только текстовый ответ.
 - «Сразу делай нейтив, без концептов» → прямой Stage 2–4 маршрут.
@@ -232,6 +233,40 @@ Stage 2 остаётся source artwork или воспроизводимым п
 
 Свободная повторная генерация нового объекта вместо cleanup выбранного concept запрещена.
 
+## Канонический Stage 2–4 production contract
+
+После выбора concept Художник по умолчанию **не вызывает image generation и не создаёт новое художественное изображение**. Выбранный concept используется только как визуальный референс конструкции, силуэта, пропорций и акцентов.
+
+Внутренняя инструкция для производства финального спрайта формируется по следующему обязательному шаблону:
+
+```text
+Не вызывай image generation. Используй выбранный concept только как референс.
+Подготовь настоящий RGBA PNG <native canvas>;
+основание занимает <native footprint>, anchor — <anchor/pivot>.
+Перестрой силуэт на native pixel grid, используй ограниченную палитру,
+чистую прозрачность и только осознанные alpha-пиксели.
+Создай runtime-файл, integer nearest-neighbor preview и world-grid preview.
+Перед ответом декодируй сохранённый PNG и проверь фактические dimensions,
+mode/format, alpha bounds, footprint, anchor, byte length и SHA-256.
+```
+
+Параметры в угловых скобках выводятся из repository contract и конкретного asset; они не копируются как placeholders в пользовательский результат.
+
+Для небольшого pixel-art asset этот contract означает прямое контролируемое pixel-level authoring на точном native canvas либо программную воспроизводимую сборку. Простое уменьшение случайного high-resolution render допустимо только как исходная заготовка и не заменяет перестройку силуэта на native grid.
+
+### Единственное исключение для image generation после выбора concept
+
+Image generation на Stage 2–4 разрешена только когда пользователь **целенаправленно и прямо в текущем сообщении** просит:
+
+- сгенерировать новую художественную версию;
+- перерисовать concept генератором;
+- исследовать дополнительные визуальные варианты;
+- применить конкретную generative style transformation.
+
+Общие команды «го», «делай», «сделай нейтив», «сделай финальный», «game-ready», «продолжай» или feedback после проверки в игре не являются разрешением на image generation.
+
+Даже при прямом разрешении сгенерированное изображение остаётся source artwork. Оно не считается native sprite, пока отдельно не пройдёт native production, binary verification и Stage 4 proof.
+
 ## Stage 3 — honest native production
 
 До первого native export Художник повторно читает фактический `TILE_SIZE`.
@@ -247,9 +282,10 @@ native footprint depth  = D * TILE_SIZE
 
 Обязательные правила:
 
+- Stage 3 следует каноническому Stage 2–4 production contract выше;
 - native dimensions выводятся из фактического grid contract, а не выбираются произвольно;
 - conversion из Stage 2 source выполняется программно и воспроизводимо;
-- для маленького pixel-art asset допустимо прямое контролируемое pixel-level authoring на native canvas с сохранением выбранного Stage 1 дизайна;
+- для маленького pixel-art asset предпочтительно прямое контролируемое pixel-level authoring на native canvas с сохранением выбранного Stage 1 дизайна;
 - resampling сохраняет дискретную pixel grid;
 - финальный preview использует integer nearest-neighbor;
 - финальный файл декодируется как ожидаемый PNG/RGBA или другой заранее установленный runtime format;
@@ -259,7 +295,7 @@ native footprint depth  = D * TILE_SIZE
 - в binary нет фона, glow, presentation shadow, подписи, рамки или concept-sheet элементов;
 - animation sheet соблюдает точные frame dimensions, order и spacing.
 
-После conversion допустима контролируемая pixel-level cleanup. Генератор не перерисовывает утверждённый native sprite.
+После conversion допустима контролируемая pixel-level cleanup. Генератор не перерисовывает утверждённый native sprite без прямой просьбы пользователя по правилам исключения выше.
 
 ## Stage 4 — native cleanup and visual proof
 
@@ -272,7 +308,8 @@ native footprint depth  = D * TILE_SIZE
 - alpha и крайние пиксели;
 - отсутствие blur, fractional scaling и unintended semi-transparent noise;
 - совместимость с камерой, соседними assets и палитрой;
-- frame bounds/order для анимации.
+- frame bounds/order для анимации;
+- фактические dimensions и mode декодированного runtime binary, а не заявленный размер рабочего изображения.
 
 Пользователю показываются минимум:
 
@@ -296,10 +333,13 @@ native footprint depth  = D * TILE_SIZE
 - трактовать новый asset request как прямой native route только из-за слов «спрайт», «для игры» или указанного footprint;
 - выдавать Stage 1 concept за runtime asset;
 - выдавать high-resolution pseudo-pixel render за честный native sprite;
+- вызывать image generation после выбора concept без прямой целенаправленной просьбы пользователя в текущем сообщении;
+- трактовать «го», «делай», «сделай нейтив», «финальный», «game-ready» или native feedback как разрешение на новую генерацию;
 - после выбора варианта снова генерировать случайный новый concept вместо Stage 2 cleanup;
 - после игрового feedback возвращаться к хаотичной генерации новых вариантов без прямой просьбы заново начать Stage 1;
 - считать preview заменой downloadable/runtime binary;
 - сообщать внутренний container path как пользовательский результат;
+- утверждать dimensions до декодирования сохранённого runtime binary;
 - переспрашивать уже названные пользователем параметры.
 
 ## Repository naming and placement
@@ -367,13 +407,14 @@ Manifest не создаётся ради дублирования информ�
 
 - Новый asset по умолчанию начинается с ровно трёх Stage 1 pseudo-pixel concepts.
 - Выбранный concept переводится в Stage 2–4 native production без свободной повторной генерации.
+- После выбора concept image generation запрещена по умолчанию и разрешается только прямой целенаправленной просьбой пользователя.
+- Финальный sprite производится по каноническому Stage 2–4 production contract: native RGBA binary, exact grid, limited palette, clean alpha, nearest-neighbor preview, world preview и decoded-binary verification.
 - Содержательный вопрос получает текстовый ответ и приостанавливает generation.
 - Feedback после проверки в игре изменяет existing native asset и не возвращает процесс к Stage 1 без прямой просьбы.
 - Фактический `TILE_SIZE` проверяется до первого native export.
 - Pseudo-pixel concept никогда не выдаётся за runtime sprite.
-- Native dimensions выводятся из установленного grid contract.
+- Native dimensions выводятся из установленного grid contract и подтверждаются чтением сохранённого binary.
 - Map asset соответствует игровой камере, а не изометрической или icon-подаче.
-- Финальный native sprite не перегенерируется случайным новым изображением.
 - Naming и destination выводятся из canonical owner и соседних assets.
 - Approved binary не остаётся во временной папке.
 - Repository delivery завершается read-back, metadata и provenance.
