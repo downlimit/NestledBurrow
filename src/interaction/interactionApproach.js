@@ -3,6 +3,7 @@ import { createActorNavigation, findGridPath } from "../tavern/gridPathfinder.js
 import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "./interactionDirections.js";
 
 export const INTERACTION_NAVIGATION_CELL_SIZE = 16;
+const GRID_EDGE_EPSILON = 0.000001;
 
 export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
   const probeWallsBySource = new WeakMap();
@@ -210,28 +211,45 @@ function segmentIntersectsRect(start, goal, rect) {
   return maximum >= 0 && minimum <= 1;
 }
 
+export function interactionFootprintBounds(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  const size = Math.max(1, Number(cellSize) || INTERACTION_NAVIGATION_CELL_SIZE);
+  const sourceLeft = Number(bounds?.left) || 0;
+  const sourceRight = Number(bounds?.right) || sourceLeft + size;
+  const sourceTop = Number(bounds?.top) || 0;
+  const sourceBottom = Number(bounds?.bottom) || sourceTop + size;
+  const left = Math.floor((sourceLeft + GRID_EDGE_EPSILON) / size) * size;
+  const top = Math.floor((sourceTop + GRID_EDGE_EPSILON) / size) * size;
+  let right = Math.ceil((sourceRight - GRID_EDGE_EPSILON) / size) * size;
+  let bottom = Math.ceil((sourceBottom - GRID_EDGE_EPSILON) / size) * size;
+  if (right <= left) right = left + size;
+  if (bottom <= top) bottom = top + size;
+  return Object.freeze({ left, right, top, bottom });
+}
+
 export function perimeterInteractionPointEntries(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
-  const width = Math.max(1, Math.ceil((bounds.right - bounds.left) / cellSize));
-  const height = Math.max(1, Math.ceil((bounds.bottom - bounds.top) / cellSize));
+  const size = Math.max(1, Number(cellSize) || INTERACTION_NAVIGATION_CELL_SIZE);
+  const footprint = interactionFootprintBounds(bounds, size);
+  const width = Math.max(1, Math.round((footprint.right - footprint.left) / size));
+  const height = Math.max(1, Math.round((footprint.bottom - footprint.top) / size));
   const entries = [];
   for (let x = -1; x <= width; x += 1) {
     entries.push({
       direction: x === -1 ? "top-left" : x === width ? "top-right" : "top",
-      point: { x: bounds.left + (x + 0.5) * cellSize, y: bounds.top - cellSize / 2 },
+      point: { x: footprint.left + (x + 0.5) * size, y: footprint.top - size / 2 },
     });
     entries.push({
       direction: x === -1 ? "bottom-left" : x === width ? "bottom-right" : "bottom",
-      point: { x: bounds.left + (x + 0.5) * cellSize, y: bounds.top + (height + 0.5) * cellSize },
+      point: { x: footprint.left + (x + 0.5) * size, y: footprint.bottom + size / 2 },
     });
   }
   for (let y = 0; y < height; y += 1) {
     entries.push({
       direction: "left",
-      point: { x: bounds.left - cellSize / 2, y: bounds.top + (y + 0.5) * cellSize },
+      point: { x: footprint.left - size / 2, y: footprint.top + (y + 0.5) * size },
     });
     entries.push({
       direction: "right",
-      point: { x: bounds.left + (width + 0.5) * cellSize, y: bounds.top + (y + 0.5) * cellSize },
+      point: { x: footprint.right + size / 2, y: footprint.top + (y + 0.5) * size },
     });
   }
   return Object.freeze(entries.map(({ direction, point }) => Object.freeze({
