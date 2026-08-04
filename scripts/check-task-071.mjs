@@ -25,6 +25,7 @@ import { COLLIDER_DEBUG_STORAGE_KEY } from "../src/build/colliderDebugOverrides.
 import { editRectDraftByArrow, roundColliderDraftToGrid } from "../src/build/colliderResize.js";
 import {
   filterPerimeterInteractionPoints,
+  interactionFootprintBounds,
   perimeterInteractionPointEntries,
 } from "../src/interaction/interactionApproach.js";
 import { INTERACTION_APPROACH_DIRECTIONS } from "../src/interaction/interactionDirections.js";
@@ -124,11 +125,18 @@ assert.deepEqual(normalizedFacility.visual, { x: 16, y: 32, width: 32, height: 3
 assert.deepEqual(normalizedFacility.position, { x: 24, y: 40 });
 assert.deepEqual(normalizedFacility.usePosition, { x: 56, y: 48 });
 const normalizedBed = normalizeBedDefinitionToGrid({
+  id: "legacy-bed",
   position: { x: 31, y: 43 },
   wakePosition: { x: 31, y: 59 },
+  usePosition: { x: 31, y: 59 },
+  aimPosition: { x: 31, y: 43 },
+  presentationPose: { x: 31, y: 42, angle: -90 },
 });
-assert.deepEqual(normalizedBed.position, { x: 24, y: 40 }, "bed centre derives from one grid-aligned footprint cell");
-assert.deepEqual(normalizedBed.wakePosition, { x: 24, y: 56 });
+assert.deepEqual(normalizedBed.position, { x: 24, y: 40 }, "bed stores only its grid-aligned placement centre");
+assert.equal("wakePosition" in normalizedBed, false, "legacy wake positions are removed rather than shifted forward");
+assert.equal("usePosition" in normalizedBed, false, "bed approach positions are runtime-derived");
+assert.equal("aimPosition" in normalizedBed, false, "bed aim positions are runtime-derived");
+assert.equal("presentationPose" in normalizedBed, false, "bed timeline poses are runtime-derived");
 
 const cellBounds = { left: 16, right: 32, top: 32, bottom: 48 };
 const entries = perimeterInteractionPointEntries(cellBounds, 16);
@@ -142,6 +150,17 @@ assert.deepEqual(
   filterPerimeterInteractionPoints(cellBounds, ["top", "bottom"], 16),
   [{ x: 24, y: 24 }, { x: 24, y: 56 }],
   "disabled directions are removed from the exact approach-point set",
+);
+const paddedCollider = { left: 18, right: 30, top: 34, bottom: 46 };
+assert.deepEqual(
+  interactionFootprintBounds(paddedCollider, 16),
+  { left: 16, right: 32, top: 32, bottom: 48 },
+  "interaction cells derive from the occupied grid footprint rather than the padded collider corner",
+);
+assert.deepEqual(
+  filterPerimeterInteractionPoints(paddedCollider, ["top-left", "top", "top-right"], 16),
+  [{ x: 8, y: 24 }, { x: 24, y: 24 }, { x: 40, y: 24 }],
+  "approach markers sit at surrounding cell centres",
 );
 
 const cropCalls = [];
@@ -177,6 +196,8 @@ assert(source.includes('"visualCropInsets"'));
 const facilityVisualSource = readFileSync("src/facilities/facilityPreviewVisuals.js", "utf8");
 const interactionApproachSource = readFileSync("src/interaction/interactionApproach.js", "utf8");
 const gridAuthoringSource = readFileSync("src/build/assetGridAuthoringBootstrap.js", "utf8");
+const runtimeConsistencySource = readFileSync("src/build/assetRuntimeConsistencyBootstrap.js", "utf8");
+const indexSource = readFileSync("index.html", "utf8");
 assert(facilityVisualSource.includes("applyVisualCrop"), "canonical crop applies when normal runtime visuals are created");
 assert(interactionApproachSource.includes("assetProfilesDefault.js"), "canonical approach masks apply without opening the debug panel");
 assert(gridAuthoringSource.includes("GRID_OVERLAY_ALPHA = 0.4"), "collider volumes are rendered at forty percent of their previous layer opacity");
@@ -184,6 +205,11 @@ assert(gridAuthoringSource.includes("stopPlayerMotion"), "active authoring keybo
 assert(gridAuthoringSource.includes("roundColliderToAssetFootprint(selection.draft"), "rounding consumes the live edited collider draft");
 assert(gridAuthoringSource.includes("snapAssetPlacementFromAnchor(raw, anchorOffset"), "catalog placement uses the freshly computed current anchor");
 assert(gridAuthoringSource.includes("removeItem?.(COLLIDER_DEBUG_STORAGE_KEY)"), "legacy collider duplicates are discarded after migration and editing");
+assert(runtimeConsistencySource.includes("this.active || this.gridEnabled"), "the construction grid remains visible while build mode is active");
+assert(runtimeConsistencySource.includes("position: geometry.visualCenter"), "bed sleep pose derives from its current visual geometry");
+assert(runtimeConsistencySource.includes("aimPosition: geometry.interactionCenter"), "bed targeting derives from its current effective collider");
+assert(runtimeConsistencySource.includes("requiresFacing: false"), "bed prompts remain available from every enabled approach direction");
+assert(indexSource.includes("assetRuntimeConsistencyBootstrap.js"), "runtime consistency patches load before the world scene");
 
 const storage = createStorage();
 storage.setItem(COLLIDER_DEBUG_STORAGE_KEY, "legacy-offsets");
@@ -209,4 +235,4 @@ await assert.rejects(() => saveAssetProfilesToProject(profiles, {
 }), (error) => error.localSaved === true && /static host/.test(error.message));
 assert(failedStorage.getItem(ASSET_PROFILES_STORAGE_KEY), "static hosting keeps a recoverable browser draft");
 
-console.log("Task #071 contracts passed: live collider intent, current anchors, grid placement, WASD/arrow authoring, dimmed volumes, crop and approach directions");
+console.log("Task #071 contracts passed: current bed geometry, mandatory build grid, cell-centred approach points, live collider intent, current anchors and authoring profiles");
