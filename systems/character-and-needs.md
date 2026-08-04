@@ -64,7 +64,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only radius, perimeter and wall checks; A* runs after activation. Activation validates all nearby candidates once and skips unreachable furniture. Walls block routes; objects expose exact walkable perimeter points. Crossing a point counts as arrival; overlaps rank by aim distance. Enter/exit interpolate presentation without moving the safe motor position. Effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only radius, perimeter and wall checks; A* runs after activation. Activation validates all nearby candidates once and skips unreachable furniture. Walls block routes; objects expose exact walkable perimeter points. Each asset profile can allow or disable the eight surrounding direction classes (`top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`, `bottom-left`, `left`). A one-cell object therefore has exactly eight candidate approach cells; for wider objects, cardinal directions cover every cell along that edge and diagonal directions cover the corner cells. Disabled direction classes are removed before probe and exact route selection. At least one direction remains enabled. Crossing a point counts as arrival; overlaps rank by aim distance. Enter/exit interpolate presentation without moving the safe motor position. Effects run only in active.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -81,13 +81,14 @@ The target need is protected enter through exit; recovery is active-only. Normal
 - time drain and discrete costs are additive;
 - event consequences expose reusable world/presentation outputs;
 - presentation never rewrites safe motor position;
+- approach-direction masks affect automatic positioning, not the timeline pose or effect contract;
 - `WorldLocationRuntime` owns location facility/needs lifecycle and realtime update;
 - saves exclude debug presets and interaction timeline state.
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable points. `src/main.js` composes.
+`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:interaction`; focused browser E2E.
