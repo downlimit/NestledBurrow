@@ -15,7 +15,7 @@ Owns player construction and canonical layout/asset editing.
 - catalog cursor attachment is recalculated from the midpoint of the current pivot and current effective collider centre, then the footprint origin is grid-snapped;
 - moving an existing object retains its grabbed point and grid-aligned footprint;
 - approach markers occupy surrounding cell centres, derived from the collider's grid footprint rather than its padded edge;
-- beds store only canonical placement geometry; sleep pose derives from the current visual and targeting derives from the current effective collider;
+- placeables store only footprint/identity data; interaction aim, approach, bed/facility presentation pose and depth derive from current profile geometry at runtime;
 - runtime construction is not gameplay-persisted.
 
 ## Developer-authoring contract
@@ -30,7 +30,7 @@ Collider rounding uses the live draft. After removing the fixed `2 px` padding, 
 
 Collider debug renders at `40%` of its former opacity. Crop remains inside the sprite source with one visible pixel minimum; procedural visuals reject crop. At least one approach direction remains enabled.
 
-Browser storage may hold drafts and backups. The versioned profile is the current owner of collider, pivot and related values. Legacy standalone collider data and derived bed wake/presentation positions are discarded. Local dev writes checked-in layout/profile defaults; successful canonical save clears browser profile and legacy collider drafts. Static hosting retains a recoverable profile draft.
+Browser storage may hold drafts and backups. The versioned profile owns collider, pivot and visual values. Layout normalization permanently discards legacy `usePosition`, `aimPosition`, `wakePosition` and `presentationPose`; runtime never treats them as canonical. Local dev writes checked-in defaults; successful canonical save clears browser profile and legacy collider drafts. Static hosting retains a recoverable profile draft.
 
 Temporary staging coordinates cannot become canonical. `NEW GAME` restores the authored baseline.
 
@@ -38,7 +38,7 @@ Temporary staging coordinates cannot become canonical. `NEW GAME` restores the a
 
 - coordinator: `src/build/worldBuildCoordinator.js`;
 - UI/input: `src/build/buildModeRuntime.js`, `src/build/assetAuthoringInput.js`;
-- geometry: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`, `src/build/assetGridPlacement.js`;
+- geometry: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`, `src/build/assetGridPlacement.js`, `src/build/liveAssetGeometry.js`;
 - profiles/crop: `src/build/assetProfiles.js`, `src/build/assetProfilesDefault.js`, `src/build/assetVisualCrop.js`;
 - authoring/runtime consistency: `src/build/editorAuthoringBootstrap.js`, `src/build/assetGridAuthoringBootstrap.js`, `src/build/assetRuntimeConsistencyBootstrap.js`;
 - baseline: `src/build/startingLayout.js`, `src/build/startingLayoutDefault.js`.
@@ -50,12 +50,12 @@ Temporary staging coordinates cannot become canonical. `NEW GAME` restores the a
 - horizontal and vertical wall colliders remain independent;
 - explicit columns do not duplicate automatic junctions;
 - footprint origins remain exact grid coordinates;
-- cursor attachment reads only current profile geometry;
+- cursor attachment and interaction read only current profile geometry;
 - drag anchors affect grab behavior, not footprint alignment;
 - rounding preserves the cell span described by the live draft;
 - crop and approach masks are profile-wide;
 - approach targets are cell-centred;
-- bed timelines do not consume stored wake, aim or presentation positions;
+- no placeable timeline consumes stored derived coordinates;
 - authoring directional input suppresses character movement;
 - authoring remains separate from gameplay persistence;
 - build orchestration remains outside `src/main.js`.
