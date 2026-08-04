@@ -20,9 +20,18 @@ import {
   snapAssetPlacementFromAnchor,
   snapAssetPlacementPoint,
 } from "../src/build/assetGridPlacement.js";
+import {
+  hydrateFacilityRuntimeDefinition,
+  liveFacilityGeometry,
+  liveFacilityPresentationPose,
+  livePlaceableInteraction,
+  PLACEABLE_TARGETING_GROUP,
+} from "../src/build/liveAssetGeometry.js";
+import { normalizeStartingLayout } from "../src/build/startingLayout.js";
 import { applyVisualCrop } from "../src/build/assetVisualCrop.js";
 import { COLLIDER_DEBUG_STORAGE_KEY } from "../src/build/colliderDebugOverrides.js";
 import { editRectDraftByArrow, roundColliderDraftToGrid } from "../src/build/colliderResize.js";
+import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction/interaction.js";
 import {
   filterPerimeterInteractionPoints,
   interactionFootprintBounds,
@@ -138,6 +147,71 @@ assert.equal("usePosition" in normalizedBed, false, "bed approach positions are 
 assert.equal("aimPosition" in normalizedBed, false, "bed aim positions are runtime-derived");
 assert.equal("presentationPose" in normalizedBed, false, "bed timeline poses are runtime-derived");
 
+const migratedLayout = normalizeStartingLayout({
+  version: 1,
+  nextBuildObjectId: 0,
+  removedCanonicalFloors: [],
+  removedCanonicalWalls: [],
+  buildObjects: [],
+  furniture: [],
+  facilities: [{
+    id: "legacy-bath",
+    facilityType: "shower",
+    footprint: { x: 32, y: 48, width: 32, height: 32 },
+    visual: { x: 32, y: 48, width: 32, height: 32 },
+    position: { x: 999, y: 999 },
+    usePosition: { x: 998, y: 998 },
+    aimPosition: { x: 997, y: 997 },
+    presentationPose: { x: 996, y: 996 },
+  }],
+  beds: [{
+    id: "legacy-bed",
+    position: { x: 24, y: 40 },
+    wakePosition: { x: 900, y: 900 },
+    presentationPose: { x: 901, y: 901 },
+  }],
+});
+for (const field of ["position", "usePosition", "aimPosition", "presentationPose"]) {
+  assert.equal(field in migratedLayout.facilities[0], false, `canonical facilities discard ${field}`);
+}
+assert.equal("wakePosition" in migratedLayout.beds[0], false, "canonical beds discard wakePosition");
+assert.equal("presentationPose" in migratedLayout.beds[0], false, "canonical beds discard presentationPose");
+
+const hydratedBath = hydrateFacilityRuntimeDefinition(migratedLayout.facilities[0]);
+assert.deepEqual(hydratedBath.position, { x: 48, y: 64 }, "runtime hydration derives the facility centre from footprint");
+assert.deepEqual(hydratedBath.usePosition, { x: 48, y: 64 }, "runtime hydration cannot revive an old authored use position");
+const bathGeometry = liveFacilityGeometry(
+  hydratedBath,
+  { visualOffset: { x: 64, y: -16 }, snapAnchorOffset: { x: 7, y: 9 } },
+  { left: 96, right: 128, top: 80, bottom: 112 },
+);
+assert.deepEqual(bathGeometry.visualCenter, { x: 112, y: 48 }, "facility visual centre follows the current visual offset");
+assert.deepEqual(bathGeometry.interactionCenter, { x: 112, y: 96 }, "facility aim follows the current effective collider");
+const bathPose = liveFacilityPresentationPose(hydratedBath, bathGeometry);
+assert.deepEqual({ x: bathPose.x, y: bathPose.y }, { x: 112, y: 48 }, "facility timeline pose follows live visual geometry");
+const bathInteraction = livePlaceableInteraction(hydratedBath, bathGeometry);
+assert.deepEqual(bathInteraction.position, { x: 112, y: 96 });
+assert.deepEqual(bathInteraction.aimPosition, { x: 112, y: 96 });
+assert.equal(bathInteraction.targetingMode, "facing-first");
+assert.equal(bathInteraction.targetingGroup, PLACEABLE_TARGETING_GROUP);
+assert.equal(bathInteraction.requiresFacing, true);
+
+const sourceSnapshot = { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } };
+const bedTarget = createInteractionTarget({
+  id: "bed", entityId: "bed", kind: "sleep-bed", position: { x: 20, y: 0 }, aimPosition: { x: 20, y: 0 },
+  radius: 50, priority: 21, requiresFacing: true, facingDotThreshold: 0,
+  targetingMode: "facing-first", targetingGroup: PLACEABLE_TARGETING_GROUP,
+  prompt: "sleep", payload: {},
+});
+const toiletTarget = createInteractionTarget({
+  id: "toilet", entityId: "toilet", kind: "use-facility", position: { x: 0, y: 16 }, aimPosition: { x: 0, y: 16 },
+  radius: 50, priority: 20, requiresFacing: true, facingDotThreshold: 0,
+  targetingMode: "facing-first", targetingGroup: PLACEABLE_TARGETING_GROUP,
+  prompt: "toilet", payload: {},
+});
+assert.equal(findBestInteractionTarget(sourceSnapshot, [bedTarget, toiletTarget])?.entityId, "bed", "looking at the bed selects the bed");
+assert.equal(findBestInteractionTarget({ ...sourceSnapshot, facingDirection: { x: 0, y: 1 } }, [bedTarget, toiletTarget])?.entityId, "toilet", "looking at the toilet selects the toilet despite bed priority");
+
 const cellBounds = { left: 16, right: 32, top: 32, bottom: 48 };
 const entries = perimeterInteractionPointEntries(cellBounds, 16);
 assert.equal(entries.length, 8, "a one-cell object exposes exactly eight surrounding approach cells");
@@ -197,6 +271,8 @@ const facilityVisualSource = readFileSync("src/facilities/facilityPreviewVisuals
 const interactionApproachSource = readFileSync("src/interaction/interactionApproach.js", "utf8");
 const gridAuthoringSource = readFileSync("src/build/assetGridAuthoringBootstrap.js", "utf8");
 const runtimeConsistencySource = readFileSync("src/build/assetRuntimeConsistencyBootstrap.js", "utf8");
+const liveGeometrySource = readFileSync("src/build/liveAssetGeometry.js", "utf8");
+const startingLayoutSource = readFileSync("src/build/startingLayout.js", "utf8");
 const indexSource = readFileSync("index.html", "utf8");
 assert(facilityVisualSource.includes("applyVisualCrop"), "canonical crop applies when normal runtime visuals are created");
 assert(interactionApproachSource.includes("assetProfilesDefault.js"), "canonical approach masks apply without opening the debug panel");
@@ -206,9 +282,12 @@ assert(gridAuthoringSource.includes("roundColliderToAssetFootprint(selection.dra
 assert(gridAuthoringSource.includes("snapAssetPlacementFromAnchor(raw, anchorOffset"), "catalog placement uses the freshly computed current anchor");
 assert(gridAuthoringSource.includes("removeItem?.(COLLIDER_DEBUG_STORAGE_KEY)"), "legacy collider duplicates are discarded after migration and editing");
 assert(runtimeConsistencySource.includes("this.active || this.gridEnabled"), "the construction grid remains visible while build mode is active");
-assert(runtimeConsistencySource.includes("position: geometry.visualCenter"), "bed sleep pose derives from its current visual geometry");
-assert(runtimeConsistencySource.includes("aimPosition: geometry.interactionCenter"), "bed targeting derives from its current effective collider");
-assert(runtimeConsistencySource.includes("requiresFacing: false"), "bed prompts remain available from every enabled approach direction");
+assert(runtimeConsistencySource.includes("patchFacilityRuntime"), "facility interactions and poses use the live geometry adapter");
+assert(runtimeConsistencySource.includes("WorldLocationRuntime.prototype.mount"), "live geometry installs before canonical layout restore and interaction binding");
+assert(liveGeometrySource.includes("FACILITY_DERIVED_FIELDS"), "facility derived coordinates have one explicit removal contract");
+assert(liveGeometrySource.includes('targetingMode: "facing-first"'), "placeable selection follows the player aim before priority");
+assert(startingLayoutSource.includes("canonicalFacilityDefinition"), "canonical layout strips runtime-only facility coordinates");
+assert(startingLayoutSource.includes("hydrateFacilityRuntimeDefinition"), "layout restore recreates temporary runtime geometry from footprint");
 assert(indexSource.includes("assetRuntimeConsistencyBootstrap.js"), "runtime consistency patches load before the world scene");
 
 const storage = createStorage();
@@ -235,4 +314,4 @@ await assert.rejects(() => saveAssetProfilesToProject(profiles, {
 }), (error) => error.localSaved === true && /static host/.test(error.message));
 assert(failedStorage.getItem(ASSET_PROFILES_STORAGE_KEY), "static hosting keeps a recoverable browser draft");
 
-console.log("Task #071 contracts passed: current bed geometry, mandatory build grid, cell-centred approach points, live collider intent, current anchors and authoring profiles");
+console.log("Task #071 contracts passed: live facility/bed targeting, runtime-only poses, canonical layout stripping and authoring profiles");
