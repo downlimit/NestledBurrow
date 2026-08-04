@@ -35,6 +35,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         footDepth: player.footDepth,
       });
       const routes = nearbyPoints.flatMap((point) => {
+        if (!navigation.isWorldWalkable(point)) return [];
         const path = findGridPath({
           start: sourceSnapshot.position,
           goal: point,
@@ -43,9 +44,10 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
           ...navigation,
         });
         if (!path) return [];
-        const route = path.length > 0 ? path : [{ ...point }];
+        const route = connectExactApproachPoint(sourceSnapshot.position, path, point, navigation);
+        if (!route) return [];
         const distance = pathDistance(sourceSnapshot.position, route);
-        const endpoint = route.at(-1);
+        const endpoint = point;
         return distance <= definition.radius
           && hasDirectInteractionReach(worldLayout, endpoint, aimPosition, definition.entityId ?? definition.id)
           ? [{ point: endpoint, path: route, distance }]
@@ -57,10 +59,34 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         position: nearest.point,
         aimPosition,
         availabilityDistance: nearest.distance,
+        selectionDistance: Math.hypot(
+          aimPosition.x - sourceSnapshot.position.x,
+          aimPosition.y - sourceSnapshot.position.y,
+        ),
         payload: { ...definition.payload, approachPoint: nearest.point, approachPath: nearest.path },
       };
     },
   });
+}
+
+function connectExactApproachPoint(start, gridPath, point, navigation) {
+  if (navigation.canTraverseWorld(start, point)) return [{ ...point }];
+  const route = gridPath.map((entry) => ({ ...entry }));
+  const first = route[0] ?? point;
+  if (!navigation.canTraverseWorld(start, first)) return null;
+  const tail = route.at(-1) ?? start;
+  if (!samePoint(tail, point)) {
+    if (!navigation.canTraverseWorld(tail, point)) return null;
+    route.push({ ...point });
+  } else if (route.length > 0) {
+    route[route.length - 1] = { ...point };
+  }
+  if (route.length === 0) route.push({ ...point });
+  return route;
+}
+
+function samePoint(left, right) {
+  return Math.abs(left.x - right.x) < 1e-9 && Math.abs(left.y - right.y) < 1e-9;
 }
 
 function interactionCollider(worldLayout, definition) {

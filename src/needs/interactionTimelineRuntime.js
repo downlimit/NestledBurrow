@@ -23,10 +23,11 @@ export function createInteractionTimelineRuntime({
     const profile = INTERACTION_TIMELINE_PROFILES[profileId];
     if (!profile) return { status: "unknown-profile", mutated: false };
     if (state.phase !== INTERACTION_PHASE.free) return { status: "busy", mutated: false };
-    const start = poseFrom(getPresentationPosition(), targetPose);
+    const start = poseFrom(getPresentationPosition());
+    const target = poseFrom(targetPose, start);
     state = {
       phase: INTERACTION_PHASE.enter, profileId, profile, elapsedMs: 0, durationMs: profile.enterMs,
-      startPose: start, targetPose: poseFrom(targetPose, targetPose), onActivate, onDeactivate, onComplete,
+      startPose: start, targetPose: target, onActivate, onDeactivate, onComplete,
       metadata, effectActive: false,
     };
     setPresentationPose(start);

@@ -26,9 +26,7 @@ export function createActorNavigation(environment, { cellSize = 16, footWidth, f
     const position = cellToWorld(cell, bounds, cellSize);
     return isWorldWalkable(position);
   };
-  const canTraverse = (fromCell, toCell) => {
-    const from = cellToWorld(fromCell, bounds, cellSize);
-    const to = cellToWorld(toCell, bounds, cellSize);
+  const canTraverseWorld = (from, to) => {
     const distance = Math.hypot(to.x - from.x, to.y - from.y);
     const sampleSpacing = Math.max(1, Math.min(cellSize / 4, Number(environment.cellSize) / 2 || cellSize / 4));
     const steps = Math.max(1, Math.ceil(distance / sampleSpacing));
@@ -41,7 +39,11 @@ export function createActorNavigation(environment, { cellSize = 16, footWidth, f
     }
     return true;
   };
-  return { isWalkable, canTraverse };
+  const canTraverse = (fromCell, toCell) => canTraverseWorld(
+    cellToWorld(fromCell, bounds, cellSize),
+    cellToWorld(toCell, bounds, cellSize),
+  );
+  return { isWalkable, canTraverse, isWorldWalkable, canTraverseWorld };
 }
 
 export function createActorWalkability(environment, options) {

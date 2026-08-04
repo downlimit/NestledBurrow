@@ -88,6 +88,7 @@ export function createNeedsInteractionCoordinator({
       point: { ...path.at(-1) },
       timelineOptions,
       movementDirection: { x: 0, y: 0 },
+      previousPosition: { ...getPlayer().motor.position },
       lastDistance: Number.POSITIVE_INFINITY,
       blockedMs: 0,
     };
@@ -115,10 +116,12 @@ export function createNeedsInteractionCoordinator({
     const dx = waypoint.x - position.x;
     const dy = waypoint.y - position.y;
     const distance = Math.hypot(dx, dy);
-    if (distance <= ARRIVAL_RADIUS) {
+    if (arrivedAtWaypoint(approach.previousPosition, position, waypoint)) {
+      getPlayer().motor.position = { ...waypoint };
       approach.waypointIndex += 1;
       approach.blockedMs = 0;
       approach.lastDistance = Number.POSITIVE_INFINITY;
+      approach.previousPosition = { ...waypoint };
       if (approach.waypointIndex >= approach.path.length) startTimelineAfterApproach();
       return getState();
     }
@@ -126,6 +129,7 @@ export function createNeedsInteractionCoordinator({
     const madeProgress = distance < approach.lastDistance - 0.05;
     approach.blockedMs = !madeProgress ? approach.blockedMs + Math.max(0, Number(deltaMs) || 0) : 0;
     approach.lastDistance = distance;
+    approach.previousPosition = { ...position };
     if (approach.blockedMs >= BLOCKED_CANCEL_MS) cancelApproach();
     return getState();
   }
@@ -270,6 +274,19 @@ export function createNeedsInteractionCoordinator({
         || state.phase === INTERACTION_PHASE.active && definition?.id === state.metadata?.id;
     },
   });
+}
+
+function arrivedAtWaypoint(previous, current, waypoint) {
+  if (Math.hypot(waypoint.x - current.x, waypoint.y - current.y) <= ARRIVAL_RADIUS) return true;
+  const dx = current.x - previous.x;
+  const dy = current.y - previous.y;
+  const segmentLengthSquared = dx * dx + dy * dy;
+  if (segmentLengthSquared === 0) return false;
+  const fraction = Math.min(1, Math.max(0, (
+    (waypoint.x - previous.x) * dx + (waypoint.y - previous.y) * dy
+  ) / segmentLengthSquared));
+  const closest = { x: previous.x + dx * fraction, y: previous.y + dy * fraction };
+  return Math.hypot(waypoint.x - closest.x, waypoint.y - closest.y) <= ARRIVAL_RADIUS;
 }
 
 function facePoint(origin, target) {

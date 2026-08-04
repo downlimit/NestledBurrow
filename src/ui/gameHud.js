@@ -31,6 +31,7 @@ import {
 import { createTransientMessageRuntime } from "./transientMessageRuntime.js";
 import { createThrowAimIndicator } from "./throwAimIndicator.js";
 import { NEED_FLOW_PROFILE_BY_ARROWS } from "./presentationTuning.js";
+import { needMeterValues } from "../needs/needsFlowRuntime.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -63,6 +64,7 @@ export const NEEDS_HUD_AREA = Object.freeze({ x: 252, y: 38, width: 60, height: 
 export const ENERGY_HUD_AREA = NEEDS_HUD_AREA;
 export const NEED_ROW_IDS = Object.freeze(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
 export const NEED_ROW_SYMBOLS = Object.freeze(["N", "E", "S", "T", "L", "D"]);
+export const NEED_VALUE_TRACK = Object.freeze({ xOffset: 12, width: 23 });
 export const NEED_ROW_AREAS = Object.freeze(NEED_ROW_IDS.map((_id, index) => Object.freeze({
   x: NEEDS_HUD_AREA.x,
   y: NEEDS_HUD_AREA.y + 4 + index * 10,
@@ -83,6 +85,11 @@ export function shouldShakeEnergyAfterInteraction({ mutated, energyBefore, curre
 
 export function isEnergyCritical(currentEnergy, maximumEnergy) {
   return Number(maximumEnergy) > 0 && Number(currentEnergy) / Number(maximumEnergy) < 0.15;
+}
+
+export function needValueFromPointerX(row, pointerX) {
+  const ratio = (Number(pointerX) - row.x - NEED_VALUE_TRACK.xOffset) / NEED_VALUE_TRACK.width;
+  return Math.round(Math.min(1, Math.max(0, Number.isFinite(ratio) ? ratio : 0)) * 100);
 }
 
 export function needFlowPulseAlpha(arrows, nowMs, seed = 0) {
@@ -124,6 +131,7 @@ export function createGameHud(scene, options) {
     onConfirmationChange = () => {},
     onOptionsChange = () => {},
     onTimeScaleChange = () => {},
+    onNeedDebugValueChange = null,
     onDroppedItemCollision = () => {},
     onCoinDrop = () => ({ status: "unavailable", mutated: false }),
     playEffect = () => {},
@@ -132,6 +140,13 @@ export function createGameHud(scene, options) {
     getLocationOwners = () => ({}),
     isCoarsePointer = () => false,
   } = options;
+  const applyNeedDebugValueChange = onNeedDebugValueChange ?? ((needId, value) => {
+    const result = scene.needsRuntime?.setDebugValue?.(needId, value);
+    const gameplay = getGameplayState?.();
+    if (result?.mutated && gameplay) scene.needsFlowRuntime?.reset?.(needMeterValues(gameplay));
+    scene.syncPlayerEnergyTarget?.();
+    return result;
+  });
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const energyBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0);
   const energyArrowGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 3).setScrollFactor(0);
@@ -258,8 +273,12 @@ export function createGameHud(scene, options) {
     zone.on("pointerout", () => { if (!isCoarsePointer()) { hoveredNeedId = null; render(); } });
     zone.on("pointerdown", (pointer, _x, _y, event) => {
       stop(pointer, event);
-      if (!isCoarsePointer()) return;
       const needId = NEED_ROW_IDS[index];
+      if (!isCoarsePointer()) {
+        applyNeedDebugValueChange(needId, needValueFromPointerX(rect, pointer?.x));
+        render();
+        return;
+      }
       pinnedNeedId = pinnedNeedId === needId ? null : needId;
       render();
     });
@@ -534,10 +553,10 @@ export function createGameHud(scene, options) {
       const ratio = Math.min(1, Math.max(0, Number(values[id]) / 100 || 0));
       const flow = flows[id] ?? null;
       drawBitmapTextInto(energyBarGraphics, rect.x + 3, rect.y + 1, NEED_ROW_SYMBOLS[index], { shadow: 0 });
-      energyBarGraphics.fillStyle(HUD_COLORS.shadow, 1).fillRect(rect.x + 11, rect.y + 2, 25, 6);
+      energyBarGraphics.fillStyle(HUD_COLORS.shadow, 1).fillRect(rect.x + NEED_VALUE_TRACK.xOffset - 1, rect.y + 2, NEED_VALUE_TRACK.width + 2, 6);
       const critical = id === "energy" && ratio < 0.15;
-      const fillWidth = ratio > 0 ? Math.max(1, Math.round(23 * ratio)) : 0;
-      energyBarGraphics.fillStyle(critical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(rect.x + 12, rect.y + 3, fillWidth, 4);
+      const fillWidth = ratio > 0 ? Math.max(1, Math.round(NEED_VALUE_TRACK.width * ratio)) : 0;
+      energyBarGraphics.fillStyle(critical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(rect.x + NEED_VALUE_TRACK.xOffset, rect.y + 3, fillWidth, 4);
       drawNeedFlow(energyArrowGraphics, rect.x + 40, rect.y + 2, flow, scene.time.now, id);
       return { id, symbol: NEED_ROW_SYMBOLS[index], ratio, flow };
     });
