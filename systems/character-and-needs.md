@@ -10,7 +10,7 @@ One hour is `60` real seconds. Waking E: ordinary `5/hour`, walking `5.5`, runni
 
 Targets: `20h` near-idle, `16..18h` normal, `14..16h` heavy. Proofs: `10h ordinary + 6h walk + 1h run + 40 axe = 99 E`; `7h ordinary + 7h walk + 2h run + 50x0.25 = 102 E`.
 
-Other waking rates: `S -7/hour`, `T -6/hour`, `N -1/hour`, `D -2/hour` without friendly company, plus activity-dependent L below.
+Other waking rates: `S -7/hour`, `T -6/hour`, `N -1/hour`, `D -2/hour` without friendly company, plus activity-dependent L.
 
 ```text
 pressure(X,q) = clamp((q - X) / q, 0, 1)
@@ -21,7 +21,7 @@ physical cost = base * (1 + 0.5 * hunger) * urgency * repetition
 E recovery multiplier = 1 - 0.4 * hunger
 ```
 
-Activity surcharge is ordinary `0`, walking `0.5`, running `3`. Below `S=30`, hunger scales linearly: `S=15` gives load/actions `1.25x`, recovery `0.8x`; `S=0` gives `1.5x/0.6x` and hourly totals `5/5.75/9.5`.
+Activity surcharge: ordinary `0`, walking `0.5`, running `3`. At `S=15`, load/actions are `1.25x` and recovery `0.8x`; at `S=0`, `1.5x/0.6x`, with hourly totals `5/5.75/9.5`.
 
 No normal awake regeneration exists. Catch-breath at `E<15`, after three real seconds inactive with `S>0`, restores `1 E/s` up to `15`. Sleep restores `14 E/game hour * recovery multiplier`. At `E=0`, collapse lasts at least two game hours and until `E=25`; other needs continue.
 
@@ -50,8 +50,7 @@ Running is unavailable below `20 E`.
 | hoe/soil | 3 |
 | pickaxe/mining | 4 |
 
-Resource work has priority over running and never stacks with it. Tool hits have no discrete L cost; events may use the discrete-L domain hook.
-HUD arrows use actual N/E/S/T/L/D deltas through `660 ms`; presentation owns normalization and pulse timing.
+Resource work has priority over running. Tool hits have no discrete L cost; events may use the discrete-L hook. HUD arrows use actual N/E/S/T/L/D deltas through `660 ms`; presentation owns pulse timing.
 
 ```text
 lustre speed = 1 - 0.50 * pressure(L,33)
@@ -62,13 +61,13 @@ Below `L=33`, pressure is linear; at zero, speed is `0.5x` and N drain `1.5x`. E
 
 ## Novelty and dialogue
 
-After three identical physical actions, repeats cost `1 N` and set `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use repeats under its own key, three free then `-1 N`; any other non-ordinary activity resets. Accepted melee spends E on misses and is blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
+After three identical physical actions, repeats cost `1 N` and set `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use has its own repetition key; any other non-ordinary activity resets it. Accepted melee spends E on misses and is blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
 
 NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may restore D/E. Solo-rest E multiplier is `1 - 0.25 * pressure(D,30)`; D pressure raises novelty drain up to `1.25`.
 
 ## Long interaction timeline
 
-Long uses follow `approach -> enter -> active -> exit -> free`. Walls block route and final reach; a 1x1 object has eight perimeter points. The nearest route drains ordinary. Enter/exit preserve motor and affect pose; effects run only in active.
+Long uses follow `approach -> enter -> active -> exit -> free`. Prompt scans use radius, perimeter and wall checks only; A* route construction is deferred until activation. Walls block route and final reach; nearest route drains ordinary. Enter/exit preserve motor; effects run only in active.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
