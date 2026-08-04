@@ -31,6 +31,7 @@ import {
 import { createTransientMessageRuntime } from "./transientMessageRuntime.js";
 import { createThrowAimIndicator } from "./throwAimIndicator.js";
 import { NEED_FLOW_PROFILE_BY_ARROWS } from "./presentationTuning.js";
+import { needMeterValues } from "../needs/needsFlowRuntime.js";
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -130,7 +131,7 @@ export function createGameHud(scene, options) {
     onConfirmationChange = () => {},
     onOptionsChange = () => {},
     onTimeScaleChange = () => {},
-    onNeedDebugValueChange = () => {},
+    onNeedDebugValueChange = null,
     onDroppedItemCollision = () => {},
     onCoinDrop = () => ({ status: "unavailable", mutated: false }),
     playEffect = () => {},
@@ -139,6 +140,13 @@ export function createGameHud(scene, options) {
     getLocationOwners = () => ({}),
     isCoarsePointer = () => false,
   } = options;
+  const applyNeedDebugValueChange = onNeedDebugValueChange ?? ((needId, value) => {
+    const result = scene.needsRuntime?.setDebugValue?.(needId, value);
+    const gameplay = getGameplayState?.();
+    if (result?.mutated && gameplay) scene.needsFlowRuntime?.reset?.(needMeterValues(gameplay));
+    scene.syncPlayerEnergyTarget?.();
+    return result;
+  });
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 1).setScrollFactor(0);
   const energyBarGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 2).setScrollFactor(0);
   const energyArrowGraphics = scene.add.graphics().setDepth(HUD_DEPTH + 3).setScrollFactor(0);
@@ -246,8 +254,6 @@ export function createGameHud(scene, options) {
     loadoutDragCoordinator,
     isSuppressed: isInventoryModeSuppressed,
     onStateChange: () => {
-      const mode = inventoryModeHud?.getState?.();
-      if (mode?.stableMode === INVENTORY_MODES.COMBAT && !mode.altDown) inventoryHud?.clearSelection?.();
       scene.syncGameplayHudVisibility?.();
       scene.interactionRuntime?.refresh?.();
     },
@@ -269,7 +275,7 @@ export function createGameHud(scene, options) {
       stop(pointer, event);
       const needId = NEED_ROW_IDS[index];
       if (!isCoarsePointer()) {
-        onNeedDebugValueChange(needId, needValueFromPointerX(rect, pointer?.x));
+        applyNeedDebugValueChange(needId, needValueFromPointerX(rect, pointer?.x));
         render();
         return;
       }
