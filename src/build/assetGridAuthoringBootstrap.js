@@ -3,10 +3,17 @@ import { TILE_SIZE } from "../world/worldConfig.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { authoringArrowDelta, createAuthoringArrowEvent } from "./assetAuthoringInput.js";
 import {
+  ASSET_PROFILES_STORAGE_KEY,
+  DEFAULT_ASSET_PROFILES,
+} from "./assetProfiles.js";
+import { COLLIDER_DEBUG_STORAGE_KEY } from "./colliderDebugOverrides.js";
+import { editRectDraftByArrow } from "./colliderResize.js";
+import {
   normalizeBedDefinitionToGrid,
   normalizeBuildObjectToGrid,
   normalizeFacilityDefinitionToGrid,
   roundColliderToAssetFootprint,
+  snapAssetPlacementFromAnchor,
   snapAssetPlacementPoint,
 } from "./assetGridPlacement.js";
 
@@ -24,7 +31,8 @@ if (!BuildModeRuntime.prototype[GRID_BOOTSTRAP_PATCH]) {
         x: Number(pointer?.worldX ?? pointer?.x) || 0,
         y: Number(pointer?.worldY ?? pointer?.y) || 0,
       };
-      const snapped = snapAssetPlacementPoint(raw, TILE_SIZE);
+      const anchorOffset = this.getPlacementAnchorOffset?.(item) ?? { x: 0, y: 0 };
+      const snapped = snapAssetPlacementFromAnchor(raw, anchorOffset, TILE_SIZE);
       return { ...snapped, rawX: raw.x, rawY: raw.y };
     }
     return originalGetActionPoint.call(this, pointer, item, demolitionType, wallAxis);
@@ -95,13 +103,32 @@ function installGridAuthoringFeedback(panel) {
   const scene = panel.scene;
   if (!scene || panel[GRID_BOOTSTRAP_PATCH]?.scene === scene) return;
   teardownGridAuthoringFeedback(panel);
+  discardLegacyColliderDraft(panel, scene);
   installRuntimePlacementAdapters(scene);
-  installColliderPresentation(scene);
+  installColliderPresentation(scene, panel.storage);
   normalizeLivePlacements(scene);
 
   const keydown = (event) => handleAuthoringNavigationKey(panel, event);
   globalThis.addEventListener?.("keydown", keydown, true);
   panel[GRID_BOOTSTRAP_PATCH] = { scene, keydown };
+}
+
+function discardLegacyColliderDraft(panel, scene) {
+  const storage = panel.storage ?? globalThis.localStorage;
+  const legacy = storage?.getItem?.(COLLIDER_DEBUG_STORAGE_KEY);
+  if (!legacy) return;
+  const hasProfileDraft = Boolean(storage?.getItem?.(ASSET_PROFILES_STORAGE_KEY));
+  if (!hasProfileDraft) {
+    scene.assetProfiles = DEFAULT_ASSET_PROFILES;
+    scene.colliderOverrides = {};
+    for (const [profileKey, profile] of Object.entries(DEFAULT_ASSET_PROFILES)) {
+      const offsets = { ...profile.colliderOffsets };
+      scene.colliderOverrides[profileKey] = offsets;
+      scene.worldLayout?.setColliderOverride?.(profileKey, offsets);
+    }
+    scene.renderColliderDebug?.();
+  }
+  storage?.removeItem?.(COLLIDER_DEBUG_STORAGE_KEY);
 }
 
 function teardownGridAuthoringFeedback(panel) {
@@ -123,7 +150,16 @@ function handleAuthoringNavigationKey(panel, event) {
   mapped.stopImmediatePropagation();
   stopPlayerMotion(state.scene);
 
-  if (mode === "collider" || mode === "crop") {
+  if (mode === "collider") {
+    const selection = state.scene?.colliderEditSelection;
+    const next = selection ? editRectDraftByArrow(selection.draft, mapped) : null;
+    if (!next) return;
+    selection.draft = next;
+    state.scene.syncColliderEditorPanel?.();
+    state.scene.renderColliderDebug?.();
+    return;
+  }
+  if (mode === "crop") {
     state.listeners?.key?.(mapped);
     return;
   }
@@ -168,12 +204,6 @@ function installRuntimePlacementAdapters(scene) {
 
 function patchCoordinator(coordinator) {
   if (!coordinator || coordinator[GRID_RUNTIME_PATCH]) return;
-  const originalAnchor = coordinator.getBuildPlacementAnchorOffset?.bind(coordinator);
-  if (originalAnchor) {
-    coordinator.getBuildPlacementAnchorOffset = (item) => (
-      DIRECT_GRID_PLACEMENTS.has(item?.placement) ? { x: 0, y: 0 } : originalAnchor(item)
-    );
-  }
   const originalMoveTarget = coordinator.getBuildMoveTarget?.bind(coordinator);
   if (originalMoveTarget) {
     coordinator.getBuildMoveTarget = (point) => {
@@ -234,7 +264,7 @@ function patchBedRuntime(runtime) {
   Object.defineProperty(runtime, GRID_RUNTIME_PATCH, { value: true });
 }
 
-function installColliderPresentation(scene) {
+function installColliderPresentation(scene, storage = globalThis.localStorage) {
   if (scene[GRID_RUNTIME_PATCH]) return;
   const originalVisibility = scene.setColliderDebugVisible?.bind(scene);
   if (originalVisibility) {
@@ -244,12 +274,20 @@ function installColliderPresentation(scene) {
       return result;
     };
   }
+  const originalConfirm = scene.confirmColliderDraft?.bind(scene);
+  if (originalConfirm) {
+    scene.confirmColliderDraft = () => {
+      const result = originalConfirm();
+      storage?.removeItem?.(COLLIDER_DEBUG_STORAGE_KEY);
+      return result;
+    };
+  }
   scene.colliderDebugGraphics?.setAlpha?.(GRID_OVERLAY_ALPHA);
   scene.roundSelectedCollider = () => {
     const selection = scene.colliderEditSelection;
     if (!selection) return { status: "empty" };
     if (!scene.assetProfiles?.[selection.groupKey]) return { status: "unsupported" };
-    selection.draft = { ...roundColliderToAssetFootprint(selection.base ?? selection.draft, TILE_SIZE, 2) };
+    selection.draft = { ...roundColliderToAssetFootprint(selection.draft, TILE_SIZE, 2) };
     scene.syncColliderEditorPanel?.();
     scene.renderColliderDebug?.();
     return { status: "rounded", id: selection.id, draft: { ...selection.draft } };
