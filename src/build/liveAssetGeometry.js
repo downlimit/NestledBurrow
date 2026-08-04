@@ -70,6 +70,8 @@ export function hydrateFacilityRuntimeDefinition(definition) {
     presentationPose: null,
     requiresFacing: true,
     facingDotThreshold: 0,
+    targetingMode: "facing-first",
+    targetingGroup: PLACEABLE_TARGETING_GROUP,
   });
 }
 
@@ -132,8 +134,6 @@ export function livePlaceableInteraction(definition, geometry, { position = "int
     "aimPosition",
     "presentationPose",
     "wakePosition",
-    "targetingMode",
-    "targetingGroup",
   ]);
   return Object.freeze({
     ...canonical,
@@ -141,6 +141,8 @@ export function livePlaceableInteraction(definition, geometry, { position = "int
     aimPosition: geometry.interactionCenter,
     requiresFacing: true,
     facingDotThreshold: 0,
+    targetingMode: "facing-first",
+    targetingGroup: PLACEABLE_TARGETING_GROUP,
   });
 }
 
