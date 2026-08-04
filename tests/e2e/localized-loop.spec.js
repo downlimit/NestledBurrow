@@ -45,6 +45,15 @@ function inventoryQuantity(gameplay, itemId) {
     .reduce((total, item) => total + item.quantity, 0);
 }
 
+function expectSevenAxeHitsEnergyContract(before, after) {
+  const elapsedGameHours = Math.max(0, after.worldTimeSeconds - before.worldTimeSeconds) / 3600;
+  const ordinaryEnergySpend = elapsedGameHours * 5;
+  const discreteEnergySpend = before.currentEnergy - after.currentEnergy - ordinaryEnergySpend;
+  expect(after.currentEnergy).toBeGreaterThan(0);
+  expect(discreteEnergySpend).toBeGreaterThan(1.3);
+  expect(discreteEnergySpend).toBeLessThan(1.5);
+}
+
 test("default Russian locale and saved preference survive reload", async ({ page }) => {
   await boot(page);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("ru");
@@ -154,6 +163,7 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(0);
   await placeNear(page, "fallen-log-01");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("fallen-log-01");
+  const clearingStartGameplay = (await bridge(page, "getSession")).gameplay;
   for (let hitCount = 1; hitCount <= 7; hitCount += 1) {
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
     await pressInteract(page);
@@ -169,9 +179,7 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
     };
   }).toMatchObject({ maximumEnergy: 100, wood: 1, node: { cleared: true, progress: 1 } });
   const clearedSession = await bridge(page, "getSession");
-  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
-  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(98);
-  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(98.6);
+  expectSevenAxeHitsEnergyContract(clearingStartGameplay, clearedSession.gameplay);
   await expect.poll(async () => (await bridge(page, "getDebrisState"))?.present).toBe(false);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toBeNull();
   await page.reload();
@@ -208,6 +216,7 @@ test("mobile touch clears a resource through prompt hit area", async ({ page }, 
   await boot(page);
   await bridge(page, "selectInventorySlot", 0);
   await placeNear(page, "fallen-log-01");
+  const clearingStartGameplay = (await bridge(page, "getSession")).gameplay;
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
   for (let hitCount = 1; hitCount <= 7; hitCount += 1) {
@@ -225,7 +234,5 @@ test("mobile touch clears a resource through prompt hit area", async ({ page }, 
     return { wood: inventoryQuantity(session.gameplay, "wood"), node: session.gameplay.resourceNodes["fallen-log-01"] };
   }).toMatchObject({ wood: 1, node: { cleared: true } });
   const clearedSession = await bridge(page, "getSession");
-  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(0);
-  expect(clearedSession.gameplay.currentEnergy).toBeGreaterThan(98);
-  expect(clearedSession.gameplay.currentEnergy).toBeLessThan(98.6);
+  expectSevenAxeHitsEnergyContract(clearingStartGameplay, clearedSession.gameplay);
 });

@@ -3,70 +3,122 @@ import { createActorNavigation, findGridPath } from "../tavern/gridPathfinder.js
 export const INTERACTION_NAVIGATION_CELL_SIZE = 16;
 
 export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
-  return Object.freeze({
-    resolve(definition, sourceSnapshot) {
-      if (definition.targetingMode === "facing-first") {
-        const distance = Math.hypot(
-          definition.position.x - sourceSnapshot.position.x,
-          definition.position.y - sourceSnapshot.position.y,
-        );
-        if (distance > definition.radius || !hasDirectInteractionReach(worldLayout, sourceSnapshot.position, definition.position, definition.id)) return null;
-        return {
-          position: definition.position,
-          aimPosition: definition.aimPosition ?? definition.position,
-          availabilityDistance: distance,
-          payload: { ...definition.payload },
-        };
-      }
-      const player = getPlayer();
-      const collider = interactionCollider(worldLayout, definition);
-      const points = collider
-        ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
-        : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
-      const aimPosition = definition.aimPosition ?? definition.position;
-      const nearbyPoints = points.filter((point) => (
-        Math.hypot(point.x - sourceSnapshot.position.x, point.y - sourceSnapshot.position.y) <= definition.radius
-        && hasDirectInteractionReach(worldLayout, point, aimPosition, definition.entityId ?? definition.id)
-      ));
-      if (nearbyPoints.length === 0) return null;
-      const navigation = createActorNavigation(worldLayout, {
-        cellSize: INTERACTION_NAVIGATION_CELL_SIZE,
-        footWidth: player.footWidth,
-        footDepth: player.footDepth,
-      });
-      const routes = nearbyPoints.flatMap((point) => {
-        if (!navigation.isWorldWalkable(point)) return [];
-        const path = findGridPath({
-          start: sourceSnapshot.position,
-          goal: point,
-          bounds: worldLayout.bounds,
-          cellSize: INTERACTION_NAVIGATION_CELL_SIZE,
-          ...navigation,
-        });
-        if (!path) return [];
-        const route = connectExactApproachPoint(sourceSnapshot.position, path, point, navigation);
-        if (!route) return [];
-        const distance = pathDistance(sourceSnapshot.position, route);
-        const endpoint = point;
-        return distance <= definition.radius
-          && hasDirectInteractionReach(worldLayout, endpoint, aimPosition, definition.entityId ?? definition.id)
-          ? [{ point: endpoint, path: route, distance }]
-          : [];
-      }).sort((a, b) => a.distance - b.distance || a.point.y - b.point.y || a.point.x - b.point.x);
-      const nearest = routes[0];
-      if (!nearest) return null;
+  const probeWallsBySource = new WeakMap();
+
+  function probeWalls(sourceSnapshot) {
+    if (sourceSnapshot && typeof sourceSnapshot === "object" && probeWallsBySource.has(sourceSnapshot)) {
+      return probeWallsBySource.get(sourceSnapshot);
+    }
+    const walls = (worldLayout.getWorldObjectColliders?.() ?? []).filter(isWallBarrier);
+    if (sourceSnapshot && typeof sourceSnapshot === "object") probeWallsBySource.set(sourceSnapshot, walls);
+    return walls;
+  }
+
+  function probe(definition, sourceSnapshot) {
+    const aimPosition = definition.aimPosition ?? definition.position;
+    const targetId = definition.entityId ?? definition.id;
+    const walls = probeWalls(sourceSnapshot);
+    if (definition.targetingMode === "facing-first") {
+      const distance = Math.hypot(
+        definition.position.x - sourceSnapshot.position.x,
+        definition.position.y - sourceSnapshot.position.y,
+      );
+      if (distance > definition.radius
+        || !hasDirectInteractionReachAgainst(walls, sourceSnapshot.position, definition.position, targetId)) return null;
       return {
-        position: nearest.point,
+        position: definition.position,
         aimPosition,
-        availabilityDistance: nearest.distance,
-        selectionDistance: Math.hypot(
-          aimPosition.x - sourceSnapshot.position.x,
-          aimPosition.y - sourceSnapshot.position.y,
-        ),
-        payload: { ...definition.payload, approachPoint: nearest.point, approachPath: nearest.path },
+        availabilityDistance: distance,
+        payload: { ...definition.payload },
       };
-    },
-  });
+    }
+
+    const collider = interactionCollider(worldLayout, definition);
+    const points = collider
+      ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
+      : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+    const nearest = points
+      .flatMap((point) => {
+        const distance = Math.hypot(
+          point.x - sourceSnapshot.position.x,
+          point.y - sourceSnapshot.position.y,
+        );
+        return distance <= definition.radius
+          && hasDirectInteractionReachAgainst(walls, point, aimPosition, targetId)
+          ? [{ point, distance }]
+          : [];
+      })
+      .sort((a, b) => a.distance - b.distance || a.point.y - b.point.y || a.point.x - b.point.x)[0];
+    if (!nearest) return null;
+    return {
+      position: nearest.point,
+      aimPosition,
+      availabilityDistance: nearest.distance,
+      selectionDistance: Math.hypot(
+        aimPosition.x - sourceSnapshot.position.x,
+        aimPosition.y - sourceSnapshot.position.y,
+      ),
+      payload: { ...definition.payload },
+    };
+  }
+
+  function resolve(definition, sourceSnapshot) {
+    if (definition.__interactionProbe) return probe(definition, sourceSnapshot);
+    if (definition.targetingMode === "facing-first") return probe(definition, sourceSnapshot);
+    const player = getPlayer();
+    const collider = interactionCollider(worldLayout, definition);
+    const points = collider
+      ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
+      : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+    const aimPosition = definition.aimPosition ?? definition.position;
+    const targetId = definition.entityId ?? definition.id;
+    const nearbyPoints = points.filter((point) => (
+      Math.hypot(
+        point.x - sourceSnapshot.position.x,
+        point.y - sourceSnapshot.position.y,
+      ) <= definition.radius
+      && hasDirectInteractionReach(worldLayout, point, aimPosition, targetId)
+    ));
+    if (nearbyPoints.length === 0) return null;
+
+    const navigation = createActorNavigation(worldLayout, {
+      cellSize: INTERACTION_NAVIGATION_CELL_SIZE,
+      footWidth: player.footWidth,
+      footDepth: player.footDepth,
+    });
+    const routes = nearbyPoints.flatMap((point) => {
+      if (!navigation.isWorldWalkable(point)) return [];
+      const path = findGridPath({
+        start: sourceSnapshot.position,
+        goal: point,
+        bounds: worldLayout.bounds,
+        cellSize: INTERACTION_NAVIGATION_CELL_SIZE,
+        ...navigation,
+      });
+      if (!path) return [];
+      const route = connectExactApproachPoint(sourceSnapshot.position, path, point, navigation);
+      if (!route) return [];
+      const distance = pathDistance(sourceSnapshot.position, route);
+      return distance <= definition.radius
+        && hasDirectInteractionReach(worldLayout, point, aimPosition, targetId)
+        ? [{ point, path: route, distance }]
+        : [];
+    }).sort((a, b) => a.distance - b.distance || a.point.y - b.point.y || a.point.x - b.point.x);
+    const nearest = routes[0];
+    if (!nearest) return null;
+    return {
+      position: nearest.point,
+      aimPosition,
+      availabilityDistance: nearest.distance,
+      selectionDistance: Math.hypot(
+        aimPosition.x - sourceSnapshot.position.x,
+        aimPosition.y - sourceSnapshot.position.y,
+      ),
+      payload: { ...definition.payload, approachPoint: nearest.point, approachPath: nearest.path },
+    };
+  }
+
+  return Object.freeze({ probe, resolve });
 }
 
 function connectExactApproachPoint(start, gridPath, point, navigation) {
@@ -100,7 +152,15 @@ function interactionCollider(worldLayout, definition) {
 }
 
 export function hasDirectInteractionReach(worldLayout, start, goal, targetId = null) {
-  const colliders = worldLayout.getWorldObjectColliders?.() ?? [];
+  return hasDirectInteractionReachAgainst(
+    worldLayout.getWorldObjectColliders?.() ?? [],
+    start,
+    goal,
+    targetId,
+  );
+}
+
+function hasDirectInteractionReachAgainst(colliders, start, goal, targetId = null) {
   return !colliders.some((entry) => entry.id !== targetId
     && isWallBarrier(entry)
     && segmentIntersectsRect(start, goal, entry.rect));
