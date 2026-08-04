@@ -5,6 +5,11 @@ import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from 
 export const INTERACTION_NAVIGATION_CELL_SIZE = 16;
 const GRID_EDGE_EPSILON = 0.000001;
 
+function finite(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
   const probeWallsBySource = new WeakMap();
 
@@ -212,11 +217,11 @@ function segmentIntersectsRect(start, goal, rect) {
 }
 
 export function interactionFootprintBounds(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
-  const size = Math.max(1, Number(cellSize) || INTERACTION_NAVIGATION_CELL_SIZE);
-  const sourceLeft = Number(bounds?.left) || 0;
-  const sourceRight = Number(bounds?.right) || sourceLeft + size;
-  const sourceTop = Number(bounds?.top) || 0;
-  const sourceBottom = Number(bounds?.bottom) || sourceTop + size;
+  const size = Math.max(1, finite(cellSize, INTERACTION_NAVIGATION_CELL_SIZE));
+  const sourceLeft = finite(bounds?.left);
+  const sourceRight = finite(bounds?.right, sourceLeft + size);
+  const sourceTop = finite(bounds?.top);
+  const sourceBottom = finite(bounds?.bottom, sourceTop + size);
   const left = Math.floor((sourceLeft + GRID_EDGE_EPSILON) / size) * size;
   const top = Math.floor((sourceTop + GRID_EDGE_EPSILON) / size) * size;
   let right = Math.ceil((sourceRight - GRID_EDGE_EPSILON) / size) * size;
@@ -227,7 +232,7 @@ export function interactionFootprintBounds(bounds, cellSize = INTERACTION_NAVIGA
 }
 
 export function perimeterInteractionPointEntries(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
-  const size = Math.max(1, Number(cellSize) || INTERACTION_NAVIGATION_CELL_SIZE);
+  const size = Math.max(1, finite(cellSize, INTERACTION_NAVIGATION_CELL_SIZE));
   const footprint = interactionFootprintBounds(bounds, size);
   const width = Math.max(1, Math.round((footprint.right - footprint.left) / size));
   const height = Math.max(1, Math.round((footprint.bottom - footprint.top) / size));
