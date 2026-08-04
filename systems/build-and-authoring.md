@@ -7,13 +7,15 @@ Owns player construction and canonical layout/asset editing.
 ## Player-facing build contract
 
 - walls, surfaces, furniture, facilities, expedition objects and plants share placement, move, demolition and grouped undo;
-- build mode opens without a selected catalog asset;
-- placeable assets store the top-left footprint cell on the `16 px` grid;
+- build mode opens without a selected catalog asset and always shows the `16 px` cell grid;
+- placeable assets store the top-left footprint cell on that grid;
 - canonical, restored, new and moved objects share this normalization;
 - visual offset and pivot do not change occupied cells;
 - validation uses effective profile colliders;
 - catalog cursor attachment is recalculated from the midpoint of the current pivot and current effective collider centre, then the footprint origin is grid-snapped;
 - moving an existing object retains its grabbed point and grid-aligned footprint;
+- approach markers occupy surrounding cell centres, derived from the collider's grid footprint rather than its padded edge;
+- beds store only canonical placement geometry; sleep pose derives from the current visual and targeting derives from the current effective collider;
 - runtime construction is not gameplay-persisted.
 
 ## Developer-authoring contract
@@ -28,7 +30,7 @@ Collider rounding uses the live draft. After removing the fixed `2 px` padding, 
 
 Collider debug renders at `40%` of its former opacity. Crop remains inside the sprite source with one visible pixel minimum; procedural visuals reject crop. At least one approach direction remains enabled.
 
-Browser storage may hold drafts and backups. The versioned profile is the current owner of collider, pivot and related values. Legacy standalone collider data is removed during migration and after profile edits. Local dev writes checked-in layout/profile defaults; successful canonical save clears browser profile and legacy collider drafts. Static hosting retains a recoverable profile draft.
+Browser storage may hold drafts and backups. The versioned profile is the current owner of collider, pivot and related values. Legacy standalone collider data and derived bed wake/presentation positions are discarded. Local dev writes checked-in layout/profile defaults; successful canonical save clears browser profile and legacy collider drafts. Static hosting retains a recoverable profile draft.
 
 Temporary staging coordinates cannot become canonical. `NEW GAME` restores the authored baseline.
 
@@ -38,7 +40,7 @@ Temporary staging coordinates cannot become canonical. `NEW GAME` restores the a
 - UI/input: `src/build/buildModeRuntime.js`, `src/build/assetAuthoringInput.js`;
 - geometry: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`, `src/build/assetGridPlacement.js`;
 - profiles/crop: `src/build/assetProfiles.js`, `src/build/assetProfilesDefault.js`, `src/build/assetVisualCrop.js`;
-- authoring: `src/build/editorAuthoringRuntime.js`, `src/build/editorAuthoringBootstrap.js`, `src/build/assetGridAuthoringBootstrap.js`;
+- authoring/runtime consistency: `src/build/editorAuthoringBootstrap.js`, `src/build/assetGridAuthoringBootstrap.js`, `src/build/assetRuntimeConsistencyBootstrap.js`;
 - baseline: `src/build/startingLayout.js`, `src/build/startingLayoutDefault.js`.
 
 `WorldBuildCoordinator` owns placed objects, previews, grouped actions and undo. Runtime owners handle facilities, beds/resources, wells, sign and training dummy. `WorldScene` remains composition only.
@@ -52,6 +54,8 @@ Temporary staging coordinates cannot become canonical. `NEW GAME` restores the a
 - drag anchors affect grab behavior, not footprint alignment;
 - rounding preserves the cell span described by the live draft;
 - crop and approach masks are profile-wide;
+- approach targets are cell-centred;
+- bed timelines do not consume stored wake, aim or presentation positions;
 - authoring directional input suppresses character movement;
 - authoring remains separate from gameplay persistence;
 - build orchestration remains outside `src/main.js`.
