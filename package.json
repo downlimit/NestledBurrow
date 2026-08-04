@@ -21,7 +21,7 @@
     "check:task-066": "node scripts/check-task-066.mjs",
     "check:task-067": "node scripts/check-task-067.mjs",
     "check:task-070": "node scripts/check-task-070.mjs",
-    "check:task-071": "node scripts/check-task-071.mjs",
+    "check:task-071": "node scripts/check-task-071.mjs && node scripts/check-task-071-live-routing.mjs",
     "check:inventory": "node scripts/check-inventory.mjs",
     "check:clock-cycle": "node scripts/check-clock-cycle.mjs",
     "check:needs": "node scripts/check-needs.mjs",
