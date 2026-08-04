@@ -1,4 +1,5 @@
 import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
+import { WorldLocationRuntime } from "../world/worldLocationRuntime.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./liveAssetGeometry.js";
 
 const BUILD_GRID_PATCH = Symbol("nestledBurrowBuildGridVisibilityPatch");
+const LOCATION_RUNTIME_PATCH = Symbol("nestledBurrowAssetRuntimeConsistencyLocationPatch");
 const PANEL_PATCH = Symbol("nestledBurrowAssetRuntimeConsistencyPanelPatch");
 const BED_RUNTIME_PATCH = Symbol("nestledBurrowBedRuntimeConsistencyPatch");
 const FACILITY_RUNTIME_PATCH = Symbol("nestledBurrowFacilityRuntimeConsistencyPatch");
@@ -33,6 +35,16 @@ if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
   };
 
   Object.defineProperty(BuildModeRuntime.prototype, BUILD_GRID_PATCH, { value: true });
+}
+
+if (!WorldLocationRuntime.prototype[LOCATION_RUNTIME_PATCH]) {
+  const originalMount = WorldLocationRuntime.prototype.mount;
+  WorldLocationRuntime.prototype.mount = function mountWithCurrentAssetGeometry(...args) {
+    const result = originalMount.apply(this, args);
+    installCurrentAssetRuntime(this.renderingHost);
+    return result;
+  };
+  Object.defineProperty(WorldLocationRuntime.prototype, LOCATION_RUNTIME_PATCH, { value: true });
 }
 
 if (!MovementDebugPanel.prototype[PANEL_PATCH]) {
