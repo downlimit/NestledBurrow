@@ -26,6 +26,8 @@ export function createNeedsRuntime({
   let collapseElapsedGameHours = 0;
   let consecutiveLabourActions = 0;
   let lastLabourAction = null;
+  let selfUseActionKey = null;
+  let consecutiveSelfUses = 0;
   let lastNonOrdinaryActivity = null;
   let inactiveRealSeconds = 0;
   let activePhysicalTool = null;
@@ -103,6 +105,16 @@ export function createNeedsRuntime({
     return snapshot(events, normalizedActivity);
   }
 
+  function wakeFromCollapse() {
+    collapseElapsedGameHours = 0;
+    gameplay().currentEnergy = Math.max(
+      gameplay().currentEnergy,
+      Math.max(1, Number(tuning.collapse.wakeEnergy) || 0),
+    );
+    onWake({ collapsed: true, manual: true });
+    return { status: "awake", mutated: true, energy: gameplay().currentEnergy };
+  }
+
   function getPhysicalActionCost(toolId) {
     const baseCost = tuning.toolCosts[toolId] ?? 0;
     return physicalActionEnergyCost(baseCost, needs(), {
@@ -127,8 +139,27 @@ export function createNeedsRuntime({
     lastNonOrdinaryActivity = `labour:${toolId}`;
     activePhysicalTool = toolId;
     physicalActivityRemainingSeconds = tuning.physicalActivityWindowSeconds;
+    selfUseActionKey = null;
+    consecutiveSelfUses = 0;
     if (consecutiveLabourActions > 3) needs().novelty = normalizeNeedValue(needs().novelty - 1);
     return { status: "spent", mutated: true, cost: preview.cost, consecutiveLabourActions };
+  }
+
+  function recordSelfUse(actionKey, { drainsNovelty = false } = {}) {
+    if (selfUseActionKey === actionKey) consecutiveSelfUses += 1;
+    else {
+      selfUseActionKey = actionKey;
+      consecutiveSelfUses = 1;
+    }
+    lastLabourAction = null;
+    consecutiveLabourActions = 0;
+    lastNonOrdinaryActivity = `self-use:${actionKey}`;
+    let noveltyDelta = 0;
+    if (drainsNovelty && consecutiveSelfUses > 3) {
+      needs().novelty = normalizeNeedValue(needs().novelty - 1);
+      noveltyDelta = -1;
+    }
+    return { status: "spent", mutated: true, consecutiveSelfUses, noveltyDelta };
   }
 
   function applyMeaningfulConversation(gain = tuning.dialogue.meaningfulConversationGain) {
@@ -246,6 +277,8 @@ export function createNeedsRuntime({
   function resetRepetition(activity) {
     consecutiveLabourActions = 0;
     lastLabourAction = null;
+    selfUseActionKey = null;
+    consecutiveSelfUses = 0;
     lastNonOrdinaryActivity = activity;
   }
 
@@ -264,6 +297,8 @@ export function createNeedsRuntime({
       collapseElapsedGameHours,
       consecutiveLabourActions,
       lastLabourAction,
+      selfUseActionKey,
+      consecutiveSelfUses,
       catchBreathInactiveSeconds: inactiveRealSeconds,
       activePhysicalTool,
       debugPresetActive: Boolean(debugBaseline),
@@ -276,11 +311,13 @@ export function createNeedsRuntime({
 
   return Object.freeze({
     update,
+    wakeFromCollapse,
     getState,
     getFlow: () => flow,
     getPhysicalActionCost,
     canPerformPhysicalAction,
     recordPhysicalAction,
+    recordSelfUse,
     applyMeaningfulConversation,
     applyNoveltyEvent,
     beginToiletAccident,
