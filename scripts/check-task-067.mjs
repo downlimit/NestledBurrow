@@ -56,8 +56,8 @@ player.motor.position = { ...toiletSource.position };
 player.sprite.x = toiletSource.position.x;
 player.sprite.y = toiletSource.position.y;
 const toiletApproach = approachResolver.resolve(definitions.get("editor-toilet-2"), toiletSource);
-assert.deepEqual(toiletApproach?.position, { x: 592, y: 376 }, "lower-right toilet use keeps the exact nearest perimeter point");
-assert.deepEqual(toiletApproach?.payload.approachPath, [{ x: 592, y: 376 }], "direct toilet route has no grid-center detour");
+assert.deepEqual(toiletApproach?.position, { x: 584, y: 376 }, "lower-right toilet use resolves to the centre of the nearest surrounding cell");
+assert.deepEqual(toiletApproach?.payload.approachPath, [{ x: 584, y: 376 }], "direct toilet route ends at the exact surrounding cell centre");
 
 let activeFacilityId = null;
 const coordinator = createNeedsInteractionCoordinator({
