@@ -277,7 +277,7 @@ const persistenceSource = readFileSync("src/session/sessionPersistence.js", "utf
 assert(!persistenceSource.includes("notifyInventoryGain"), "load and migration do not invoke gain presentation");
 const trustedWorktree = `safe.directory=${process.cwd().replaceAll("\\", "/")}`;
 const changed = [
-  ...lines(execFileSync("git", ["-c", trustedWorktree, "diff", "--name-only", "3ed68030b0401fde9f7fff820a21d0cc997fae43"], { encoding: "utf8" })),
+  ...lines(execFileSync("git", ["-c", trustedWorktree, "diff", "--name-only", "46e2428c8e39f3c9874005da478c34828d91ae5a"], { encoding: "utf8" })),
   ...lines(execFileSync("git", ["-c", trustedWorktree, "ls-files", "--others", "--exclude-standard"], { encoding: "utf8" })),
 ];
 const binary = changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path));

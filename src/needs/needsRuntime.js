@@ -26,6 +26,8 @@ export function createNeedsRuntime({
   let collapseElapsedGameHours = 0;
   let consecutiveLabourActions = 0;
   let lastLabourAction = null;
+  let selfUseActionKey = null;
+  let consecutiveSelfUses = 0;
   let lastNonOrdinaryActivity = null;
   let inactiveRealSeconds = 0;
   let activePhysicalTool = null;
@@ -137,8 +139,27 @@ export function createNeedsRuntime({
     lastNonOrdinaryActivity = `labour:${toolId}`;
     activePhysicalTool = toolId;
     physicalActivityRemainingSeconds = tuning.physicalActivityWindowSeconds;
+    selfUseActionKey = null;
+    consecutiveSelfUses = 0;
     if (consecutiveLabourActions > 3) needs().novelty = normalizeNeedValue(needs().novelty - 1);
     return { status: "spent", mutated: true, cost: preview.cost, consecutiveLabourActions };
+  }
+
+  function recordSelfUse(actionKey, { drainsNovelty = false } = {}) {
+    if (selfUseActionKey === actionKey) consecutiveSelfUses += 1;
+    else {
+      selfUseActionKey = actionKey;
+      consecutiveSelfUses = 1;
+    }
+    lastLabourAction = null;
+    consecutiveLabourActions = 0;
+    lastNonOrdinaryActivity = `self-use:${actionKey}`;
+    let noveltyDelta = 0;
+    if (drainsNovelty && consecutiveSelfUses > 3) {
+      needs().novelty = normalizeNeedValue(needs().novelty - 1);
+      noveltyDelta = -1;
+    }
+    return { status: "spent", mutated: true, consecutiveSelfUses, noveltyDelta };
   }
 
   function applyMeaningfulConversation(gain = tuning.dialogue.meaningfulConversationGain) {
@@ -233,6 +254,8 @@ export function createNeedsRuntime({
   function resetRepetition(activity) {
     consecutiveLabourActions = 0;
     lastLabourAction = null;
+    selfUseActionKey = null;
+    consecutiveSelfUses = 0;
     lastNonOrdinaryActivity = activity;
   }
 
@@ -251,6 +274,8 @@ export function createNeedsRuntime({
       collapseElapsedGameHours,
       consecutiveLabourActions,
       lastLabourAction,
+      selfUseActionKey,
+      consecutiveSelfUses,
       catchBreathInactiveSeconds: inactiveRealSeconds,
       activePhysicalTool,
       debugPresetActive: Boolean(debugBaseline),
@@ -269,6 +294,7 @@ export function createNeedsRuntime({
     getPhysicalActionCost,
     canPerformPhysicalAction,
     recordPhysicalAction,
+    recordSelfUse,
     applyMeaningfulConversation,
     applyNoveltyEvent,
     beginToiletAccident,

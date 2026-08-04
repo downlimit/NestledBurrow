@@ -24,6 +24,7 @@ import { RESOURCE_OBJECTS } from "../resources/resourceConfig.js";
 import { createTavernServiceRuntime } from "../tavern/tavernServiceRuntime.js";
 import { createTavernSignRuntime } from "../tavern/tavernSignRuntime.js";
 import { createWorldBuildCoordinator } from "../build/worldBuildCoordinator.js";
+import { createPuddleRuntime } from "./puddleRuntime.js";
 
 const EMPTY_OWNERS = Object.freeze(createEmptyOwners());
 
@@ -41,6 +42,7 @@ const DEFAULT_FACTORIES = Object.freeze({
   kitchenInteraction: createKitchenInteractionRuntime,
   movementDebugPanel: (options) => new MovementDebugPanel(options),
   worldBuildCoordinator: createWorldBuildCoordinator,
+  puddle: createPuddleRuntime,
 });
 
 export function createWorldLocationRuntime(options) {
@@ -98,6 +100,7 @@ export class WorldLocationRuntime {
     this.activeLayout = layout;
     this.presentationRuntime.mount(layout);
     try {
+      this.mountPuddle();
       if (capabilities.npcs) {
         this.mountNpcCharacters();
         this.mountMerchant();
@@ -156,6 +159,8 @@ export class WorldLocationRuntime {
     this.owners.merchantRuntime?.destroy?.();
     this.owners.merchantRuntime = null;
     this.unmountNpcCharacters();
+    this.owners.puddleRuntime?.destroy?.();
+    this.owners.puddleRuntime = null;
     this.presentationRuntime.unmount();
     this.activeDefinition = null;
     this.activeLayout = null;
@@ -170,6 +175,7 @@ export class WorldLocationRuntime {
     this.owners.needsInteractionCoordinator?.update?.(deltaMs);
     this.callbacks.updateGameplayTime?.(deltaMs);
     this.owners.cookingRuntime?.update?.(deltaMs);
+    this.owners.puddleRuntime?.update?.(deltaMs);
   }
 
   runWorldStep(deltaMs, updateCharacters) {
@@ -266,6 +272,12 @@ export class WorldLocationRuntime {
     }
   }
 
+  mountPuddle() {
+    this.owners.puddleRuntime = this.factories.puddle(this.renderingHost, {
+      getWorldTimeSeconds: () => this.sessionState?.gameplay?.worldTimeSeconds ?? 0,
+    });
+  }
+
   mountMerchant() {
     this.owners.merchantRuntime = this.factories.merchant(this.renderingHost, {
       sessionState: this.sessionState,
@@ -343,6 +355,7 @@ export class WorldLocationRuntime {
       isSleeping: () => this.callbacks.isSleeping?.() ?? false,
       toiletAccidentTuning: this.gameplayTuning.needs.toiletAccident,
       onToiletAccident: (event) => this.globalOwners.needsRuntime?.beginToiletAccident?.(event),
+      onToiletAccidentPuddle: (event) => this.owners.puddleRuntime?.spawn?.(event.position),
       onToiletAccidentRecovery: (progress) => this.globalOwners.needsRuntime?.advanceToiletAccidentRecovery?.(progress),
       refresh: () => this.globalOwners.interactionRuntime?.refresh?.(),
     });
@@ -649,5 +662,6 @@ function createEmptyOwners() {
     movementDebugPanel: null,
     worldBuildCoordinator: null,
     buildModeRuntime: null,
+    puddleRuntime: null,
   };
 }

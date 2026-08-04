@@ -102,10 +102,13 @@ export function createCombatLoadoutRuntime(scene, {
 
   function quickUse(slotIndex) {
     if (!quickUseEnabled() || slotDefinitions[slotIndex]?.kind !== "number") return { status: "blocked", mutated: false };
-    const result = useCombatNumberSlot(gameplay(), slotIndex);
+    const result = useCombatNumberSlot(gameplay(), slotIndex, {
+      recordSelfUse: (actionKey, options) => scene.needsRuntime?.recordSelfUse?.(actionKey, options) ?? null,
+    });
     if (result.messageKey) scene.gameHud?.showTransientMessage?.(result.messageKey);
     if (!result.mutated) return result;
-    scene.needsFlowRuntime?.reset?.(needMeterValues(gameplay()));
+    scene.needsFlowRuntime?.observe?.(needMeterValues(gameplay()));
+    if (result.spawnPuddle) scene.puddleRuntime?.spawn?.(scene.playerCharacter?.motor?.position);
     scene.syncPlayerEnergyTarget?.();
     render();
     scene.gameHud?.render?.();
