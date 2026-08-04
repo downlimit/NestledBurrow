@@ -15,8 +15,11 @@ export function toAuthoringArrowKey(key) {
 }
 
 export function createAuthoringArrowEvent(event) {
-  const key = toAuthoringArrowKey(event?.key);
+  const sourceKey = String(event?.key ?? "");
+  const key = toAuthoringArrowKey(sourceKey);
   if (!key) return null;
+  const isArrowKey = sourceKey.startsWith("Arrow");
+  if (!isArrowKey && (event?.ctrlKey || event?.altKey || event?.metaKey)) return null;
   return {
     key,
     ctrlKey: Boolean(event?.ctrlKey),
