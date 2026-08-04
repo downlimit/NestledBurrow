@@ -7,6 +7,10 @@ const AUTHORING_ARROW_KEYS = Object.freeze({
   d: "ArrowRight",
   w: "ArrowUp",
   s: "ArrowDown",
+  KeyA: "ArrowLeft",
+  KeyD: "ArrowRight",
+  KeyW: "ArrowUp",
+  KeyS: "ArrowDown",
 });
 
 export function toAuthoringArrowKey(key) {
@@ -15,10 +19,11 @@ export function toAuthoringArrowKey(key) {
 }
 
 export function createAuthoringArrowEvent(event) {
+  const sourceCode = String(event?.code ?? "");
   const sourceKey = String(event?.key ?? "");
-  const key = toAuthoringArrowKey(sourceKey);
+  const key = toAuthoringArrowKey(sourceCode) ?? toAuthoringArrowKey(sourceKey);
   if (!key) return null;
-  const isArrowKey = sourceKey.startsWith("Arrow");
+  const isArrowKey = sourceCode.startsWith("Arrow") || sourceKey.startsWith("Arrow");
   if (!isArrowKey && (event?.ctrlKey || event?.altKey || event?.metaKey)) return null;
   return {
     key,
