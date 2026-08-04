@@ -8,11 +8,16 @@ import {
   normalizeAssetProfiles,
   saveAssetProfilesToProject,
 } from "../src/build/assetProfiles.js";
-import { authoringArrowDelta, toAuthoringArrowKey } from "../src/build/assetAuthoringInput.js";
+import {
+  authoringArrowDelta,
+  createAuthoringArrowEvent,
+  toAuthoringArrowKey,
+} from "../src/build/assetAuthoringInput.js";
 import {
   normalizeBedDefinitionToGrid,
   normalizeFacilityDefinitionToGrid,
   roundColliderToAssetFootprint,
+  snapAssetPlacementFromAnchor,
   snapAssetPlacementPoint,
 } from "../src/build/assetGridPlacement.js";
 import { applyVisualCrop } from "../src/build/assetVisualCrop.js";
@@ -44,9 +49,19 @@ assert.deepEqual(
   "a roughly two-cell collider keeps the nearest two-cell span and the same perimeter padding",
 );
 assert.deepEqual(
-  roundColliderToAssetFootprint({ left: 165, right: 181, top: 278, bottom: 294 }, 16, 2),
-  { left: 162, right: 174, top: 274, bottom: 286 },
-  "authoring round uses the asset footprint and produces one padded grid cell even from an off-grid legacy placement",
+  roundColliderToAssetFootprint({ left: 34, right: 46, top: 50, bottom: 62 }, 16, 2),
+  { left: 34, right: 46, top: 50, bottom: 62 },
+  "rounding follows the currently authored collider edges rather than an immutable base rectangle",
+);
+assert.deepEqual(
+  roundColliderToAssetFootprint({ left: 18, right: 46, top: 18, bottom: 30 }, 16, 2),
+  { left: 18, right: 46, top: 18, bottom: 30 },
+  "a two-cell authored collider keeps its described span and fixed wall padding",
+);
+assert.deepEqual(
+  roundColliderToAssetFootprint({ left: 20, right: 43, top: 19, bottom: 31 }, 16, 2),
+  { left: 18, right: 46, top: 18, bottom: 30 },
+  "each live collider edge snaps to the nearest full-cell boundary before padding is restored",
 );
 
 const rect = { left: 10, right: 20, top: 30, bottom: 40 };
@@ -73,11 +88,28 @@ assert.deepEqual(
 assert.equal(toAuthoringArrowKey("w"), "ArrowUp", "W maps to the same editor action as ArrowUp");
 assert.equal(toAuthoringArrowKey("A"), "ArrowLeft", "WASD mapping is case-insensitive");
 assert.deepEqual(authoringArrowDelta("d"), { x: 1, y: 0 }, "D performs the same one-pixel nudge as ArrowRight");
+const russianLayoutWasd = createAuthoringArrowEvent({ code: "KeyW", key: "ц" });
+assert.equal(russianLayoutWasd?.key, "ArrowUp", "physical WASD remains valid under a non-Latin keyboard layout");
+assert.deepEqual(
+  editRectDraftByArrow(rect, russianLayoutWasd),
+  { left: 10, right: 20, top: 29, bottom: 39 },
+  "WASD edits volumes through the same one-pixel contract as arrow keys",
+);
 
 assert.deepEqual(
   snapAssetPlacementPoint({ x: 23, y: 39 }, 16),
   { x: 16, y: 32 },
   "placeable assets store their top-left placement on the tile grid",
+);
+assert.deepEqual(
+  snapAssetPlacementFromAnchor({ x: 43, y: 39 }, { x: 11, y: 7 }, 16),
+  { x: 32, y: 32 },
+  "catalog placement subtracts the current pivot/collider midpoint before snapping the footprint",
+);
+assert.deepEqual(
+  snapAssetPlacementFromAnchor({ x: 43, y: 39 }, { x: 3, y: 7 }, 16),
+  { x: 48, y: 32 },
+  "changing the authored anchor immediately changes cursor attachment without cached pivots",
 );
 const normalizedFacility = normalizeFacilityDefinitionToGrid({
   id: "legacy-shower",
@@ -149,6 +181,9 @@ assert(facilityVisualSource.includes("applyVisualCrop"), "canonical crop applies
 assert(interactionApproachSource.includes("assetProfilesDefault.js"), "canonical approach masks apply without opening the debug panel");
 assert(gridAuthoringSource.includes("GRID_OVERLAY_ALPHA = 0.4"), "collider volumes are rendered at forty percent of their previous layer opacity");
 assert(gridAuthoringSource.includes("stopPlayerMotion"), "active authoring keyboard input explicitly stops player motion");
+assert(gridAuthoringSource.includes("roundColliderToAssetFootprint(selection.draft"), "rounding consumes the live edited collider draft");
+assert(gridAuthoringSource.includes("snapAssetPlacementFromAnchor(raw, anchorOffset"), "catalog placement uses the freshly computed current anchor");
+assert(gridAuthoringSource.includes("removeItem?.(COLLIDER_DEBUG_STORAGE_KEY)"), "legacy collider duplicates are discarded after migration and editing");
 
 const storage = createStorage();
 storage.setItem(COLLIDER_DEBUG_STORAGE_KEY, "legacy-offsets");
@@ -174,4 +209,4 @@ await assert.rejects(() => saveAssetProfilesToProject(profiles, {
 }), (error) => error.localSaved === true && /static host/.test(error.message));
 assert(failedStorage.getItem(ASSET_PROFILES_STORAGE_KEY), "static hosting keeps a recoverable browser draft");
 
-console.log("Task #071 contracts passed: grid placement, WASD/arrow authoring, dimmed volumes, canonical profiles, crop and approach directions");
+console.log("Task #071 contracts passed: live collider intent, current anchors, grid placement, WASD/arrow authoring, dimmed volumes, crop and approach directions");
