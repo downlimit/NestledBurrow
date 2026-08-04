@@ -20,6 +20,7 @@ export function createInteractionRuntime({
 }) {
   let destroyed = false;
   let currentCandidate = null;
+  let currentCandidateDefinition = null;
 
   function update({ actions = {} } = {}) {
     if (destroyed) return;
@@ -32,21 +33,25 @@ export function createInteractionRuntime({
       return;
     }
 
-    currentCandidate = findCandidate();
+    applySelection(findCandidate());
     if (currentCandidate) {
       if (!presenter?.isMessageVisible?.()) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
     } else presenter?.hidePrompt?.();
 
-    if (interact && currentCandidate) startCandidateInteraction(currentCandidate);
+    if (interact && currentCandidate) startSelectedInteraction();
   }
 
   function findCandidate() {
     const player = characterSystem.getSnapshot(sessionState.playerId);
     const targets = [];
+    const definitionsByTargetId = new Map();
     const addTarget = (definition) => {
       if (!(worldInteractionCoordinator?.isInteractionAllowed?.(definition) ?? true)) return;
-      const resolved = resolveInteractionTarget(definition, player);
-      if (resolved) targets.push(createInteractionTarget({ ...definition, ...resolved }));
+      const resolved = resolveInteractionTarget({ ...definition, __interactionProbe: true }, player);
+      if (!resolved) return;
+      const target = createInteractionTarget({ ...definition, ...resolved });
+      targets.push(target);
+      definitionsByTargetId.set(target.id, definition);
     };
     for (const definition of getInteractionDefinitions()) {
       if (!characterSystem.has(definition.entityId)) continue;
@@ -54,7 +59,40 @@ export function createInteractionRuntime({
       addTarget({ ...definition, position: snapshot.position });
     }
     for (const definition of worldInteractionCoordinator?.getStaticInteractionDefinitions?.() ?? []) addTarget(definition);
-    return findBestInteractionTarget(player, targets);
+    const candidate = findBestInteractionTarget(player, targets);
+    return candidate
+      ? { candidate, definition: definitionsByTargetId.get(candidate.targetId) ?? null }
+      : null;
+  }
+
+  function applySelection(selection) {
+    currentCandidate = selection?.candidate ?? null;
+    currentCandidateDefinition = selection?.definition ?? null;
+  }
+
+  function clearCandidate() {
+    currentCandidate = null;
+    currentCandidateDefinition = null;
+  }
+
+  function startSelectedInteraction() {
+    const definition = currentCandidateDefinition;
+    if (!definition || !(worldInteractionCoordinator?.isInteractionAllowed?.(definition) ?? true)) {
+      clearCandidate();
+      presenter?.hidePrompt?.();
+      return;
+    }
+    const player = characterSystem.getSnapshot(sessionState.playerId);
+    const resolved = resolveInteractionTarget(definition, player);
+    const target = resolved ? createInteractionTarget({ ...definition, ...resolved }) : null;
+    const candidate = target ? findBestInteractionTarget(player, [target]) : null;
+    if (!candidate) {
+      clearCandidate();
+      presenter?.hidePrompt?.();
+      return;
+    }
+    currentCandidate = candidate;
+    startCandidateInteraction(candidate);
   }
 
   function resolveCandidateDialogueId(candidate) {
@@ -76,7 +114,7 @@ export function createInteractionRuntime({
         presenter?.showPrompt?.({ promptKey: candidate.prompt });
         return;
       }
-      currentCandidate = null;
+      clearCandidate();
       if (result?.transientMessageShown) {
         currentCandidate = candidate;
         presenter?.showPrompt?.({ promptKey: candidate.prompt });
@@ -95,7 +133,7 @@ export function createInteractionRuntime({
     const dialogueId = resolveCandidateDialogueId(candidate);
     const definition = getDialogueDefinition(dialogueId);
     startDialogue(sessionState, { targetId: candidate.entityId, dialogueId: definition.id });
-    currentCandidate = null;
+    clearCandidate();
     presenter?.hidePrompt?.();
     showCurrentDialogueLine();
   }
@@ -123,7 +161,7 @@ export function createInteractionRuntime({
       if (completion?.status === "updated") {
         onPersistentMutation?.({ dialogueId, completion });
       }
-      currentCandidate = null;
+      clearCandidate();
       presenter?.hideDialogue?.();
       presenter?.hidePrompt?.();
       return;
@@ -154,18 +192,18 @@ export function createInteractionRuntime({
         showCurrentDialogueLine();
         return;
       }
-      currentCandidate = findCandidate();
+      applySelection(findCandidate());
       if (currentCandidate) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
       else presenter?.hidePrompt?.();
     },
     resetCandidate() {
-      currentCandidate = null;
+      clearCandidate();
       presenter?.hidePrompt?.();
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      currentCandidate = null;
+      clearCandidate();
       presenter = null;
       characterSystem = null;
       sessionState = null;
