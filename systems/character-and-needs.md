@@ -64,7 +64,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only radius, perimeter and wall checks; A* runs after activation. Activation validates all nearby candidates once and skips unreachable furniture. Walls block routes; objects expose exact walkable perimeter points. Each asset profile can allow or disable the eight surrounding direction classes (`top-left`, `top`, `top-right`, `right`, `bottom-right`, `bottom`, `bottom-left`, `left`). A one-cell object therefore has exactly eight candidate approach cells; for wider objects, cardinal directions cover every cell along that edge and diagonal directions cover the corner cells. Disabled direction classes are removed before probe and exact route selection. At least one direction remains enabled. Crossing a point counts as arrival; overlaps rank by aim distance. Enter/exit interpolate presentation without moving the safe motor position. Effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use radius, perimeter and wall checks; A* runs only after activation. Walls block routes. Profiles filter perimeter points by eight directions. A one-cell object exposes eight candidate cells; wider objects expose corners and edge cells. Disabled classes are removed before probe and exact routing; at least one remains enabled. Crossing a point counts as arrival. Enter/exit interpolate presentation without moving the motor. Effects run only in active.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -73,16 +73,15 @@ Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only r
 | table/eating | S | 500 ms | 650 ms | 300 ms |
 | bed/sleep | E | 1000 ms | 1200 ms | 500 ms |
 
-The target need is protected enter through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
+The target need is protected through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
 
 ## Invariants
 
 - formulas stay deterministic, framework-free and JSON-safe;
 - time drain and discrete costs are additive;
-- event consequences expose reusable world/presentation outputs;
 - presentation never rewrites safe motor position;
-- approach-direction masks affect automatic positioning, not the timeline pose or effect contract;
-- `WorldLocationRuntime` owns location facility/needs lifecycle and realtime update;
+- approach masks change automatic positioning, not timeline pose or effects;
+- `WorldLocationRuntime` owns location facility/needs lifecycle;
 - saves exclude debug presets and interaction timeline state.
 
 ## Current baseline
