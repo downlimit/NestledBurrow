@@ -148,6 +148,6 @@ function patchBedRuntime(runtime, scene) {
     };
   }
 
-  scene.interactionRuntime?.refresh?.();
   Object.defineProperty(runtime, BED_RUNTIME_PATCH, { value: true });
+  scene.interactionRuntime?.refresh?.();
 }
