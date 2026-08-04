@@ -29,6 +29,7 @@ import { WORLD_IDS } from "./world/worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "./world/worldLocationCoordinator.js";
 import { createWorldLocationRuntime } from "./world/worldLocationRuntime.js";
 import { createWorldPresentationRuntime } from "./world/worldPresentationRuntime.js";
+import { preloadPuddleAsset } from "./world/puddleRuntime.js";
 import { NPCS } from "./character/npcConfig.js";
 import { advanceGameTime, applyGameplayTuning, createFreshGameSessionState } from "./session/gameSessionState.js";
 import { dayNightMultiplyColor, formatClock } from "./session/gameClock.js";
@@ -94,6 +95,7 @@ class WorldScene extends Phaser.Scene {
     preloadFarmingAssets(this, import.meta.env.BASE_URL);
     preloadLemonadeAssets(this, import.meta.env.BASE_URL);
     preloadMeleeAssets(this);
+    preloadPuddleAsset(this, import.meta.env.BASE_URL);
     this.load.spritesheet(TAVERN_SIGN_ASSET.key, `${import.meta.env.BASE_URL}${TAVERN_SIGN_ASSET.path}`, {
       frameWidth: TAVERN_SIGN_ASSET.frameWidth,
       frameHeight: TAVERN_SIGN_ASSET.frameHeight,
@@ -487,6 +489,7 @@ class WorldScene extends Phaser.Scene {
   get movementDebugPanel() { return this.locationOwners.movementDebugPanel ?? null; }
   get worldBuildCoordinator() { return this.locationOwners.worldBuildCoordinator ?? null; }
   get buildMode() { return this.locationOwners.buildModeRuntime ?? null; }
+  get puddleRuntime() { return this.locationOwners.puddleRuntime ?? null; }
 
   setColliderDebugVisible(visible) {
     this.colliderDebugVisible = Boolean(visible);

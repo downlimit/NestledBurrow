@@ -62,7 +62,7 @@ Below `L=33`, pressure is linear; at zero, speed is `0.5x` and N drain `1.5x`. E
 
 ## Novelty and dialogue
 
-After three identical physical actions, repeats cost `1 N` and set `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Accepted melee spends E on misses and is blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
+After three identical physical actions, repeats cost `1 N` and set `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use repeats under its own key, three free then `-1 N`; any other non-ordinary activity resets. Accepted melee spends E on misses and is blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
 
 NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may restore D/E. Solo-rest E multiplier is `1 - 0.25 * pressure(D,30)`; D pressure raises novelty drain up to `1.25`.
 

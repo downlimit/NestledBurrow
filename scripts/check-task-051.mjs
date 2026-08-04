@@ -398,7 +398,7 @@ assert(!persistence.includes('"sword"') && !persistence.includes('"battle-axe"')
 
 const trustedWorktree = `safe.directory=${process.cwd().replaceAll("\\", "/")}`;
 const changed = [
-  ...lines(execFileSync("git", ["-c", trustedWorktree, "diff", "--name-only", "45ec5d6a028ffb04d84499531eda0fb3bf159ca1"], { encoding: "utf8" })),
+  ...lines(execFileSync("git", ["-c", trustedWorktree, "diff", "--name-only", "46e2428c8e39f3c9874005da478c34828d91ae5a"], { encoding: "utf8" })),
   ...lines(execFileSync("git", ["-c", trustedWorktree, "ls-files", "--others", "--exclude-standard"], { encoding: "utf8" })),
 ];
 assert(!changed.includes("src/assets/meleeWeaponSpriteAssets.js"));

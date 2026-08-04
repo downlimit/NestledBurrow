@@ -14,6 +14,7 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 - panel modes and Alt lifecycle: `src/inventory/inventoryModeRuntime.js`;
 - item visuals/gain cues: `src/inventory/inventoryVisuals.js`, `src/inventory/inventoryGainPresentation.js`;
 - transient and interaction UI: `src/ui/transientMessageRuntime.js`, `src/ui/interactionHud.js`;
+- transient world puddles: `src/world/puddleRuntime.js`, `src/world/puddleDomain.js`;
 - text/localization: `localization/`, `src/ui/textResolution.js`, `src/ui/hud.js`, `public/locales/{ru,en}`;
 - camera/audio/day-night: `src/character/cameraFollowRuntime.js`, `src/audio/`, `src/session/gameClock.js`.
 
@@ -34,6 +35,7 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 - panel transforms include frames, items, quantities, selection, water gauge, hit zones and gain cues; world drops and throw aim stay world-space;
 - the bucket always shows its vertical fill gauge; load, migration and reorder emit no gain cue;
 - procedural effects fire only after the owning mutation succeeds;
+- puddles are location-scoped transient MULTIPLY sprites fixed to one `16×16` cell, dry at `1/30` day / `1/60` night real seconds, reset alpha on re-spawn and die with location teardown without save;
 - long-use presentation never rewrites safe motor position and is never persisted;
 - day/night multiply does not cover HUD or change gameplay state;
 - player-visible changes require managed preview acceptance;
@@ -41,7 +43,7 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 
 ## Current baseline
 
-Localized HUD, peaceful/combat/loadout-edit panels, persistent ten-slot combat loadout, two-way drag, six numbered self-use slots, ten-slot inventory, gain feedback, transient messages, compact Atoll titles/path tips, needs, options, fullscreen, audio, mobile input, camera and day/night presentation are integrated. Current self-use profiles are cooked potato dish for satiety and bucket water for lustre.
+Localized HUD, peaceful/combat/loadout-edit panels, persistent ten-slot combat loadout, two-way drag, six numbered self-use slots, ten-slot inventory, gain feedback, transient messages, compact Atoll titles/path tips, needs, options, fullscreen, audio, mobile input, camera and day/night presentation are integrated. Current self-use profiles are cooked potato dish for satiety and bucket water for lustre; puddles from bucket self-use and toilet accidents share one runtime owner.
 
 ## Not yet
 

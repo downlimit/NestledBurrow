@@ -106,7 +106,7 @@ const village = definition("village-fixture", {
 const firstVillageOwners = lifecycle.runtime.mount({ definition: village, layout: layout("village-fixture") });
 assert.deepEqual(
   creationEvents(lifecycle.events),
-  ["presentation", "npc", "merchant", "debris", "melee", "facility", "needs", "tavern-sign", "tavern-service", "farming", "cooking", "kitchen", "movement-debug", "build", "interaction-bind", "candidate-reset", "hud-sync"],
+  ["presentation", "puddle", "npc", "merchant", "debris", "melee", "facility", "needs", "tavern-sign", "tavern-service", "farming", "cooking", "kitchen", "movement-debug", "build", "interaction-bind", "candidate-reset", "hud-sync"],
   "capabilities must mount in canonical order",
 );
 assert(firstVillageOwners.merchantRuntime && firstVillageOwners.worldBuildCoordinator && firstVillageOwners.buildModeRuntime);
@@ -121,6 +121,7 @@ assert.deepEqual(lifecycle.events, [
   "needs-update",
   "gameplay-time",
   "cooking-update",
+  "puddle-update",
   "tavern-update",
   "melee-before",
   "characters-update",
@@ -155,6 +156,7 @@ assert.deepEqual(destroyEvents(firstDestroyEvents), [
   "destroy:debris",
   "destroy:merchant",
   "destroy:npc",
+  "destroy:puddle",
   "destroy:presentation",
 ], "destroy must reverse the dependency order and leave presentation last");
 assert(Object.values(lifecycle.runtime.getOwners()).every((owner) => owner === null));
@@ -275,6 +277,10 @@ function createLifecycleHarness() {
     movementDebugPanel: () => {
       events.push("movement-debug");
       return owner("movement-debug", { updateStatus: () => events.push("debug-update") });
+    },
+    puddle: () => {
+      events.push("puddle");
+      return owner("puddle", { update: () => events.push("puddle-update") });
     },
     worldBuildCoordinator: () => {
       events.push("build");
