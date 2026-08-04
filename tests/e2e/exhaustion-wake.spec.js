@@ -11,10 +11,15 @@ async function boot(page) {
   await expect(page.locator("canvas")).toHaveJSProperty("width", 320);
 }
 
+async function tapGameKey(page, key) {
+  await page.keyboard.down(key);
+  await page.waitForTimeout(120);
+  await page.keyboard.up(key);
+  await page.waitForTimeout(80);
+}
+
 async function tapAlt(page) {
-  await page.keyboard.down("Alt");
-  await page.waitForTimeout(60);
-  await page.keyboard.up("Alt");
+  await tapGameKey(page, "Alt");
 }
 
 async function collapseWithGuaranteedWake(page) {
@@ -38,7 +43,7 @@ test("manual wake remains available from peaceful and combat inventory modes", a
     suppressed: false,
     promptVisible: true,
   });
-  await page.keyboard.press("Space");
+  await tapGameKey(page, "Space");
   await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
     sleeping: false,
     exhaustedSleeping: false,
@@ -56,7 +61,7 @@ test("manual wake remains available from peaceful and combat inventory modes", a
     suppressed: false,
     promptVisible: true,
   });
-  await page.keyboard.press("Space");
+  await tapGameKey(page, "Space");
   await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
     sleeping: false,
     exhaustedSleeping: false,
@@ -71,7 +76,7 @@ test("Wild Atoll knockout exposes no manual wake interaction", async ({ page }, 
   await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("nest");
   await bridge(page, "placePlayerAt", { x: 11 * 16, y: 7 * 16, facing: { x: 0, y: -1 } });
   await page.waitForTimeout(120);
-  await page.keyboard.press("Space");
+  await tapGameKey(page, "Space");
   await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("atoll");
 
   await bridge(page, "setEnergy", 0);
