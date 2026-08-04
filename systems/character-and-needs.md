@@ -68,7 +68,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses follow `approach -> enter -> active -> exit -> free`. Walls block route and final reach; a 1x1 object has eight perimeter points. The nearest route drains ordinary. Enter/exit preserve motor and affect pose; effects run only in active.
+Long uses follow `approach -> enter -> active -> exit -> free`. Prompt discovery performs only radius and wall checks; A* route construction runs once after the player commits the interaction. Walls still block route and final reach; a 1x1 object has eight perimeter points. The nearest route drains ordinary. Enter/exit preserve motor and affect pose; effects run only in active.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
