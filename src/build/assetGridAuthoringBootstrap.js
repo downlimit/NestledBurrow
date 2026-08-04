@@ -9,7 +9,6 @@ import {
   roundColliderToAssetFootprint,
   snapAssetPlacementPoint,
 } from "./assetGridPlacement.js";
-import { saveStartingLayout } from "./startingLayout.js";
 
 const DIRECT_GRID_PLACEMENTS = new Set(["bed", "facility", "tree"]);
 const GRID_BOOTSTRAP_PATCH = Symbol("nestledBurrowGridAuthoringBootstrap");
@@ -98,15 +97,7 @@ function installGridAuthoringFeedback(panel) {
   teardownGridAuthoringFeedback(panel);
   installRuntimePlacementAdapters(scene);
   installColliderPresentation(scene);
-  const normalizedCount = normalizeLivePlacements(scene);
-  if (normalizedCount > 0) {
-    try {
-      saveStartingLayout(scene, panel.storage);
-      panel.setAuthoringStatus?.(`Расстановка выровнена по клеткам: ${normalizedCount} объектов`);
-    } catch (error) {
-      console.warn("Grid-normalized authoring layout could not be cached", error);
-    }
-  }
+  normalizeLivePlacements(scene);
 
   const keydown = (event) => handleAuthoringNavigationKey(panel, event);
   globalThis.addEventListener?.("keydown", keydown, true);
@@ -268,19 +259,18 @@ function installColliderPresentation(scene) {
 
 function normalizeLivePlacements(scene) {
   const owners = scene.worldLocationRuntime?.getOwners?.() ?? {};
-  let changed = 0;
   const facilityRuntime = owners.facilityRuntime;
   for (const definition of facilityRuntime?.getDefinitions?.() ?? []) {
     const normalized = normalizeFacilityDefinitionToGrid(definition);
-    if (sameFacilityPlacement(definition, normalized)) continue;
-    if (facilityRuntime.replace?.(normalized, { validateFootprint: false })) changed += 1;
+    if (!sameFacilityPlacement(definition, normalized)) {
+      facilityRuntime.replace?.(normalized, { validateFootprint: false });
+    }
   }
 
   const debrisRuntime = owners.debrisRuntime;
   for (const definition of debrisRuntime?.getBedDefinitions?.() ?? []) {
     const normalized = normalizeBedDefinitionToGrid(definition);
-    if (samePoint(definition.position, normalized.position)) continue;
-    if (debrisRuntime.replaceBed?.(normalized)) changed += 1;
+    if (!samePoint(definition.position, normalized.position)) debrisRuntime.replaceBed?.(normalized);
   }
 
   const coordinator = owners.worldBuildCoordinator;
@@ -289,10 +279,8 @@ function normalizeLivePlacements(scene) {
     const normalized = normalizeBuildObjectToGrid(object);
     if (samePoint(object.point, normalized.point)) continue;
     coordinator.removeBuildPlacedObjectById?.(object.id);
-    if (coordinator.restoreBuildPlacedObject?.(normalized)) changed += 1;
-    else coordinator.restoreBuildPlacedObject?.(object);
+    if (!coordinator.restoreBuildPlacedObject?.(normalized)) coordinator.restoreBuildPlacedObject?.(object);
   }
-  return changed;
 }
 
 function sameFacilityPlacement(left, right) {
