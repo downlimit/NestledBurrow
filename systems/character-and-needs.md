@@ -64,7 +64,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Walls block routes; objects expose exact walkable perimeter points. Crossing a point counts as arrival; overlaps rank by aim distance. Enter/exit interpolate presentation without moving the safe motor position. Effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only radius, perimeter and wall checks; A* runs after activation. Activation validates all nearby candidates once and skips unreachable furniture. Walls block routes; objects expose exact walkable perimeter points. Crossing a point counts as arrival; overlaps rank by aim distance. Enter/exit interpolate presentation without moving the safe motor position. Effects run only in active.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -90,4 +90,4 @@ The target need is protected enter through exit; recovery is active-only. Normal
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:interaction`; focused browser E2E.
