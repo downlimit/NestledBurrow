@@ -40,10 +40,10 @@ canvas {
   left: 8px;
   z-index: 20;
   display: grid;
-  gap: 6px;
+  gap: 5px;
   width: min(280px, calc(100vw - 16px));
   max-height: calc(100vh - 48px);
-  padding: 10px;
+  padding: 8px;
   overflow: auto;
   color: #f2eadc;
   background: rgb(23 23 36 / 94%);
@@ -107,8 +107,41 @@ canvas {
 .movement-debug-actions {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
+}
+
+.authoring-debug-section {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid rgb(242 234 220 / 22%);
+  background: rgb(255 255 255 / 3%);
+}
+
+.authoring-debug-caption {
+  margin-top: 2px;
+  color: rgb(242 234 220 / 68%);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.authoring-option-list {
+  display: grid;
+  gap: 2px;
+}
+
+.authoring-option-list label {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 20px;
+  gap: 6px;
+}
+
+.authoring-option-list input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
 }
 
 .collider-debug-editor {
@@ -124,7 +157,8 @@ canvas {
 
 .collider-debug-editor output,
 .collider-debug-editor button:last-child,
-.collider-debug-editor .collider-debug-wide-action {
+.collider-debug-editor .collider-debug-wide-action,
+.collider-debug-editor .interaction-direction-grid {
   grid-column: 1 / -1;
 }
 
@@ -132,4 +166,30 @@ canvas {
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.interaction-direction-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  justify-content: center;
+  gap: 3px;
+}
+
+.interaction-direction-grid[hidden] {
+  display: none;
+}
+
+.interaction-direction-grid button {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+}
+
+.interaction-direction-grid button[data-enabled="true"] {
+  border-color: #63f59a;
+}
+
+.interaction-direction-grid button[data-enabled="false"] {
+  opacity: 0.55;
+  border-color: #ff5f6d;
 }
