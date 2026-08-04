@@ -12,7 +12,8 @@ Owns player-facing construction and developer-facing canonical layout/asset edit
 - canonical objects, browser drafts, newly placed objects and moved objects use the same placement normalization;
 - visual offset and pivot never change occupied cells or repair invalid placement;
 - placement validation uses effective profile colliders;
-- dragged objects keep their grabbed point while the resulting footprint remains grid-aligned;
+- catalog cursor attachment is recalculated from the midpoint between the current authored pivot and current effective collider centre, then the footprint origin is snapped to the grid;
+- moving an existing object retains its grabbed point while the resulting footprint remains grid-aligned;
 - runtime construction is not yet gameplay-persisted.
 
 ## Developer-authoring contract
@@ -23,11 +24,11 @@ Collider, pivot and visual offset support mouse editing and `1 px` keyboard move
 
 Any active edit mode owns directional input, suppresses player translation, clears current velocity and resets the mobile joystick.
 
-Collider rounding uses the selected asset's canonical footprint, aligns it to the nearest whole-cell span and applies `2 px` perimeter padding. A one-cell bed becomes one centred padded cell; multi-cell assets preserve the same padding.
+Collider rounding respects the currently edited draft. Each draft edge is interpreted with the fixed `2 px` wall padding removed, snapped to the nearest full-cell boundary, and padded again. It never substitutes the immutable pre-edit base rectangle. A one-cell outline therefore becomes one centred padded cell; a draft describing two cells remains a two-cell span.
 
 The collider debug layer renders at `40%` of its former opacity. Crop stays inside the sprite source with at least one visible pixel. Procedural visuals reject crop editing. Direction masks keep at least one of eight directions enabled.
 
-Browser storage may hold drafts and backups. Local dev endpoints write checked-in starting-layout and profile defaults. Successful canonical profile save clears current profile drafts and legacy collider overrides. Static hosting retains a recoverable browser draft.
+Browser storage may hold drafts and backups. The versioned asset profile is the only current owner of collider, pivot and related authoring values. Legacy standalone collider data is discarded during migration and after profile edits, so it cannot be reapplied over current values. Local dev endpoints write checked-in starting-layout and profile defaults. Successful canonical profile save clears current profile drafts and legacy collider overrides. Static hosting retains a recoverable browser draft.
 
 The generated starting-layout module owns the canonical default. Temporary staging coordinates fail closed during capture and never become canonical. `NEW GAME` restores the authored baseline.
 
@@ -47,7 +48,9 @@ The generated starting-layout module owns the canonical default. Temporary stagi
 - horizontal and vertical wall colliders remain independent;
 - explicit columns do not duplicate automatic junctions;
 - placeable footprint origins remain exact grid coordinates;
+- cursor attachment uses only current profile geometry and cannot read stale baked anchors;
 - drag anchors affect grab behavior, not footprint alignment;
+- collider rounding preserves the cell span described by the live draft;
 - crop and approach masks are profile-wide across live instances;
 - authoring directional input suppresses character movement;
 - developer authoring stays separate from gameplay persistence;
