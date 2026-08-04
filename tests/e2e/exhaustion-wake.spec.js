@@ -1,0 +1,87 @@
+import { expect, test } from "@playwright/test";
+
+async function bridge(page, method, argument) {
+  return page.evaluate(({ method, argument }) => window.__NESTLED_BURROW_E2E__?.[method]?.(argument), { method, argument });
+}
+
+async function boot(page) {
+  await page.setViewportSize({ width: 320, height: 180 });
+  await page.goto("./");
+  await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 320);
+}
+
+async function tapAlt(page) {
+  await page.keyboard.down("Alt");
+  await page.waitForTimeout(60);
+  await page.keyboard.up("Alt");
+}
+
+async function collapseWithGuaranteedWake(page) {
+  await bridge(page, "setWakeRandomValue", 0);
+  await bridge(page, "setEnergy", 0);
+  await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
+    sleeping: true,
+    exhaustedSleeping: true,
+  });
+  await expect.poll(async () => bridge(page, "getInteractionState")).toMatchObject({
+    candidate: { kind: "wake-exhausted", prompt: "hud:interaction.tryWake" },
+  });
+}
+
+test("manual wake remains available from peaceful and combat inventory modes", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "physical inventory modes are desktop-only");
+  await boot(page);
+
+  await collapseWithGuaranteedWake(page);
+  await expect.poll(async () => bridge(page, "getInteractionHudState")).toMatchObject({
+    suppressed: false,
+    promptVisible: true,
+  });
+  await page.keyboard.press("Space");
+  await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
+    sleeping: false,
+    exhaustedSleeping: false,
+  });
+
+  await tapAlt(page);
+  await expect.poll(async () => (await bridge(page, "getHudState")).inventoryMode).toMatchObject({
+    mode: "COMBAT",
+    stableMode: "COMBAT",
+    transitioning: false,
+  });
+
+  await collapseWithGuaranteedWake(page);
+  await expect.poll(async () => bridge(page, "getInteractionHudState")).toMatchObject({
+    suppressed: false,
+    promptVisible: true,
+  });
+  await page.keyboard.press("Space");
+  await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
+    sleeping: false,
+    exhaustedSleeping: false,
+  });
+});
+
+test("Wild Atoll knockout exposes no manual wake interaction", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "Atoll keyboard route is covered on desktop");
+  await boot(page);
+
+  await bridge(page, "enterTransport", "village-nest-transport");
+  await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("nest");
+  await bridge(page, "placePlayerAt", { x: 11 * 16, y: 7 * 16, facing: { x: 0, y: -1 } });
+  await page.waitForTimeout(120);
+  await page.keyboard.press("Space");
+  await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("atoll");
+
+  await bridge(page, "setEnergy", 0);
+  await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
+    sleeping: true,
+    exhaustedSleeping: true,
+  });
+  await page.waitForTimeout(100);
+  expect((await bridge(page, "getInteractionState")).candidate).toBeNull();
+  await expect.poll(async () => bridge(page, "getInteractionHudState")).toMatchObject({
+    promptVisible: false,
+  });
+});

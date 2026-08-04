@@ -58,7 +58,22 @@ const nestDescriptors = [
   ["nest-stone-small-02", "stone-small", 29, 24],
 ];
 
-function makeResource([id, profileId, cellX, cellY], worldId) {
+export function createResourceDefinition({
+  id,
+  profileId,
+  cell,
+  worldId,
+  roomId = worldId,
+  radius = null,
+  priority = null,
+  requiresFacing = false,
+  facingDotThreshold = -1,
+  targetingMode = "facing-first",
+  targetingGroup = EXTRACTABLE_TARGETING_GROUP,
+} = {}) {
+  if (typeof id !== "string" || id.trim() === "") throw new Error("Resource definition requires a stable ID");
+  if (!cell || !Number.isFinite(cell.x) || !Number.isFinite(cell.y)) throw new Error(`Resource ${id} requires a finite cell`);
+  if (typeof worldId !== "string" || worldId.trim() === "") throw new Error(`Resource ${id} requires a world ID`);
   const profile = getResourceProfile(profileId);
   const collision = profile.collisionRect ?? {
     left: 0,
@@ -66,17 +81,33 @@ function makeResource([id, profileId, cellX, cellY], worldId) {
     right: profile.footprint.width * PLACEMENT_CELL_SIZE,
     bottom: profile.footprint.height * PLACEMENT_CELL_SIZE,
   };
+  const frozenCell = Object.freeze({ x: Number(cell.x), y: Number(cell.y) });
   const position = Object.freeze({
-    x: cellX * PLACEMENT_CELL_SIZE + (collision.left + collision.right) / 2,
-    y: cellY * PLACEMENT_CELL_SIZE + (collision.top + collision.bottom) / 2,
+    x: frozenCell.x * PLACEMENT_CELL_SIZE + (collision.left + collision.right) / 2,
+    y: frozenCell.y * PLACEMENT_CELL_SIZE + (collision.top + collision.bottom) / 2,
   });
   return Object.freeze({
-    id, entityId: id, worldId, roomId: worldId === "village" ? "yard" : "nest", kind: RESOURCE_INTERACTION_KIND, profileId,
-    cell: Object.freeze({ x: cellX, y: cellY }), position,
-    radius: profile.size === "large" ? 36 : 30, priority: profile.kind === "ruby" ? 1.5 : 1,
-    requiresFacing: false, facingDotThreshold: -1, targetingMode: "facing-first", targetingGroup: EXTRACTABLE_TARGETING_GROUP, prompt: profile.prompt,
+    id,
+    entityId: id,
+    worldId,
+    roomId,
+    kind: RESOURCE_INTERACTION_KIND,
+    profileId,
+    cell: frozenCell,
+    position,
+    radius: radius ?? (profile.size === "large" ? 36 : 30),
+    priority: priority ?? (profile.kind === "ruby" ? 1.5 : 1),
+    requiresFacing: Boolean(requiresFacing),
+    facingDotThreshold: Number(facingDotThreshold),
+    targetingMode,
+    targetingGroup,
+    prompt: profile.prompt,
     payload: Object.freeze({ resourceId: id }),
   });
+}
+
+function makeResource([id, profileId, cellX, cellY], worldId) {
+  return createResourceDefinition({ id, profileId, cell: { x: cellX, y: cellY }, worldId, roomId: worldId === "village" ? "yard" : "nest" });
 }
 
 export const RESOURCE_OBJECTS = Object.freeze([

@@ -5,6 +5,7 @@ import { DIALOGUE_DEFINITIONS } from "../src/interaction/dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "../src/interaction/interactionConfig.js";
 import { createGameSessionState } from "../src/session/gameSessionState.js";
 import { FALLBACK_LANGUAGE, LOCALIZATION_NAMESPACES, SUPPORTED_LOCALES, normalizeLanguageCode } from "../src/localization/locales.js";
+import { WILD_ATOLL_LOCALIZATION_KEYS } from "../src/world/wildAtollDomain.js";
 
 const root = "public/locales";
 function flatten(obj, prefix = "") {
@@ -22,12 +23,15 @@ for (const locale of SUPPORTED_LOCALES) {
   for (const ns of LOCALIZATION_NAMESPACES) {
     const entries = new Map(flatten(read(locale, ns)));
     assert.deepEqual([...entries.keys()].sort(), [...primary.get(ns).keys()].sort(), `${locale}/${ns} keys match fallback`);
-    for (const [key, value] of entries) assert(typeof value === "string" && value.trim(), `${locale}/${ns}:${key} is non-empty text`);
+    for (const [key, value] of entries) {
+      assert(typeof value === "string" && value.trim(), `${locale}/${ns}:${key} is non-empty text`);
+    }
   }
 }
 function assertKey(ref) { const [ns, key] = ref.split(":"); assert(primary.get(ns)?.has(key), `fallback contains ${ref}`); }
 for (const dialogue of Object.values(DIALOGUE_DEFINITIONS)) { assertKey(dialogue.speakerKey); for (const line of dialogue.lines) assertKey(line.textKey); }
 for (const definition of INTERACTION_DEFINITIONS) assertKey(definition.promptKey);
+for (const key of WILD_ATOLL_LOCALIZATION_KEYS) assertKey(key);
 assertKey("hud:interaction.next"); assertKey("hud:interaction.close");
 assert.equal(FALLBACK_LANGUAGE, "ru", "clean storage fallback locale is Russian"); assert.equal(normalizeLanguageCode("en-US"), "en"); assert.equal(normalizeLanguageCode("ru-RU"), "ru"); assert.equal(normalizeLanguageCode("fr-FR"), "ru");
 assert(!("language" in createGameSessionState()), "GameSessionState does not contain language preference");
@@ -46,6 +50,21 @@ for (const locale of SUPPORTED_LOCALES) {
   bracesAreBalanced(d.validation.visitorMood);
   assert(d.validation.itemCount.includes("plural"), `${locale} representative plural exists`);
   assert(d.validation.visitorMood.includes("select"), `${locale} representative select exists`);
+  const atollEntries = flatten(read(locale, "hud").atoll);
+  for (const [key, value] of atollEntries) {
+    assert(!value.includes("?"), `${locale}/hud:atoll.${key} does not substitute a question mark for a dash`);
+    assert(value.length <= 40, `${locale}/hud:atoll.${key} stays within the compact HUD text budget`);
+    assert(!/^(?:hud:)?atoll\./.test(value), `${locale}/hud:atoll.${key} is player text, not a technical key`);
+  }
+}
+const terminalNames = {
+  ru: { forest: "КОЧУЮЩИЙ ОСТРОВ", grotto: "БЛУЖДАЮЩИЙ ОСТРОВ" },
+  en: { forest: "ROVING ISLAND", grotto: "WANDERING ISLAND" },
+};
+for (const locale of SUPPORTED_LOCALES) {
+  const atoll = read(locale, "atoll");
+  assert.equal(atoll.arenas["forested-isthmus"].edge, terminalNames[locale].forest, `${locale} forest NPC threshold is the reached island itself`);
+  assert.equal(atoll.arenas["shadow-isthmus"].edge, terminalNames[locale].grotto, `${locale} grotto NPC threshold is the reached island itself`);
 }
 for (const file of ["src/interaction/dialogueConfig.js", "src/interaction/interactionConfig.js", "src/interaction/interactionRuntime.js", "src/ui/interactionHud.js"]) {
   const text = readFileSync(file, "utf8");
@@ -63,6 +82,9 @@ assert(mainSource.includes('import "@fontsource/pixelify-sans/cyrillic.css"'), "
 for (const forbidden of [".ttf", ".otf", ".woff", ".woff2"]) {
   assert(!mainSource.includes(`public/assets/fonts/pixelify-sans`) && !mainSource.includes(forbidden), `runtime does not reference committed font binary ${forbidden}`);
 }
+const localizationSource = readFileSync("src/localization/index.js", "utf8");
+assert(localizationSource.includes("VITE_BUILD_ID"), "locale requests are versioned by the current build");
+assert(localizationSource.includes("{{ns}}.json?v="), "locale backend bypasses stale preview caches");
 for (const locale of SUPPORTED_LOCALES) {
   const hud = read(locale, "hud");
   assert.equal(hud.language.current, locale.toUpperCase(), `${locale} language button exposes only current language code`);

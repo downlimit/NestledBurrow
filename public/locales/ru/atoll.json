@@ -1,0 +1,255 @@
+{
+  "arrival": "Вы вошли в Дикий Атолл.",
+  "leftRun": "Вы вернулись в Островное Гнездо.",
+  "promptEnter": "SPACE - ДИКИЙ АТОЛЛ",
+  "segments": {
+    "starter": "ПЕРВЫЕ ТРОПЫ",
+    "sereneSkerries": "БЕЗМЯТЕЖНЫЕ ШХЕРЫ",
+    "forestedIsthmus": "ЛЕСИСТАЯ ПЕРЕЙМА",
+    "deepSkerries": "ДРЕМУЧИЕ ШХЕРЫ",
+    "motu": "МОТУ",
+    "fearsomeSkerries": "ГРОЗНЫЕ ШХЕРЫ",
+    "sereneGrotto": "БЕЗМЯТЕЖНЫЙ ГРОТ",
+    "shadowIsthmus": "ТЕНЕВАЯ ПЕРЕЙМА",
+    "deepGrotto": "ГЛУБОКИЙ ГРОТ",
+    "blueHole": "ГОЛУБАЯ ДЫРА",
+    "relictGrotto": "РЕЛИКТОВЫЙ ГРОТ"
+  },
+  "segmentPaths": {
+    "serene-skerries": "SPACE - В БЕЗМЯТЕЖНЫЕ ШХЕРЫ",
+    "forested-isthmus": "SPACE - НА ЛЕСИСТУЮ ПЕРЕЙМУ",
+    "deep-skerries": "SPACE - В ДРЕМУЧИЕ ШХЕРЫ",
+    "motu": "SPACE - В МОТУ",
+    "fearsome-skerries": "SPACE - В ГРОЗНЫЕ ШХЕРЫ",
+    "serene-grotto": "SPACE - В БЕЗМЯТЕЖНЫЙ ГРОТ",
+    "shadow-isthmus": "SPACE - НА ТЕНЕВУЮ ПЕРЕЙМУ",
+    "deep-grotto": "SPACE - В ГЛУБОКИЙ ГРОТ",
+    "blue-hole": "SPACE - В ГОЛУБУЮ ДЫРУ",
+    "relict-grotto": "SPACE - В РЕЛИКТОВЫЙ ГРОТ"
+  },
+  "arenas": {
+    "starter": {
+      "root": "КРАЙ",
+      "left1": "ПОЛЯНА",
+      "right1": "КАМНИ",
+      "left2": "ПРУД",
+      "right2": "ЗАРОСЛИ",
+      "left3": "КОРНИ",
+      "right3": "ОСЫПЬ",
+      "edge": "ПЕРЕВАЛ"
+    },
+    "serene-skerries": {
+      "root": "ТИХАЯ ОПУШКА",
+      "left1": "СВЕТЛАЯ ПОЛЯНА",
+      "right1": "БЕРЁЗОВЫЙ СКЛОН",
+      "left2": "РУЧЕЙ",
+      "right2": "ПАПОРОТНИКИ",
+      "left3": "МЯГКИЙ МОХ",
+      "right3": "СОЛНЕЧНАЯ КРОМКА",
+      "edge": "ДАЛЬНИЙ БЕРЕГ"
+    },
+    "forested-isthmus": {
+      "root": "ЛЕСНАЯ ПЕРЕМЫЧКА",
+      "left1": "ЗЕЛЁНЫЙ ОТРОГ",
+      "right1": "ТРОПА СЛЕДОВ",
+      "left2": "ДЫМНАЯ ГРЯДА",
+      "right2": "ПАРЯЩАЯ КРОМКА",
+      "left3": "ЧУЖОЙ ФОНАРЬ",
+      "right3": "УЗКАЯ ПЕРЕЙМА",
+      "edge": "КОЧУЮЩИЙ ОСТРОВ"
+    },
+    "deep-skerries": {
+      "root": "ЗАТЕНЁННАЯ ОПУШКА",
+      "left1": "СОСНОВАЯ ГРЯДА",
+      "right1": "БУРЕЛОМ",
+      "left2": "МХОВАЯ ЛОЖБИНА",
+      "right2": "ГУСТАЯ ЧАЩА",
+      "left3": "КОРНЕВОЙ ХОД",
+      "right3": "КАМЕННЫЙ РУЧЕЙ",
+      "edge": "ДАЛЬНЯЯ КРОМКА"
+    },
+    "motu": {
+      "root": "БЕРЕГ МОТУ",
+      "left1": "КАМНИ ДУШ",
+      "right1": "ТИХИЕ ИДОЛЫ",
+      "left2": "ЖИВОЙ КРИСТАЛЛ",
+      "right2": "САД ОБЛОМКОВ",
+      "left3": "СВЕТЯЩАЯСЯ ЖИЛА",
+      "right3": "КРУГ КАМНЕЙ",
+      "edge": "СЕРДЦЕ МОТУ"
+    },
+    "fearsome-skerries": {
+      "root": "ГРОЗОВОЙ БЕРЕГ",
+      "left1": "МЁРТВЫЕ СОСНЫ",
+      "right1": "СЛЕД БЕЗ ЗВЕРЯ",
+      "left2": "ЧЁРНЫЙ БУРЕЛОМ",
+      "right2": "ШЕПОЧУЩАЯ ЧАЩА",
+      "left3": "ХИЩНАЯ ТРОПА",
+      "right3": "БЕЗМОЛВНЫЕ КОРНИ",
+      "edge": "КРАЙ БУРИ"
+    },
+    "serene-grotto": {
+      "root": "ТИХИЙ ВХОД",
+      "left1": "ПЕСЧАНЫЙ ХОД",
+      "right1": "СУХАЯ ГАЛЕРЕЯ",
+      "left2": "СВЕТЛЫЙ ЗАЛ",
+      "right2": "КАМЕННАЯ АРКА",
+      "left3": "НЕГЛУБОКИЙ СПУСК",
+      "right3": "ТИХАЯ ТРЕЩИНА",
+      "edge": "ДАЛЬНИЙ СВОД"
+    },
+    "shadow-isthmus": {
+      "root": "ТЕНЕВАЯ ПЕРЕМЫЧКА",
+      "left1": "КАМЕННЫЙ ОТРОГ",
+      "right1": "СЛЕДЫ В ПЫЛИ",
+      "left2": "ГЛУХОЙ ЗВОН",
+      "right2": "ЧУЖОЙ ОГОНЬ",
+      "left3": "ПАРЯЩАЯ ОСЫПЬ",
+      "right3": "РАЗОРВАННАЯ ПЕРЕЙМА",
+      "edge": "БЛУЖДАЮЩИЙ ОСТРОВ"
+    },
+    "deep-grotto": {
+      "root": "НИЖНИЙ ВХОД",
+      "left1": "ТЁМНАЯ ГАЛЕРЕЯ",
+      "right1": "СТАРЫЙ ОБВАЛ",
+      "left2": "ГЛУБОКИЙ ЗАЛ",
+      "right2": "УЗКИЙ ХОД",
+      "left3": "НИЖНИЙ СПУСК",
+      "right3": "ХОЛОДНАЯ ТРЕЩИНА",
+      "edge": "ДАЛЬНИЙ СВОД"
+    },
+    "blue-hole": {
+      "root": "СИНИЙ СПУСК",
+      "left1": "МАГНИТНАЯ ЖИЛА",
+      "right1": "МЕДНЫЙ ЗВОН",
+      "left2": "ЧЁРНЫЙ СПЛАВ",
+      "right2": "ИСКРЯЩИЙСЯ КАМЕНЬ",
+      "left3": "ПОЛЮСНЫЙ ЗАЛ",
+      "right3": "ГРОЗОВАЯ ТРЕЩИНА",
+      "edge": "ДНО ДЫРЫ"
+    },
+    "relict-grotto": {
+      "root": "РЕЛИКТОВЫЙ ВХОД",
+      "left1": "ЗАЛ БЕЗ ЭХА",
+      "right1": "СЛЕПАЯ ЖИЛА",
+      "left2": "НЕЧЕЙ АЛТАРЬ",
+      "right2": "ДЫШАЩИЙ КАМЕНЬ",
+      "left3": "ХОД БЕЗ СЛЕДОВ",
+      "right3": "ЧЁРНЫЙ ПРОВАЛ",
+      "edge": "ДРЕВНИЙ ПРЕДЕЛ"
+    }
+  },
+  "paths": {
+    "nest": "SPACE - В ГНЕЗДО",
+    "starter": {
+      "root": "SPACE - КРАЙ",
+      "left1": "SPACE - ПОЛЯНА",
+      "right1": "SPACE - КАМНИ",
+      "left2": "SPACE - ПРУД",
+      "right2": "SPACE - ЗАРОСЛИ",
+      "left3": "SPACE - КОРНИ",
+      "right3": "SPACE - ОСЫПЬ",
+      "edge": "SPACE - ПЕРЕВАЛ"
+    },
+    "serene-skerries": {
+      "root": "SPACE - ТИХАЯ ОПУШКА",
+      "left1": "SPACE - СВЕТЛАЯ ПОЛЯНА",
+      "right1": "SPACE - БЕРЁЗОВЫЙ СКЛОН",
+      "left2": "SPACE - РУЧЕЙ",
+      "right2": "SPACE - ПАПОРОТНИКИ",
+      "left3": "SPACE - МЯГКИЙ МОХ",
+      "right3": "SPACE - СОЛНЕЧНАЯ КРОМКА",
+      "edge": "SPACE - ДАЛЬНИЙ БЕРЕГ"
+    },
+    "forested-isthmus": {
+      "root": "SPACE - ЛЕСНАЯ ПЕРЕМЫЧКА",
+      "left1": "SPACE - ЗЕЛЁНЫЙ ОТРОГ",
+      "right1": "SPACE - ТРОПА СЛЕДОВ",
+      "left2": "SPACE - ДЫМНАЯ ГРЯДА",
+      "right2": "SPACE - ПАРЯЩАЯ КРОМКА",
+      "left3": "SPACE - ЧУЖОЙ ФОНАРЬ",
+      "right3": "SPACE - УЗКАЯ ПЕРЕЙМА",
+      "edge": "SPACE - КОЧУЮЩИЙ ОСТРОВ"
+    },
+    "deep-skerries": {
+      "root": "SPACE - ЗАТЕНЁННАЯ ОПУШКА",
+      "left1": "SPACE - СОСНОВАЯ ГРЯДА",
+      "right1": "SPACE - БУРЕЛОМ",
+      "left2": "SPACE - МХОВАЯ ЛОЖБИНА",
+      "right2": "SPACE - ГУСТАЯ ЧАЩА",
+      "left3": "SPACE - КОРНЕВОЙ ХОД",
+      "right3": "SPACE - КАМЕННЫЙ РУЧЕЙ",
+      "edge": "SPACE - ДАЛЬНЯЯ КРОМКА"
+    },
+    "motu": {
+      "root": "SPACE - БЕРЕГ МОТУ",
+      "left1": "SPACE - КАМНИ ДУШ",
+      "right1": "SPACE - ТИХИЕ ИДОЛЫ",
+      "left2": "SPACE - ЖИВОЙ КРИСТАЛЛ",
+      "right2": "SPACE - САД ОБЛОМКОВ",
+      "left3": "SPACE - СВЕТЯЩАЯСЯ ЖИЛА",
+      "right3": "SPACE - КРУГ КАМНЕЙ",
+      "edge": "SPACE - СЕРДЦЕ МОТУ"
+    },
+    "fearsome-skerries": {
+      "root": "SPACE - ГРОЗОВОЙ БЕРЕГ",
+      "left1": "SPACE - МЁРТВЫЕ СОСНЫ",
+      "right1": "SPACE - СЛЕД БЕЗ ЗВЕРЯ",
+      "left2": "SPACE - ЧЁРНЫЙ БУРЕЛОМ",
+      "right2": "SPACE - ШЕПОЧУЩАЯ ЧАЩА",
+      "left3": "SPACE - ХИЩНАЯ ТРОПА",
+      "right3": "SPACE - БЕЗМОЛВНЫЕ КОРНИ",
+      "edge": "SPACE - КРАЙ БУРИ"
+    },
+    "serene-grotto": {
+      "root": "SPACE - ТИХИЙ ВХОД",
+      "left1": "SPACE - ПЕСЧАНЫЙ ХОД",
+      "right1": "SPACE - СУХАЯ ГАЛЕРЕЯ",
+      "left2": "SPACE - СВЕТЛЫЙ ЗАЛ",
+      "right2": "SPACE - КАМЕННАЯ АРКА",
+      "left3": "SPACE - НЕГЛУБОКИЙ СПУСК",
+      "right3": "SPACE - ТИХАЯ ТРЕЩИНА",
+      "edge": "SPACE - ДАЛЬНИЙ СВОД"
+    },
+    "shadow-isthmus": {
+      "root": "SPACE - ТЕНЕВАЯ ПЕРЕМЫЧКА",
+      "left1": "SPACE - КАМЕННЫЙ ОТРОГ",
+      "right1": "SPACE - СЛЕДЫ В ПЫЛИ",
+      "left2": "SPACE - ГЛУХОЙ ЗВОН",
+      "right2": "SPACE - ЧУЖОЙ ОГОНЬ",
+      "left3": "SPACE - ПАРЯЩАЯ ОСЫПЬ",
+      "right3": "SPACE - РАЗОРВАННАЯ ПЕРЕЙМА",
+      "edge": "SPACE - БЛУЖДАЮЩИЙ ОСТРОВ"
+    },
+    "deep-grotto": {
+      "root": "SPACE - НИЖНИЙ ВХОД",
+      "left1": "SPACE - ТЁМНАЯ ГАЛЕРЕЯ",
+      "right1": "SPACE - СТАРЫЙ ОБВАЛ",
+      "left2": "SPACE - ГЛУБОКИЙ ЗАЛ",
+      "right2": "SPACE - УЗКИЙ ХОД",
+      "left3": "SPACE - НИЖНИЙ СПУСК",
+      "right3": "SPACE - ХОЛОДНАЯ ТРЕЩИНА",
+      "edge": "SPACE - ДАЛЬНИЙ СВОД"
+    },
+    "blue-hole": {
+      "root": "SPACE - СИНИЙ СПУСК",
+      "left1": "SPACE - МАГНИТНАЯ ЖИЛА",
+      "right1": "SPACE - МЕДНЫЙ ЗВОН",
+      "left2": "SPACE - ЧЁРНЫЙ СПЛАВ",
+      "right2": "SPACE - ИСКРЯЩИЙСЯ КАМЕНЬ",
+      "left3": "SPACE - ПОЛЮСНЫЙ ЗАЛ",
+      "right3": "SPACE - ГРОЗОВАЯ ТРЕЩИНА",
+      "edge": "SPACE - ДНО ДЫРЫ"
+    },
+    "relict-grotto": {
+      "root": "SPACE - РЕЛИКТОВЫЙ ВХОД",
+      "left1": "SPACE - ЗАЛ БЕЗ ЭХА",
+      "right1": "SPACE - СЛЕПАЯ ЖИЛА",
+      "left2": "SPACE - НЕЧЕЙ АЛТАРЬ",
+      "right2": "SPACE - ДЫШАЩИЙ КАМЕНЬ",
+      "left3": "SPACE - ХОД БЕЗ СЛЕДОВ",
+      "right3": "SPACE - ЧЁРНЫЙ ПРОВАЛ",
+      "edge": "SPACE - ДРЕВНИЙ ПРЕДЕЛ"
+    }
+  }
+}

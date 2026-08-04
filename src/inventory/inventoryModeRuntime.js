@@ -395,6 +395,7 @@ export function createInventoryModeRuntime(scene, {
       ...state,
       transitioning,
       interactionBlocked: !state.suppressed
+        && !scene.exhaustedSleeping
         && (transitioning || state.altDown || state.mode !== INVENTORY_MODES.PEACEFUL),
       holdThresholdMs: ALT_HOLD_THRESHOLD_MS,
       transitionMs: INVENTORY_MODE_TRANSITION_MS,
@@ -448,7 +449,6 @@ function renderPeacefulEar(graphics) {
   drawBitmapTextInto(graphics, PEACEFUL_EAR_AREA.x + 1, PEACEFUL_EAR_AREA.y + 13, "E", { shadow: 0 });
   drawFilledArrow(graphics, PEACEFUL_EAR_AREA.x + 7, PEACEFUL_EAR_AREA.y + 14, 1);
 }
-
 
 function drawFilledArrow(graphics, x, y, direction) {
   const pixels = direction < 0

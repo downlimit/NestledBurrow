@@ -102,24 +102,49 @@ export class WorldLocationCoordinator {
   transition(transition) {
     const destinationDefinition = getWorldLocationDefinition(transition.destinationWorldId);
     if (!destinationDefinition || this.switching || this.destroyed) return { status: "invalid", transitioned: false };
+    const nextLayout = this.prepareLayout(destinationDefinition);
+    const destinationTransport = nextLayout.transitions.find(({ id }) => id === transition.destinationTransportId);
+    if (!destinationTransport) throw new Error(`Missing destination transport: ${transition.destinationTransportId}`);
+    return this.performTransition({
+      destinationDefinition,
+      nextLayout,
+      spawn: destinationTransport.safeSpawn,
+      lockedTransportId: destinationTransport.id,
+    });
+  }
+
+  transitionTo(worldId, spawn = null) {
+    if (this.switching || this.destroyed) return { status: "invalid", transitioned: false };
+    if (!this.canTransition()) return { status: "suppressed", transitioned: false };
+    const destinationDefinition = getWorldLocationDefinition(worldId);
+    if (!destinationDefinition) return { status: "invalid", transitioned: false };
+    const nextLayout = this.prepareLayout(destinationDefinition);
+    const resolvedSpawn = spawn ?? destinationDefinition.loadSpawn ?? nextLayout.spawn;
+    if (!resolvedSpawn) throw new Error(`Missing explicit spawn for world: ${destinationDefinition.id}`);
+    return this.performTransition({
+      destinationDefinition,
+      nextLayout,
+      spawn: resolvedSpawn,
+      lockedTransportId: null,
+    });
+  }
+
+  performTransition({ destinationDefinition, nextLayout, spawn, lockedTransportId }) {
     this.switching = true;
     const previousDefinition = this.activeDefinition;
     const previousLayout = this.activeLayout;
+    const nextSpawn = clonePoint(spawn);
     try {
       this.beforeLocationChange({ definition: previousDefinition, layout: previousLayout });
-      const nextLayout = this.prepareLayout(destinationDefinition);
-      const destinationTransport = nextLayout.transitions.find(({ id }) => id === transition.destinationTransportId);
-      if (!destinationTransport) throw new Error(`Missing destination transport: ${transition.destinationTransportId}`);
-      const spawn = clonePoint(destinationTransport.safeSpawn);
       this.activeDefinition = destinationDefinition;
       this.activeLayout = nextLayout;
       this.sessionState.currentWorldId = destinationDefinition.id;
       this.applyLocationLayout({ definition: destinationDefinition, layout: nextLayout });
-      this.resetPlayer(spawn);
+      this.resetPlayer(nextSpawn);
       this.setCameraBounds(nextLayout.bounds);
-      this.resetCamera(spawn);
+      this.resetCamera(nextSpawn);
       this.afterLocationChange({ definition: destinationDefinition, layout: nextLayout });
-      this.lockedTransportId = destinationTransport.id;
+      this.lockedTransportId = lockedTransportId;
       this.refreshInteractions();
       this.saveSession();
       return { status: "transitioned", transitioned: true, worldId: destinationDefinition.id };

@@ -92,20 +92,24 @@ Player-visible gameplay, UI, input, localization, animation, audio и assets т�
 
 Codex никогда не генерирует, не дорисовывает, не интерпретирует, не заменяет и не подготавливает игровые изображения.
 
-Любая новая графика проходит Lead asset-preparation route:
+Художественная подготовка принадлежит отдельной роли Художника и выполняется по `ARTIST.md`. Лид владеет только игровой функцией asset, scope boundary, обязательными states/footprint и интеграционным acceptance.
 
-1. определить обязательные бинарники и проверить существующие assets;
-2. самостоятельно подготовить отсутствующие изображения;
-3. проверить native grid, transparency, frame order, palette, provenance и лицензию;
-4. закоммитить immutable binaries в canonical paths;
-5. зафиксировать dimensions, byte length, SHA-256 и manifest;
-6. сделать read-back и только затем выдать code-only integration task по `BINARY_IMPORT.md`.
+Если для задачи нужен новый visual binary:
 
-Для pixel art визуальная «пиксельность» не является доказательством native asset. Крупный raster с blur, glow, antialiasing, фоном, подписями или нецелочисленным масштабом — concept/reference; его запрещено уменьшать, нарезать или выдавать за runtime spritesheet.
+1. Лид проверяет существующие assets и формулирует невосстановимые ограничения: назначение, примерный footprint, states, collision/anchor и требуемый owner;
+2. пользователь явно переключает текущий чат в роль Художника либо открывает отдельный Artist-чат;
+3. Художник подготавливает варианты, получает visual approval, создаёт native asset и доставляет immutable binary в canonical path;
+4. Художник фиксирует dimensions, footprint/frame grid, byte length, SHA-256 и provenance;
+5. Лид выполняет read-back из подтверждённого Base SHA;
+6. только затем Лид выдаёт code-only integration task по `BINARY_IMPORT.md`.
 
-Runtime binary создаётся на точной native frame grid либо из пикселей принятого native-grid источника. До handoff Лид декодирует PNG, проверяет dimensions, RGBA/alpha, frame bounds/order и показывает nearest-neighbor contact sheet, построенный из финального binary.
+Лид не назначает случайный путь заранее. Он указывает owner или реализационное ограничение, а Художник проверяет фактическую canonical folder и naming convention по соседним assets.
 
-Явная просьба создать графику не передаёт её изготовление Codex. Если обязательного бинарника нет в подтверждённом Base SHA, задача заблокирована: нельзя выдавать placeholder, будущий путь или разрешение изготовить замену.
+Для pixel art визуальная «пиксельность» не является доказательством native asset. Крупный raster с blur, glow, antialiasing, фоном, подписями или нецелочисленным масштабом — concept/reference; его запрещено выдавать за runtime sprite.
+
+Runtime binary создаётся на точной native frame grid по `ARTIST.md`. До Codex handoff должны быть проверены dimensions, RGBA/alpha, frame bounds/order, byte length, SHA-256 и integer nearest-neighbor preview.
+
+Явная просьба создать графику не передаёт её изготовление Codex. Если обязательного binary нет в подтверждённом Base SHA, integration task заблокирована: нельзя выдавать placeholder, будущий путь или разрешение изготовить замену.
 
 Постоянная загрузка:
 [Загрузить файлы в `asset-inbox/incoming`](https://github.com/downlimit/NestledBurrow/upload/asset-inbox/incoming)

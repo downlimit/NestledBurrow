@@ -50,7 +50,12 @@ export function createToiletAccidentTimelineRuntime({
         if (state.elapsedMs < phaseDuration) continue;
         state.phase = TOILET_ACCIDENT_PHASE.recovery;
         state.elapsedMs = 0;
-        state.puddleOutput = Object.freeze({ type: "toilet-accident-puddle", localPuddle: true, witnessed: state.witnessed });
+        state.puddleOutput = Object.freeze({
+          type: "toilet-accident-puddle",
+          localPuddle: true,
+          witnessed: state.witnessed,
+          position: Object.freeze({ x: state.basePose.x, y: state.basePose.y }),
+        });
         setPresentationPose(state.basePose);
         onPuddle(state.puddleOutput);
         onRecoveryProgress(0);

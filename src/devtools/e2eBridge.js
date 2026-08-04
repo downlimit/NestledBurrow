@@ -263,6 +263,7 @@ export function installWorldE2EBridge(scene) {
       needsRuntime: clone(scene.needsRuntime?.getState?.() ?? {}),
       interactionTimeline: clone(getLocationOwners().needsInteractionCoordinator?.getState?.() ?? {}),
     }),
+    getPuddleState: () => clone(scene.puddleRuntime?.getState?.() ?? []),
     setWorldTimeSeconds: (value) => {
       const seconds = Math.max(0, Number(value) || 0);
       scene.sessionState.gameplay.worldTimeSeconds = seconds;

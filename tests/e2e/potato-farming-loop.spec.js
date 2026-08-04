@@ -238,10 +238,18 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   }]);
   await bridge(page, "setFarmingRandomValue", 0.999999);
   await faceFarmCell(page);
-  await bridge(page, "advanceGameplayTime", 1_440_000);
+  for (let period = 0; period < 3; period += 1) {
+    await bridge(page, "setNeeds", {
+      novelty: 100,
+      satiety: 100,
+      toilet: 100,
+      lustre: 100,
+      dialogue: 100,
+    });
+    await bridge(page, "setEnergy", 100);
+    await bridge(page, "advanceGameplayTime", 480_000);
+  }
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.mature).toBe(true);
-  await bridge(page, "setEnergy", 100);
-  await bridge(page, "wakeUp");
   await expect.poll(async () => (await bridge(page, "getRuntimeState")).sleeping).toBe(false);
   await bridge(page, "selectInventorySlot", seedSlot);
   await faceFarmCell(page);

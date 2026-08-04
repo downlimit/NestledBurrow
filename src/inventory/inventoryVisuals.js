@@ -19,6 +19,12 @@ export function drawInventoryItem(graphics, itemId, options = {}) {
     drawRuby(graphics, 0, options);
     return graphics;
   }
+  if (itemId === "berry") {
+    graphics.fillStyle(color(0x315c32), 1).fillRect(4, 7, 9, 6).fillRect(6, 4, 5, 8);
+    graphics.fillStyle(color(0x7650a6), 1).fillRect(5, 8, 3, 3).fillRect(9, 6, 3, 3).fillRect(9, 10, 3, 3);
+    graphics.fillStyle(color(0xc0a0df), 1).fillRect(5, 8, 1, 1).fillRect(9, 6, 1, 1).fillRect(9, 10, 1, 1);
+    return graphics;
+  }
   graphics.fillStyle(color(0x4a332a), 1).fillRect(3, 3, 10, 10);
   graphics.fillStyle(color(0xf2eadc), 0.9).fillRect(7, 5, 2, 5).fillRect(7, 12, 2, 2);
   return graphics;
