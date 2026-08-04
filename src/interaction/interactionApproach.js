@@ -1,4 +1,5 @@
 import { createActorNavigation, findGridPath } from "../tavern/gridPathfinder.js";
+import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "./interactionDirections.js";
 
 export const INTERACTION_NAVIGATION_CELL_SIZE = 16;
 
@@ -34,9 +35,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
     }
 
     const collider = interactionCollider(worldLayout, definition);
-    const points = collider
-      ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
-      : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+    const points = interactionPoints(definition, collider);
     const nearest = points
       .flatMap((point) => {
         const distance = Math.hypot(
@@ -67,9 +66,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
     if (definition.targetingMode === "facing-first") return probe(definition, sourceSnapshot);
     const player = getPlayer();
     const collider = interactionCollider(worldLayout, definition);
-    const points = collider
-      ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
-      : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+    const points = interactionPoints(definition, collider);
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
     const nearbyPoints = points.filter((point) => (
@@ -119,6 +116,14 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
   }
 
   return Object.freeze({ probe, resolve });
+}
+
+function interactionPoints(definition, collider) {
+  if (!collider) return definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+  const enabledDirections = new Set(normalizeInteractionDirections(definition.interactionDirections));
+  return perimeterInteractionPointEntries(collider, INTERACTION_NAVIGATION_CELL_SIZE)
+    .filter(({ direction }) => enabledDirections.has(direction))
+    .map(({ point }) => point);
 }
 
 function connectExactApproachPoint(start, gridPath, point, navigation) {
@@ -190,19 +195,45 @@ function segmentIntersectsRect(start, goal, rect) {
   return maximum >= 0 && minimum <= 1;
 }
 
-export function perimeterInteractionPoints(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+export function perimeterInteractionPointEntries(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
   const width = Math.max(1, Math.ceil((bounds.right - bounds.left) / cellSize));
   const height = Math.max(1, Math.ceil((bounds.bottom - bounds.top) / cellSize));
-  const points = [];
+  const entries = [];
   for (let x = -1; x <= width; x += 1) {
-    points.push({ x: bounds.left + (x + 0.5) * cellSize, y: bounds.top - cellSize / 2 });
-    points.push({ x: bounds.left + (x + 0.5) * cellSize, y: bounds.top + (height + 0.5) * cellSize });
+    entries.push({
+      direction: x === -1 ? "top-left" : x === width ? "top-right" : "top",
+      point: { x: bounds.left + (x + 0.5) * cellSize, y: bounds.top - cellSize / 2 },
+    });
+    entries.push({
+      direction: x === -1 ? "bottom-left" : x === width ? "bottom-right" : "bottom",
+      point: { x: bounds.left + (x + 0.5) * cellSize, y: bounds.top + (height + 0.5) * cellSize },
+    });
   }
   for (let y = 0; y < height; y += 1) {
-    points.push({ x: bounds.left - cellSize / 2, y: bounds.top + (y + 0.5) * cellSize });
-    points.push({ x: bounds.left + (width + 0.5) * cellSize, y: bounds.top + (y + 0.5) * cellSize });
+    entries.push({
+      direction: "left",
+      point: { x: bounds.left - cellSize / 2, y: bounds.top + (y + 0.5) * cellSize },
+    });
+    entries.push({
+      direction: "right",
+      point: { x: bounds.left + (width + 0.5) * cellSize, y: bounds.top + (y + 0.5) * cellSize },
+    });
   }
-  return Object.freeze(points.map(Object.freeze));
+  return Object.freeze(entries.map(({ direction, point }) => Object.freeze({
+    direction,
+    point: Object.freeze(point),
+  })));
+}
+
+export function perimeterInteractionPoints(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  return Object.freeze(perimeterInteractionPointEntries(bounds, cellSize).map(({ point }) => point));
+}
+
+export function filterPerimeterInteractionPoints(bounds, directions = INTERACTION_APPROACH_DIRECTIONS, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  const enabled = new Set(normalizeInteractionDirections(directions));
+  return Object.freeze(perimeterInteractionPointEntries(bounds, cellSize)
+    .filter(({ direction }) => enabled.has(direction))
+    .map(({ point }) => point));
 }
 
 function pathDistance(start, path) {
