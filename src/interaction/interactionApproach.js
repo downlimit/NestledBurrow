@@ -1,3 +1,4 @@
+import PROJECT_ASSET_PROFILES from "../build/assetProfilesDefault.js";
 import { createActorNavigation, findGridPath } from "../tavern/gridPathfinder.js";
 import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "./interactionDirections.js";
 
@@ -120,10 +121,24 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
 
 function interactionPoints(definition, collider) {
   if (!collider) return definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
-  const enabledDirections = new Set(normalizeInteractionDirections(definition.interactionDirections));
+  const enabledDirections = new Set(normalizeInteractionDirections(interactionDirectionsFor(definition)));
   return perimeterInteractionPointEntries(collider, INTERACTION_NAVIGATION_CELL_SIZE)
     .filter(({ direction }) => enabledDirections.has(direction))
     .map(({ point }) => point);
+}
+
+function interactionDirectionsFor(definition) {
+  if (definition.interactionDirections) return definition.interactionDirections;
+  const profileKey = interactionProfileKey(definition);
+  return PROJECT_ASSET_PROFILES?.profiles?.[profileKey]?.interactionDirections
+    ?? INTERACTION_APPROACH_DIRECTIONS;
+}
+
+function interactionProfileKey(definition) {
+  if (definition?.facilityType) return `facility:${definition.facilityType}`;
+  if (definition?.profileId) return `resource:${definition.profileId}`;
+  if (definition?.payload?.bedId || String(definition?.id ?? "").includes("bed")) return "furniture:bed";
+  return null;
 }
 
 function connectExactApproachPoint(start, gridPath, point, navigation) {
