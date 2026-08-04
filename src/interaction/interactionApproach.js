@@ -1,4 +1,5 @@
 import PROJECT_ASSET_PROFILES from "../build/assetProfilesDefault.js";
+import { PLACEABLE_TARGETING_GROUP } from "../build/liveAssetGeometry.js";
 import { createActorNavigation, findGridPath } from "../tavern/gridPathfinder.js";
 import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "./interactionDirections.js";
 
@@ -8,6 +9,15 @@ const GRID_EDGE_EPSILON = 0.000001;
 function finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
+}
+
+function colliderTargeting(collider) {
+  return collider ? Object.freeze({
+    requiresFacing: true,
+    facingDotThreshold: 0,
+    targetingMode: "facing-first",
+    targetingGroup: PLACEABLE_TARGETING_GROUP,
+  }) : Object.freeze({});
 }
 
 export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
@@ -65,6 +75,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         aimPosition.y - sourceSnapshot.position.y,
       ),
       payload: { ...definition.payload },
+      ...colliderTargeting(collider),
     };
   }
 
@@ -119,6 +130,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         aimPosition.y - sourceSnapshot.position.y,
       ),
       payload: { ...definition.payload, approachPoint: nearest.point, approachPath: nearest.path },
+      ...colliderTargeting(collider),
     };
   }
 
