@@ -14,6 +14,7 @@ export function createNeedsInteractionCoordinator({
   isSleeping = () => false,
   toiletAccidentTuning,
   onToiletAccident = () => {},
+  onToiletAccidentPuddle = () => {},
   onToiletAccidentRecovery = () => {},
   refresh = () => {},
 } = {}) {
@@ -34,7 +35,10 @@ export function createNeedsInteractionCoordinator({
       originY: 1,
     }),
     setPresentationPose: (pose) => getPlayer().visual.setPresentationPose(pose),
-    onPuddle: (event) => onToiletAccident(event),
+    onPuddle: (event) => {
+      onToiletAccident(event);
+      onToiletAccidentPuddle(event);
+    },
     onRecoveryProgress: (progress) => onToiletAccidentRecovery(progress),
     onComplete: completeAccidentTransition,
   });
