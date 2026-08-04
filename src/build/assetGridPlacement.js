@@ -37,6 +37,13 @@ export function snapAssetPlacementPoint(point, gridSize = TILE_SIZE) {
   });
 }
 
+export function snapAssetPlacementFromAnchor(pointer, anchorOffset = { x: 0, y: 0 }, gridSize = TILE_SIZE) {
+  return snapAssetPlacementPoint({
+    x: finite(pointer?.x) - finite(anchorOffset?.x),
+    y: finite(pointer?.y) - finite(anchorOffset?.y),
+  }, gridSize);
+}
+
 export function isAssetPlacementAligned(point, gridSize = TILE_SIZE) {
   const snapped = snapAssetPlacementPoint(point, gridSize);
   return snapped.x === finite(point?.x) && snapped.y === finite(point?.y);
@@ -64,16 +71,31 @@ export function snapAssetFootprintBounds(bounds, gridSize = TILE_SIZE) {
   });
 }
 
+function snapOutlinedAxis(start, end, gridSize, padding) {
+  const outerStart = finite(start) - padding;
+  const outerEnd = finite(end) + padding;
+  let snappedStart = Math.round(outerStart / gridSize) * gridSize;
+  let snappedEnd = Math.round(outerEnd / gridSize) * gridSize;
+  if (snappedEnd <= snappedStart) {
+    const center = (outerStart + outerEnd) / 2;
+    snappedStart = Math.floor(center / gridSize) * gridSize;
+    snappedEnd = snappedStart + gridSize;
+  }
+  return { start: snappedStart, end: snappedEnd };
+}
+
 export function roundColliderToAssetFootprint(bounds, gridSize = TILE_SIZE, padding = 2) {
-  const footprint = snapAssetFootprintBounds(bounds, gridSize);
+  const size = positiveGridSize(gridSize);
   const inset = Math.max(0, finite(padding));
-  const safeInsetX = Math.min(inset, (footprint.right - footprint.left - 1) / 2);
-  const safeInsetY = Math.min(inset, (footprint.bottom - footprint.top - 1) / 2);
+  const horizontal = snapOutlinedAxis(bounds?.left, bounds?.right, size, inset);
+  const vertical = snapOutlinedAxis(bounds?.top, bounds?.bottom, size, inset);
+  const safeInsetX = Math.min(inset, (horizontal.end - horizontal.start - 1) / 2);
+  const safeInsetY = Math.min(inset, (vertical.end - vertical.start - 1) / 2);
   return Object.freeze({
-    left: footprint.left + safeInsetX,
-    right: footprint.right - safeInsetX,
-    top: footprint.top + safeInsetY,
-    bottom: footprint.bottom - safeInsetY,
+    left: horizontal.start + safeInsetX,
+    right: horizontal.end - safeInsetX,
+    top: vertical.start + safeInsetY,
+    bottom: vertical.end - safeInsetY,
   });
 }
 
