@@ -659,6 +659,7 @@ class WorldScene extends Phaser.Scene {
       isCoarsePointer: () => this.isCoarsePointer(),
       getLocationOwners: () => this.worldLocationRuntime?.getOwners?.() ?? {},
       getGameplayState: () => ({ ...this.sessionState?.gameplay, clock: formatClock(this.sessionState.gameplay.worldTimeSeconds, this.localization.getLanguage()), sleeping: this.sleeping, timeScale: this.simulationScale, selectedTimeScale: this.playerTimeScale, energyFlow: this.getEnergyFlow(), needsFlow: this.getNeedsHudFlow() }),
+      onNeedDebugValueChange: (needId, value) => this.setNeedDebugValue(needId, value),
       onLanguageChange: () => this.interactionRuntime?.refresh?.(), onTimeScaleChange: (scale) => { if (scale > 1) this.audioRuntime?.playEffect?.("time-speed-up"); else if (scale === 1 && this.playerTimeScale !== 1) this.audioRuntime?.playEffect?.("time-speed-normal"); this.playerTimeScale = scale; }, onDroppedItemCollision: (item, collider) => this.farmingRuntime?.handleDroppedItemCollision?.(item, collider), playEffect: (type) => this.audioRuntime?.playEffect?.(type),
       onCoinDrop: (pointerWorld) => this.tavernServiceRuntime?.dropWalletCoin?.({
         position: this.playerCharacter?.motor?.position,
@@ -1060,6 +1061,13 @@ class WorldScene extends Phaser.Scene {
     if (!gameplay) return null;
     const { energy, ...needsFlow } = this.needsFlowRuntime?.observe(needMeterValues(gameplay)) ?? {};
     return needsFlow;
+  }
+
+  setNeedDebugValue(needId, value) {
+    const result = this.needsRuntime?.setDebugValue?.(needId, value);
+    this.needsFlowRuntime?.reset?.(needMeterValues(this.sessionState.gameplay));
+    this.syncPlayerEnergyTarget();
+    return result;
   }
 
   getNeedsActivityContext(nowMs = globalThis.performance?.now?.() ?? Date.now()) {

@@ -9,6 +9,7 @@ import {
   NEED_ROW_AREAS,
   NEED_ROW_IDS,
   NEED_ROW_SYMBOLS,
+  NEED_VALUE_TRACK,
   NEED_TOOLTIP_AREA,
   LANGUAGE_HIT_AREA,
   NEW_GAME_CANCEL_HIT_AREA,
@@ -20,6 +21,7 @@ import {
   OPTIONS_PANEL_AREA,
   SOUND_SLIDER_RECTS,
   isEnergyCritical,
+  needValueFromPointerX,
   needFlowPhaseOffset,
   needFlowPulseAlpha,
   shouldShakeEnergyAfterInteraction,
@@ -162,10 +164,13 @@ assert(NEEDS_HUD_AREA.x + NEEDS_HUD_AREA.width <= GAME_WIDTH - 8, "right HUD kee
 assert(NEEDS_HUD_AREA.y + NEEDS_HUD_AREA.height < DIALOGUE_TOP, "needs stay above dialogue UI");
 assert.deepEqual(NEED_ROW_SYMBOLS.join(""), "NESTLD", "six rows use canonical NESTLD order");
 assert.equal(NEED_ROW_IDS.length, 6);
+assert.deepEqual(NEED_VALUE_TRACK, { xOffset: 12, width: 23 });
 for (const row of NEED_ROW_AREAS) {
   assert(isPointInRect(row.x + 1, row.y + 1, NEEDS_HUD_AREA), "need row hit zone starts inside block");
   assert(isPointInRect(row.x + row.width - 1, row.y + row.height - 1, NEEDS_HUD_AREA), "need row hit zone fits inside block");
 }
+assert.equal(needValueFromPointerX(NEED_ROW_AREAS[0], NEED_ROW_AREAS[0].x), 0, "clicks left of a need track clamp to zero");
+assert.equal(needValueFromPointerX(NEED_ROW_AREAS[0], NEED_ROW_AREAS[0].x + 35), 100, "need track right edge maps to one hundred");
 assert(NEED_TOOLTIP_AREA.x + NEED_TOOLTIP_AREA.width < NEEDS_HUD_AREA.x, "tooltip opens left of needs block");
 assert(OPTIONS_PANEL_AREA.y + OPTIONS_PANEL_AREA.height <= DIALOGUE_TOP, "Options panel stays above dialogue UI");
 for (const rect of [LANGUAGE_HIT_AREA, NEW_GAME_HIT_AREA, ...Object.values(SOUND_SLIDER_RECTS)]) {
@@ -266,7 +271,7 @@ assert(gameHud.includes("throwAimIndicator.show(worldPointFromPointer(scene, poi
 assert(inventoryRuntime.includes("setThrowAimTarget(worldPointFromPointer(scene, pointer))"), "inventory drag shares its cursor point with the throw aim");
 assert(throwAimIndicator.includes("throwAimPixels(pose.direction)") && throwAimIndicator.includes("graphics.fillRect(x, y, 1, 1)"), "throw aim rerasterizes an eight-pixel triangle without rotated antialiasing");
 assert(throwAimIndicator.includes('worldDepthFromAnchorY(sprite.y, "throw-aim", 499)'), "player world depth remains above the throw aim");
-assert(gameHud.includes("ratio > 0 ? Math.max(1, Math.round(23 * ratio))"), "low non-zero needs remain visibly filled");
+assert(gameHud.includes("ratio > 0 ? Math.max(1, Math.round(NEED_VALUE_TRACK.width * ratio))"), "low non-zero needs remain visibly filled");
 assert(gameHud.includes("targets: energyBarGraphics"), "low-energy feedback remains intact");
 assert(gameHud.includes("renderNeedTooltip"), "need tooltip remains intact");
 assert(interactionHud.includes("setSuppressed(value)"), "interaction HUD suppression remains intact");

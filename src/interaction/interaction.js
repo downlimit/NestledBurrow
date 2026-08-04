@@ -95,6 +95,7 @@ export function createInteractionTarget(options) {
   const prompt = options?.prompt;
   const payload = assertPlainSerializablePayload(options?.payload);
   const availabilityDistance = options?.availabilityDistance;
+  const selectionDistance = options?.selectionDistance;
   const explicitAimPosition = options?.aimPosition;
   const aimPosition = explicitAimPosition ?? position;
   const targetingMode = options?.targetingMode ?? "priority-distance";
@@ -125,6 +126,7 @@ export function createInteractionTarget(options) {
   }
   assertNonEmptyString(prompt, "Interaction prompt");
   if (availabilityDistance !== undefined) assertFiniteNumber(availabilityDistance, "Interaction availability distance");
+  if (selectionDistance !== undefined) assertFiniteNumber(selectionDistance, "Interaction selection distance");
   if (!["priority-distance", "facing-first"].includes(targetingMode)) throw new Error("Interaction targetingMode is invalid");
   if (targetingGroup !== null) assertNonEmptyString(targetingGroup, "Interaction targeting group");
 
@@ -144,6 +146,7 @@ export function createInteractionTarget(options) {
   };
   if (explicitAimPosition !== undefined) target.aimPosition = { x: aimPosition.x, y: aimPosition.y };
   if (availabilityDistance !== undefined) target.availabilityDistance = availabilityDistance;
+  if (selectionDistance !== undefined) target.selectionDistance = selectionDistance;
   return deepFreeze(target);
 }
 
@@ -185,9 +188,10 @@ export function findBestInteractionTarget(sourceSnapshot, targets) {
   for (const target of targets) {
     const dx = target.position.x - sourceSnapshot.position.x;
     const dy = target.position.y - sourceSnapshot.position.y;
-    const distance = target.availabilityDistance ?? Math.hypot(dx, dy);
+    const availabilityDistance = target.availabilityDistance ?? Math.hypot(dx, dy);
+    const distance = target.selectionDistance ?? availabilityDistance;
     const aimDot = facingDot(sourceSnapshot, target);
-    if (!isAvailable(sourceSnapshot, target, distance, aimDot)) {
+    if (!isAvailable(sourceSnapshot, target, availabilityDistance, aimDot)) {
       continue;
     }
 

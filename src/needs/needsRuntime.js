@@ -198,12 +198,35 @@ export function createNeedsRuntime({
   }
 
   function setDebugPreset(preset) {
-    if (!debugBaseline) debugBaseline = { energy: gameplay().currentEnergy, needs: { ...needs() } };
+    ensureDebugBaseline();
     if (preset === "hungry") needs().satiety = 0;
     else if (preset === "exhausted") gameplay().currentEnergy = 10;
     else if (preset === "urgent-toilet") needs().toilet = 5;
     else throw new Error(`Unknown needs debug preset: ${preset}`);
     return getState();
+  }
+
+  function setDebugValue(needId, value) {
+    const isEnergy = needId === "energy";
+    if (!isEnergy && !Object.prototype.hasOwnProperty.call(needs(), needId)) {
+      return { status: "unknown-need", mutated: false, needId };
+    }
+    ensureDebugBaseline();
+    const normalized = normalizeNeedValue(value, 0);
+    if (isEnergy) {
+      gameplay().currentEnergy = gameplay().maximumEnergy * normalized / 100;
+    } else {
+      needs()[needId] = normalized;
+      if (needId === "toilet" && !toiletAccidentConsequencesApplied) {
+        toiletZeroElapsedGameMinutes = 0;
+        toiletAccidentPending = false;
+      }
+    }
+    return { status: "updated", mutated: true, needId, value: normalized };
+  }
+
+  function ensureDebugBaseline() {
+    if (!debugBaseline) debugBaseline = { energy: gameplay().currentEnergy, needs: { ...needs() } };
   }
 
   function clearDebugPreset() {
@@ -265,6 +288,7 @@ export function createNeedsRuntime({
     movementState,
     canStartLongAction: () => canStartLongAction({ toilet: needs().toilet }),
     setDebugPreset,
+    setDebugValue,
     clearDebugPreset,
     shouldSuppressPersistence: () => Boolean(debugBaseline),
   });
