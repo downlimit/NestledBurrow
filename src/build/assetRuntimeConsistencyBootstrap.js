@@ -1,10 +1,19 @@
 import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
+import {
+  canonicalBedDefinition,
+  hydrateFacilityRuntimeDefinition,
+  liveBedGeometry,
+  liveFacilityGeometry,
+  liveFacilityPresentationPose,
+  livePlaceableInteraction,
+} from "./liveAssetGeometry.js";
 
 const BUILD_GRID_PATCH = Symbol("nestledBurrowBuildGridVisibilityPatch");
 const PANEL_PATCH = Symbol("nestledBurrowAssetRuntimeConsistencyPanelPatch");
 const BED_RUNTIME_PATCH = Symbol("nestledBurrowBedRuntimeConsistencyPatch");
+const FACILITY_RUNTIME_PATCH = Symbol("nestledBurrowFacilityRuntimeConsistencyPatch");
 const BED_PROFILE_KEY = "furniture:bed";
 
 if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
@@ -40,7 +49,97 @@ if (!MovementDebugPanel.prototype[PANEL_PATCH]) {
 
 function installCurrentAssetRuntime(scene) {
   const owners = scene?.worldLocationRuntime?.getOwners?.() ?? {};
+  patchFacilityRuntime(owners.facilityRuntime, scene);
   patchBedRuntime(owners.debrisRuntime, scene);
+  scene?.interactionRuntime?.refresh?.();
+}
+
+function registeredCollider(scene, id, fallback, profileKey) {
+  const entry = scene.worldLayout?.getWorldObjectColliders?.().find((candidate) => candidate.id === id);
+  return entry?.rect
+    ?? scene.worldLayout?.getEffectiveCollider?.(fallback, profileKey)
+    ?? fallback;
+}
+
+function patchFacilityRuntime(runtime, scene) {
+  if (!runtime || !scene || runtime[FACILITY_RUNTIME_PATCH]) return;
+
+  const originalAdd = runtime.add?.bind(runtime);
+  const originalMove = runtime.move?.bind(runtime);
+  const originalRestore = runtime.restore?.bind(runtime);
+  const originalReplace = runtime.replace?.bind(runtime);
+  const originalGetDefinition = runtime.getDefinition?.bind(runtime);
+  const originalGetDefinitionByType = runtime.getDefinitionByType?.bind(runtime);
+  const originalGetDefinitions = runtime.getDefinitions?.bind(runtime);
+  const originalGetInteractionDefinitions = runtime.getInteractionDefinitions?.bind(runtime);
+
+  if (!originalGetDefinition || !originalGetDefinitions) return;
+
+  function currentGeometry(definition) {
+    if (!definition?.footprint) return null;
+    const profileKey = `facility:${definition.facilityType}`;
+    const footprint = {
+      left: definition.footprint.x,
+      right: definition.footprint.x + definition.footprint.width,
+      top: definition.footprint.y,
+      bottom: definition.footprint.y + definition.footprint.height,
+    };
+    return liveFacilityGeometry(
+      definition,
+      scene.assetProfiles?.[profileKey] ?? {},
+      registeredCollider(scene, definition.id, footprint, profileKey),
+    );
+  }
+
+  function currentDefinition(definition) {
+    return livePlaceableInteraction(definition, currentGeometry(definition));
+  }
+
+  if (originalRestore) {
+    runtime.restore = (definition, options) => originalRestore(hydrateFacilityRuntimeDefinition(definition), options);
+  }
+  if (originalReplace) {
+    runtime.replace = (definition, options) => originalReplace(hydrateFacilityRuntimeDefinition(definition), options);
+  }
+  if (originalAdd) {
+    runtime.add = (...args) => currentDefinition(originalAdd(...args));
+  }
+  if (originalMove) {
+    runtime.move = (...args) => {
+      const result = originalMove(...args);
+      return result ? {
+        ...result,
+        previous: currentDefinition(result.previous),
+        current: currentDefinition(result.current),
+      } : null;
+    };
+  }
+
+  runtime.getFacilityRuntimeGeometry = (id) => currentGeometry(originalGetDefinition(id));
+  runtime.getDefinition = (id) => currentDefinition(originalGetDefinition(id));
+  runtime.getDefinitions = () => originalGetDefinitions().map(currentDefinition);
+  if (originalGetDefinitionByType) {
+    runtime.getDefinitionByType = (type) => currentDefinition(originalGetDefinitionByType(type));
+  }
+  if (originalGetInteractionDefinitions) {
+    runtime.getInteractionDefinitions = () => originalGetInteractionDefinitions().map((definition) => {
+      const raw = originalGetDefinition(definition.id) ?? originalGetDefinition(definition.entityId);
+      const current = currentDefinition(raw ?? definition);
+      return Object.freeze({
+        ...definition,
+        ...current,
+        prompt: definition.prompt,
+        stopPrompt: definition.stopPrompt,
+        interactionDirections: definition.interactionDirections,
+      });
+    });
+  }
+  runtime.getPresentationPose = (id = runtime.getActiveId?.()) => {
+    const definition = originalGetDefinition(id);
+    return liveFacilityPresentationPose(definition, currentGeometry(definition));
+  };
+
+  Object.defineProperty(runtime, FACILITY_RUNTIME_PATCH, { value: true });
 }
 
 function patchBedRuntime(runtime, scene) {
@@ -74,7 +173,7 @@ function patchBedRuntime(runtime, scene) {
       if (!created) return null;
       const canonical = normalizeBedDefinitionToGrid(created);
       if (canonical !== created) originalReplaceBed?.(canonical);
-      return canonical;
+      return canonicalBedDefinition(canonical);
     };
   }
   if (originalMoveBed) {
@@ -84,7 +183,11 @@ function patchBedRuntime(runtime, scene) {
       const previous = normalizeBedDefinitionToGrid(result.previous);
       const current = normalizeBedDefinitionToGrid(result.current);
       if (current !== result.current) originalReplaceBed?.(current);
-      return { ...result, previous, current };
+      return {
+        ...result,
+        previous: canonicalBedDefinition(previous),
+        current: canonicalBedDefinition(current),
+      };
     };
   }
 
@@ -92,44 +195,23 @@ function patchBedRuntime(runtime, scene) {
     if (!definition) return null;
     const footprint = originalGetBedBounds(definition.id);
     if (!footprint) return null;
-    const worldEntry = scene.worldLayout?.getWorldObjectColliders?.().find(({ id }) => id === definition.id);
-    const collider = worldEntry?.rect
-      ?? scene.worldLayout?.getEffectiveCollider?.(footprint, BED_PROFILE_KEY)
-      ?? footprint;
-    const visualOffset = scene.assetProfiles?.[BED_PROFILE_KEY]?.visualOffset ?? { x: 0, y: 0 };
-    return Object.freeze({
-      footprint: Object.freeze({ ...footprint }),
-      collider: Object.freeze({ ...collider }),
-      visualCenter: Object.freeze({
-        x: (footprint.left + footprint.right) / 2 + Number(visualOffset.x || 0),
-        y: (footprint.top + footprint.bottom) / 2 + Number(visualOffset.y || 0),
-      }),
-      interactionCenter: Object.freeze({
-        x: (collider.left + collider.right) / 2,
-        y: (collider.top + collider.bottom) / 2,
-      }),
-    });
+    return liveBedGeometry(
+      footprint,
+      scene.assetProfiles?.[BED_PROFILE_KEY] ?? {},
+      registeredCollider(scene, definition.id, footprint, BED_PROFILE_KEY),
+    );
   }
 
   function currentDefinition(definition) {
     const canonical = normalizeBedDefinitionToGrid(definition);
-    const geometry = currentGeometry(canonical);
-    if (!canonical || !geometry) return canonical;
-    return Object.freeze({
-      ...canonical,
-      position: geometry.visualCenter,
-      aimPosition: geometry.interactionCenter,
-      requiresFacing: false,
-      facingDotThreshold: -1,
-    });
+    return livePlaceableInteraction(canonical, currentGeometry(canonical), { position: "visual" });
   }
 
-  runtime.getBedRuntimeGeometry = (id = null) => {
-    const definition = originalGetBedDefinition(id);
-    return currentGeometry(definition);
-  };
+  runtime.getBedRuntimeGeometry = (id = null) => currentGeometry(originalGetBedDefinition(id));
   runtime.getBedDefinition = (id = null) => currentDefinition(originalGetBedDefinition(id));
-  runtime.getBedDefinitions = () => originalGetBedDefinitions().map(normalizeBedDefinitionToGrid);
+  runtime.getBedDefinitions = () => originalGetBedDefinitions()
+    .map(normalizeBedDefinitionToGrid)
+    .map(canonicalBedDefinition);
 
   if (originalGetInteractionDefinitions) {
     runtime.getInteractionDefinitions = () => {
@@ -149,5 +231,4 @@ function patchBedRuntime(runtime, scene) {
   }
 
   Object.defineProperty(runtime, BED_RUNTIME_PATCH, { value: true });
-  scene.interactionRuntime?.refresh?.();
 }
