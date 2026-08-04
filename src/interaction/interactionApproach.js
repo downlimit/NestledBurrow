@@ -81,9 +81,9 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
 
   function resolve(definition, sourceSnapshot) {
     if (definition.__interactionProbe) return probe(definition, sourceSnapshot);
-    if (definition.targetingMode === "facing-first") return probe(definition, sourceSnapshot);
-    const player = getPlayer();
     const collider = interactionCollider(worldLayout, definition);
+    if (definition.targetingMode === "facing-first" && !collider) return probe(definition, sourceSnapshot);
+    const player = getPlayer();
     const points = interactionPoints(definition, collider);
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
