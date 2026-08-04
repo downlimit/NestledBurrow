@@ -51,7 +51,7 @@ Running is unavailable below `20 E`.
 | pickaxe/mining | 4 |
 
 Resource work has priority over running and never stacks with it. Tool hits have no discrete L cost; events may use the discrete-L domain hook.
-HUD arrows show actual N/E/S/T/L/D deltas through `660 ms`. Desktop bar clicks set runtime debug values; saves stay unchanged and reload restores them.
+HUD arrows show actual N/E/S/T/L/D deltas for `660 ms`. Desktop bar clicks set transient debug values; reload restores saved state.
 
 ```text
 lustre speed = 1 - 0.50 * pressure(L,33)
@@ -68,7 +68,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Walls block routes; a 1x1 object has eight exact walkable points. Crossing one counts as arrival. Overlaps rank by aim distance. Enter/exit preserve motor and interpolate pose; effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Walls block routes; objects expose exact walkable perimeter points. Crossing counts as arrival; overlaps rank by aim distance. Enter/exit interpolate pose without moving motor.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
