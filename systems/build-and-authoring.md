@@ -27,7 +27,7 @@ One versioned asset profile stores per family:
 - sprite crop insets;
 - enabled interaction-approach directions.
 
-Collider, pivot and visual offset support mouse editing and `1 px` keyboard movement. Arrow keys and `WASD` are equivalent. Collider and crop rectangles share this keyboard contract: unmodified input translates, `Ctrl` expands toward the direction, `Alt` shrinks from the opposite edge toward the direction.
+Collider, pivot and visual offset support mouse editing and `1 px` keyboard movement. Unmodified arrow keys and `WASD` are equivalent for one-pixel nudging. Collider and crop rectangles use `Ctrl+Arrow` to expand toward the direction and `Alt+Arrow` to shrink from the opposite edge. Modified `WASD` is deliberately not captured because browser shortcuts such as `Ctrl+W` cannot be made safe or consistent.
 
 Any active asset-editing mode owns directional keyboard input and suppresses player translation. Entering an edit mode clears current player velocity and resets the mobile joystick.
 
