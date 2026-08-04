@@ -129,6 +129,13 @@ export function normalizeFacilityDefinitionToGrid(definition, gridSize = TILE_SI
 
 export function normalizeBedDefinitionToGrid(definition, gridSize = TILE_SIZE) {
   if (!definition?.position) return definition;
+  const {
+    wakePosition: _wakePosition,
+    presentationPose: _presentationPose,
+    usePosition: _usePosition,
+    aimPosition: _aimPosition,
+    ...canonical
+  } = definition;
   const size = positiveGridSize(gridSize);
   const topLeft = {
     x: finite(definition.position.x) - size / 2,
@@ -137,18 +144,14 @@ export function normalizeBedDefinitionToGrid(definition, gridSize = TILE_SIZE) {
   const snapped = snapAssetPlacementPoint(topLeft, size);
   const dx = snapped.x - topLeft.x;
   const dy = snapped.y - topLeft.y;
-  if (dx === 0 && dy === 0) return definition;
+  const hadDerivedGeometry = "wakePosition" in definition
+    || "presentationPose" in definition
+    || "usePosition" in definition
+    || "aimPosition" in definition;
+  if (dx === 0 && dy === 0 && !hadDerivedGeometry) return definition;
   return Object.freeze({
-    ...definition,
+    ...canonical,
     position: shiftedPoint(definition.position, dx, dy),
-    wakePosition: shiftedPoint(definition.wakePosition, dx, dy),
-    presentationPose: definition.presentationPose
-      ? Object.freeze({
-          ...definition.presentationPose,
-          x: finite(definition.presentationPose.x) + dx,
-          y: finite(definition.presentationPose.y) + dy,
-        })
-      : definition.presentationPose,
   });
 }
 
