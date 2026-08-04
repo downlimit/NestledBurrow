@@ -2,72 +2,73 @@
 
 ## Purpose
 
-This system owns player-facing construction interactions and developer-facing canonical layout/asset editing.
+Owns player-facing construction and developer-facing canonical layout/asset editing.
 
 ## Player-facing build contract
 
-- every opening starts with no selected catalog asset, so the opening pointer cannot leak through and select a wall;
-- library selects walls, surfaces, furniture, facilities, expedition objects and plants; movable training dummies and the tavern sign participate in canonical furniture persistence;
-- the `Expedition` / `Походные` catalog group contains the current field-capable bed, table, toilet and a single-segment privacy screen backed by the existing wall tileset;
-- the privacy screen uses ordinary wall topology, placement validation, demolition and undo; it does not introduce a separate persisted object type;
-- placement, move and demolition use the same world geometry;
-- existing objects can be dragged without jumping their grabbed point under the cursor;
-- validation uses effective profile colliders;
-- grouped undo reverses the last build action;
-- runtime construction is not yet a gameplay save.
+- each opening starts without a selected catalog asset, preventing pointer leak-through;
+- walls, surfaces, furniture, facilities, expedition objects and plants share placement, move, demolition and grouped undo;
+- movable training dummies and the tavern sign use canonical furniture persistence;
+- the expedition group uses existing functional bed, table, toilet and a wall-backed privacy screen;
+- placement and validation use effective profile colliders;
+- dragged objects retain their grabbed point;
+- runtime construction is not yet gameplay-persisted.
 
 ## Developer-authoring contract
 
-- one versioned asset profile stores collider offsets, drag/pivot anchor, visual offset, sprite crop insets and the eight-direction interaction-approach mask per asset family;
-- collider, pivot and visual offset remain mouse-editable; arrows move the active geometry by `1 px`;
-- collider and crop rectangles use the same keyboard contract: arrows translate, `Ctrl+Arrow` expands toward the arrow, `Alt+Arrow` shrinks from the opposite edge toward the arrow;
-- collider grid rounding chooses the nearest whole-cell span from the reference size and centre, then applies the same fixed perimeter padding to one-cell and multi-cell spans;
-- the crop rectangle is clamped to the sprite source and keeps at least one visible pixel; procedural graphics without a sprite source reject crop editing explicitly;
-- at least one interaction approach direction remains enabled; disabling interaction entirely is a separate gameplay decision;
-- collider and layout drafts can live in browser storage;
-- a versioned backup moves drafts between browsers;
-- local dev endpoints write checked-in starting-layout and asset-profile defaults;
-- a successful canonical asset-profile write clears both the current browser profile draft and legacy collider overrides, preventing stale or accumulated offsets from being reapplied after reload;
-- the generated starting-layout module owns only the canonical default value; fallback fixtures stay in `src/build/startingLayout.js` so repeated saves cannot remove required exports;
-- temporary facility staging coordinates fail closed during capture, are removed from legacy browser drafts, and are never promoted into the canonical layout;
-- static GitHub Pages cannot commit the repository and keeps a recoverable browser draft instead;
-- `NEW GAME` restores the authored starting baseline, not arbitrary runtime edits.
+One versioned asset profile stores per family:
+
+- collider offsets;
+- drag/pivot anchor;
+- visual offset;
+- sprite crop insets;
+- enabled interaction-approach directions.
+
+Collider, pivot and visual offset support mouse editing and `1 px` arrow movement. Collider and crop rectangles share this keyboard contract: arrows translate, `Ctrl+Arrow` expands toward the arrow, `Alt+Arrow` shrinks from the opposite edge toward the arrow.
+
+Collider rounding selects the nearest whole-cell span from reference size and centre, then applies fixed perimeter padding. The same padding applies to one-cell and multi-cell spans.
+
+Crop stays inside the sprite source with at least one visible pixel. Procedural graphics without a sprite source reject crop editing. Direction masks use the eight surrounding classes and keep at least one enabled; disabling interaction entirely is a separate gameplay decision.
+
+Browser storage may hold drafts and versioned backups. Local dev endpoints write checked-in starting-layout and asset-profile defaults. Successful canonical profile save clears current profile drafts and legacy collider overrides, preventing stale offsets from being reapplied. Static hosting keeps a recoverable browser draft because it cannot write the repository.
+
+The generated starting-layout module owns only the canonical default. Fallback fixtures stay in `src/build/startingLayout.js`. Temporary facility staging coordinates fail closed during capture, are removed from legacy drafts and never become canonical. `NEW GAME` restores the authored starting baseline.
 
 ## Owners
 
-- world mutation and transient build-session state: `src/build/worldBuildCoordinator.js`;
-- UI/input lifecycle: `src/build/buildModeRuntime.js`;
+- mutation/session state: `src/build/worldBuildCoordinator.js`;
+- UI/input: `src/build/buildModeRuntime.js`;
 - catalog: `src/build/buildAssetCatalog.js`;
-- geometry/colliders: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`;
+- geometry: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`;
 - profiles: `src/build/assetProfiles.js`, `src/build/assetProfilesDefault.js`, `src/build/colliderDefaults.js`;
-- sprite crop adapter: `src/build/assetVisualCrop.js`;
+- crop adapter: `src/build/assetVisualCrop.js`;
 - authoring: `src/build/editorAuthoringRuntime.js`, `src/build/editorAuthoringBootstrap.js`, `src/build/authoringBackup.js`;
 - starting baseline: `src/build/startingLayout.js`, `src/build/startingLayoutDefault.js`;
 - scene registry: `src/build/worldSceneRegistry.js`.
 
-`WorldBuildCoordinator` owns placed runtime objects, surfaces, walls, automatic junctions, previews, demolition highlighting, the active grouped action and undo history. It creates `BuildModeRuntime`, receives runtime owners and world callbacks as explicit dependencies, and routes facility, bed/resource, well/farming, tavern-sign and training-dummy mutations back to those owners. The Phaser scene is only its rendering host.
+`WorldBuildCoordinator` owns placed objects, surfaces, walls, junctions, previews, highlights, grouped actions and undo. It creates `BuildModeRuntime`, receives runtime owners and routes facility, bed/resource, well/farming, tavern-sign and training-dummy mutations to those owners. Phaser remains the rendering host.
 
-`WorldScene` constructs the coordinator, passes layout/profile/runtime adapters, exposes its `BuildModeRuntime` for the surrounding input-suppression contract, and delegates location cleanup. Starting-layout and developer-authoring owners use the coordinator public API; they do not receive its internal maps, undo stack or preview state.
+`WorldScene` constructs the coordinator, passes layouts, profiles and adapters, exposes build mode for input suppression and delegates location cleanup. Authoring and starting-layout code use public coordinator methods only.
 
 ## Invariants
 
-- horizontal and vertical wall profile colliders are independent;
-- explicit columns do not duplicate automatic wall junctions;
-- placement uses effective collider after profile offsets;
-- drag anchor affects grabbing/snap, not arbitrary visual drift;
-- crop and approach-direction edits are profile-wide and apply to every live instance of that profile;
-- authoring arrow input suppresses character movement while any asset edit mode is active;
-- developer authoring and gameplay persistence remain separate;
-- build orchestration remains in `WorldBuildCoordinator`; `src/main.js` may not grow beyond its architecture budget;
-- expedition catalog grouping does not duplicate canonical asset IDs or create binary substitutes for missing field props.
+- horizontal and vertical wall colliders remain independent;
+- explicit columns do not duplicate automatic junctions;
+- placement uses the effective collider;
+- drag anchor controls grab/snap, not arbitrary visual drift;
+- crop and approach masks are profile-wide across live instances;
+- authoring arrow input suppresses character movement;
+- developer authoring stays separate from gameplay persistence;
+- build orchestration remains outside `src/main.js`;
+- expedition grouping creates no duplicate IDs or binary substitutes.
 
 ## Current baseline
 
-Walls, surfaces, furniture, facilities, plants, wells, the tavern sign and the training dummy preserve placement, move, demolition and grouped undo through `WorldBuildCoordinator`. The catalog exposes a dedicated expedition group using existing functional objects and one wall-backed privacy screen. Asset profiles, collider/pivot/visual/crop editors, approach-direction masks, browser backup and canonical starting layout remain in their authoring owners. Authoring persistence has an end-to-end reload/`NEW GAME` regression.
+Walls, surfaces, furniture, facilities, plants, wells, the tavern sign and training dummy support placement, move, demolition and grouped undo through `WorldBuildCoordinator`. The editor supports collider, pivot, visual offset, crop and approach-direction profiles, browser backup, canonical profile writes and canonical starting layout.
 
 ## Not yet
 
-Rotation, gameplay persistence of construction, history/versioning, general map editor, multiplayer edits, whistle behavior and native art for additional expedition props.
+Rotation, gameplay persistence of construction, history/versioning, a general map editor, multiplayer edits, whistle behavior and native art for further expedition props.
 
 ## Evidence
 
