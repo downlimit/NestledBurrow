@@ -11,7 +11,10 @@ import {
   DEFAULT_ASSET_PROFILES,
   normalizeAssetProfiles,
 } from "../src/build/assetProfiles.js";
-import { resolvePlaceablePlacementPose } from "../src/build/placeablePlacementPose.js";
+import {
+  resolvePlaceablePlacementAnchor,
+  resolvePlaceablePlacementPose,
+} from "../src/build/placeablePlacementPose.js";
 import { FACILITY_ASSETS } from "../src/facilities/facilityConfig.js";
 import {
   assertPlaceableOwnerAdapter,
@@ -104,17 +107,45 @@ assert.deepEqual(resourceVisualBoundsAt({ x: 32, y: 48 }, RESOURCE_PROFILES["tre
   bottom: 48 + 4 * TILE_SIZE,
 }, "tree targeting covers the visible composite sprite rather than only its trunk collider");
 
-const pose = resolvePlaceablePlacementPose({
+const placementScene = {
   assetProfiles: {
     "facility:tavern-sign": {
       snapAnchorOffset: { x: 3, y: 5 },
       visualOffset: { x: 7, y: -2 },
     },
   },
-}, "facility:tavern-sign", { x: 100, y: 200 });
-assert.deepEqual(pose.placementPosition, { x: 100, y: 200 });
-assert.deepEqual(pose.pivotPosition, { x: 103, y: 205 });
-assert.deepEqual(pose.visualPosition, { x: 107, y: 198 });
+  worldLayout: {
+    getEffectiveCollider(rect) {
+      return {
+        left: rect.left - 2,
+        right: rect.right + 4,
+        top: rect.top + 1,
+        bottom: rect.bottom + 3,
+      };
+    },
+  },
+};
+const pose = resolvePlaceablePlacementPose(
+  placementScene,
+  "facility:tavern-sign",
+  { x: 100.5, y: 200.5 },
+);
+assert.deepEqual(pose.placementPosition, { x: 100.5, y: 200.5 });
+assert.deepEqual(pose.pivotPosition, { x: 103.5, y: 205.5 });
+assert.deepEqual(pose.visualPosition, { x: 108, y: 199 });
+
+const signAnchor = resolvePlaceablePlacementAnchor(
+  placementScene,
+  PLACEABLE_BUILD_OWNER_IDS.tavernSign,
+  { profileKey: "facility:tavern-sign" },
+  { x: 100.5, y: 200.5 },
+);
+assert.deepEqual(
+  signAnchor,
+  { x: 2, y: 1.5 },
+  "cursor anchor is the midpoint between the current pivot and current effective collider centre",
+);
+assert.notDeepEqual(signAnchor, pose.pivotOffset, "cursor cannot attach directly to the pivot");
 
 assert.equal(ASSET_PROFILES_VERSION, 4, "direct special-placeable pivot basis is a versioned profile migration");
 const migratedSignProfile = normalizeAssetProfiles({
@@ -147,6 +178,9 @@ assert(!contractSource.includes(".setDepth(9021)"), "placeable thumbnails cannot
 const poseSource = fs.readFileSync(new URL("../src/build/placeablePlacementPose.js", import.meta.url), "utf8");
 for (const required of [
   "resolvePlaceablePlacementPose",
+  "resolvePlaceablePlacementAnchor",
+  "placementMidpointOffset",
+  "effectiveCollider",
   "pose.visualPosition",
   "pose.pivotOffset",
   "renderTavernSignPreview",
@@ -155,6 +189,7 @@ for (const required of [
 ]) {
   assert(poseSource.includes(required), `preview/commit pose retains ${required}`);
 }
+assert(!poseSource.includes("return profilePoint(scene.assetProfiles?.[profileKey]?.snapAnchorOffset)"));
 
 const ownerSource = fs.readFileSync(new URL("../src/build/placeableBuildOwners.js", import.meta.url), "utf8");
 for (const required of [
@@ -217,6 +252,7 @@ assert(systemSource.includes("place → move → remove → restore"));
 assert(systemSource.includes("berry-bush"));
 assert(systemSource.includes("authoring selection"));
 assert(systemSource.includes("preview and commit"));
+assert(systemSource.includes("midpoint between the current pivot and current effective collider centre"));
 assert(systemSource.includes("authoring-canon.json"));
 
-console.log("Task #072 contracts passed: every placeable has full lifecycle, exact preview/commit pose, current geometry, universal authoring and complete canon export");
+console.log("Task #072 contracts passed: every placeable has full lifecycle, midpoint cursor anchor, exact preview/commit pose, universal authoring and complete canon export");
