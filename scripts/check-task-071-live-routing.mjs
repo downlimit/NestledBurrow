@@ -27,8 +27,8 @@ const definition = {
   position: { x: 40, y: 40 },
   aimPosition: { x: 40, y: 40 },
   radius: 64,
-  requiresFacing: true,
-  facingDotThreshold: 0,
+  requiresFacing: false,
+  facingDotThreshold: -1,
   targetingMode: "facing-first",
   targetingGroup: PLACEABLE_TARGETING_GROUP,
   interactionDirections: ["top"],
@@ -41,7 +41,7 @@ const source = {
 };
 
 const probe = resolver.probe({ ...definition, __interactionProbe: true }, source);
-assert(probe, "gaze-ranked collider target is visible to the prompt scan");
+assert(probe, "gaze-ranked collider target is visible to the prompt scan without a hard facing gate");
 
 const resolved = resolver.resolve(definition, source);
 assert.deepEqual(resolved?.payload.approachPoint, { x: 40, y: 24 }, "activation still resolves the enabled perimeter cell");
