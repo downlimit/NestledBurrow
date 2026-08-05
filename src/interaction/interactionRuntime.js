@@ -33,6 +33,11 @@ export function createInteractionRuntime({
       return;
     }
 
+    if (interact && currentCandidate && currentCandidateDefinitions.length > 0) {
+      startSelectedInteraction();
+      return;
+    }
+
     applySelection(findCandidate());
     if (currentCandidate) {
       if (!presenter?.isMessageVisible?.()) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
