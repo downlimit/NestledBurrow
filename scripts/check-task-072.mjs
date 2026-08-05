@@ -83,6 +83,7 @@ for (const required of [
 const ownerSource = fs.readFileSync(new URL("../src/build/placeableBuildOwners.js", import.meta.url), "utf8");
 for (const required of [
   "removeState: false",
+  "persistedIds",
   "runtime.registerResource(current)",
   "getBedRuntimeGeometry",
   "getFacilityRuntimeGeometry",
