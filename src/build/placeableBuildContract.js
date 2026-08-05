@@ -58,10 +58,12 @@ function patchBuildModeRuntime() {
   };
 
   BuildModeRuntime.prototype.createThumbnail = function createPlaceableThumbnail(item, x, y) {
+    const panelDepth = Number(this.panel?.depth);
+    const thumbnailDepth = Number.isFinite(panelDepth) ? panelDepth + 1 : 10021;
     if (item?.facilityType) {
       const graphics = this.scene.add.graphics()
         .setPosition(x, y)
-        .setDepth(9021)
+        .setDepth(thumbnailDepth)
         .setScrollFactor(0)
         .setVisible(false);
       drawFacility(graphics, item.facilityType);
@@ -73,7 +75,7 @@ function patchBuildModeRuntime() {
       const profile = getResourceProfile(item.resourceProfileId);
       const graphics = this.scene.add.graphics()
         .setPosition(x, y)
-        .setDepth(9021)
+        .setDepth(thumbnailDepth)
         .setScrollFactor(0)
         .setVisible(false);
       drawResourceVisual(graphics, profile);
