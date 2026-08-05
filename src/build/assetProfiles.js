@@ -1,11 +1,14 @@
+import { TRAINING_DUMMY } from "../combat/meleeConfig.js";
 import { FACILITY_ASSETS } from "../facilities/facilityConfig.js";
-import { RESOURCE_PROFILES } from "../resources/resourceDomain.js";
 import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "../interaction/interactionDirections.js";
+import { WELL_PROFILE } from "../resources/farmingConfig.js";
+import { RESOURCE_PROFILES } from "../resources/resourceDomain.js";
+import { TAVERN_SIGN } from "../tavern/guestConfig.js";
 import { TILE_SIZE } from "../world/worldConfig.js";
 import { COLLIDER_DEBUG_STORAGE_KEY } from "./colliderDebugOverrides.js";
 import PROJECT_ASSET_PROFILES from "./assetProfilesDefault.js";
 
-export const ASSET_PROFILES_STORAGE_KEY = "nestledBurrow.assetProfiles";
+export const ASSET_PROFILES_STORAGE_KEY = "nestledburrow.assetProfiles";
 export const ASSET_PROFILES_SAVE_ENDPOINT = "__nestledburrow/save-asset-profiles";
 export const ASSET_PROFILES_VERSION = 3;
 
@@ -20,32 +23,31 @@ const defaultResourcePivot = (id) => id === "tree-planted"
       RESOURCE_PROFILES[id].footprint.width * TILE_SIZE / 4,
       RESOURCE_PROFILES[id].footprint.height * TILE_SIZE / 4,
     );
+const profile = (family, snapAnchorOffset) => Object.freeze({
+  family,
+  colliderOffsets: offsets(),
+  visualOffset: point(0, 0),
+  snapAnchorOffset,
+  visualCropInsets: cropInsets(),
+  interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
+});
 
 const BASE_ASSET_PROFILES = Object.freeze({
-  ...Object.fromEntries(RESOURCE_PROFILE_KEYS.map((id) => [`resource:${id}`, Object.freeze({
-    family: "resource",
-    colliderOffsets: offsets(),
-    visualOffset: point(0, 0),
-    snapAnchorOffset: defaultResourcePivot(id),
-    visualCropInsets: cropInsets(),
-    interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
-  })])),
-  ...Object.fromEntries(FACILITY_PROFILE_KEYS.map((id) => [`facility:${id}`, Object.freeze({
-    family: "facility",
-    colliderOffsets: offsets(),
-    visualOffset: point(0, 0),
-    snapAnchorOffset: point(FACILITY_ASSETS[id].width / 2, FACILITY_ASSETS[id].height),
-    visualCropInsets: cropInsets(),
-    interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
-  })])),
-  "furniture:bed": Object.freeze({
-    family: "furniture",
-    colliderOffsets: offsets(),
-    visualOffset: point(0, 0),
-    snapAnchorOffset: point(TILE_SIZE / 2, TILE_SIZE / 2),
-    visualCropInsets: cropInsets(),
-    interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
-  }),
+  ...Object.fromEntries(RESOURCE_PROFILE_KEYS.map((id) => [
+    `resource:${id}`,
+    profile("resource", defaultResourcePivot(id)),
+  ])),
+  ...Object.fromEntries(FACILITY_PROFILE_KEYS.map((id) => [
+    `facility:${id}`,
+    profile("facility", point(FACILITY_ASSETS[id].width / 2, FACILITY_ASSETS[id].height)),
+  ])),
+  "furniture:bed": profile("furniture", point(TILE_SIZE / 2, TILE_SIZE / 2)),
+  "farming:well": profile("farming", point(WELL_PROFILE.depthAnchorOffset.x, WELL_PROFILE.depthAnchorOffset.y)),
+  "facility:tavern-sign": profile("facility", point(TAVERN_SIGN.snapAnchorOffset.x, TAVERN_SIGN.snapAnchorOffset.y)),
+  "melee:training-dummy": profile(
+    "melee",
+    point(TRAINING_DUMMY.asset.depthAnchor.x, TRAINING_DUMMY.asset.depthAnchor.y),
+  ),
 });
 
 function finite(value, fallback = 0) {
