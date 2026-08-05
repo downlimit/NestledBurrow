@@ -6,7 +6,12 @@ import {
   BUILD_RESOURCE_ITEMS,
   BUILD_SPECIAL_ITEMS,
 } from "../src/build/buildAssetCatalog.js";
-import { DEFAULT_ASSET_PROFILES } from "../src/build/assetProfiles.js";
+import {
+  ASSET_PROFILES_VERSION,
+  DEFAULT_ASSET_PROFILES,
+  normalizeAssetProfiles,
+} from "../src/build/assetProfiles.js";
+import { resolvePlaceablePlacementPose } from "../src/build/placeablePlacementPose.js";
 import { FACILITY_ASSETS } from "../src/facilities/facilityConfig.js";
 import {
   assertPlaceableOwnerAdapter,
@@ -99,6 +104,31 @@ assert.deepEqual(resourceVisualBoundsAt({ x: 32, y: 48 }, RESOURCE_PROFILES["tre
   bottom: 48 + 4 * TILE_SIZE,
 }, "tree targeting covers the visible composite sprite rather than only its trunk collider");
 
+const pose = resolvePlaceablePlacementPose({
+  assetProfiles: {
+    "facility:tavern-sign": {
+      snapAnchorOffset: { x: 3, y: 5 },
+      visualOffset: { x: 7, y: -2 },
+    },
+  },
+}, "facility:tavern-sign", { x: 100, y: 200 });
+assert.deepEqual(pose.placementPosition, { x: 100, y: 200 });
+assert.deepEqual(pose.pivotPosition, { x: 103, y: 205 });
+assert.deepEqual(pose.visualPosition, { x: 107, y: 198 });
+
+assert.equal(ASSET_PROFILES_VERSION, 4, "direct special-placeable pivot basis is a versioned profile migration");
+const migratedSignProfile = normalizeAssetProfiles({
+  version: 3,
+  profiles: {
+    "facility:tavern-sign": {
+      snapAnchorOffset: { x: 17, y: 21 },
+      visualOffset: { x: 4, y: -3 },
+    },
+  },
+})["facility:tavern-sign"];
+assert.deepEqual(migratedSignProfile.snapAnchorOffset, { x: 9, y: 13 }, "legacy sign pivot keeps the same world position after removing its hidden 8 px origin");
+assert.deepEqual(migratedSignProfile.visualOffset, { x: 4, y: -3 });
+
 const contractSource = fs.readFileSync(new URL("../src/build/placeableBuildContract.js", import.meta.url), "utf8");
 for (const required of [
   "coordinator.getBuildMoveTarget =",
@@ -108,10 +138,23 @@ for (const required of [
   "coordinator.recordBuildUndo",
   "createPlaceableThumbnail",
   "Number(this.panel?.depth)",
+  "decoratePlaceablePlacementAdapters",
 ]) {
   assert(contractSource.includes(required), `placeable lifecycle contract retains ${required}`);
 }
 assert(!contractSource.includes(".setDepth(9021)"), "placeable thumbnails cannot render below the HUD-depth build panel");
+
+const poseSource = fs.readFileSync(new URL("../src/build/placeablePlacementPose.js", import.meta.url), "utf8");
+for (const required of [
+  "resolvePlaceablePlacementPose",
+  "pose.visualPosition",
+  "pose.pivotOffset",
+  "renderTavernSignPreview",
+  "renderWellPreview",
+  "renderTrainingDummyPreview",
+]) {
+  assert(poseSource.includes(required), `preview/commit pose retains ${required}`);
+}
 
 const ownerSource = fs.readFileSync(new URL("../src/build/placeableBuildOwners.js", import.meta.url), "utf8");
 for (const required of [
@@ -127,7 +170,14 @@ for (const required of [
 }
 
 const signSource = fs.readFileSync(new URL("../src/tavern/tavernSignRuntime.js", import.meta.url), "utf8");
-for (const required of ["placeBuildTarget", "removeBuildTarget", "restoreBuildTarget", "isBuildPlacementBlocked"]) {
+for (const required of [
+  "placeBuildTarget",
+  "removeBuildTarget",
+  "restoreBuildTarget",
+  "isBuildPlacementBlocked",
+  "visualPositionAt",
+  "assetDepthFromPivot(position, pivot",
+]) {
   assert(signSource.includes(required), `tavern sign runtime retains ${required}`);
 }
 
@@ -143,10 +193,20 @@ for (const required of [
   "trainingDummyInstances",
   "canonicalVisualOffsetAtCurrentPivot",
   "syncSpecialInstances",
+  "installAuthoringCanonExport",
 ]) {
   assert(authoringSource.includes(required), `universal authoring retains ${required}`);
 }
 assert(!authoringSource.includes("DEFAULT_ASSET_PROFILES[visualSelection.profileKey]?.visualOffset"));
+assert(!authoringSource.includes("state.position.x - TAVERN_SIGN.snapAnchorOffset.x"), "sign authoring cannot revive a hidden profile origin");
+
+const exportSource = fs.readFileSync(new URL("../src/build/authoringCanonExport.js", import.meta.url), "utf8");
+assert(exportSource.includes("Сохранить и выгрузить канон объектов"));
+assert(exportSource.includes("createLiveAuthoringCanon"));
+const backupSource = fs.readFileSync(new URL("../src/build/authoringBackup.js", import.meta.url), "utf8");
+for (const required of ["captureStartingLayout(scene)", "scene.colliderOverrides", "scene.assetProfiles", "AUTHORING_CANON_FILENAME"]) {
+  assert(backupSource.includes(required), `live canon export retains ${required}`);
+}
 
 const bootstrapSource = fs.readFileSync(new URL("../src/build/assetRuntimeConsistencyBootstrap.js", import.meta.url), "utf8");
 assert(bootstrapSource.includes("installPlaceableBuildContract(scene, owners)"), "every mounted build-enabled location installs the placeable contract");
@@ -156,5 +216,7 @@ const systemSource = fs.readFileSync(new URL("../systems/build-and-authoring.md"
 assert(systemSource.includes("place → move → remove → restore"));
 assert(systemSource.includes("berry-bush"));
 assert(systemSource.includes("authoring selection"));
+assert(systemSource.includes("preview and commit"));
+assert(systemSource.includes("authoring-canon.json"));
 
-console.log("Task #072 contracts passed: every placeable has full lifecycle, visible thumbnails, current geometry and universal pivot/visual authoring");
+console.log("Task #072 contracts passed: every placeable has full lifecycle, exact preview/commit pose, current geometry, universal authoring and complete canon export");
