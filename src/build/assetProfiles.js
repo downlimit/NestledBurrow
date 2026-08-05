@@ -1,14 +1,22 @@
+import { TRAINING_DUMMY } from "../combat/meleeConfig.js";
 import { FACILITY_ASSETS } from "../facilities/facilityConfig.js";
-import { RESOURCE_PROFILES } from "../resources/resourceDomain.js";
 import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "../interaction/interactionDirections.js";
+import { WELL_PROFILE } from "../resources/farmingConfig.js";
+import { RESOURCE_PROFILES } from "../resources/resourceDomain.js";
+import { TAVERN_SIGN } from "../tavern/guestConfig.js";
 import { TILE_SIZE } from "../world/worldConfig.js";
 import { COLLIDER_DEBUG_STORAGE_KEY } from "./colliderDebugOverrides.js";
 import PROJECT_ASSET_PROFILES from "./assetProfilesDefault.js";
 
 export const ASSET_PROFILES_STORAGE_KEY = "nestledBurrow.assetProfiles";
 export const ASSET_PROFILES_SAVE_ENDPOINT = "__nestledburrow/save-asset-profiles";
-export const ASSET_PROFILES_VERSION = 3;
+export const ASSET_PROFILES_VERSION = 4;
 
+const TAVERN_SIGN_PROFILE_KEY = "facility:tavern-sign";
+const LEGACY_TAVERN_SIGN_PROFILE_ORIGIN_OFFSET = Object.freeze({
+  x: Number(TAVERN_SIGN.snapAnchorOffset?.x) || 0,
+  y: Number(TAVERN_SIGN.snapAnchorOffset?.y) || 0,
+});
 const RESOURCE_PROFILE_KEYS = Object.keys(RESOURCE_PROFILES);
 const FACILITY_PROFILE_KEYS = Object.keys(FACILITY_ASSETS);
 const point = (x, y) => Object.freeze({ x, y });
@@ -20,32 +28,31 @@ const defaultResourcePivot = (id) => id === "tree-planted"
       RESOURCE_PROFILES[id].footprint.width * TILE_SIZE / 4,
       RESOURCE_PROFILES[id].footprint.height * TILE_SIZE / 4,
     );
+const profile = (family, snapAnchorOffset) => Object.freeze({
+  family,
+  colliderOffsets: offsets(),
+  visualOffset: point(0, 0),
+  snapAnchorOffset,
+  visualCropInsets: cropInsets(),
+  interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
+});
 
 const BASE_ASSET_PROFILES = Object.freeze({
-  ...Object.fromEntries(RESOURCE_PROFILE_KEYS.map((id) => [`resource:${id}`, Object.freeze({
-    family: "resource",
-    colliderOffsets: offsets(),
-    visualOffset: point(0, 0),
-    snapAnchorOffset: defaultResourcePivot(id),
-    visualCropInsets: cropInsets(),
-    interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
-  })])),
-  ...Object.fromEntries(FACILITY_PROFILE_KEYS.map((id) => [`facility:${id}`, Object.freeze({
-    family: "facility",
-    colliderOffsets: offsets(),
-    visualOffset: point(0, 0),
-    snapAnchorOffset: point(FACILITY_ASSETS[id].width / 2, FACILITY_ASSETS[id].height),
-    visualCropInsets: cropInsets(),
-    interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
-  })])),
-  "furniture:bed": Object.freeze({
-    family: "furniture",
-    colliderOffsets: offsets(),
-    visualOffset: point(0, 0),
-    snapAnchorOffset: point(TILE_SIZE / 2, TILE_SIZE / 2),
-    visualCropInsets: cropInsets(),
-    interactionDirections: INTERACTION_APPROACH_DIRECTIONS,
-  }),
+  ...Object.fromEntries(RESOURCE_PROFILE_KEYS.map((id) => [
+    `resource:${id}`,
+    profile("resource", defaultResourcePivot(id)),
+  ])),
+  ...Object.fromEntries(FACILITY_PROFILE_KEYS.map((id) => [
+    `facility:${id}`,
+    profile("facility", point(FACILITY_ASSETS[id].width / 2, FACILITY_ASSETS[id].height)),
+  ])),
+  "furniture:bed": profile("furniture", point(TILE_SIZE / 2, TILE_SIZE / 2)),
+  "farming:well": profile("farming", point(WELL_PROFILE.depthAnchorOffset.x, WELL_PROFILE.depthAnchorOffset.y)),
+  [TAVERN_SIGN_PROFILE_KEY]: profile("facility", point(0, 0)),
+  "melee:training-dummy": profile(
+    "melee",
+    point(TRAINING_DUMMY.asset.depthAnchor.x, TRAINING_DUMMY.asset.depthAnchor.y),
+  ),
 });
 
 function finite(value, fallback = 0) {
@@ -82,9 +89,28 @@ export function normalizeVisualCropInsets(value = {}, fallback = cropInsets()) {
   });
 }
 
+function migrateLegacyProfileOrigins(sourceProfiles, version) {
+  if (!sourceProfiles || typeof sourceProfiles !== "object" || Number(version) >= ASSET_PROFILES_VERSION) {
+    return sourceProfiles ?? {};
+  }
+  const sign = sourceProfiles[TAVERN_SIGN_PROFILE_KEY];
+  if (!sign?.snapAnchorOffset) return sourceProfiles;
+  return {
+    ...sourceProfiles,
+    [TAVERN_SIGN_PROFILE_KEY]: {
+      ...sign,
+      snapAnchorOffset: {
+        x: finite(sign.snapAnchorOffset.x) - LEGACY_TAVERN_SIGN_PROFILE_ORIGIN_OFFSET.x,
+        y: finite(sign.snapAnchorOffset.y) - LEGACY_TAVERN_SIGN_PROFILE_ORIGIN_OFFSET.y,
+      },
+    },
+  };
+}
+
 function projectDefaultSource() {
   if (!PROJECT_ASSET_PROFILES || typeof PROJECT_ASSET_PROFILES !== "object") return {};
-  return PROJECT_ASSET_PROFILES.profiles ?? PROJECT_ASSET_PROFILES;
+  const source = PROJECT_ASSET_PROFILES.profiles ?? PROJECT_ASSET_PROFILES;
+  return migrateLegacyProfileOrigins(source, PROJECT_ASSET_PROFILES.version);
 }
 
 function normalizeProfile(source, fallback) {
@@ -106,10 +132,11 @@ export const DEFAULT_ASSET_PROFILES = Object.freeze(Object.fromEntries(
 ));
 
 export function normalizeAssetProfiles(value = {}) {
-  if (value?.version !== undefined && ![1, 2, ASSET_PROFILES_VERSION].includes(value.version)) {
+  if (value?.version !== undefined && ![1, 2, 3, ASSET_PROFILES_VERSION].includes(value.version)) {
     throw new Error(`Unsupported asset profiles version: ${String(value.version)}`);
   }
-  const sourceProfiles = value?.version !== undefined ? value.profiles ?? {} : value;
+  const rawProfiles = value?.version !== undefined ? value.profiles ?? {} : value;
+  const sourceProfiles = migrateLegacyProfileOrigins(rawProfiles, value?.version);
   if (!sourceProfiles || typeof sourceProfiles !== "object" || Array.isArray(sourceProfiles)) {
     throw new Error("Asset profiles must be an object");
   }

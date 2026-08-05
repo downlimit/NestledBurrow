@@ -2,6 +2,8 @@ import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { WorldLocationRuntime } from "../world/worldLocationRuntime.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
+import { installPlaceableBuildContract } from "./placeableBuildContract.js";
+import { installUniversalPlaceableAuthoring } from "./universalPlaceableAuthoring.js";
 import {
   canonicalBedDefinition,
   derivedFacilityUsePosition,
@@ -67,6 +69,8 @@ function installCurrentAssetRuntime(scene) {
   patchFacilityRuntime(owners.facilityRuntime, scene);
   patchBedRuntime(owners.debrisRuntime, scene);
   patchFarmingRuntime(owners.farmingRuntime, scene);
+  installPlaceableBuildContract(scene, owners);
+  installUniversalPlaceableAuthoring(scene?.movementDebugPanel, scene);
   scene?.interactionRuntime?.refresh?.();
 }
 

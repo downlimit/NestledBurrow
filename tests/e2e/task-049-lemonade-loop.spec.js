@@ -56,7 +56,7 @@ function combatQuantity(session, itemId) {
     .reduce((sum, item) => sum + item.quantity, 0);
 }
 
-test("fresh Task 049 world has four tools, fixed kitchen/well and two trees", async ({ page }, testInfo) => {
+test("fresh Task 049 world has four tools, editable kitchen/well and two trees", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
@@ -67,7 +67,7 @@ test("fresh Task 049 world has four tools, fixed kitchen/well and two trees", as
   expect(quantity(session, "potato")).toBe(0);
   expect(session.gameplay.farm.waterBucket).toEqual({ capacity: 8, currentWater: 0 });
   expect(session.gameplay.farm.wells).toHaveLength(1);
-  expect(session.gameplay.farm.wells[0]).toMatchObject({ x: 544, y: 496, fixed: true });
+  expect(session.gameplay.farm.wells[0]).toMatchObject({ x: 544, y: 496 });
   expect(session.gameplay.kitchen).toEqual({
     starterLemons: 6,
     stoveRepaired: false,
@@ -168,7 +168,7 @@ test("merchant gain feedback aggregates and finite lemons become lemonade atomic
     depth: 10022,
   }));
   expect((await bridge(page, "getSession")).gameplay.kitchen.starterLemons).toBe(0);
-  expect((await bridge(page, "getFacilityState")).visuals["home-lemon-sack-01"]).toBeNull();
+  expect((await bridge(page, "getFacilityState")).visuals["home-lemon-sack-01"]).toMatchObject({ visible: true });
   await bridge(page, "placePlayerNear", "home-lemon-sack-01");
   expect((await bridge(page, "getInteractionState")).candidate?.entityId).not.toBe("home-lemon-sack-01");
 

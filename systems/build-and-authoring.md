@@ -2,72 +2,75 @@
 
 ## Purpose
 
-Owns player construction and canonical layout/asset editing.
+Owns construction, placeable lifecycle and asset/layout editing.
 
 ## Player-facing build contract
 
-- walls, surfaces, furniture, facilities, expedition objects and plants share placement, move, demolition and grouped undo;
-- build mode opens without a selected catalog asset and always shows the `16 px` cell grid;
-- placeable assets store the top-left footprint cell on that grid;
-- canonical, restored, new and moved objects share this normalization;
-- visual offset and pivot do not change occupied cells;
-- validation uses effective profile colliders;
-- catalog cursor attachment is recalculated from the midpoint of the current pivot and current effective collider centre, then the footprint origin is grid-snapped;
-- moving an existing object retains its grabbed point and grid-aligned footprint;
-- approach markers occupy surrounding cell centres, derived from the collider's grid footprint rather than its padded edge;
-- placeables store only footprint/identity data; interaction aim, approach, bed/facility presentation pose and depth derive from current profile geometry at runtime;
+- walls and surfaces support placement, demolition and grouped undo;
+- object-like entries additionally support movement through one owner;
+- the library shows object names and previews, never interaction verbs;
+- all editable facilities, resources, wells, tavern signs and training dummies appear in the library;
+- placement uses the `16 px` grid and one canonical placement position;
+- the cursor anchor is the midpoint between the current pivot and current effective collider centre;
+- preview and commit use the same position, pivot, visual offset and effective collider;
+- the committed object appears on the exact preview pixels;
 - runtime construction is not gameplay-persisted.
+
+## Universal placeable lifecycle
+
+Every object-like catalog entry declares `objectLike: true`, one `placeableOwner`, and `place → move → remove → restore`.
+
+One owner descriptor drives move/demolition hover and commit. Bounds combine current visible geometry and effective collider. Grouped undo uses the same restore operation. Partial catalog support is invalid.
+
+`FACILITY_BUILD_ORDER` covers all `FACILITY_ASSETS`. `RESOURCE_PROFILES` automatically supplies trees, `berry-bush`, logs, stones and ruby nodes. Resource movement preserves state; demolition removes it and undo restores it. Wells, tavern signs and training dummies follow the same contract.
 
 ## Developer-authoring contract
 
-One versioned profile stores collider offsets, pivot, visual offset, crop and eight approach directions.
+One versioned profile owns collider, pivot, visual offset, crop and approach directions. Mouse and `1 px` keyboard edits are supported; active editing suppresses player movement.
 
-Collider, pivot and visual offset support mouse editing and `1 px` arrows/`WASD`. Collider and crop use `Ctrl+Arrow` to expand and `Alt+Arrow` to shrink. Modified `WASD` remains available to browser shortcuts.
+Pivot and visual offset are asset-space vectors. Moving either never rewrites world placement. Visual reset preserves the current pivot and restores the canonical visual-to-pivot relation; it never reads layout, footprint-origin or legacy world coordinates.
 
-Any active edit mode owns directional input, blocks player translation, clears velocity and resets the mobile joystick.
+Editing either the pivot or collider immediately changes the build cursor anchor because that anchor is always recomputed from their current values. No cached or default anchor may override the live midpoint.
 
-Collider rounding uses the live draft. After removing the fixed `2 px` padding, each edge snaps to the nearest full-cell boundary and receives the padding again. The immutable pre-edit base is never substituted. One-cell and multi-cell outlines retain the span described by the draft.
+Authoring selection covers every live placeable profile. New catalog objects cannot require a separate pivot-selection list.
 
-Collider debug renders at `40%` of its former opacity. Crop remains inside the sprite source with one visible pixel minimum; procedural visuals reject crop. At least one approach direction remains enabled.
+`Сохранить и выгрузить канон объектов` commits the current collider draft and downloads `nestledburrow-authoring-canon.json`. It contains the live starting layout, collider overrides and every complete asset profile for updating checked-in defaults.
 
-Browser storage may hold drafts and backups. The versioned profile owns collider, pivot and visual values. Layout normalization permanently discards legacy `usePosition`, `aimPosition`, `wakePosition` and `presentationPose`; runtime never treats them as canonical. Local dev writes checked-in defaults; successful canonical save clears browser profile and legacy collider drafts. Static hosting retains a recoverable profile draft.
-
-Temporary staging coordinates cannot become canonical. `NEW GAME` restores the authored baseline.
+Collider rounding uses the live draft: remove `2 px` padding, snap to cells, restore padding. Crop keeps one visible pixel. Browser storage may hold drafts/backups. Layout normalization discards derived interaction/pose coordinates. `NEW GAME` restores the authored baseline.
 
 ## Owners
 
-- coordinator: `src/build/worldBuildCoordinator.js`;
-- UI/input: `src/build/buildModeRuntime.js`, `src/build/assetAuthoringInput.js`;
-- geometry: `src/build/buildWorldGeometry.js`, `src/build/colliderResize.js`, `src/build/assetGridPlacement.js`, `src/build/liveAssetGeometry.js`;
-- profiles/crop: `src/build/assetProfiles.js`, `src/build/assetProfilesDefault.js`, `src/build/assetVisualCrop.js`;
-- authoring/runtime consistency: `src/build/editorAuthoringBootstrap.js`, `src/build/assetGridAuthoringBootstrap.js`, `src/build/assetRuntimeConsistencyBootstrap.js`;
-- baseline: `src/build/startingLayout.js`, `src/build/startingLayoutDefault.js`.
+- orchestration: `src/build/worldBuildCoordinator.js`;
+- lifecycle: `src/build/placeableBuildProtocol.js`, `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeableBuildGeometry.js`;
+- placement: `src/build/placeablePlacementPose.js`, `src/build/buildWorldGeometry.js`;
+- profiles/input: `src/build/assetProfiles.js`, `src/build/assetProfileRelations.js`, `src/build/assetAuthoringInput.js`;
+- authoring/export: `src/build/universalPlaceableAuthoring.js`, `src/build/authoringCanonExport.js`, `src/build/authoringBackup.js`, `src/build/assetRuntimeConsistencyBootstrap.js`, `src/build/startingLayout.js`.
 
-`WorldBuildCoordinator` owns placed objects, previews, grouped actions and undo. Runtime owners handle facilities, beds/resources, wells, sign and training dummy. `WorldScene` remains composition only.
+`WorldBuildCoordinator` owns previews, grouped actions and undo. Runtime owners own entities. `WorldScene` remains composition only.
 
 ## Invariants
 
-- horizontal and vertical wall colliders remain independent;
-- explicit columns do not duplicate automatic junctions;
-- footprint origins remain exact grid coordinates;
-- cursor attachment and interaction read only current profile geometry;
-- drag anchors affect grab behavior, not footprint alignment;
-- rounding preserves the cell span described by the live draft;
-- crop and approach masks are profile-wide;
-- approach targets are cell-centred;
-- no placeable timeline consumes stored derived coordinates;
-- authoring directional input suppresses character movement;
+- preview and commit use one exact placement pose;
+- cursor anchor equals the midpoint between live pivot and live effective collider centre;
+- changing pivot or collider changes the cursor anchor without cached legacy values;
+- targeting reads current profile geometry;
+- pivot and visual offset never become world coordinates;
+- authoring selection covers every live placeable profile;
+- every object-like catalog entry has one full lifecycle owner;
+- move and demolition resolve the same target;
+- resource movement preserves state and demolition undo restores it;
+- canon export includes live layout, colliders and all profiles;
 - authoring remains separate from gameplay persistence;
 - build orchestration remains outside `src/main.js`.
 
 ## Current baseline
 
-Construction supports placement, move, demolition and grouped undo through `WorldBuildCoordinator`. Placeable origins are grid-normalized. The editor supports collider, pivot, visual offset, crop, approach directions, backup and canonical profile/layout writes.
+Furniture, kitchen facilities, special objects and resources support placement, movement, demolition, grouped undo and shared pivot/visual authoring.
 
 ## Not yet
 
-Rotation, gameplay construction persistence, history, general map editing, multiplayer editing and further native expedition props.
+Rotation, gameplay construction persistence, history, general map editing and multiplayer editing.
 
 ## Evidence
 
-`check:build-mode`, `check:authoring`, `check:task-044`, `check:task-062`, `check:task-068`, `check:task-071`, `authoring-persistence.spec.js`.
+`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `authoring-persistence.spec.js`.

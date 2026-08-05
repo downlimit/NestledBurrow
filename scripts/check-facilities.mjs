@@ -29,7 +29,7 @@ assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, 
 assert(FACILITIES.every((facility) => Number.isInteger(facility.visual.x) && Number.isInteger(facility.visual.y)));
 assert(FACILITIES.filter((facility) => ["shower", "toilet"].includes(facility.facilityType)).every((facility) => facility.presentationPose));
 assert(FACILITIES.filter((facility) => !["shower", "toilet"].includes(facility.facilityType)).every((facility) => facility.presentationPose === null));
-assert(FACILITIES.filter((facility) => ["cutting-table", "gas-stove", "serving-table", "lemon-sack", "juicer"].includes(facility.facilityType)).every((facility) => facility.editable === false));
+assert(FACILITIES.every((facility) => facility.editable !== false), "every facility shown in build mode is movable and removable");
 for (const type of ["cutting-table", "gas-stove", "serving-table"]) {
   const asset = FACILITY_ASSETS[type];
   const path = `public/${asset.path}`;
@@ -65,6 +65,7 @@ assert(preloaded.some(([key, path]) => key === BED_ASSET.key && path === `/Nestl
 const facilitySource = readFileSync("src/facilities/facilityRuntime.js", "utf8");
 assert(facilitySource.includes("drawFacility(graphics, facility.facilityType)"), "runtime and build previews share the facility presentation adapter");
 assert(facilitySource.includes("pixelAlignedWorldPoint"), "facility graphics and serving dishes use the shared pixel-aligned render position");
+assert(facilitySource.includes('LEMONADE_FRAMES["lemon-sack-empty"]'), "empty lemon sacks remain visible build objects");
 const previewSource = readFileSync("src/facilities/facilityPreviewVisuals.js", "utf8");
 assert(previewSource.includes("bindSpriteVisual"));
 assert(!previewSource.includes("fillRect"));
@@ -99,6 +100,7 @@ const runtime = createFacilityRuntime(scene, {
 assert.equal(images.length, 9); assert.deepEqual([...colliders.values()].map((bounds) => [(bounds.right - bounds.left) / 16, (bounds.bottom - bounds.top) / 16]), [[2, 2], [1, 1], [3, 1], [2, 1], [1, 2], [2, 1], [1, 1], [1, 1]]);
 const motor = { position: null, movement: { velocity: { x: 3, y: -2 } } };
 for (const facility of FACILITIES.filter((candidate) => candidate.editable !== false)) {
+  if (["cutting-table", "gas-stove", "serving-table", "juicer", "lemon-sack"].includes(facility.facilityType)) continue;
   motor.position = { x: 123, y: 456 };
   assert.equal(runtime.toggle(facility.id, motor).status, "started");
   assert.deepEqual(motor.position, { x: 123, y: 456 }, `${facility.facilityType} interaction never moves the player motor`);
@@ -115,12 +117,14 @@ assert.equal(runtime.getVisualStates()[lemonSack.id]?.visible, true, "full start
 assert(colliders.has(lemonSack.id), "full starter sack blocks the world");
 kitchen.starterLemons = 0;
 runtime.syncKitchenVisuals();
-assert.equal(runtime.getVisualStates()[lemonSack.id], null, "depleted starter sack visual is removed");
-assert.equal(colliders.has(lemonSack.id), false, "depleted starter sack collider is removed");
-assert.equal(runtime.getInteractionDefinitions().some((facility) => facility.id === lemonSack.id), false, "depleted starter sack cannot be targeted");
-const fixedCuttingTable = FACILITIES.find((facility) => facility.facilityType === "cutting-table");
-assert.equal(runtime.remove(fixedCuttingTable.id), false, "fixed kitchen facilities cannot be removed");
-assert.equal(runtime.getDemolitionTargetAt(fixedCuttingTable.position), null, "fixed kitchen facilities cannot be selected for demolition");
+assert.equal(runtime.getVisualStates()[lemonSack.id]?.visible, true, "depleted starter sack remains visible as furniture");
+assert.equal(colliders.has(lemonSack.id), true, "depleted starter sack remains a build object");
+assert.equal(runtime.getInteractionDefinitions().some((facility) => facility.id === lemonSack.id), false, "depleted starter sack cannot be targeted for taking lemons");
+const cuttingTable = FACILITIES.find((facility) => facility.facilityType === "cutting-table");
+assert(runtime.getDemolitionTargetAt(cuttingTable.position), "kitchen facilities can be selected for demolition");
+assert.equal(runtime.remove(cuttingTable.id), true, "kitchen facilities can be removed");
+assert.equal(runtime.getDefinition(cuttingTable.id), null);
+assert.equal(runtime.restore(cuttingTable), true, "removed kitchen facilities can be restored by undo");
 const shower = runtime.getDefinitions().find((facility) => facility.facilityType === "shower");
 blockFacilityPlacement = true;
 assert.equal(runtime.replace(shower, { validateFootprint: false }), true, "canonical restore bypasses transient footprint and use-position blockers");
@@ -128,9 +132,9 @@ blockFacilityPlacement = false;
 const movedShower = runtime.move(shower.id, { x: 640, y: 320 });
 assert(movedShower && runtime.getDefinition(shower.id).footprint.x === 640, "editable facility moves to a snapped destination");
 assert.equal(runtime.replace(movedShower.previous), true, "facility move can be undone with its original definition");
-const movedCuttingTable = runtime.move(fixedCuttingTable.id, { x: 640, y: 320 });
-assert(movedCuttingTable && runtime.getDefinition(fixedCuttingTable.id).footprint.x === 640, "fixed kitchen facilities can move while remaining protected from demolition");
-assert.equal(runtime.replace(movedCuttingTable.previous), true, "fixed kitchen facility move supports undo");
+const movedCuttingTable = runtime.move(cuttingTable.id, { x: 640, y: 320 });
+assert(movedCuttingTable && runtime.getDefinition(cuttingTable.id).footprint.x === 640, "kitchen facilities move through the same build lifecycle");
+assert.equal(runtime.replace(movedCuttingTable.previous), true, "kitchen facility move supports undo");
 const servingTable = runtime.getDefinitions().find((facility) => facility.facilityType === "serving-table");
 const movedServingTable = runtime.move(servingTable.id, { x: 672, y: 320 });
 assert(movedServingTable, "serving table can move");
@@ -152,4 +156,4 @@ assert.notDeepEqual(
   "each serving table owns its own dish visual",
 );
 runtime.destroy(); runtime.destroy(); assert.equal(colliders.size, 0); assert(images.every((image) => image.destroyed));
-console.log("facility checks passed: canonical furniture sprites, independent serving visuals, interaction and teardown");
+console.log("facility checks passed: all furniture is editable, empty sacks persist, serving visuals remain independent, and teardown is clean");

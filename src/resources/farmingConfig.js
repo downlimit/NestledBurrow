@@ -75,6 +75,8 @@ export const STARTER_WELL = Object.freeze({
   id: "farm-well-1",
   x: 544,
   y: 496,
+  // Compatibility marker for old saves/tests. Build-mode editability is owned
+  // by the placeable lifecycle and does not consult this field.
   fixed: true,
 });
 

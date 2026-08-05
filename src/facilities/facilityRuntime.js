@@ -199,14 +199,15 @@ export function createFacilityRuntime(scene, {
       kitchen?.stoveRepaired ? stove.visual.key : BROKEN_STOVE_TEXTURE_KEY,
       0,
     );
-    const sack = [...definitions.values()].find((facility) => facility.facilityType === "lemon-sack");
-    if (sack && kitchen?.starterLemons > 0) {
+    const sacks = [...definitions.values()].filter((facility) => facility.facilityType === "lemon-sack");
+    for (const sack of sacks) {
       if (!visuals.has(sack.id)) createVisual(sack, { validateFootprint: false });
-      visuals.get(sack.id)?.setTexture?.(LEMONADE_TEXTURE_KEY, LEMONADE_FRAMES["lemon-sack-full"]);
-    } else if (sack) {
-      visuals.get(sack.id)?.destroy?.();
-      visuals.delete(sack.id);
-      worldLayout.clearWorldObjectCollider(sack.id);
+      visuals.get(sack.id)?.setTexture?.(
+        LEMONADE_TEXTURE_KEY,
+        kitchen?.starterLemons > 0
+          ? LEMONADE_FRAMES["lemon-sack-full"]
+          : LEMONADE_FRAMES["lemon-sack-empty"],
+      );
     }
     const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
     const servingTables = [...definitions.values()].filter((facility) => facility.facilityType === "serving-table");
