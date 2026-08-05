@@ -20,6 +20,7 @@ const BED_RUNTIME_PATCH = Symbol("nestledBurrowBedRuntimeConsistencyPatch");
 const FACILITY_RUNTIME_PATCH = Symbol("nestledBurrowFacilityRuntimeConsistencyPatch");
 const FARMING_RUNTIME_PATCH = Symbol("nestledBurrowFarmingRuntimeConsistencyPatch");
 const BED_PROFILE_KEY = "furniture:bed";
+const GAZE_RANKED_FACILITY_TYPES = new Set(["shower", "toilet", "table"]);
 
 if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
   const originalSetActive = BuildModeRuntime.prototype.setActive;
@@ -77,6 +78,16 @@ function registeredCollider(scene, id, fallback, profileKey) {
     ?? fallback;
 }
 
+function facilityInteraction(definition, geometry) {
+  const interaction = livePlaceableInteraction(definition, geometry);
+  if (!interaction || GAZE_RANKED_FACILITY_TYPES.has(definition?.facilityType)) return interaction;
+  return Object.freeze({
+    ...interaction,
+    targetingMode: "priority-distance",
+    targetingGroup: null,
+  });
+}
+
 function patchFacilityRuntime(runtime, scene) {
   if (!runtime || !scene || runtime[FACILITY_RUNTIME_PATCH]) return;
 
@@ -109,7 +120,7 @@ function patchFacilityRuntime(runtime, scene) {
 
   function currentDefinition(definition) {
     if (!definition) return null;
-    const interaction = livePlaceableInteraction(definition, currentGeometry(definition));
+    const interaction = facilityInteraction(definition, currentGeometry(definition));
     return Object.freeze({
       ...interaction,
       usePosition: definition.usePosition ?? derivedFacilityUsePosition(definition),
@@ -145,7 +156,7 @@ function patchFacilityRuntime(runtime, scene) {
   if (originalGetInteractionDefinitions) {
     runtime.getInteractionDefinitions = () => originalGetInteractionDefinitions().map((definition) => {
       const raw = originalGetDefinition(definition.id) ?? originalGetDefinition(definition.entityId);
-      const current = livePlaceableInteraction(raw ?? definition, currentGeometry(raw ?? definition));
+      const current = facilityInteraction(raw ?? definition, currentGeometry(raw ?? definition));
       return Object.freeze({
         ...definition,
         ...current,
