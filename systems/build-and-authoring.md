@@ -31,9 +31,9 @@ Starter well, tavern sign and training dummy use the same lifecycle. A fixed wor
 
 One versioned profile owns collider, pivot, visual offset, crop and approach directions. Mouse and `1 px` keyboard edits are supported; active editing suppresses player movement.
 
-Pivot and visual offset are asset-space vectors relative to the same current placement anchor. They never contain world, layout, spawn or historical object coordinates. Moving the pivot leaves the visual in place; moving the visual leaves the pivot in place.
+Pivot and visual offset are relative asset-space vectors. Moving either one never rewrites the object's world placement. Resetting visual offset preserves the current pivot and restores the canonical visual-to-pivot relation; it never reads starting-layout, footprint-origin or other legacy world coordinates.
 
-`Reset visual offset` preserves the current pivot and restores the canonical visual-to-pivot relation. It must not copy an old absolute visual offset or consult starting-layout coordinates. Therefore a reset cannot return an object to an earlier world position, even when a browser draft was created many branches ago.
+Authoring selection is assembled from every live placeable profile, including beds, facilities, resources, wells, tavern signs and training dummies. New catalog objects cannot require a separate hand-written pivot-selection list.
 
 Collider rounding uses the live draft: remove `2 px` padding, snap to cells, restore padding. Crop keeps one visible pixel. Browser storage may hold drafts/backups; canonical profiles own geometry. Layout normalization discards stored derived interaction/pose coordinates. `NEW GAME` restores the authored baseline.
 
@@ -42,9 +42,8 @@ Collider rounding uses the live draft: remove `2 px` padding, snap to cells, res
 - orchestration: `src/build/worldBuildCoordinator.js`;
 - lifecycle: `src/build/placeableBuildProtocol.js`, `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeableBuildGeometry.js`;
 - UI/input: `src/build/buildModeRuntime.js`, `src/build/assetAuthoringInput.js`;
-- profile relations: `src/build/assetProfileRelations.js`;
-- geometry: `src/build/buildWorldGeometry.js`, `src/build/assetGridPlacement.js`, `src/build/liveAssetGeometry.js`, `src/build/assetProfiles.js`;
-- authoring: `src/build/editorAuthoringRuntime.js`, `src/build/editorAuthoringBootstrap.js`, `src/build/assetRuntimeConsistencyBootstrap.js`, `src/build/startingLayout.js`.
+- geometry: `src/build/buildWorldGeometry.js`, `src/build/assetGridPlacement.js`, `src/build/liveAssetGeometry.js`, `src/build/assetProfiles.js`, `src/build/assetProfileRelations.js`;
+- authoring: `src/build/editorAuthoringBootstrap.js`, `src/build/universalPlaceableAuthoring.js`, `src/build/assetRuntimeConsistencyBootstrap.js`, `src/build/startingLayout.js`.
 
 `WorldBuildCoordinator` owns previews, grouped actions and undo. Runtime owners own the entities. `WorldScene` remains composition only.
 
@@ -53,18 +52,19 @@ Collider rounding uses the live draft: remove `2 px` padding, snap to cells, res
 - footprint origins are exact grid coordinates;
 - targeting reads current profile geometry;
 - drag anchors do not alter footprint alignment;
+- pivot and visual offset never become alternate world coordinates;
+- visual reset uses current pivot plus canonical asset-space relation only;
+- authoring selection covers every live placeable profile;
 - every object-like catalog entry has one full lifecycle owner;
 - catalog entries name and preview objects, not gameplay actions;
 - move and demolition resolve the same target;
 - resource movement preserves state and demolition undo restores it;
-- pivot and visual offset are relative asset-space values, never world coordinates;
-- visual reset preserves the current pivot and canonical relative relation;
 - authoring remains separate from gameplay persistence;
 - build orchestration remains outside `src/main.js`.
 
 ## Current baseline
 
-Furniture, kitchen facilities, special world objects and resource profiles support placement, movement, demolition and grouped undo. Berry bushes, trees, logs, stones and ruby nodes are real resource-runtime placeables. Visual reset is pivot-relative and independent of historical layout positions.
+Furniture, kitchen facilities, special world objects and resource profiles support placement, movement, demolition, grouped undo and shared pivot/visual authoring. Berry bushes, trees, logs, stones and ruby nodes are real resource-runtime placeables.
 
 ## Not yet
 
