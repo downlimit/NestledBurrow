@@ -10,6 +10,7 @@ import {
   liveFacilityGeometry,
   liveFacilityPresentationPose,
   livePlaceableInteraction,
+  PLACEABLE_TARGETING_GROUP,
 } from "./liveAssetGeometry.js";
 
 const BUILD_GRID_PATCH = Symbol("nestledBurrowBuildGridVisibilityPatch");
@@ -17,6 +18,7 @@ const LOCATION_RUNTIME_PATCH = Symbol("nestledBurrowAssetRuntimeConsistencyLocat
 const PANEL_PATCH = Symbol("nestledBurrowAssetRuntimeConsistencyPanelPatch");
 const BED_RUNTIME_PATCH = Symbol("nestledBurrowBedRuntimeConsistencyPatch");
 const FACILITY_RUNTIME_PATCH = Symbol("nestledBurrowFacilityRuntimeConsistencyPatch");
+const FARMING_RUNTIME_PATCH = Symbol("nestledBurrowFarmingRuntimeConsistencyPatch");
 const BED_PROFILE_KEY = "furniture:bed";
 
 if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
@@ -64,6 +66,7 @@ function installCurrentAssetRuntime(scene) {
   const owners = scene?.worldLocationRuntime?.getOwners?.() ?? {};
   patchFacilityRuntime(owners.facilityRuntime, scene);
   patchBedRuntime(owners.debrisRuntime, scene);
+  patchFarmingRuntime(owners.farmingRuntime, scene);
   scene?.interactionRuntime?.refresh?.();
 }
 
@@ -244,4 +247,32 @@ function patchBedRuntime(runtime, scene) {
   }
 
   Object.defineProperty(runtime, BED_RUNTIME_PATCH, { value: true });
+}
+
+function patchFarmingRuntime(runtime, scene) {
+  if (!runtime || !scene || runtime[FARMING_RUNTIME_PATCH]) return;
+  const originalGetInteractionDefinitions = runtime.getInteractionDefinitions?.bind(runtime);
+  if (!originalGetInteractionDefinitions) return;
+
+  runtime.getInteractionDefinitions = () => originalGetInteractionDefinitions().map((definition) => {
+    const collider = scene.worldLayout?.getWorldObjectColliders?.().find(({ id }) => (
+      id === definition.entityId || id === definition.id
+    ))?.rect;
+    if (!collider) return definition;
+    const centre = Object.freeze({
+      x: (collider.left + collider.right) / 2,
+      y: (collider.top + collider.bottom) / 2,
+    });
+    return Object.freeze({
+      ...definition,
+      position: centre,
+      aimPosition: centre,
+      requiresFacing: false,
+      facingDotThreshold: -1,
+      targetingMode: "facing-first",
+      targetingGroup: PLACEABLE_TARGETING_GROUP,
+    });
+  });
+
+  Object.defineProperty(runtime, FARMING_RUNTIME_PATCH, { value: true });
 }
