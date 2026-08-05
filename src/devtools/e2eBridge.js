@@ -23,10 +23,10 @@ export function installWorldE2EBridge(scene) {
       scene.interactionRuntime?.refresh();
     },
     placePlayerNear: (entityId) => {
-      forcedFacilityId = null;
+      const facility = getLocationOwners().facilityRuntime?.getDefinition?.(entityId) ?? null;
+      forcedFacilityId = facility ? entityId : null;
       const placed = placePlayerNear(scene, entityId);
-      if (!placed && getLocationOwners().facilityRuntime?.getDefinition?.(entityId)) forcedFacilityId = entityId;
-      return placed || Boolean(forcedFacilityId);
+      return placed || Boolean(facility);
     },
     placePlayerAt: ({ x, y, facing = { x: 0, y: -1 } }) => {
       forcedFacilityId = null;
