@@ -6,7 +6,7 @@ Owns movement, time, sleep, energy and `0..100` needs. HUD order: N novelty, E e
 
 ## Time, energy and satiety
 
-One hour is `60` real seconds. Waking E/hour: ordinary `5`, walking `5.5`, running `8`. Actions: axe `0.2`, pickaxe `0.3`, hoe `0.15`, watering `0.1`, sword `0.75`, battle axe `0.1`.
+One hour is `60` real seconds. Waking E/hour: ordinary `5`, walking `5.5`, running `8`. Base actions: axe `0.2`, pickaxe `0.3`, hoe `0.15`, watering `0.1`, sword `0.75`, battle axe `0.1`. Targets: `20h` near-idle, `16..18h` normal, `14..16h` heavy.
 
 Waking rates: `S -7/hour`, `T -6/hour`, `N -1/hour`, `D -2/hour` without friendly company. L depends on activity.
 
@@ -58,13 +58,15 @@ At `L=0`, speed is `0.5x` and N drain `1.5x`. E/L compose with a `0.5..1` clamp;
 
 ## Novelty and dialogue
 
-After three identical physical actions, repeats cost `1 N` and use `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use has three free uses, then `-1 N`. Accepted melee spends E on misses and is blocked when unaffordable.
+After three identical physical actions, repeats cost `1 N` and use `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use has its own key: three free uses, then `-1 N`; another non-ordinary activity resets it. Accepted melee spends E on misses and is blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
 
 NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may restore D/E. Solo-rest E multiplier is `1 - 0.25 * pressure(D,30)`; D pressure raises novelty drain up to `1.25`.
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use radius, perimeter and wall checks; A* runs only after activation. Collider-backed world targets share one facing-first group: among nearby valid targets, player aim wins before priority or distance. Walls block routes. Profiles filter perimeter points by eight directions. A one-cell object exposes eight surrounding cell centres; wider objects expose corners and edge cells. Disabled classes are removed before probe/routing; at least one remains enabled. Crossing a point counts as arrival. Enter/exit interpolate a pose derived from current asset geometry without moving the motor. Effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use radius, perimeter and wall checks; A* runs only after activation. Walls block routes. Profiles filter perimeter points by eight directions. A one-cell object exposes eight candidate cells; wider objects expose corners and edge cells. Disabled classes are removed before probe and exact routing; at least one remains enabled. Crossing a point counts as arrival. Enter/exit interpolate presentation without moving the motor. Effects run only in active.
+
+Gaze ranks nearby collider targets; it does not gate availability or replace exact routing.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -73,15 +75,14 @@ Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use radius
 | table/eating | S | 500 ms | 650 ms | 300 ms |
 | bed/sleep | E | 1000 ms | 1200 ms | 500 ms |
 
-The target need is protected through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Timelines are transient; load resumes `free`.
+The target need is protected through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
 
 ## Invariants
 
 - formulas stay deterministic, framework-free and JSON-safe;
 - time drain and discrete costs are additive;
 - presentation never rewrites safe motor position;
-- placeable target selection uses current collider/visual geometry and player aim;
-- approach masks change automatic positioning, not effects;
+- approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
 - saves exclude debug presets and interaction timeline state.
 
