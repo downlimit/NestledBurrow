@@ -5,6 +5,8 @@ import { drawResourceVisual } from "../resources/resourceVisuals.js";
 import { WELL_PROFILE } from "../resources/farmingConfig.js";
 import { FACILITY_ASSETS } from "../facilities/facilityConfig.js";
 import { drawFacility } from "../facilities/facilityPreviewVisuals.js";
+import { TRAINING_DUMMY } from "../combat/meleeConfig.js";
+import { TAVERN_SIGN, TAVERN_SIGN_BUILD_KIND } from "../tavern/guestConfig.js";
 import { TILE_SIZE } from "../world/worldConfig.js";
 import { PLACEABLE_BUILD_OWNER_IDS } from "./placeableBuildProtocol.js";
 import {
@@ -22,6 +24,8 @@ import {
 
 export function createDefaultPlaceableBuildOwners(scene, owners, coordinator) {
   return [
+    createTavernSignAdapter(scene, owners.tavernSignRuntime),
+    createTrainingDummyAdapter(scene, owners.meleeRuntime),
     createWellAdapter(scene, coordinator),
     createFacilityAdapter(scene, owners.facilityRuntime),
     createBedAdapter(scene, owners.debrisRuntime),
@@ -65,7 +69,10 @@ function createBedAdapter(scene, runtime) {
         .find((target) => target && contains(target.bounds, point)) ?? null;
     },
     getPlacementAnchorOffset: () => midpointAnchor(scene, profileKey, {
-      left: 0, right: TILE_SIZE, top: 0, bottom: TILE_SIZE,
+      left: 0,
+      right: TILE_SIZE,
+      top: 0,
+      bottom: TILE_SIZE,
     }),
     isPlacementBlocked(_item, point, ignoreId = null) {
       const base = { left: point.x, right: point.x + TILE_SIZE, top: point.y, bottom: point.y + TILE_SIZE };
@@ -75,7 +82,9 @@ function createBedAdapter(scene, runtime) {
       const definition = runtime.addBed(point);
       return definition ? { id: definition.id, definition } : null;
     },
-    move(target, point) { return runtime.moveBed(target.id ?? target.definition?.id, point); },
+    move(target, point) {
+      return runtime.moveBed(target.id ?? target.definition?.id, point);
+    },
     remove(target) {
       const definition = target.definition ?? runtime.getBedDefinitions().find(({ id }) => id === target.id);
       return definition && runtime.removeBed(definition.id) ? definition : null;
@@ -145,7 +154,10 @@ function createFacilityAdapter(scene, runtime) {
       const asset = FACILITY_ASSETS[item.facilityType];
       if (!asset) return { x: 0, y: 0 };
       return midpointAnchor(scene, `facility:${item.facilityType}`, {
-        left: 0, right: asset.width, top: 0, bottom: asset.height,
+        left: 0,
+        right: asset.width,
+        top: 0,
+        bottom: asset.height,
       });
     },
     isPlacementBlocked(item, point, ignoreId = null) {
@@ -160,12 +172,16 @@ function createFacilityAdapter(scene, runtime) {
       const definition = runtime.add(item.facilityType, point);
       return definition ? { id: definition.id, definition } : null;
     },
-    move(target, point) { return runtime.move(target.id ?? target.definition?.id, point); },
+    move(target, point) {
+      return runtime.move(target.id ?? target.definition?.id, point);
+    },
     remove(target) {
       const definition = target.definition ?? runtime.getDefinition(target.id);
       return definition && runtime.remove(definition.id) ? definition : null;
     },
-    restore(definition) { return runtime.replace?.(definition) ?? runtime.restore(definition); },
+    restore(definition) {
+      return runtime.replace?.(definition) ?? runtime.restore(definition);
+    },
     renderPreview(item, point, { blocked = false, demolition = false } = {}) {
       const facilityType = item.facilityType ?? item.definition?.facilityType;
       const profileKey = `facility:${facilityType}`;
@@ -333,7 +349,9 @@ function createWellAdapter(scene, coordinator) {
       return result?.status === "placed" ? { id: result.id, definition: result.definition } : null;
     },
     move: (target, point) => runtime.move(target, point),
-    remove(target) { return runtime.removeAt(target.definition ?? target); },
+    remove(target) {
+      return runtime.removeAt(target.definition ?? target);
+    },
     restore(definition) {
       const current = runtime.getWellState?.().find(({ id }) => id === definition?.id);
       if (current) runtime.removeAt(current);
@@ -343,6 +361,118 @@ function createWellAdapter(scene, coordinator) {
       scene.interactionRuntime?.refresh?.();
       coordinator.persistGameplay?.();
     },
+  };
+}
+
+function createTavernSignAdapter(scene, runtime) {
+  if (!runtime?.getBuildMoveTargetAt || !runtime?.placeBuildTarget || !runtime?.removeBuildTarget) return null;
+  return {
+    id: PLACEABLE_BUILD_OWNER_IDS.tavernSign,
+    matchesItem: (item) => item?.placement === TAVERN_SIGN_BUILD_KIND,
+    getTargetAt: (point) => runtime.getBuildMoveTargetAt(point),
+    getPlacementAnchorOffset: () => ({ ...TAVERN_SIGN.snapAnchorOffset }),
+    isPlacementBlocked: (_item, point) => runtime.isBuildPlacementBlocked(point),
+    place(_item, point) {
+      const definition = runtime.placeBuildTarget(point);
+      return definition ? { id: definition.id, definition } : null;
+    },
+    move: (_target, point) => runtime.moveBuildTarget(point),
+    remove: () => runtime.removeBuildTarget(),
+    restore: (definition) => runtime.restoreBuildTarget(definition),
+    renderPreview: (_item, point) => runtime.renderBuildPreview(point),
+    afterMutation: () => scene.interactionRuntime?.refresh?.(),
+  };
+}
+
+function createTrainingDummyAdapter(scene, runtime) {
+  const initialState = runtime?.getState?.()?.dummy;
+  if (!runtime?.getBuildMoveTargetAt || !runtime?.moveBuildTarget || !runtime?.restoreBuildTarget || !initialState) return null;
+  const initialTarget = runtime.getBuildMoveTargetAt(initialState.position);
+  const targets = initialTarget?.targets ?? [];
+  const offMap = {
+    x: (scene.worldLayout?.bounds?.left ?? 0) - 4096,
+    y: (scene.worldLayout?.bounds?.top ?? 0) - 4096,
+  };
+  let present = true;
+
+  function definitionAt(point) {
+    return {
+      id: TRAINING_DUMMY.id,
+      kind: "training-dummy",
+      position: { x: Number(point.x), y: Number(point.y) },
+    };
+  }
+
+  function setTargetsVisible(value) {
+    for (const target of targets) target.setVisible?.(value);
+  }
+
+  function targetAt(point) {
+    if (!present) return null;
+    const target = runtime.getBuildMoveTargetAt(point);
+    if (!target) return null;
+    const position = target.placementPosition ?? runtime.getState?.()?.dummy?.position;
+    return {
+      ...target,
+      id: TRAINING_DUMMY.id,
+      definition: definitionAt(position),
+      bounds: {
+        left: position.x,
+        right: position.x + TRAINING_DUMMY.asset.width,
+        top: position.y,
+        bottom: position.y + TRAINING_DUMMY.asset.height,
+      },
+    };
+  }
+
+  function blocked(point, ignoreId = null) {
+    const collision = TRAINING_DUMMY.asset.collision;
+    const box = {
+      left: point.x + collision.left,
+      top: point.y + collision.top,
+      right: point.x + collision.right,
+      bottom: point.y + collision.bottom,
+    };
+    const bounds = scene.worldLayout?.bounds;
+    if (bounds && (box.left < bounds.left || box.top < bounds.top || box.right > bounds.right || box.bottom > bounds.bottom)) {
+      return true;
+    }
+    return isBlocked(scene, box, ignoreId ?? TRAINING_DUMMY.id);
+  }
+
+  return {
+    id: PLACEABLE_BUILD_OWNER_IDS.trainingDummy,
+    matchesItem: (item) => item?.placement === "training-dummy",
+    getTargetAt: targetAt,
+    getPlacementAnchorOffset: () => ({ x: 8, y: 16 }),
+    isPlacementBlocked: (_item, point, ignoreId = null) => blocked(point, ignoreId),
+    place(_item, point) {
+      if (present || blocked(point, TRAINING_DUMMY.id)) return null;
+      runtime.restoreBuildTarget(point);
+      present = true;
+      setTargetsVisible(true);
+      const definition = definitionAt(point);
+      return { id: definition.id, definition };
+    },
+    move: (_target, point) => runtime.moveBuildTarget(point),
+    remove(target) {
+      if (!present) return null;
+      const removed = target?.definition ?? definitionAt(runtime.getState?.()?.dummy?.position);
+      runtime.restoreBuildTarget(offMap);
+      present = false;
+      setTargetsVisible(false);
+      return removed;
+    },
+    restore(definition) {
+      const point = definition?.position ?? definition;
+      if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return false;
+      runtime.restoreBuildTarget(point);
+      present = true;
+      setTargetsVisible(true);
+      return true;
+    },
+    renderPreview: (_item, point) => runtime.renderBuildPreview(point),
+    afterMutation: () => scene.interactionRuntime?.refresh?.(),
   };
 }
 
