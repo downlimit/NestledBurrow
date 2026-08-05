@@ -4,29 +4,37 @@ import { getCurrentWorldScene } from "../build/worldSceneRegistry.js";
 import { perimeterInteractionPointEntries } from "../interaction/interactionApproach.js";
 
 const INSTALL_MARKER = Symbol("nestledBurrowStableE2EPlacement");
+const BRIDGE_KEY = "__NESTLED_BURROW_E2E__";
 
 if (import.meta.env.VITE_E2E) installStableE2EPlacement();
 
 function installStableE2EPlacement() {
-  const tryInstall = () => {
+  const host = globalThis.window;
+  if (!host) return;
+  let bridgeValue = host[BRIDGE_KEY] ?? null;
+
+  Object.defineProperty(host, BRIDGE_KEY, {
+    configurable: true,
+    enumerable: true,
+    get: () => bridgeValue,
+    set: (value) => {
+      bridgeValue = value;
+      patchBridge(value);
+    },
+  });
+  if (bridgeValue) patchBridge(bridgeValue);
+}
+
+function patchBridge(bridge) {
+  if (!bridge || bridge[INSTALL_MARKER]) return;
+  const fallbackPlacePlayerNear = bridge.placePlayerNear?.bind(bridge);
+  bridge.placePlayerNear = (entityId) => {
     const scene = getCurrentWorldScene();
-    const bridge = globalThis.window?.__NESTLED_BURROW_E2E__;
-    if (!scene || !bridge) {
-      globalThis.requestAnimationFrame?.(tryInstall);
-      return;
-    }
-    if (bridge[INSTALL_MARKER]) return;
-
-    const fallbackPlacePlayerNear = bridge.placePlayerNear?.bind(bridge);
-    bridge.placePlayerNear = (entityId) => (
-      placePlayerAtLiveInteraction(scene, entityId)
+    return Boolean(scene && placePlayerAtLiveInteraction(scene, entityId))
       || fallbackPlacePlayerNear?.(entityId)
-      || false
-    );
-    Object.defineProperty(bridge, INSTALL_MARKER, { value: true });
+      || false;
   };
-
-  globalThis.requestAnimationFrame?.(tryInstall);
+  Object.defineProperty(bridge, INSTALL_MARKER, { value: true });
 }
 
 function placePlayerAtLiveInteraction(scene, entityId) {
