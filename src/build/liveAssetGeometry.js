@@ -22,6 +22,17 @@ const BED_DERIVED_FIELDS = Object.freeze([
   "targetingGroup",
 ]);
 
+const FACILITY_USE_OFFSETS = Object.freeze({
+  shower: Object.freeze({ x: 40, y: 24 }),
+  toilet: Object.freeze({ x: 40, y: 24 }),
+  table: Object.freeze({ x: -24, y: 24 }),
+  "cutting-table": Object.freeze({ x: 24, y: 24 }),
+  "gas-stove": Object.freeze({ x: 24, y: 24 }),
+  "serving-table": Object.freeze({ x: 24, y: 24 }),
+  juicer: Object.freeze({ x: 24, y: 8 }),
+  "lemon-sack": Object.freeze({ x: 24, y: 8 }),
+});
+
 function finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -59,6 +70,20 @@ export function canonicalBedDefinition(definition) {
   return definition ? Object.freeze(withoutFields(definition, BED_DERIVED_FIELDS)) : null;
 }
 
+export function derivedFacilityUsePosition(definition) {
+  const footprint = definition?.footprint;
+  if (!footprint) return null;
+  const fallback = {
+    x: Math.max(1, finite(footprint.width, 1)) / 2,
+    y: Math.max(1, finite(footprint.height, 1)) + 8,
+  };
+  const offset = FACILITY_USE_OFFSETS[definition.facilityType] ?? fallback;
+  return Object.freeze({
+    x: finite(footprint.x) + finite(offset.x),
+    y: finite(footprint.y) + finite(offset.y),
+  });
+}
+
 export function hydrateFacilityRuntimeDefinition(definition) {
   if (!definition?.footprint) return definition;
   const canonical = canonicalFacilityDefinition(definition);
@@ -66,10 +91,10 @@ export function hydrateFacilityRuntimeDefinition(definition) {
   return Object.freeze({
     ...canonical,
     position: center,
-    usePosition: center,
+    usePosition: derivedFacilityUsePosition(canonical),
     presentationPose: null,
-    requiresFacing: true,
-    facingDotThreshold: 0,
+    requiresFacing: false,
+    facingDotThreshold: -1,
     targetingMode: "facing-first",
     targetingGroup: PLACEABLE_TARGETING_GROUP,
   });
@@ -139,8 +164,8 @@ export function livePlaceableInteraction(definition, geometry, { position = "int
     ...canonical,
     position: position === "visual" ? geometry.visualCenter : geometry.interactionCenter,
     aimPosition: geometry.interactionCenter,
-    requiresFacing: true,
-    facingDotThreshold: 0,
+    requiresFacing: false,
+    facingDotThreshold: -1,
     targetingMode: "facing-first",
     targetingGroup: PLACEABLE_TARGETING_GROUP,
   });
