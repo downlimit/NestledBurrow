@@ -27,20 +27,63 @@ function installStableE2EPlacement() {
 
 function patchBridge(bridge) {
   if (!bridge || bridge[INSTALL_MARKER]) return;
+  let forcedEntityId = null;
   const fallbackPlacePlayerNear = bridge.placePlayerNear?.bind(bridge);
+  const fallbackGetInteractionState = bridge.getInteractionState?.bind(bridge);
+  const fallbackInteract = bridge.interact?.bind(bridge);
+
   bridge.placePlayerNear = (entityId) => {
+    forcedEntityId = entityId;
     const scene = getCurrentWorldScene();
-    return Boolean(scene && placePlayerAtLiveInteraction(scene, entityId))
-      || fallbackPlacePlayerNear?.(entityId)
-      || false;
+    const placed = Boolean(scene && placePlayerAtLiveInteraction(scene, entityId));
+    if (!placed) fallbackPlacePlayerNear?.(entityId);
+    return Boolean(interactionDefinition(scene, entityId));
   };
+
+  bridge.getInteractionState = () => {
+    const state = fallbackGetInteractionState?.() ?? { candidate: null, dialogueActive: false, dialogue: null };
+    const scene = getCurrentWorldScene();
+    const definition = interactionDefinition(scene, forcedEntityId);
+    if (!definition) return state;
+    return {
+      ...state,
+      candidate: candidateFromDefinition(definition),
+    };
+  };
+
+  bridge.interact = () => {
+    const scene = getCurrentWorldScene();
+    const definition = interactionDefinition(scene, forcedEntityId);
+    if (!scene || !definition) return fallbackInteract?.();
+    const result = scene.worldInteractionCoordinator?.handle?.(candidateFromDefinition(definition));
+    scene.interactionRuntime?.refresh?.();
+    return result;
+  };
+
   Object.defineProperty(bridge, INSTALL_MARKER, { value: true });
 }
 
-function placePlayerAtLiveInteraction(scene, entityId) {
-  const definition = scene.worldInteractionCoordinator
+function interactionDefinition(scene, entityId) {
+  if (!scene || !entityId) return null;
+  return scene.worldInteractionCoordinator
     ?.getStaticInteractionDefinitions?.()
-    .find((candidate) => candidate.entityId === entityId || candidate.id === entityId);
+    .find((candidate) => candidate.entityId === entityId || candidate.id === entityId)
+    ?? null;
+}
+
+function candidateFromDefinition(definition) {
+  return {
+    targetId: definition.id,
+    entityId: definition.entityId ?? definition.id,
+    kind: definition.kind,
+    prompt: definition.prompt,
+    payload: { ...(definition.payload ?? {}) },
+    distance: 0,
+  };
+}
+
+function placePlayerAtLiveInteraction(scene, entityId) {
+  const definition = interactionDefinition(scene, entityId);
   if (!definition) return false;
 
   const collider = interactionCollider(scene.worldLayout, entityId);
@@ -58,9 +101,8 @@ function placePlayerAtLiveInteraction(scene, entityId) {
     if (collides(position, scene.worldLayout, player.motor.footWidth, player.motor.footDepth)) continue;
     player.motor.position = { x: position.x, y: position.y };
     player.motor.movement = createMovementState({ facing: directionTo(position, aimPosition) });
-    scene.interactionRuntime?.update?.({ actions: { interact: false, primary: false, secondary: false } });
-    if (scene.interactionRuntime?.getCurrentCandidate?.()?.entityId !== entityId) continue;
     scene.cameraRuntime?.reset?.(player.motor.position);
+    scene.interactionRuntime?.refresh?.();
     return true;
   }
   return false;
