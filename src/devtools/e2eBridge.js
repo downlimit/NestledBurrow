@@ -344,7 +344,8 @@ function placePlayerNear(scene, entityId) {
   }
   player.visual.setPresentationPose(null);
   scene.cameraRuntime?.reset(player.motor.position);
-  scene.interactionRuntime?.refresh?.();
+  if (!placed) scene.interactionRuntime?.refresh?.();
+  return placed;
 }
 
 function clone(value) {
