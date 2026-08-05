@@ -12,10 +12,17 @@ import {
 import { effectiveCollider, resourceColliderAt } from "./placeableBuildGeometry.js";
 import { PLACEABLE_BUILD_OWNER_IDS } from "./placeableBuildProtocol.js";
 
-function point(value = {}) {
+function profilePoint(value = {}) {
   return Object.freeze({
     x: Math.round(Number(value.x) || 0),
     y: Math.round(Number(value.y) || 0),
+  });
+}
+
+function placementPoint(value = {}) {
+  return Object.freeze({
+    x: Number(value.x) || 0,
+    y: Number(value.y) || 0,
   });
 }
 
@@ -66,10 +73,10 @@ function basePlacementCollider(adapterId, value, placement) {
 }
 
 export function resolvePlaceablePlacementPose(scene, profileKey, placementPosition) {
-  const placement = point(placementPosition);
+  const placement = placementPoint(placementPosition);
   const profile = scene.assetProfiles?.[profileKey] ?? {};
-  const pivotOffset = point(profile.snapAnchorOffset);
-  const visualOffset = point(profile.visualOffset);
+  const pivotOffset = profilePoint(profile.snapAnchorOffset);
+  const visualOffset = profilePoint(profile.visualOffset);
   const visualPosition = pixelAlignedWorldPoint({
     x: placement.x + visualOffset.x,
     y: placement.y + visualOffset.y,
@@ -90,10 +97,10 @@ export function resolvePlaceablePlacementPose(scene, profileKey, placementPositi
 export function resolvePlaceablePlacementAnchor(scene, adapterId, value = {}, placementPosition = { x: 0, y: 0 }) {
   const profileKey = profileKeyFor(adapterId, value);
   if (!profileKey) return null;
-  const placement = point(placementPosition);
+  const placement = placementPoint(placementPosition);
   const baseCollider = basePlacementCollider(adapterId, value, placement);
   if (!baseCollider) return null;
-  const pivotOffset = point(scene.assetProfiles?.[profileKey]?.snapAnchorOffset);
+  const pivotOffset = profilePoint(scene.assetProfiles?.[profileKey]?.snapAnchorOffset);
   return placementMidpointOffset({
     placementPosition: placement,
     pivotOffset,
