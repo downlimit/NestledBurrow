@@ -20,7 +20,6 @@ const BED_RUNTIME_PATCH = Symbol("nestledBurrowBedRuntimeConsistencyPatch");
 const FACILITY_RUNTIME_PATCH = Symbol("nestledBurrowFacilityRuntimeConsistencyPatch");
 const FARMING_RUNTIME_PATCH = Symbol("nestledBurrowFarmingRuntimeConsistencyPatch");
 const BED_PROFILE_KEY = "furniture:bed";
-const GAZE_RANKED_FACILITY_TYPES = new Set(["shower", "toilet", "table"]);
 
 if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
   const originalSetActive = BuildModeRuntime.prototype.setActive;
@@ -79,14 +78,7 @@ function registeredCollider(scene, id, fallback, profileKey) {
 }
 
 function facilityInteraction(definition, geometry) {
-  const interaction = livePlaceableInteraction(definition, geometry);
-  if (!interaction || GAZE_RANKED_FACILITY_TYPES.has(definition?.facilityType)) return interaction;
-  return Object.freeze({
-    ...interaction,
-    position: definition.usePosition ?? derivedFacilityUsePosition(definition) ?? interaction.position,
-    targetingMode: "priority-distance",
-    targetingGroup: null,
-  });
+  return livePlaceableInteraction(definition, geometry);
 }
 
 function patchFacilityRuntime(runtime, scene) {
