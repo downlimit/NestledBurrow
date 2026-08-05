@@ -11,10 +11,9 @@ Owns construction, placeable lifecycle and asset/layout editing.
 - the library shows object names and previews, never interaction verbs;
 - all editable facilities, resources, wells, tavern signs and training dummies appear in the library;
 - placement uses the `16 px` grid and one canonical placement position;
-- the cursor attaches to the current pivot;
-- preview and commit use the same position, pivot and visual offset;
+- the cursor anchor is the midpoint between the current pivot and current effective collider centre;
+- preview and commit use the same position, pivot, visual offset and effective collider;
 - the committed object appears on the exact preview pixels;
-- validation uses the current effective collider;
 - runtime construction is not gameplay-persisted.
 
 ## Universal placeable lifecycle
@@ -30,6 +29,8 @@ One owner descriptor drives move/demolition hover and commit. Bounds combine cur
 One versioned profile owns collider, pivot, visual offset, crop and approach directions. Mouse and `1 px` keyboard edits are supported; active editing suppresses player movement.
 
 Pivot and visual offset are asset-space vectors. Moving either never rewrites world placement. Visual reset preserves the current pivot and restores the canonical visual-to-pivot relation; it never reads layout, footprint-origin or legacy world coordinates.
+
+Editing either the pivot or collider immediately changes the build cursor anchor because that anchor is always recomputed from their current values. No cached or default anchor may override the live midpoint.
 
 Authoring selection covers every live placeable profile. New catalog objects cannot require a separate pivot-selection list.
 
@@ -50,7 +51,8 @@ Collider rounding uses the live draft: remove `2 px` padding, snap to cells, res
 ## Invariants
 
 - preview and commit use one exact placement pose;
-- the current pivot is the only cursor anchor;
+- cursor anchor equals the midpoint between live pivot and live effective collider centre;
+- changing pivot or collider changes the cursor anchor without cached legacy values;
 - targeting reads current profile geometry;
 - pivot and visual offset never become world coordinates;
 - authoring selection covers every live placeable profile;
