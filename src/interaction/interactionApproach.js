@@ -11,13 +11,8 @@ function finite(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function colliderTargeting(collider) {
-  return collider ? Object.freeze({
-    requiresFacing: false,
-    facingDotThreshold: -1,
-    targetingMode: "facing-first",
-    targetingGroup: PLACEABLE_TARGETING_GROUP,
-  }) : Object.freeze({});
+function usesPlaceablePerimeter(definition, collider) {
+  return Boolean(collider && definition?.targetingGroup === PLACEABLE_TARGETING_GROUP);
 }
 
 export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
@@ -36,7 +31,8 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
     const walls = probeWalls(sourceSnapshot);
-    if (definition.targetingMode === "facing-first") {
+    const collider = interactionCollider(worldLayout, definition);
+    if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
       const distance = Math.hypot(
         definition.position.x - sourceSnapshot.position.x,
         definition.position.y - sourceSnapshot.position.y,
@@ -51,7 +47,6 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
       };
     }
 
-    const collider = interactionCollider(worldLayout, definition);
     const points = interactionPoints(definition, collider);
     const nearest = points
       .flatMap((point) => {
@@ -75,14 +70,15 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         aimPosition.y - sourceSnapshot.position.y,
       ),
       payload: { ...definition.payload },
-      ...colliderTargeting(collider),
     };
   }
 
   function resolve(definition, sourceSnapshot) {
     if (definition.__interactionProbe) return probe(definition, sourceSnapshot);
     const collider = interactionCollider(worldLayout, definition);
-    if (definition.targetingMode === "facing-first" && !collider) return probe(definition, sourceSnapshot);
+    if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
+      return probe(definition, sourceSnapshot);
+    }
     const player = getPlayer();
     const points = interactionPoints(definition, collider);
     const aimPosition = definition.aimPosition ?? definition.position;
@@ -130,7 +126,6 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         aimPosition.y - sourceSnapshot.position.y,
       ),
       payload: { ...definition.payload, approachPoint: nearest.point, approachPath: nearest.path },
-      ...colliderTargeting(collider),
     };
   }
 
