@@ -103,9 +103,11 @@ for (const required of [
   "coordinator.demolishBuildObject =",
   "coordinator.recordBuildUndo",
   "createPlaceableThumbnail",
+  "Number(this.panel?.depth)",
 ]) {
   assert(contractSource.includes(required), `placeable lifecycle contract retains ${required}`);
 }
+assert(!contractSource.includes(".setDepth(9021)"), "placeable thumbnails cannot render below the HUD-depth build panel");
 
 const ownerSource = fs.readFileSync(new URL("../src/build/placeableBuildOwners.js", import.meta.url), "utf8");
 for (const required of [
@@ -135,4 +137,4 @@ const systemSource = fs.readFileSync(new URL("../systems/build-and-authoring.md"
 assert(systemSource.includes("place → move → remove → restore"));
 assert(systemSource.includes("berry-bush"));
 
-console.log("Task #072 contracts passed: the build library contains every facility, special object and resource with names, thumbnails and a full lifecycle owner");
+console.log("Task #072 contracts passed: the build library contains every facility, special object and resource with names, visible thumbnails and a full lifecycle owner");
