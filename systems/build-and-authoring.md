@@ -11,20 +11,20 @@ Owns player construction, placeable lifecycle and canonical layout/asset editing
 - build mode opens with no selected asset and shows the `16 px` grid;
 - placeables store a grid-aligned top-left footprint; new, restored and moved instances use the same normalization;
 - visual offset and pivot do not change occupied cells; validation uses effective profile colliders;
-- placement attachment is derived from the current pivot and effective collider centre;
-- movement preserves the grabbed point and grid-aligned footprint;
-- approach points, interaction aim and bed/facility poses derive from current profile geometry;
+- placement attachment derives from the current pivot and effective collider centre;
+- movement preserves the grabbed point and footprint alignment;
+- interaction aim and bed/facility poses derive from current profile geometry;
 - runtime construction is not gameplay-persisted.
 
 ## Universal placeable lifecycle
 
 Every object-like catalog entity declares `objectLike: true`, a stable `placeableOwner`, and one complete owner lifecycle: `place → move → remove → restore`.
 
-The owner supplies placement validation and one target descriptor used by move hover, pickup, demolition hover and demolition commit. Target bounds combine current visible geometry with the effective collider. Grouped undo restores through the same owner operation; partial place-only, move-only or remove-only catalog support is invalid.
+The owner supplies validation and one target descriptor for move hover, pickup, demolition hover and commit. Bounds combine current visible geometry with the effective collider. Grouped undo uses the same restoration operation; partial catalog support is invalid.
 
-`RESOURCE_PROFILES` drives resource catalog entries automatically. New profiles therefore become constructible, movable and removable through the resource owner. Current profiles include `tree-planted`, `berry-bush`, logs, stones and ruby nodes. Resource movement preserves node state; demolition removes it and undo restores it.
+`RESOURCE_PROFILES` drives resource catalog entries automatically. New profiles become constructible, movable and removable through the resource owner. Current profiles include `tree-planted`, `berry-bush`, logs, stones and ruby nodes. Movement preserves node state; demolition removes it and undo restores it.
 
-A world anchor may remain outside this contract only when it is absent from the catalog and explicitly fixed by its owner.
+A world anchor may remain outside this contract only when absent from the catalog and explicitly fixed by its owner.
 
 ## Developer-authoring contract
 
@@ -39,10 +39,10 @@ Browser storage may hold drafts/backups. Canonical profiles own geometry. Layout
 ## Owners
 
 - orchestration: `src/build/worldBuildCoordinator.js`;
-- placeables: `src/build/placeableBuildProtocol.js`, `placeableBuildContract.js`, `placeableBuildOwners.js`, `placeableBuildGeometry.js`;
-- UI/input: `src/build/buildModeRuntime.js`, `assetAuthoringInput.js`;
-- geometry/profiles: `src/build/buildWorldGeometry.js`, `assetGridPlacement.js`, `liveAssetGeometry.js`, `assetProfiles.js`;
-- authoring/baseline: `src/build/editorAuthoringBootstrap.js`, `assetRuntimeConsistencyBootstrap.js`, `startingLayout.js`.
+- placeables: `src/build/placeableBuildProtocol.js`, `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeableBuildGeometry.js`;
+- UI/input: `src/build/buildModeRuntime.js`, `src/build/assetAuthoringInput.js`;
+- geometry/profiles: `src/build/buildWorldGeometry.js`, `src/build/assetGridPlacement.js`, `src/build/liveAssetGeometry.js`, `src/build/assetProfiles.js`;
+- authoring/baseline: `src/build/editorAuthoringBootstrap.js`, `src/build/assetRuntimeConsistencyBootstrap.js`, `src/build/startingLayout.js`.
 
 `WorldBuildCoordinator` owns previews, grouped actions and undo. Runtime owners own beds/resources, facilities and wells. `WorldScene` remains composition only.
 
