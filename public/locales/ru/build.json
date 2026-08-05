@@ -1,0 +1,23 @@
+{
+  "groups": {
+    "facilities": "Мебель и объекты",
+    "resources": "Ресурсы"
+  },
+  "assets": {
+    "cuttingTable": "Разделочный стол",
+    "gasStove": "Газовая плита",
+    "servingTable": "Стол для подачи еды",
+    "juicer": "Соковыжималка",
+    "lemonSack": "Мешок с лимонами",
+    "well": "Колодец",
+    "tavernSign": "Вывеска таверны",
+    "trainingDummy": "Тренировочный манекен",
+    "tree": "Дерево",
+    "berryBush": "Куст лесных ягод",
+    "smallLog": "Малое бревно",
+    "largeLog": "Большое бревно",
+    "smallStone": "Малый камень",
+    "largeStone": "Большой камень",
+    "rubyNode": "Рубиновая жила"
+  }
+}
