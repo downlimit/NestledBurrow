@@ -6,6 +6,7 @@ import {
 } from "./colliderDebugOverrides.js";
 import {
   STARTING_LAYOUT_STORAGE_KEY,
+  captureStartingLayout,
   normalizeStartingLayout,
 } from "./startingLayout.js";
 import {
@@ -18,6 +19,7 @@ import { migrateDirectionalWallOverrides } from "./buildWorldGeometry.js";
 
 export const AUTHORING_BACKUP_VERSION = 3;
 export const AUTHORING_BACKUP_FILENAME = "nestledburrow-authoring-backup.json";
+export const AUTHORING_CANON_FILENAME = "nestledburrow-authoring-canon.json";
 
 function assertRecord(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -69,6 +71,27 @@ export function createAuthoringBackup(storage = globalThis.localStorage, now = n
     startingLayout: readStoredLayout(storage),
     colliderOverrides: loadColliderDebugOverrides(storage),
     assetProfiles: loadAssetProfiles(storage, loadColliderDebugOverrides(storage)),
+  });
+}
+
+export function createLiveAuthoringCanon(scene, storage = globalThis.localStorage, now = new Date()) {
+  if (!scene) throw new Error("World scene is unavailable");
+  const startingLayout = captureStartingLayout(scene);
+  const colliderOverrides = migrateDirectionalWallOverrides(normalizeColliderOverrides(
+    scene.colliderOverrides ?? loadColliderDebugOverrides(storage),
+  ));
+  const assetProfiles = normalizeAssetProfiles(
+    scene.assetProfiles ?? loadAssetProfiles(storage, colliderOverrides),
+  );
+  storage?.setItem?.(STARTING_LAYOUT_STORAGE_KEY, JSON.stringify(startingLayout));
+  saveColliderDebugOverrides(colliderOverrides, storage);
+  saveAssetProfiles(assetProfiles, storage);
+  return normalizeAuthoringBackup({
+    version: AUTHORING_BACKUP_VERSION,
+    savedAt: now.toISOString(),
+    startingLayout,
+    colliderOverrides,
+    assetProfiles,
   });
 }
 
