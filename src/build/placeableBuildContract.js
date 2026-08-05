@@ -1,4 +1,8 @@
 import { BuildModeRuntime } from "./buildModeRuntime.js";
+import { FACILITY_ASSETS } from "../facilities/facilityConfig.js";
+import { drawFacility } from "../facilities/facilityPreviewVisuals.js";
+import { getResourceProfile } from "../resources/resourceDomain.js";
+import { drawResourceVisual } from "../resources/resourceVisuals.js";
 import { assertPlaceableOwnerAdapter, placeableOwnerIdForItem } from "./placeableBuildProtocol.js";
 import { createDefaultPlaceableBuildOwners } from "./placeableBuildOwners.js";
 import { precisePoint } from "./placeableBuildGeometry.js";
@@ -7,10 +11,11 @@ const BUILD_MODE_PATCH = Symbol("nestledBurrowPlaceableBuildModePatch");
 const COORDINATOR_PATCH = Symbol("nestledBurrowPlaceableBuildCoordinatorPatch");
 const REGISTRY = Symbol("nestledBurrowPlaceableBuildRegistry");
 
+patchBuildModeRuntime();
+
 export function installPlaceableBuildContract(scene, owners = {}) {
   const coordinator = owners.worldBuildCoordinator;
   if (!scene || !coordinator || coordinator[COORDINATOR_PATCH]) return coordinator ?? null;
-  patchBuildModeRuntime();
 
   const adapters = createDefaultPlaceableBuildOwners(scene, owners, coordinator)
     .map(assertPlaceableOwnerAdapter);
@@ -29,6 +34,7 @@ function patchBuildModeRuntime() {
   if (BuildModeRuntime.prototype[BUILD_MODE_PATCH]) return;
   const originalGetActionPoint = BuildModeRuntime.prototype.getActionPoint;
   const originalContinuePanelDrag = BuildModeRuntime.prototype.continuePanelDrag;
+  const originalCreateThumbnail = BuildModeRuntime.prototype.createThumbnail;
 
   BuildModeRuntime.prototype.getActionPoint = function getPlaceableActionPoint(pointer, item, ...rest) {
     const normalized = item?.objectLike && !["bed", "facility", "tree"].includes(item.placement)
@@ -49,6 +55,34 @@ function patchBuildModeRuntime() {
     } finally {
       entry.item = originalItem;
     }
+  };
+
+  BuildModeRuntime.prototype.createThumbnail = function createPlaceableThumbnail(item, x, y) {
+    if (item?.facilityType) {
+      const graphics = this.scene.add.graphics()
+        .setPosition(x, y)
+        .setDepth(9021)
+        .setScrollFactor(0)
+        .setVisible(false);
+      drawFacility(graphics, item.facilityType);
+      const asset = FACILITY_ASSETS[item.facilityType];
+      graphics.setScale(Math.min(1, 16 / Math.max(asset.width, asset.height)));
+      return graphics;
+    }
+    if (item?.resourceProfileId) {
+      const profile = getResourceProfile(item.resourceProfileId);
+      const graphics = this.scene.add.graphics()
+        .setPosition(x, y)
+        .setDepth(9021)
+        .setScrollFactor(0)
+        .setVisible(false);
+      drawResourceVisual(graphics, profile);
+      graphics.setScale(profile.visual === "tree" ? 0.25 : profile.size === "large" ? 0.67 : 1);
+      return graphics;
+    }
+    const thumbnail = originalCreateThumbnail.call(this, item, x, y);
+    if (Number.isFinite(item?.thumbnailScale)) thumbnail?.setScale?.(item.thumbnailScale);
+    return thumbnail;
   };
 
   Object.defineProperty(BuildModeRuntime.prototype, BUILD_MODE_PATCH, { value: true });
@@ -85,7 +119,7 @@ function normalizeTarget(adapter, target) {
   };
 }
 
-function patchCoordinator(coordinator, owners, registry) {
+function patchCoordinator(coordinator, _owners, registry) {
   const original = {
     placeBuildAsset: coordinator.placeBuildAsset.bind(coordinator),
     isBuildObjectPlacementBlocked: coordinator.isBuildObjectPlacementBlocked.bind(coordinator),
@@ -138,12 +172,9 @@ function patchCoordinator(coordinator, owners, registry) {
     };
   };
 
-  coordinator.getBuildMoveTarget = (point) => {
-    const hit = precisePoint(point);
-    const external = owners.tavernSignRuntime?.getBuildMoveTargetAt?.(hit)
-      ?? owners.meleeRuntime?.getBuildMoveTargetAt?.(hit);
-    return external ?? registry.getTargetAt(hit) ?? original.getBuildMoveTarget(point);
-  };
+  coordinator.getBuildMoveTarget = (point) => (
+    registry.getTargetAt(precisePoint(point)) ?? original.getBuildMoveTarget(point)
+  );
 
   coordinator.getBuildDemolitionPreviewTarget = (point) => (
     registry.getTargetAt(precisePoint(point)) ?? original.getBuildDemolitionPreviewTarget(point)
