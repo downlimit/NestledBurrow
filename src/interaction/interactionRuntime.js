@@ -60,8 +60,9 @@ export function createInteractionRuntime({
     }
     for (const definition of worldInteractionCoordinator?.getStaticInteractionDefinitions?.() ?? []) addTarget(definition);
     const candidate = findBestInteractionTarget(player, targets);
-    return candidate
-      ? { candidate, definitions: [...definitionsByTargetId.values()] }
+    const selectedDefinition = candidate ? definitionsByTargetId.get(candidate.targetId) : null;
+    return candidate && selectedDefinition
+      ? { candidate, definitions: [selectedDefinition] }
       : null;
   }
 
