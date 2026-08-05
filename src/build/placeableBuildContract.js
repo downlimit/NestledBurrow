@@ -5,6 +5,7 @@ import { getResourceProfile } from "../resources/resourceDomain.js";
 import { drawResourceVisual } from "../resources/resourceVisuals.js";
 import { assertPlaceableOwnerAdapter, placeableOwnerIdForItem } from "./placeableBuildProtocol.js";
 import { createDefaultPlaceableBuildOwners } from "./placeableBuildOwners.js";
+import { decoratePlaceablePlacementAdapters } from "./placeablePlacementPose.js";
 import { precisePoint } from "./placeableBuildGeometry.js";
 
 const BUILD_MODE_PATCH = Symbol("nestledBurrowPlaceableBuildModePatch");
@@ -17,8 +18,11 @@ export function installPlaceableBuildContract(scene, owners = {}) {
   const coordinator = owners.worldBuildCoordinator;
   if (!scene || !coordinator || coordinator[COORDINATOR_PATCH]) return coordinator ?? null;
 
-  const adapters = createDefaultPlaceableBuildOwners(scene, owners, coordinator)
-    .map(assertPlaceableOwnerAdapter);
+  const adapters = decoratePlaceablePlacementAdapters(
+    scene,
+    owners,
+    createDefaultPlaceableBuildOwners(scene, owners, coordinator),
+  ).map(assertPlaceableOwnerAdapter);
   const registry = createRegistry(adapters);
   Object.defineProperty(coordinator, REGISTRY, { value: registry });
   patchCoordinator(coordinator, owners, registry);
@@ -224,6 +228,7 @@ function patchCoordinator(coordinator, _owners, registry) {
       const preview = adapter.renderPreview(item, point, {
         blocked: adapter.isPlacementBlocked(item, point, null),
         moving: false,
+        ignoreId: null,
       });
       if (preview) coordinator.buildPreviewObjects.push(preview);
     }
@@ -233,9 +238,11 @@ function patchCoordinator(coordinator, _owners, registry) {
     const adapter = registry.ownerForTarget(target);
     if (!adapter?.renderPreview) return original.renderBuildMovePreview(target, point);
     coordinator.clearBuildPreview();
+    const ignoreId = target.id ?? target.definition?.id ?? null;
     const preview = adapter.renderPreview(target, point, {
-      blocked: adapter.isPlacementBlocked(target, point, target.id ?? target.definition?.id),
+      blocked: adapter.isPlacementBlocked(target, point, ignoreId),
       moving: true,
+      ignoreId,
     });
     if (preview) coordinator.buildPreviewObjects.push(preview);
   };
@@ -268,7 +275,7 @@ function patchCoordinator(coordinator, _owners, registry) {
     }
     const adapter = registry.ownerForTarget(target);
     const overlay = !tintable && adapter?.renderPreview
-      ? adapter.renderPreview(target, target.placementPosition, { blocked: true, demolition: true })
+      ? adapter.renderPreview(target, target.placementPosition, { blocked: true, demolition: true, ignoreId: target.id })
       : null;
     coordinator.buildDemolitionHighlight = { targets, overlay };
   };
