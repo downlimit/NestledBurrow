@@ -61,9 +61,11 @@ export function createInteractionRuntime({
     for (const definition of worldInteractionCoordinator?.getStaticInteractionDefinitions?.() ?? []) addTarget(definition);
     const candidate = findBestInteractionTarget(player, targets);
     const selectedDefinition = candidate ? definitionsByTargetId.get(candidate.targetId) : null;
-    return candidate && selectedDefinition
-      ? { candidate, definitions: [selectedDefinition] }
-      : null;
+    if (!candidate || !selectedDefinition) return null;
+    const fallbacks = [...definitionsByTargetId.entries()]
+      .filter(([targetId]) => targetId !== candidate.targetId)
+      .map(([, definition]) => definition);
+    return { candidate, definitions: [selectedDefinition, ...fallbacks] };
   }
 
   function applySelection(selection) {
@@ -76,6 +78,12 @@ export function createInteractionRuntime({
     currentCandidateDefinitions = [];
   }
 
+  function exactTarget(definition, player) {
+    if (!(worldInteractionCoordinator?.isInteractionAllowed?.(definition) ?? true)) return null;
+    const resolved = resolveInteractionTarget(definition, player);
+    return resolved ? createInteractionTarget({ ...definition, ...resolved }) : null;
+  }
+
   function startSelectedInteraction() {
     if (currentCandidateDefinitions.length === 0) {
       clearCandidate();
@@ -83,20 +91,28 @@ export function createInteractionRuntime({
       return;
     }
     const player = characterSystem.getSnapshot(sessionState.playerId);
-    const exactTargets = [];
-    for (const definition of currentCandidateDefinitions) {
-      if (!(worldInteractionCoordinator?.isInteractionAllowed?.(definition) ?? true)) continue;
-      const resolved = resolveInteractionTarget(definition, player);
-      if (resolved) exactTargets.push(createInteractionTarget({ ...definition, ...resolved }));
+    const [selectedDefinition, ...fallbackDefinitions] = currentCandidateDefinitions;
+    const selectedTarget = exactTarget(selectedDefinition, player);
+    const selectedCandidate = selectedTarget
+      ? findBestInteractionTarget(player, [selectedTarget])
+      : null;
+    if (selectedCandidate) {
+      currentCandidate = selectedCandidate;
+      startCandidateInteraction(selectedCandidate);
+      return;
     }
-    const candidate = findBestInteractionTarget(player, exactTargets);
-    if (!candidate) {
+
+    const fallbackTargets = fallbackDefinitions
+      .map((definition) => exactTarget(definition, player))
+      .filter(Boolean);
+    const fallbackCandidate = findBestInteractionTarget(player, fallbackTargets);
+    if (!fallbackCandidate) {
       clearCandidate();
       presenter?.hidePrompt?.();
       return;
     }
-    currentCandidate = candidate;
-    startCandidateInteraction(candidate);
+    currentCandidate = fallbackCandidate;
+    startCandidateInteraction(fallbackCandidate);
   }
 
   function resolveCandidateDialogueId(candidate) {
