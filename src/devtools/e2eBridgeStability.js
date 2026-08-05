@@ -5,6 +5,7 @@ import { perimeterInteractionPointEntries } from "../interaction/interactionAppr
 
 const INSTALL_MARKER = Symbol("nestledBurrowStableE2EPlacement");
 const BRIDGE_KEY = "__NESTLED_BURROW_E2E__";
+const FACILITY_INTERACTION_KIND = "use-facility";
 
 if (import.meta.env.VITE_E2E) installStableE2EPlacement();
 
@@ -33,18 +34,25 @@ function patchBridge(bridge) {
   const fallbackInteract = bridge.interact?.bind(bridge);
 
   bridge.placePlayerNear = (entityId) => {
-    forcedEntityId = entityId;
+    forcedEntityId = null;
     const scene = getCurrentWorldScene();
-    const placed = Boolean(scene && placePlayerAtLiveInteraction(scene, entityId));
-    if (!placed) fallbackPlacePlayerNear?.(entityId);
-    return Boolean(interactionDefinition(scene, entityId));
+    const definition = interactionDefinition(scene, entityId);
+    const physicallyPlaced = Boolean(scene && placePlayerAtLiveInteraction(scene, entityId));
+    const fallbackPlaced = physicallyPlaced ? false : Boolean(fallbackPlacePlayerNear?.(entityId));
+    const actualCandidate = scene?.interactionRuntime?.getCurrentCandidate?.();
+    if (actualCandidate?.entityId === entityId) return true;
+    if (definition && isForceableTarget(definition)) {
+      forcedEntityId = entityId;
+      return true;
+    }
+    return physicallyPlaced || fallbackPlaced;
   };
 
   bridge.getInteractionState = () => {
     const state = fallbackGetInteractionState?.() ?? { candidate: null, dialogueActive: false, dialogue: null };
     const scene = getCurrentWorldScene();
     const definition = interactionDefinition(scene, forcedEntityId);
-    if (!definition) return state;
+    if (!definition || !isForceableTarget(definition)) return state;
     return {
       ...state,
       candidate: candidateFromDefinition(definition),
@@ -54,13 +62,19 @@ function patchBridge(bridge) {
   bridge.interact = () => {
     const scene = getCurrentWorldScene();
     const definition = interactionDefinition(scene, forcedEntityId);
-    if (!scene || !definition) return fallbackInteract?.();
+    if (!scene || !definition || !isForceableTarget(definition)) return fallbackInteract?.();
+    forcedEntityId = null;
     const result = scene.worldInteractionCoordinator?.handle?.(candidateFromDefinition(definition));
     scene.interactionRuntime?.refresh?.();
     return result;
   };
 
   Object.defineProperty(bridge, INSTALL_MARKER, { value: true });
+}
+
+function isForceableTarget(definition) {
+  return definition?.kind === FACILITY_INTERACTION_KIND
+    || Boolean(definition?.payload?.bedId);
 }
 
 function interactionDefinition(scene, entityId) {
@@ -103,7 +117,7 @@ function placePlayerAtLiveInteraction(scene, entityId) {
     player.motor.movement = createMovementState({ facing: directionTo(position, aimPosition) });
     scene.cameraRuntime?.reset?.(player.motor.position);
     scene.interactionRuntime?.refresh?.();
-    return true;
+    if (scene.interactionRuntime?.getCurrentCandidate?.()?.entityId === entityId) return true;
   }
   return false;
 }
