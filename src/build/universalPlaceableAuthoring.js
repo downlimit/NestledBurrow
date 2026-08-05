@@ -2,6 +2,7 @@ import { TRAINING_DUMMY } from "../combat/meleeConfig.js";
 import { WELL_PROFILE } from "../resources/farmingConfig.js";
 import { TAVERN_SIGN } from "../tavern/guestConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
+import { installAuthoringCanonExport } from "./authoringCanonExport.js";
 import { canonicalVisualOffsetAtCurrentPivot } from "./assetProfileRelations.js";
 import { DEFAULT_ASSET_PROFILES } from "./assetProfiles.js";
 
@@ -290,6 +291,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
   scene.events?.on?.("postupdate", onPostUpdate);
   scene.events?.once?.("shutdown", () => scene.events?.off?.("postupdate", onPostUpdate));
   syncSpecialInstances();
+  installAuthoringCanonExport(panel, scene);
 
   Object.defineProperty(runtime, UNIVERSAL_AUTHORING_PATCH, { value: true });
   return runtime;
