@@ -109,11 +109,11 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
       if (!path) return [];
       const route = connectExactApproachPoint(sourceSnapshot.position, path, point, navigation);
       if (!route) return [];
-      const distance = pathDistance(sourceSnapshot.position, route);
-      return distance <= definition.radius
-        && hasDirectInteractionReach(worldLayout, point, aimPosition, targetId)
-        ? [{ point, path: route, distance }]
-        : [];
+      return [{
+        point,
+        path: route,
+        distance: pathDistance(sourceSnapshot.position, route),
+      }];
     }).sort((a, b) => a.distance - b.distance || a.point.y - b.point.y || a.point.x - b.point.x);
     const nearest = routes[0];
     if (!nearest) return null;
