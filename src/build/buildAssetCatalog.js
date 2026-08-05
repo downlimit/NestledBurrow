@@ -6,6 +6,44 @@ import {
   TILE_SIZE,
   TREES_TEXTURE_KEY,
 } from "../world/worldConfig.js";
+import { RESOURCE_PROFILES } from "../resources/resourceDomain.js";
+import {
+  definePlaceableCatalogItem,
+  PLACEABLE_BUILD_OWNER_IDS,
+} from "./placeableBuildProtocol.js";
+
+const RESOURCE_BUILD_ORDER = Object.freeze([
+  "tree-planted",
+  "berry-bush",
+  "log-small",
+  "log-large",
+  "stone-small",
+  "stone-large",
+  "ruby-node",
+]);
+
+const RESOURCE_BUILD_LABELS = Object.freeze({
+  "tree-planted": "hud:buildMode.assets.tree",
+  "berry-bush": "hud:interaction.gatherBerries",
+  "log-small": "hud:interaction.chop",
+  "log-large": "hud:interaction.chop",
+  "stone-small": "hud:interaction.mine",
+  "stone-large": "hud:interaction.mine",
+  "ruby-node": "hud:interaction.mine",
+});
+
+export const BUILD_RESOURCE_ITEMS = Object.freeze(RESOURCE_BUILD_ORDER.map((profileId) => {
+  const profile = RESOURCE_PROFILES[profileId];
+  const tree = profileId === "tree-planted";
+  return definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.resource, {
+    id: `resource-${profileId}`,
+    placement: "resource",
+    resourceProfileId: profileId,
+    objectType: profile.kind,
+    labelKey: RESOURCE_BUILD_LABELS[profileId] ?? profile.prompt,
+    ...(tree ? { icon: "tree", textureKey: TREES_TEXTURE_KEY, frame: 0 } : {}),
+  });
+}));
 
 export const BUILD_ASSET_GROUPS = Object.freeze([
   Object.freeze({
@@ -37,28 +75,34 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     labelKey: "hud:buildMode.groups.expedition",
     items: Object.freeze([
       Object.freeze({ id: "privacy-screen", placement: "wall", dragPaint: false, labelKey: "hud:buildMode.assets.privacyScreen", textureKey: HOUSE_TEXTURE_KEY, frame: HOUSE_FRAMES.sideLeft }),
-      Object.freeze({ id: "bed", placement: "bed", icon: "bed", labelKey: "hud:buildMode.assets.bed" }),
-      Object.freeze({ id: "toilet", placement: "facility", facilityType: "toilet", icon: "toilet", labelKey: "hud:buildMode.assets.toilet" }),
-      Object.freeze({ id: "table", placement: "facility", facilityType: "table", icon: "table", labelKey: "hud:buildMode.assets.table" }),
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.bed, {
+        id: "bed", placement: "bed", icon: "bed", labelKey: "hud:buildMode.assets.bed",
+      }),
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.facility, {
+        id: "toilet", placement: "facility", facilityType: "toilet", icon: "toilet", labelKey: "hud:buildMode.assets.toilet",
+      }),
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.facility, {
+        id: "table", placement: "facility", facilityType: "table", icon: "table", labelKey: "hud:buildMode.assets.table",
+      }),
     ]),
   }),
   Object.freeze({
     id: "decorations",
     labelKey: "hud:buildMode.groups.furniture",
     items: Object.freeze([
-      Object.freeze({ id: "shower", placement: "facility", facilityType: "shower", icon: "shower", labelKey: "hud:buildMode.assets.shower" }),
-      Object.freeze({ id: "cutting-table", placement: "facility", facilityType: "cutting-table", icon: "cutting-table", labelKey: "hud:kitchen.facilities.cuttingTable" }),
-      Object.freeze({ id: "gas-stove", placement: "facility", facilityType: "gas-stove", icon: "gas-stove", labelKey: "hud:kitchen.facilities.gasStove" }),
-      Object.freeze({ id: "serving-table", placement: "facility", facilityType: "serving-table", icon: "serving-table", labelKey: "hud:kitchen.facilities.servingTable" }),
-      Object.freeze({
-        id: "tree",
-        placement: "tree",
-        objectType: "plant",
-        resourceProfileId: "tree-planted",
-        labelKey: "hud:buildMode.assets.tree",
-        textureKey: TREES_TEXTURE_KEY,
-        frame: 0,
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.facility, {
+        id: "shower", placement: "facility", facilityType: "shower", icon: "shower", labelKey: "hud:buildMode.assets.shower",
       }),
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.facility, {
+        id: "cutting-table", placement: "facility", facilityType: "cutting-table", icon: "cutting-table", labelKey: "hud:kitchen.facilities.cuttingTable",
+      }),
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.facility, {
+        id: "gas-stove", placement: "facility", facilityType: "gas-stove", icon: "gas-stove", labelKey: "hud:kitchen.facilities.gasStove",
+      }),
+      definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.facility, {
+        id: "serving-table", placement: "facility", facilityType: "serving-table", icon: "serving-table", labelKey: "hud:kitchen.facilities.servingTable",
+      }),
+      ...BUILD_RESOURCE_ITEMS,
     ]),
   }),
 ]);
