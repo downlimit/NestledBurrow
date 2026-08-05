@@ -10,6 +10,8 @@ export const PLACEABLE_BUILD_OWNER_IDS = Object.freeze({
   facility: "facility",
   resource: "resource",
   well: "well",
+  tavernSign: "tavern-sign",
+  trainingDummy: "training-dummy",
 });
 
 export function definePlaceableCatalogItem(ownerId, item = {}) {
