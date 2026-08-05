@@ -8,6 +8,10 @@ import {
 } from "../src/build/buildAssetCatalog.js";
 import { FACILITY_ASSETS } from "../src/facilities/facilityConfig.js";
 import {
+  canonicalVisualOffsetAtCurrentPivot,
+  visualToPivotOffset,
+} from "../src/build/assetProfileRelations.js";
+import {
   assertPlaceableOwnerAdapter,
   PLACEABLE_BUILD_OPERATIONS,
   PLACEABLE_BUILD_OWNER_IDS,
@@ -95,6 +99,32 @@ assert.deepEqual(resourceVisualBoundsAt({ x: 32, y: 48 }, RESOURCE_PROFILES["tre
   bottom: 48 + 4 * TILE_SIZE,
 }, "tree targeting covers the visible composite sprite rather than only its trunk collider");
 
+const canonicalBedProfile = {
+  visualOffset: { x: 0, y: 0 },
+  snapAnchorOffset: { x: 8, y: 8 },
+  legacyWorldOrigin: { x: -12000, y: 34000 },
+};
+const editedBedProfile = {
+  visualOffset: { x: -700, y: 420 },
+  snapAnchorOffset: { x: 104, y: -56 },
+  legacyWorldOrigin: { x: 999999, y: -999999 },
+};
+const resetBedOffset = canonicalVisualOffsetAtCurrentPivot(editedBedProfile, canonicalBedProfile);
+assert.deepEqual(resetBedOffset, { x: 96, y: -64 });
+assert.deepEqual(
+  visualToPivotOffset({ ...editedBedProfile, visualOffset: resetBedOffset }),
+  visualToPivotOffset(canonicalBedProfile),
+  "visual reset restores the canonical visual-to-pivot relation at the current pivot",
+);
+assert.deepEqual(
+  canonicalVisualOffsetAtCurrentPivot(
+    { ...editedBedProfile, position: { x: -500000, y: 800000 } },
+    { ...canonicalBedProfile, position: { x: 400000, y: -900000 } },
+  ),
+  resetBedOffset,
+  "visual reset cannot consume world, layout or legacy origin coordinates",
+);
+
 const contractSource = fs.readFileSync(new URL("../src/build/placeableBuildContract.js", import.meta.url), "utf8");
 for (const required of [
   "coordinator.getBuildMoveTarget =",
@@ -108,6 +138,10 @@ for (const required of [
   assert(contractSource.includes(required), `placeable lifecycle contract retains ${required}`);
 }
 assert(!contractSource.includes(".setDepth(9021)"), "placeable thumbnails cannot render below the HUD-depth build panel");
+
+const authoringSource = fs.readFileSync(new URL("../src/build/editorAuthoringRuntime.js", import.meta.url), "utf8");
+assert(authoringSource.includes("canonicalVisualOffsetAtCurrentPivot(currentProfile, canonicalProfile)"));
+assert(!authoringSource.includes("setVisualOffset(DEFAULT_ASSET_PROFILES[visualOffsetSelection.profileKey]?.visualOffset"));
 
 const ownerSource = fs.readFileSync(new URL("../src/build/placeableBuildOwners.js", import.meta.url), "utf8");
 for (const required of [
@@ -136,5 +170,6 @@ assert(bootstrapSource.includes("installPlaceableBuildContract(scene, owners)"),
 const systemSource = fs.readFileSync(new URL("../systems/build-and-authoring.md", import.meta.url), "utf8");
 assert(systemSource.includes("place → move → remove → restore"));
 assert(systemSource.includes("berry-bush"));
+assert(systemSource.includes("asset-space"));
 
-console.log("Task #072 contracts passed: the build library contains every facility, special object and resource with names, visible thumbnails and a full lifecycle owner");
+console.log("Task #072 contracts passed: placeables have a complete lifecycle, visible thumbnails, and visual reset is relative to the current pivot without legacy world coordinates");
