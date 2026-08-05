@@ -107,7 +107,9 @@ export function createInteractionRuntime({
       return;
     }
 
+    const selectedGroup = selectedDefinition.targetingGroup ?? null;
     const fallbackTargets = fallbackDefinitions
+      .filter((definition) => !selectedGroup || definition.targetingGroup !== selectedGroup)
       .map((definition) => exactTarget(definition, player))
       .filter(Boolean);
     const fallbackCandidate = findBestInteractionTarget(player, fallbackTargets);
