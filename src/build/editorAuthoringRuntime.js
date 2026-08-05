@@ -14,6 +14,7 @@ import { getResourceProfile, resourceActionForTool } from "../resources/resource
 import { hitResourceDefinition } from "../session/gameSessionState.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
+import { canonicalVisualOffsetAtCurrentPivot } from "./assetProfileRelations.js";
 
 export const PLANTED_TREE_PROFILE_ID = "tree-planted";
 
@@ -411,7 +412,11 @@ export function attachEditorAuthoringRuntime(scene, {
     getVisualOffsetSelection: visualOffsetSelectionState,
     resetVisualOffset() {
       if (!visualOffsetSelection) return null;
-      return setVisualOffset(DEFAULT_ASSET_PROFILES[visualOffsetSelection.profileKey]?.visualOffset ?? { x: 0, y: 0 });
+      const profileKey = visualOffsetSelection.profileKey;
+      const currentProfile = scene.assetProfiles?.[profileKey];
+      const canonicalProfile = DEFAULT_ASSET_PROFILES[profileKey];
+      if (!currentProfile || !canonicalProfile) return null;
+      return setVisualOffset(canonicalVisualOffsetAtCurrentPivot(currentProfile, canonicalProfile));
     },
     clearVisualOffsetSelection() { visualOffsetSelection = null; },
     getPlantDefinitions() {
