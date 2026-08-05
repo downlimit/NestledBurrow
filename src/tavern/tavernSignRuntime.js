@@ -41,7 +41,7 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
   }
 
   function syncPlacement() {
-    sprite.setVisible(present);
+    sprite.setVisible?.(present);
     if (!present) {
       worldLayout?.clearWorldObjectCollider?.(TAVERN_SIGN.id);
       return;
@@ -51,7 +51,8 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
   }
 
   function draw() {
-    sprite.setFrame(getTavernOpen() ? 0 : 1).setVisible(present);
+    sprite.setFrame(getTavernOpen() ? 0 : 1);
+    sprite.setVisible?.(present);
   }
 
   function restoreBuildTarget(value) {
