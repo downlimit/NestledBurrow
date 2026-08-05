@@ -98,13 +98,13 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     labelKey: "hud:buildMode.groups.walls",
     items: Object.freeze([
       Object.freeze({ id: "wall", placement: "wall", dragPaint: true, labelKey: "hud:buildMode.assets.wall", textureKey: HOUSE_TEXTURE_KEY, frame: HOUSE_FRAMES.bottom }),
-      Object.freeze({ id: "privacy-screen", placement: "wall", dragPaint: false, labelKey: "hud:buildMode.assets.privacyScreen", textureKey: HOUSE_TEXTURE_KEY, frame: HOUSE_FRAMES.sideLeft }),
     ]),
   }),
   Object.freeze({
-    id: "facilities",
+    id: "furniture",
     labelKey: "build:groups.facilities",
     items: Object.freeze([
+      Object.freeze({ id: "privacy-screen", placement: "wall", dragPaint: false, labelKey: "hud:buildMode.assets.privacyScreen", textureKey: HOUSE_TEXTURE_KEY, frame: HOUSE_FRAMES.sideLeft }),
       definePlaceableCatalogItem(PLACEABLE_BUILD_OWNER_IDS.bed, {
         id: "bed",
         placement: "bed",
@@ -116,7 +116,7 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     ]),
   }),
   Object.freeze({
-    id: "resources",
+    id: "decorations",
     labelKey: "build:groups.resources",
     items: BUILD_RESOURCE_ITEMS,
   }),
