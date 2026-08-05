@@ -1,3 +1,5 @@
+import PROJECT_ASSET_PROFILES from "../build/assetProfilesDefault.js";
+import { applyVisualCrop } from "../build/assetVisualCrop.js";
 import { FACILITY_ASSETS } from "./facilityConfig.js";
 
 const MIRRORED_METHODS = Object.freeze([
@@ -11,7 +13,17 @@ const MIRRORED_METHODS = Object.freeze([
   "setFrame",
 ]);
 
-export function bindSpriteVisual(graphics, asset, tint = null) {
+function canonicalCropInsets(profileKey) {
+  return profileKey
+    ? PROJECT_ASSET_PROFILES?.profiles?.[profileKey]?.visualCropInsets ?? null
+    : null;
+}
+
+function inferredProfileKey(asset) {
+  return asset?.key === "furniture.bed" ? "furniture:bed" : null;
+}
+
+export function bindSpriteVisual(graphics, asset, tint = null, profileKey = null) {
   if (!asset) throw new Error("A sprite asset is required");
   const scene = graphics?.scene;
   if (!scene?.add?.image) {
@@ -57,10 +69,12 @@ export function bindSpriteVisual(graphics, asset, tint = null) {
     return graphics;
   };
   graphics.spriteImage = image;
+  const crop = canonicalCropInsets(profileKey ?? inferredProfileKey(asset));
+  if (crop) applyVisualCrop(graphics, crop);
   return graphics;
 }
 
-export function bindCompositeSpriteVisual(graphics, asset, tint = null) {
+export function bindCompositeSpriteVisual(graphics, asset, tint = null, profileKey = null) {
   if (!asset?.key || !Array.isArray(asset.frames) || !asset.frames.length) throw new Error("A composite sprite asset is required");
   const scene = graphics?.scene;
   if (!scene?.add?.container || !scene?.add?.image) {
@@ -102,11 +116,13 @@ export function bindCompositeSpriteVisual(graphics, asset, tint = null) {
     return graphics;
   };
   graphics.spriteContainer = container;
+  const crop = canonicalCropInsets(profileKey);
+  if (crop) applyVisualCrop(graphics, crop);
   return graphics;
 }
 
 export function drawFacility(graphics, type, tint = null) {
   const asset = FACILITY_ASSETS[type];
   if (!asset) throw new Error(`Unknown facility preview type: ${type}`);
-  return bindSpriteVisual(graphics, asset, tint);
+  return bindSpriteVisual(graphics, asset, tint, `facility:${type}`);
 }

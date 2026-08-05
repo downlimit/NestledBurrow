@@ -1,6 +1,11 @@
 import { TILE_SIZE, TREES_TEXTURE_KEY } from "../world/worldConfig.js";
 import { WALL_COLLIDER_GROUPS, wallColliderGroup } from "./buildWorldGeometry.js";
 import { TAVERN_SIGN_BUILD_KIND } from "../tavern/guestConfig.js";
+import {
+  canonicalBedDefinition,
+  canonicalFacilityDefinition,
+  hydrateFacilityRuntimeDefinition,
+} from "./liveAssetGeometry.js";
 
 export const STARTING_LAYOUT_STORAGE_KEY = "nestledBurrow.startingLayout";
 export const STARTING_LAYOUT_VERSION = 1;
@@ -119,7 +124,10 @@ function normalizeDefinitionArray(value, label) {
     }
     if (ids.has(definition.id)) throw new Error(`${label} contains duplicate ID ${definition.id}`);
     ids.add(definition.id);
-    return cloneJson(definition);
+    const cloned = cloneJson(definition);
+    if (label === "facilities") return cloneJson(canonicalFacilityDefinition(cloned));
+    if (label === "beds") return cloneJson(canonicalBedDefinition(cloned));
+    return cloned;
   });
   return result.sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -288,12 +296,13 @@ function restoreFacilities(scene, definitions) {
     }
   }
   for (const definition of definitions) {
+    const runtimeDefinition = hydrateFacilityRuntimeDefinition(definition);
     // Starting layouts are captured only after editor placement validation.
     // Restore them without re-validating against the temporary staging order.
     const options = { validateFootprint: false };
     const restored = runtime.getDefinition(definition.id)
-      ? runtime.replace(definition, options)
-      : runtime.restore(definition, options);
+      ? runtime.replace(runtimeDefinition, options)
+      : runtime.restore(runtimeDefinition, options);
     if (!restored) throw new Error(`Failed to restore facility ${definition.id}`);
   }
   runtime.syncKitchenVisuals?.();

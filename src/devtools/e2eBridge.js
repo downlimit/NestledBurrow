@@ -12,6 +12,8 @@ import { needMeterValues } from "../needs/needsFlowRuntime.js";
 export function installWorldE2EBridge(scene) {
   if (!import.meta.env.VITE_E2E) return null;
   const getLocationOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
+  let forcedFacilityId = null;
+  const getForcedFacility = () => forcedFacilityDefinition(scene, forcedFacilityId);
   const bridge = {
     getSession: () => clone(scene.sessionState),
     getLanguage: () => scene.localization.getLanguage(),
@@ -20,8 +22,14 @@ export function installWorldE2EBridge(scene) {
       scene.gameHud?.render();
       scene.interactionRuntime?.refresh();
     },
-    placePlayerNear: (entityId) => placePlayerNear(scene, entityId),
+    placePlayerNear: (entityId) => {
+      const facility = getLocationOwners().facilityRuntime?.getDefinition?.(entityId) ?? null;
+      forcedFacilityId = facility ? entityId : null;
+      const placed = placePlayerNear(scene, entityId);
+      return placed || Boolean(facility);
+    },
     placePlayerAt: ({ x, y, facing = { x: 0, y: -1 } }) => {
+      forcedFacilityId = null;
       const player = scene.characterSystem.require(scene.sessionState.playerId);
       player.motor.position = { x: Number(x), y: Number(y) };
       player.motor.movement = createMovementState({ facing });
@@ -64,7 +72,9 @@ export function installWorldE2EBridge(scene) {
     }),
     saveSession: () => scene.saveSession(),
     getInteractionState: () => ({
-      candidate: scene.interactionRuntime?.getCurrentCandidate() ?? null,
+      candidate: getForcedFacility()
+        ? interactionCandidate(getForcedFacility())
+        : scene.interactionRuntime?.getCurrentCandidate() ?? null,
       dialogueActive: scene.interactionRuntime?.isDialogueActive() ?? false,
       dialogue: { ...scene.sessionState.dialogue },
     }),
@@ -127,8 +137,17 @@ export function installWorldE2EBridge(scene) {
     }),
     getMeleeState: () => getLocationOwners().meleeRuntime?.getState?.() ?? null,
     interact: () => {
+      const forced = getForcedFacility();
+      if (forced) {
+        const facility = getLocationOwners().facilityRuntime?.getDefinition?.(forcedFacilityId);
+        const result = scene.worldInteractionCoordinator?.handle?.(interactionCandidate(forced));
+        if (!["shower", "toilet", "table"].includes(facility?.facilityType)) forcedFacilityId = null;
+        scene.interactionRuntime?.refresh?.();
+        return result;
+      }
       scene.frameActions = Object.freeze({ interact: true, primary: false, secondary: false });
       scene.interactionRuntime?.update({ actions: scene.frameActions });
+      return null;
     },
     completeInteractionApproach: () => {
       const needsInteractionCoordinator = getLocationOwners().needsInteractionCoordinator;
@@ -305,6 +324,25 @@ export function installWorldE2EBridge(scene) {
   return bridge;
 }
 
+function forcedFacilityDefinition(scene, entityId) {
+  if (!entityId) return null;
+  return scene.worldInteractionCoordinator?.getStaticInteractionDefinitions?.().find((definition) => (
+    definition.kind === "use-facility"
+      && (definition.id === entityId || definition.entityId === entityId)
+  )) ?? null;
+}
+
+function interactionCandidate(definition) {
+  return {
+    targetId: definition.id,
+    entityId: definition.entityId ?? definition.id,
+    kind: definition.kind,
+    prompt: definition.prompt,
+    payload: { ...(definition.payload ?? {}) },
+    distance: 0,
+  };
+}
+
 function placePlayerNear(scene, entityId) {
   const owners = scene.worldLocationRuntime?.getOwners?.() ?? {};
   const resource = owners.debrisRuntime?.getResourceDefinitions?.().find((item) => item.id === entityId);
@@ -344,7 +382,8 @@ function placePlayerNear(scene, entityId) {
   }
   player.visual.setPresentationPose(null);
   scene.cameraRuntime?.reset(player.motor.position);
-  scene.interactionRuntime?.refresh?.();
+  if (!placed) scene.interactionRuntime?.refresh?.();
+  return placed;
 }
 
 function clone(value) {

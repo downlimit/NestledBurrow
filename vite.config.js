@@ -3,6 +3,11 @@ import { execFileSync } from "node:child_process";
 import { realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  ASSET_PROFILES_SAVE_ENDPOINT,
+  createAssetProfilesDefaultModuleSource,
+  normalizeAssetProfiles,
+} from "./src/build/assetProfiles.js";
+import {
   createColliderDefaultsModuleSource,
   normalizeColliderOverrides,
   COLLIDER_DEFAULTS_SAVE_ENDPOINT,
@@ -36,6 +41,12 @@ const AUTHORING_WRITERS = Object.freeze({
     normalize: normalizeColliderOverrides,
     serialize: createColliderDefaultsModuleSource,
     summarize: (overrides) => ({ status: "saved", groups: Object.keys(overrides).length }),
+  }),
+  [ASSET_PROFILES_SAVE_ENDPOINT]: Object.freeze({
+    targetPath: resolve("src/build/assetProfilesDefault.js"),
+    normalize: normalizeAssetProfiles,
+    serialize: createAssetProfilesDefaultModuleSource,
+    summarize: (profiles) => ({ status: "saved", profiles: Object.keys(profiles).length }),
   }),
 });
 

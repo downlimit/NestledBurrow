@@ -20,14 +20,86 @@ export function resizeColliderDraft(start, edges, delta, minimumSize = 1) {
   return next;
 }
 
+export function editRectDraftByArrow(rect, event, {
+  minimumSize = 1,
+  bounds = null,
+} = {}) {
+  const direction = {
+    ArrowLeft: { axis: "x", amount: -1, outwardEdge: "left", inwardEdge: "right" },
+    ArrowRight: { axis: "x", amount: 1, outwardEdge: "right", inwardEdge: "left" },
+    ArrowUp: { axis: "y", amount: -1, outwardEdge: "top", inwardEdge: "bottom" },
+    ArrowDown: { axis: "y", amount: 1, outwardEdge: "bottom", inwardEdge: "top" },
+  }[event?.key];
+  if (!direction || (event?.ctrlKey && event?.altKey)) return null;
+
+  const next = { ...rect };
+  if (event?.ctrlKey) {
+    next[direction.outwardEdge] += direction.amount;
+  } else if (event?.altKey) {
+    next[direction.inwardEdge] += direction.amount;
+  } else if (direction.axis === "x") {
+    next.left += direction.amount;
+    next.right += direction.amount;
+  } else {
+    next.top += direction.amount;
+    next.bottom += direction.amount;
+  }
+
+  if (next.right - next.left < minimumSize || next.bottom - next.top < minimumSize) return { ...rect };
+  return constrainRect(next, bounds, !event?.ctrlKey && !event?.altKey);
+}
+
+function constrainRect(rect, bounds, preserveSize) {
+  if (!bounds) return rect;
+  const next = { ...rect };
+  if (preserveSize) {
+    const width = next.right - next.left;
+    const height = next.bottom - next.top;
+    if (next.left < bounds.left) {
+      next.left = bounds.left;
+      next.right = next.left + width;
+    }
+    if (next.right > bounds.right) {
+      next.right = bounds.right;
+      next.left = next.right - width;
+    }
+    if (next.top < bounds.top) {
+      next.top = bounds.top;
+      next.bottom = next.top + height;
+    }
+    if (next.bottom > bounds.bottom) {
+      next.bottom = bounds.bottom;
+      next.top = next.bottom - height;
+    }
+    return next;
+  }
+  next.left = Math.max(bounds.left, next.left);
+  next.right = Math.min(bounds.right, next.right);
+  next.top = Math.max(bounds.top, next.top);
+  next.bottom = Math.min(bounds.bottom, next.bottom);
+  return next;
+}
+
 export function roundColliderDraftToGrid(rect, gridSize, padding = 2) {
   const size = Math.max(1, Number(gridSize) || 1);
-  const inset = Math.max(0, Math.min(Number(padding) || 0, (size - 1) / 2));
+  const inset = Math.max(0, Number(padding) || 0);
+  const width = Math.max(1, Number(rect.right) - Number(rect.left));
+  const height = Math.max(1, Number(rect.bottom) - Number(rect.top));
+  const cellsX = Math.max(1, Math.round((width + inset * 2) / size));
+  const cellsY = Math.max(1, Math.round((height + inset * 2) / size));
+  const spanX = cellsX * size;
+  const spanY = cellsY * size;
+  const safeInsetX = Math.min(inset, (spanX - 1) / 2);
+  const safeInsetY = Math.min(inset, (spanY - 1) / 2);
+  const centerX = (Number(rect.left) + Number(rect.right)) / 2;
+  const centerY = (Number(rect.top) + Number(rect.bottom)) / 2;
+  const startCellX = Math.round(centerX / size - cellsX / 2);
+  const startCellY = Math.round(centerY / size - cellsY / 2);
   return {
-    left: Math.floor(Number(rect.left) / size) * size + inset,
-    right: Math.ceil(Number(rect.right) / size) * size - inset,
-    top: Math.floor(Number(rect.top) / size) * size + inset,
-    bottom: Math.ceil(Number(rect.bottom) / size) * size - inset,
+    left: startCellX * size + safeInsetX,
+    right: (startCellX + cellsX) * size - safeInsetX,
+    top: startCellY * size + safeInsetY,
+    bottom: (startCellY + cellsY) * size - safeInsetY,
   };
 }
 

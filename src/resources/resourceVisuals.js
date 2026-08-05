@@ -54,6 +54,7 @@ export function drawResourceVisual(graphics, profile, progress = 0, options = {}
         graphics,
         { key: TREES_TEXTURE_KEY, frames: TREE_FRAMES.planted, columns: 3, frameWidth: TILE_SIZE, frameHeight: TILE_SIZE },
         options.colorOverride ?? null,
+        `resource:${profile.id}`,
       );
     }
     return graphics;

@@ -1,6 +1,19 @@
+import PROJECT_ASSET_PROFILES from "../build/assetProfilesDefault.js";
+import { PLACEABLE_TARGETING_GROUP } from "../build/liveAssetGeometry.js";
 import { createActorNavigation, findGridPath } from "../tavern/gridPathfinder.js";
+import { INTERACTION_APPROACH_DIRECTIONS, normalizeInteractionDirections } from "./interactionDirections.js";
 
 export const INTERACTION_NAVIGATION_CELL_SIZE = 16;
+const GRID_EDGE_EPSILON = 0.000001;
+
+function finite(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function usesPlaceablePerimeter(definition, collider) {
+  return Boolean(collider && definition?.targetingGroup === PLACEABLE_TARGETING_GROUP);
+}
 
 export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
   const probeWallsBySource = new WeakMap();
@@ -18,7 +31,8 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
     const walls = probeWalls(sourceSnapshot);
-    if (definition.targetingMode === "facing-first") {
+    const collider = interactionCollider(worldLayout, definition);
+    if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
       const distance = Math.hypot(
         definition.position.x - sourceSnapshot.position.x,
         definition.position.y - sourceSnapshot.position.y,
@@ -33,10 +47,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
       };
     }
 
-    const collider = interactionCollider(worldLayout, definition);
-    const points = collider
-      ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
-      : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+    const points = interactionPoints(definition, collider);
     const nearest = points
       .flatMap((point) => {
         const distance = Math.hypot(
@@ -64,12 +75,12 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
 
   function resolve(definition, sourceSnapshot) {
     if (definition.__interactionProbe) return probe(definition, sourceSnapshot);
-    if (definition.targetingMode === "facing-first") return probe(definition, sourceSnapshot);
-    const player = getPlayer();
     const collider = interactionCollider(worldLayout, definition);
-    const points = collider
-      ? perimeterInteractionPoints(collider, INTERACTION_NAVIGATION_CELL_SIZE)
-      : definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+    if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
+      return probe(definition, sourceSnapshot);
+    }
+    const player = getPlayer();
+    const points = interactionPoints(definition, collider);
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
     const nearbyPoints = points.filter((point) => (
@@ -119,6 +130,28 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
   }
 
   return Object.freeze({ probe, resolve });
+}
+
+function interactionPoints(definition, collider) {
+  if (!collider) return definition.usePosition ? [{ ...definition.usePosition }] : [{ ...definition.position }];
+  const enabledDirections = new Set(normalizeInteractionDirections(interactionDirectionsFor(definition)));
+  return perimeterInteractionPointEntries(collider, INTERACTION_NAVIGATION_CELL_SIZE)
+    .filter(({ direction }) => enabledDirections.has(direction))
+    .map(({ point }) => point);
+}
+
+function interactionDirectionsFor(definition) {
+  if (definition.interactionDirections) return definition.interactionDirections;
+  const profileKey = interactionProfileKey(definition);
+  return PROJECT_ASSET_PROFILES?.profiles?.[profileKey]?.interactionDirections
+    ?? INTERACTION_APPROACH_DIRECTIONS;
+}
+
+function interactionProfileKey(definition) {
+  if (definition?.facilityType) return `facility:${definition.facilityType}`;
+  if (definition?.profileId) return `resource:${definition.profileId}`;
+  if (definition?.payload?.bedId || String(definition?.id ?? "").includes("bed")) return "furniture:bed";
+  return null;
 }
 
 function connectExactApproachPoint(start, gridPath, point, navigation) {
@@ -190,19 +223,62 @@ function segmentIntersectsRect(start, goal, rect) {
   return maximum >= 0 && minimum <= 1;
 }
 
-export function perimeterInteractionPoints(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
-  const width = Math.max(1, Math.ceil((bounds.right - bounds.left) / cellSize));
-  const height = Math.max(1, Math.ceil((bounds.bottom - bounds.top) / cellSize));
-  const points = [];
+export function interactionFootprintBounds(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  const size = Math.max(1, finite(cellSize, INTERACTION_NAVIGATION_CELL_SIZE));
+  const sourceLeft = finite(bounds?.left);
+  const sourceRight = finite(bounds?.right, sourceLeft + size);
+  const sourceTop = finite(bounds?.top);
+  const sourceBottom = finite(bounds?.bottom, sourceTop + size);
+  const left = Math.floor((sourceLeft + GRID_EDGE_EPSILON) / size) * size;
+  const top = Math.floor((sourceTop + GRID_EDGE_EPSILON) / size) * size;
+  let right = Math.ceil((sourceRight - GRID_EDGE_EPSILON) / size) * size;
+  let bottom = Math.ceil((sourceBottom - GRID_EDGE_EPSILON) / size) * size;
+  if (right <= left) right = left + size;
+  if (bottom <= top) bottom = top + size;
+  return Object.freeze({ left, right, top, bottom });
+}
+
+export function perimeterInteractionPointEntries(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  const size = Math.max(1, finite(cellSize, INTERACTION_NAVIGATION_CELL_SIZE));
+  const footprint = interactionFootprintBounds(bounds, size);
+  const width = Math.max(1, Math.round((footprint.right - footprint.left) / size));
+  const height = Math.max(1, Math.round((footprint.bottom - footprint.top) / size));
+  const entries = [];
   for (let x = -1; x <= width; x += 1) {
-    points.push({ x: bounds.left + (x + 0.5) * cellSize, y: bounds.top - cellSize / 2 });
-    points.push({ x: bounds.left + (x + 0.5) * cellSize, y: bounds.top + (height + 0.5) * cellSize });
+    entries.push({
+      direction: x === -1 ? "top-left" : x === width ? "top-right" : "top",
+      point: { x: footprint.left + (x + 0.5) * size, y: footprint.top - size / 2 },
+    });
+    entries.push({
+      direction: x === -1 ? "bottom-left" : x === width ? "bottom-right" : "bottom",
+      point: { x: footprint.left + (x + 0.5) * size, y: footprint.bottom + size / 2 },
+    });
   }
   for (let y = 0; y < height; y += 1) {
-    points.push({ x: bounds.left - cellSize / 2, y: bounds.top + (y + 0.5) * cellSize });
-    points.push({ x: bounds.left + (width + 0.5) * cellSize, y: bounds.top + (y + 0.5) * cellSize });
+    entries.push({
+      direction: "left",
+      point: { x: footprint.left - size / 2, y: footprint.top + (y + 0.5) * size },
+    });
+    entries.push({
+      direction: "right",
+      point: { x: footprint.right + size / 2, y: footprint.top + (y + 0.5) * size },
+    });
   }
-  return Object.freeze(points.map(Object.freeze));
+  return Object.freeze(entries.map(({ direction, point }) => Object.freeze({
+    direction,
+    point: Object.freeze(point),
+  })));
+}
+
+export function perimeterInteractionPoints(bounds, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  return Object.freeze(perimeterInteractionPointEntries(bounds, cellSize).map(({ point }) => point));
+}
+
+export function filterPerimeterInteractionPoints(bounds, directions = INTERACTION_APPROACH_DIRECTIONS, cellSize = INTERACTION_NAVIGATION_CELL_SIZE) {
+  const enabled = new Set(normalizeInteractionDirections(directions));
+  return Object.freeze(perimeterInteractionPointEntries(bounds, cellSize)
+    .filter(({ direction }) => enabled.has(direction))
+    .map(({ point }) => point));
 }
 
 function pathDistance(start, path) {

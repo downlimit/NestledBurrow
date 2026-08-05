@@ -64,7 +64,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only radius, perimeter and wall checks; A* runs after activation. Activation validates all nearby candidates once and skips unreachable furniture. Walls block routes; objects expose exact walkable perimeter points. Crossing a point counts as arrival; overlaps rank by aim distance. Enter/exit interpolate presentation without moving the safe motor position. Effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Prompt scans rank gaze within radius/perimeter/wall checks without gating; A* runs only after activation. Walls block routes. Profiles filter perimeter points by eight directions. A one-cell object exposes eight candidate cells; wider objects expose corners and edge cells. Disabled classes are removed before probe and exact routing; at least one remains enabled. Crossing a point counts as arrival. Enter/exit interpolate presentation without moving the motor. Effects run only in active.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -73,21 +73,21 @@ Long uses `approach -> enter -> active -> exit -> free`. Prompt scans use only r
 | table/eating | S | 500 ms | 650 ms | 300 ms |
 | bed/sleep | E | 1000 ms | 1200 ms | 500 ms |
 
-The target need is protected enter through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
+The target need is protected through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
 
 ## Invariants
 
 - formulas stay deterministic, framework-free and JSON-safe;
 - time drain and discrete costs are additive;
-- event consequences expose reusable world/presentation outputs;
 - presentation never rewrites safe motor position;
-- `WorldLocationRuntime` owns location facility/needs lifecycle and realtime update;
+- approach masks change automatic positioning, not timeline pose or effects;
+- `WorldLocationRuntime` owns location facility/needs lifecycle;
 - saves exclude debug presets and interaction timeline state.
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable points. `src/main.js` composes.
+`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:interaction`; focused browser E2E.
