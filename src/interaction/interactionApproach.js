@@ -13,8 +13,8 @@ function finite(value, fallback = 0) {
 
 function colliderTargeting(collider) {
   return collider ? Object.freeze({
-    requiresFacing: true,
-    facingDotThreshold: 0,
+    requiresFacing: false,
+    facingDotThreshold: -1,
     targetingMode: "facing-first",
     targetingGroup: PLACEABLE_TARGETING_GROUP,
   }) : Object.freeze({});
