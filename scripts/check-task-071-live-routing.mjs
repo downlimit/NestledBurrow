@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { PLACEABLE_TARGETING_GROUP } from "../src/build/liveAssetGeometry.js";
+import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction/interaction.js";
 import { createInteractionApproachResolver } from "../src/interaction/interactionApproach.js";
 import { createWorldLayout } from "../src/world/worldLayout.js";
 
@@ -48,5 +50,40 @@ assert.deepEqual(resolved?.payload.approachPoint, { x: 40, y: 24 }, "activation 
 assert.deepEqual(resolved?.payload.approachPath, [{ x: 40, y: 24 }], "gaze ranking does not bypass exact approach routing");
 assert.equal(resolved?.targetingMode, "facing-first");
 assert.equal(resolved?.targetingGroup, PLACEABLE_TARGETING_GROUP);
+assert.equal(resolved?.requiresFacing, false, "exact routing does not reintroduce a hard gaze gate");
 
-console.log("Task #071 live routing passed: gaze-ranked collider targets keep exact approach paths");
+const bedTarget = createInteractionTarget({
+  ...definition,
+  prompt: "sleep",
+  priority: 21,
+});
+const wellTarget = createInteractionTarget({
+  id: "well",
+  entityId: "well",
+  kind: "refill-well",
+  position: { x: 8, y: 24 },
+  aimPosition: { x: 8, y: 24 },
+  radius: 64,
+  priority: 24,
+  requiresFacing: false,
+  facingDotThreshold: -1,
+  targetingMode: "facing-first",
+  targetingGroup: PLACEABLE_TARGETING_GROUP,
+  prompt: "bucket",
+  payload: {},
+});
+assert.equal(
+  findBestInteractionTarget({ ...source, facingDirection: { x: 0, y: 1 } }, [wellTarget, bedTarget])?.entityId,
+  "test-bed",
+  "looking at the bed beats the higher-priority nearby well",
+);
+assert.equal(
+  findBestInteractionTarget({ ...source, facingDirection: { x: -1, y: 0 } }, [wellTarget, bedTarget])?.entityId,
+  "well",
+  "looking at the well selects the well",
+);
+
+const consistencySource = readFileSync("src/build/assetRuntimeConsistencyBootstrap.js", "utf8");
+assert(consistencySource.includes("patchFarmingRuntime"), "well definitions join live collider targeting");
+
+console.log("Task #071 live routing passed: gaze-ranked collider targets keep exact approach paths and bed/well selection");
