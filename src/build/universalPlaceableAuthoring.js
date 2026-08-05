@@ -65,7 +65,7 @@ function wellInstances(owners) {
       id: well.id,
       profileKey: "farming:well",
       anchor: { x: well.x, y: well.y },
-      bounds: target.bounds ?? {
+      bounds: target.authoringBounds ?? target.bounds ?? {
         left: well.x,
         right: well.x + WELL_PROFILE.width,
         top: well.y,
@@ -87,11 +87,8 @@ function tavernSignInstances(owners) {
   return [{
     id: TAVERN_SIGN.id,
     profileKey: "facility:tavern-sign",
-    anchor: {
-      x: state.position.x - TAVERN_SIGN.snapAnchorOffset.x,
-      y: state.position.y - TAVERN_SIGN.snapAnchorOffset.y,
-    },
-    bounds: target.bounds,
+    anchor: { ...state.position },
+    bounds: target.authoringBounds ?? target.bounds,
     visualBasePosition: { ...state.position },
     targets: target.targets,
     special: true,
@@ -111,7 +108,7 @@ function trainingDummyInstances(owners) {
     id: TRAINING_DUMMY.id,
     profileKey: "melee:training-dummy",
     anchor: { ...state.position },
-    bounds: target.bounds ?? {
+    bounds: target.authoringBounds ?? target.bounds ?? {
       left: state.position.x,
       right: state.position.x + TRAINING_DUMMY.asset.width,
       top: state.position.y,
