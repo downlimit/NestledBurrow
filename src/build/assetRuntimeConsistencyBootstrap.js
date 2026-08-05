@@ -178,10 +178,10 @@ function patchBedRuntime(runtime, scene) {
   if (!originalGetBedDefinition || !originalGetBedDefinitions || !originalGetBedBounds) return;
 
   if (originalRestoreBed) {
-    runtime.restoreBed = (definition) => originalRestoreBed(normalizeBedDefinitionToGrid(definition));
+    runtime.restoreBed = (definition) => originalRestoreBed(canonicalBedDefinition(definition));
   }
   if (originalReplaceBed) {
-    runtime.replaceBed = (definition) => originalReplaceBed(normalizeBedDefinitionToGrid(definition));
+    runtime.replaceBed = (definition) => originalReplaceBed(canonicalBedDefinition(definition));
   }
   if (originalAddBed) {
     runtime.addBed = (point) => {
@@ -219,15 +219,13 @@ function patchBedRuntime(runtime, scene) {
   }
 
   function currentDefinition(definition) {
-    const canonical = normalizeBedDefinitionToGrid(definition);
-    return livePlaceableInteraction(canonical, currentGeometry(canonical), { position: "visual" });
+    const canonical = canonicalBedDefinition(definition);
+    return livePlaceableInteraction(canonical, currentGeometry(definition), { position: "visual" });
   }
 
   runtime.getBedRuntimeGeometry = (id = null) => currentGeometry(originalGetBedDefinition(id));
   runtime.getBedDefinition = (id = null) => currentDefinition(originalGetBedDefinition(id));
-  runtime.getBedDefinitions = () => originalGetBedDefinitions()
-    .map(normalizeBedDefinitionToGrid)
-    .map(canonicalBedDefinition);
+  runtime.getBedDefinitions = () => originalGetBedDefinitions().map(canonicalBedDefinition);
 
   if (originalGetInteractionDefinitions) {
     runtime.getInteractionDefinitions = () => {
