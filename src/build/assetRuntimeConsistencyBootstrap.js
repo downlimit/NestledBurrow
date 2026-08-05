@@ -83,6 +83,7 @@ function facilityInteraction(definition, geometry) {
   if (!interaction || GAZE_RANKED_FACILITY_TYPES.has(definition?.facilityType)) return interaction;
   return Object.freeze({
     ...interaction,
+    position: definition.usePosition ?? derivedFacilityUsePosition(definition) ?? interaction.position,
     targetingMode: "priority-distance",
     targetingGroup: null,
   });
