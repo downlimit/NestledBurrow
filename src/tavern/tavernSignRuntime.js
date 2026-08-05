@@ -3,6 +3,7 @@ import { worldDepthFromAnchorY } from "../build/buildWorldGeometry.js";
 
 export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
   let position = { ...TAVERN_SIGN.position };
+  let present = true;
   const sprite = scene.add.sprite(position.x, position.y, TAVERN_SIGN_ASSET.key, 1)
     .setOrigin(0.5, 1)
     .setDepth(worldDepthFromAnchorY(position.y, TAVERN_SIGN.id));
@@ -24,26 +25,52 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     && point.y >= bounds.top && point.y <= bounds.bottom;
 
   function isPlacementBlocked(point) {
-    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return true;
+    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return true;
     const bounds = boundsAt(point);
     if (worldLayout?.bounds && (bounds.left < worldLayout.bounds.left || bounds.top < worldLayout.bounds.top
       || bounds.right > worldLayout.bounds.right || bounds.bottom > worldLayout.bounds.bottom)) return true;
     return (worldLayout?.getBlockingColliders?.(colliderAt(point)) ?? []).some(({ id }) => id !== TAVERN_SIGN.id);
   }
 
+  function definition() {
+    return {
+      id: TAVERN_SIGN.id,
+      kind: TAVERN_SIGN_BUILD_KIND,
+      position: { ...position },
+    };
+  }
+
   function syncPlacement() {
+    sprite.setVisible(present);
+    if (!present) {
+      worldLayout?.clearWorldObjectCollider?.(TAVERN_SIGN.id);
+      return;
+    }
     sprite.setPosition(position.x, position.y).setDepth(worldDepthFromAnchorY(position.y, TAVERN_SIGN.id));
     worldLayout?.setWorldObjectCollider?.(TAVERN_SIGN.id, colliderAt(position), "facility:tavern-sign");
   }
 
   function draw() {
-    sprite.setFrame(getTavernOpen() ? 0 : 1);
+    sprite.setFrame(getTavernOpen() ? 0 : 1).setVisible(present);
   }
+
+  function restoreBuildTarget(value) {
+    const source = value?.position ?? value;
+    const restored = { x: Number(source?.x), y: Number(source?.y) };
+    if (!Number.isFinite(restored.x) || !Number.isFinite(restored.y)) return false;
+    position = restored;
+    present = true;
+    syncPlacement();
+    draw();
+    return true;
+  }
+
   syncPlacement();
   draw();
 
   return {
     getInteractionDefinitions() {
+      if (!present) return [];
       return [{
         id: TAVERN_SIGN.id,
         entityId: TAVERN_SIGN.entityId,
@@ -61,6 +88,7 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     sync: draw,
     getState: () => ({
       open: Boolean(getTavernOpen()),
+      present,
       ...TAVERN_SIGN,
       position: { ...position },
       interactionPosition: offsetPoint(TAVERN_SIGN.interactionOffset),
@@ -68,16 +96,27 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     }),
     getGuestCheckPoint: () => offsetPoint(TAVERN_SIGN.guestCheckOffset),
     getBuildMoveTargetAt(point) {
-      return contains(boundsAt(position), point) ? {
+      return present && contains(boundsAt(position), point) ? {
         kind: TAVERN_SIGN_BUILD_KIND,
-        definition: { id: TAVERN_SIGN.id, kind: TAVERN_SIGN_BUILD_KIND, position: { ...position } },
+        definition: definition(),
         profileKey: "facility:tavern-sign",
+        bounds: boundsAt(position),
         placementPosition: { ...position },
         snapAnchorOffset: { ...TAVERN_SIGN.snapAnchorOffset },
         targets: [sprite],
       } : null;
     },
+    isBuildPlacementBlocked: isPlacementBlocked,
+    placeBuildTarget(point) {
+      if (present || isPlacementBlocked(point)) return null;
+      position = { x: Number(point.x), y: Number(point.y) };
+      present = true;
+      syncPlacement();
+      draw();
+      return definition();
+    },
     moveBuildTarget(point) {
+      if (!present) return null;
       const next = { x: Number(point.x), y: Number(point.y) };
       if (isPlacementBlocked(next)) return null;
       const previous = { ...position };
@@ -85,29 +124,32 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
       syncPlacement();
       return { previous, current: { ...position } };
     },
-    restoreBuildTarget(point) {
-      const restored = { x: Number(point.x), y: Number(point.y) };
-      if (!Number.isFinite(restored.x) || !Number.isFinite(restored.y)) return false;
-      position = restored;
+    removeBuildTarget() {
+      if (!present) return null;
+      const removed = definition();
+      present = false;
       syncPlacement();
-      return true;
+      draw();
+      return removed;
     },
+    restoreBuildTarget,
     renderBuildPreview(point) {
-      const preview = scene.add.sprite(point.x, point.y, TAVERN_SIGN_ASSET.key, getTavernOpen() ? 0 : 1)
+      return scene.add.sprite(point.x, point.y, TAVERN_SIGN_ASSET.key, getTavernOpen() ? 0 : 1)
         .setOrigin(0.5, 1)
         .setDepth(8988)
         .setTint(isPlacementBlocked(point) ? 0xff5364 : 0x7dff9a)
         .setAlpha(0.58);
-      return preview;
     },
-    getStartingLayoutFurniture: () => [{ id: TAVERN_SIGN.id, kind: TAVERN_SIGN_BUILD_KIND, position: { ...position } }],
+    getStartingLayoutFurniture: () => present ? [definition()] : [],
     restoreStartingLayoutFurniture(definitions) {
-      const definition = definitions?.find?.(({ id }) => id === TAVERN_SIGN.id);
-      const restored = { x: Number(definition?.position?.x), y: Number(definition?.position?.y) };
-      if (definition?.kind !== TAVERN_SIGN_BUILD_KIND || !Number.isFinite(restored.x) || !Number.isFinite(restored.y)) return false;
-      position = restored;
-      syncPlacement();
-      return true;
+      const entry = definitions?.find?.(({ id }) => id === TAVERN_SIGN.id);
+      if (!entry) {
+        present = false;
+        syncPlacement();
+        draw();
+        return true;
+      }
+      return entry.kind === TAVERN_SIGN_BUILD_KIND && restoreBuildTarget(entry);
     },
     destroy: () => {
       sprite.destroy();
