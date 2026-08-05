@@ -29,11 +29,13 @@ const definition = {
   position: { x: 40, y: 40 },
   aimPosition: { x: 40, y: 40 },
   radius: 64,
+  priority: 21,
   requiresFacing: false,
   facingDotThreshold: -1,
   targetingMode: "facing-first",
   targetingGroup: PLACEABLE_TARGETING_GROUP,
   interactionDirections: ["top"],
+  prompt: "sleep",
   payload: { bedId: "test-bed" },
 };
 const source = {
@@ -48,15 +50,11 @@ assert(probe, "gaze-ranked collider target is visible to the prompt scan without
 const resolved = resolver.resolve(definition, source);
 assert.deepEqual(resolved?.payload.approachPoint, { x: 40, y: 24 }, "activation still resolves the enabled perimeter cell");
 assert.deepEqual(resolved?.payload.approachPath, [{ x: 40, y: 24 }], "gaze ranking does not bypass exact approach routing");
-assert.equal(resolved?.targetingMode, "facing-first");
-assert.equal(resolved?.targetingGroup, PLACEABLE_TARGETING_GROUP);
-assert.equal(resolved?.requiresFacing, false, "exact routing does not reintroduce a hard gaze gate");
+const bedTarget = createInteractionTarget({ ...definition, ...resolved });
+assert.equal(bedTarget.targetingMode, "facing-first");
+assert.equal(bedTarget.targetingGroup, PLACEABLE_TARGETING_GROUP);
+assert.equal(bedTarget.requiresFacing, false, "exact routing preserves the definition's non-gating gaze contract");
 
-const bedTarget = createInteractionTarget({
-  ...definition,
-  prompt: "sleep",
-  priority: 21,
-});
 const wellTarget = createInteractionTarget({
   id: "well",
   entityId: "well",
