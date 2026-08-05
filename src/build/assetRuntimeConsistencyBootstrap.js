@@ -4,6 +4,7 @@ import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
 import {
   canonicalBedDefinition,
+  derivedFacilityUsePosition,
   hydrateFacilityRuntimeDefinition,
   liveBedGeometry,
   liveFacilityGeometry,
@@ -104,7 +105,12 @@ function patchFacilityRuntime(runtime, scene) {
   }
 
   function currentDefinition(definition) {
-    return livePlaceableInteraction(definition, currentGeometry(definition));
+    if (!definition) return null;
+    const interaction = livePlaceableInteraction(definition, currentGeometry(definition));
+    return Object.freeze({
+      ...interaction,
+      usePosition: definition.usePosition ?? derivedFacilityUsePosition(definition),
+    });
   }
 
   if (originalRestore) {
@@ -136,7 +142,7 @@ function patchFacilityRuntime(runtime, scene) {
   if (originalGetInteractionDefinitions) {
     runtime.getInteractionDefinitions = () => originalGetInteractionDefinitions().map((definition) => {
       const raw = originalGetDefinition(definition.id) ?? originalGetDefinition(definition.entityId);
-      const current = currentDefinition(raw ?? definition);
+      const current = livePlaceableInteraction(raw ?? definition, currentGeometry(raw ?? definition));
       return Object.freeze({
         ...definition,
         ...current,
@@ -167,11 +173,6 @@ function patchBedRuntime(runtime, scene) {
   const originalGetInteractionDefinitions = runtime.getInteractionDefinitions?.bind(runtime);
 
   if (!originalGetBedDefinition || !originalGetBedDefinitions || !originalGetBedBounds) return;
-
-  for (const definition of originalGetBedDefinitions()) {
-    const canonical = normalizeBedDefinitionToGrid(definition);
-    if (canonical !== definition) originalReplaceBed?.(canonical);
-  }
 
   if (originalRestoreBed) {
     runtime.restoreBed = (definition) => originalRestoreBed(normalizeBedDefinitionToGrid(definition));
