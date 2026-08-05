@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { PLACEABLE_TARGETING_GROUP } from "../src/build/liveAssetGeometry.js";
 import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction/interaction.js";
 import { createInteractionApproachResolver } from "../src/interaction/interactionApproach.js";
+import { createInteractionRuntime } from "../src/interaction/interactionRuntime.js";
+import { createGameSessionState } from "../src/session/gameSessionState.js";
 import { createWorldLayout } from "../src/world/worldLayout.js";
 
 const worldLayout = createWorldLayout();
@@ -81,7 +83,66 @@ assert.equal(
   "looking at the well selects the well",
 );
 
+const selectedDefinition = {
+  id: "selected-shower",
+  entityId: "selected-shower",
+  kind: "use-facility",
+  position: { x: 16, y: 0 },
+  aimPosition: { x: 16, y: 0 },
+  radius: 64,
+  priority: 20,
+  requiresFacing: false,
+  facingDotThreshold: -1,
+  targetingMode: "facing-first",
+  targetingGroup: PLACEABLE_TARGETING_GROUP,
+  prompt: "shower",
+  payload: { facilityId: "selected-shower" },
+};
+const competingDefinition = {
+  ...selectedDefinition,
+  id: "competing-toilet",
+  entityId: "competing-toilet",
+  position: { x: 0, y: 12 },
+  aimPosition: { x: 0, y: 12 },
+  priority: 30,
+  prompt: "toilet",
+  payload: { facilityId: "competing-toilet" },
+};
+const activationSource = { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } };
+const exactCalls = [];
+let handledEntityId = null;
+const interactionRuntime = createInteractionRuntime({
+  sessionState: createGameSessionState(),
+  characterSystem: {
+    getSnapshot: () => activationSource,
+    has: () => false,
+  },
+  worldInteractionCoordinator: {
+    getStaticInteractionDefinitions: () => [selectedDefinition, competingDefinition],
+    isInteractionAllowed: () => true,
+    handle: (candidate) => {
+      handledEntityId = candidate.entityId;
+      return { status: "handled", mutated: false };
+    },
+  },
+  resolveInteractionTarget: (candidate) => {
+    if (!candidate.__interactionProbe) exactCalls.push(candidate.entityId);
+    return candidate;
+  },
+  presenter: {
+    showPrompt() {},
+    hidePrompt() {},
+    isMessageVisible: () => false,
+  },
+});
+interactionRuntime.update({ actions: { interact: false } });
+assert.equal(interactionRuntime.getCurrentCandidate()?.entityId, "selected-shower", "prompt scan selects the looked-at facility");
+interactionRuntime.update({ actions: { interact: true } });
+assert.deepEqual(exactCalls, ["selected-shower"], "activation resolves only the target whose prompt was selected");
+assert.equal(handledEntityId, "selected-shower", "interaction cannot switch to a neighbour between prompt and activation");
+interactionRuntime.destroy();
+
 const consistencySource = readFileSync("src/build/assetRuntimeConsistencyBootstrap.js", "utf8");
 assert(consistencySource.includes("patchFarmingRuntime"), "well definitions join live collider targeting");
 
-console.log("Task #071 live routing passed: gaze-ranked collider targets keep exact approach paths and bed/well selection");
+console.log("Task #071 live routing passed: gaze-ranked targets keep exact paths and activation stays on the selected object");
