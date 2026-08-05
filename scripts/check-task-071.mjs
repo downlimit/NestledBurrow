@@ -179,7 +179,7 @@ assert.equal("presentationPose" in migratedLayout.beds[0], false, "canonical bed
 
 const hydratedBath = hydrateFacilityRuntimeDefinition(migratedLayout.facilities[0]);
 assert.deepEqual(hydratedBath.position, { x: 48, y: 64 }, "runtime hydration derives the facility centre from footprint");
-assert.deepEqual(hydratedBath.usePosition, { x: 48, y: 64 }, "runtime hydration cannot revive an old authored use position");
+assert.deepEqual(hydratedBath.usePosition, { x: 72, y: 72 }, "runtime hydration derives a current service point and cannot revive an old authored value");
 const bathGeometry = liveFacilityGeometry(
   hydratedBath,
   { visualOffset: { x: 64, y: -16 }, snapAnchorOffset: { x: 7, y: 9 } },
@@ -194,18 +194,18 @@ assert.deepEqual(bathInteraction.position, { x: 112, y: 96 });
 assert.deepEqual(bathInteraction.aimPosition, { x: 112, y: 96 });
 assert.equal(bathInteraction.targetingMode, "facing-first");
 assert.equal(bathInteraction.targetingGroup, PLACEABLE_TARGETING_GROUP);
-assert.equal(bathInteraction.requiresFacing, true);
+assert.equal(bathInteraction.requiresFacing, false);
 
 const sourceSnapshot = { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } };
 const bedTarget = createInteractionTarget({
   id: "bed", entityId: "bed", kind: "sleep-bed", position: { x: 20, y: 0 }, aimPosition: { x: 20, y: 0 },
-  radius: 50, priority: 21, requiresFacing: true, facingDotThreshold: 0,
+  radius: 50, priority: 21, requiresFacing: false, facingDotThreshold: -1,
   targetingMode: "facing-first", targetingGroup: PLACEABLE_TARGETING_GROUP,
   prompt: "sleep", payload: {},
 });
 const toiletTarget = createInteractionTarget({
   id: "toilet", entityId: "toilet", kind: "use-facility", position: { x: 0, y: 16 }, aimPosition: { x: 0, y: 16 },
-  radius: 50, priority: 20, requiresFacing: true, facingDotThreshold: 0,
+  radius: 50, priority: 20, requiresFacing: false, facingDotThreshold: -1,
   targetingMode: "facing-first", targetingGroup: PLACEABLE_TARGETING_GROUP,
   prompt: "toilet", payload: {},
 });
