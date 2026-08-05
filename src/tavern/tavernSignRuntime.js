@@ -1,13 +1,22 @@
 import { TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_BUILD_KIND, TAVERN_SIGN_KIND } from "./guestConfig.js";
-import { worldDepthFromAnchorY } from "../build/buildWorldGeometry.js";
+import { assetDepthFromPivot, pixelAlignedWorldPoint } from "../build/buildWorldGeometry.js";
+
+const PROFILE_KEY = "facility:tavern-sign";
 
 export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
   let position = { ...TAVERN_SIGN.position };
   let present = true;
   const sprite = scene.add.sprite(position.x, position.y, TAVERN_SIGN_ASSET.key, 1)
-    .setOrigin(0.5, 1)
-    .setDepth(worldDepthFromAnchorY(position.y, TAVERN_SIGN.id));
+    .setOrigin(0.5, 1);
 
+  const profilePoint = (field) => {
+    const value = scene.assetProfiles?.[PROFILE_KEY]?.[field];
+    return { x: Math.round(Number(value?.x) || 0), y: Math.round(Number(value?.y) || 0) };
+  };
+  const visualPositionAt = (point) => {
+    const offset = profilePoint("visualOffset");
+    return pixelAlignedWorldPoint({ x: point.x + offset.x, y: point.y + offset.y });
+  };
   const offsetPoint = (offset, point = position) => ({ x: point.x + offset.x, y: point.y + offset.y });
   const colliderAt = (point) => ({
     left: point.x + TAVERN_SIGN.collisionRect.left,
@@ -15,21 +24,31 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     top: point.y + TAVERN_SIGN.collisionRect.top,
     bottom: point.y + TAVERN_SIGN.collisionRect.bottom,
   });
-  const boundsAt = (point) => ({
+  const effectiveColliderAt = (point) => worldLayout?.getEffectiveCollider?.(colliderAt(point), PROFILE_KEY)
+    ?? colliderAt(point);
+  const authoringBoundsAt = (point) => ({
     left: point.x - TAVERN_SIGN.width / 2,
     right: point.x + TAVERN_SIGN.width / 2,
     top: point.y - TAVERN_SIGN.height,
     bottom: point.y,
+  });
+  const visualBoundsAt = (point) => authoringBoundsAt(visualPositionAt(point));
+  const unionBounds = (first, second) => ({
+    left: Math.min(first.left, second.left),
+    right: Math.max(first.right, second.right),
+    top: Math.min(first.top, second.top),
+    bottom: Math.max(first.bottom, second.bottom),
   });
   const contains = (bounds, point) => point.x >= bounds.left && point.x <= bounds.right
     && point.y >= bounds.top && point.y <= bounds.bottom;
 
   function isPlacementBlocked(point) {
     if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return true;
-    const bounds = boundsAt(point);
+    const bounds = visualBoundsAt(point);
     if (worldLayout?.bounds && (bounds.left < worldLayout.bounds.left || bounds.top < worldLayout.bounds.top
       || bounds.right > worldLayout.bounds.right || bounds.bottom > worldLayout.bounds.bottom)) return true;
-    return (worldLayout?.getBlockingColliders?.(colliderAt(point)) ?? []).some(({ id }) => id !== TAVERN_SIGN.id);
+    return (worldLayout?.getBlockingColliders?.(effectiveColliderAt(point)) ?? [])
+      .some(({ id }) => id !== TAVERN_SIGN.id);
   }
 
   function definition() {
@@ -46,8 +65,12 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
       worldLayout?.clearWorldObjectCollider?.(TAVERN_SIGN.id);
       return;
     }
-    sprite.setPosition(position.x, position.y).setDepth(worldDepthFromAnchorY(position.y, TAVERN_SIGN.id));
-    worldLayout?.setWorldObjectCollider?.(TAVERN_SIGN.id, colliderAt(position), "facility:tavern-sign");
+    const visual = visualPositionAt(position);
+    const pivot = profilePoint("snapAnchorOffset");
+    sprite
+      .setPosition(visual.x, visual.y)
+      .setDepth(assetDepthFromPivot(position, pivot, 500, TAVERN_SIGN.id));
+    worldLayout?.setWorldObjectCollider?.(TAVERN_SIGN.id, colliderAt(position), PROFILE_KEY);
   }
 
   function draw() {
@@ -86,7 +109,10 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
         payload: {},
       }];
     },
-    sync: draw,
+    sync() {
+      syncPlacement();
+      draw();
+    },
     getState: () => ({
       open: Boolean(getTavernOpen()),
       present,
@@ -97,13 +123,17 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     }),
     getGuestCheckPoint: () => offsetPoint(TAVERN_SIGN.guestCheckOffset),
     getBuildMoveTargetAt(point) {
-      return present && contains(boundsAt(position), point) ? {
+      if (!present) return null;
+      const authoringBounds = authoringBoundsAt(position);
+      const bounds = unionBounds(visualBoundsAt(position), effectiveColliderAt(position));
+      return contains(bounds, point) ? {
         kind: TAVERN_SIGN_BUILD_KIND,
         definition: definition(),
-        profileKey: "facility:tavern-sign",
-        bounds: boundsAt(position),
+        profileKey: PROFILE_KEY,
+        authoringBounds,
+        bounds,
         placementPosition: { ...position },
-        snapAnchorOffset: { ...TAVERN_SIGN.snapAnchorOffset },
+        snapAnchorOffset: profilePoint("snapAnchorOffset"),
         targets: [sprite],
       } : null;
     },
@@ -135,9 +165,11 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     },
     restoreBuildTarget,
     renderBuildPreview(point) {
-      return scene.add.sprite(point.x, point.y, TAVERN_SIGN_ASSET.key, getTavernOpen() ? 0 : 1)
+      const visual = visualPositionAt(point);
+      const pivot = profilePoint("snapAnchorOffset");
+      return scene.add.sprite(visual.x, visual.y, TAVERN_SIGN_ASSET.key, getTavernOpen() ? 0 : 1)
         .setOrigin(0.5, 1)
-        .setDepth(8988)
+        .setDepth(assetDepthFromPivot(point, pivot, 8988, `${TAVERN_SIGN.id}:preview`))
         .setTint(isPlacementBlocked(point) ? 0xff5364 : 0x7dff9a)
         .setAlpha(0.58);
     },
