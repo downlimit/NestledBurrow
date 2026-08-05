@@ -186,7 +186,8 @@ function createFacilityAdapter(scene, runtime) {
 
 function createResourceAdapter(scene, runtime) {
   if (!runtime?.getResourceDefinitions || !runtime?.registerResource || !runtime?.unregisterResource) return null;
-  let nextId = maximumEditorResourceId(runtime.getResourceDefinitions());
+  const persistedIds = Object.keys(scene.sessionState?.gameplay?.resourceNodes ?? {}).map((id) => ({ id }));
+  let nextId = maximumEditorResourceId([...runtime.getResourceDefinitions(), ...persistedIds]);
 
   function pointFor(definition) {
     return {
