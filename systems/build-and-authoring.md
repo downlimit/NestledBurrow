@@ -40,10 +40,10 @@ Collider rounding uses the live draft: remove `2 px` padding, snap to cells, res
 ## Owners
 
 - orchestration: `src/build/worldBuildCoordinator.js`;
-- lifecycle: `src/build/placeableBuildProtocol.js`, `placeableBuildContract.js`, `placeableBuildOwners.js`, `placeableBuildGeometry.js`;
-- placement: `src/build/placeablePlacementPose.js`, `buildWorldGeometry.js`;
-- profiles/input: `src/build/assetProfiles.js`, `assetProfileRelations.js`, `assetAuthoringInput.js`;
-- authoring/export: `src/build/universalPlaceableAuthoring.js`, `authoringCanonExport.js`, `authoringBackup.js`, `assetRuntimeConsistencyBootstrap.js`, `startingLayout.js`.
+- lifecycle: `src/build/placeableBuildProtocol.js`, `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeableBuildGeometry.js`;
+- placement: `src/build/placeablePlacementPose.js`, `src/build/buildWorldGeometry.js`;
+- profiles/input: `src/build/assetProfiles.js`, `src/build/assetProfileRelations.js`, `src/build/assetAuthoringInput.js`;
+- authoring/export: `src/build/universalPlaceableAuthoring.js`, `src/build/authoringCanonExport.js`, `src/build/authoringBackup.js`, `src/build/assetRuntimeConsistencyBootstrap.js`, `src/build/startingLayout.js`.
 
 `WorldBuildCoordinator` owns previews, grouped actions and undo. Runtime owners own entities. `WorldScene` remains composition only.
 
