@@ -1,7 +1,15 @@
 import { TRAINING_DUMMY } from "../combat/meleeConfig.js";
-import { FARMING_WELL_TEXTURE_KEY } from "../resources/farmingConfig.js";
+import { FACILITY_ASSETS } from "../facilities/facilityConfig.js";
+import { FARMING_WELL_TEXTURE_KEY, WELL_PROFILE } from "../resources/farmingConfig.js";
+import { getResourceProfile } from "../resources/resourceDomain.js";
 import { TAVERN_SIGN, TAVERN_SIGN_ASSET } from "../tavern/guestConfig.js";
-import { assetDepthFromPivot, pixelAlignedWorldPoint } from "./buildWorldGeometry.js";
+import { TILE_SIZE } from "../world/worldConfig.js";
+import {
+  assetDepthFromPivot,
+  pixelAlignedWorldPoint,
+  placementMidpointOffset,
+} from "./buildWorldGeometry.js";
+import { effectiveCollider, resourceColliderAt } from "./placeableBuildGeometry.js";
 import { PLACEABLE_BUILD_OWNER_IDS } from "./placeableBuildProtocol.js";
 
 function point(value = {}) {
@@ -19,6 +27,41 @@ function profileKeyFor(adapterId, value = {}) {
   if (adapterId === PLACEABLE_BUILD_OWNER_IDS.well) return "farming:well";
   if (adapterId === PLACEABLE_BUILD_OWNER_IDS.tavernSign) return "facility:tavern-sign";
   if (adapterId === PLACEABLE_BUILD_OWNER_IDS.trainingDummy) return "melee:training-dummy";
+  return null;
+}
+
+function offsetRect(placement, rect) {
+  return Object.freeze({
+    left: placement.x + Number(rect.left),
+    right: placement.x + Number(rect.right),
+    top: placement.y + Number(rect.top),
+    bottom: placement.y + Number(rect.bottom),
+  });
+}
+
+function basePlacementCollider(adapterId, value, placement) {
+  if (adapterId === PLACEABLE_BUILD_OWNER_IDS.bed) {
+    return offsetRect(placement, { left: 0, right: TILE_SIZE, top: 0, bottom: TILE_SIZE });
+  }
+  if (adapterId === PLACEABLE_BUILD_OWNER_IDS.facility) {
+    const asset = FACILITY_ASSETS[value?.facilityType];
+    return asset
+      ? offsetRect(placement, { left: 0, right: asset.width, top: 0, bottom: asset.height })
+      : null;
+  }
+  if (adapterId === PLACEABLE_BUILD_OWNER_IDS.resource) {
+    const profileId = value?.resourceProfileId ?? value?.definition?.profileId;
+    return profileId ? resourceColliderAt(placement, getResourceProfile(profileId)) : null;
+  }
+  if (adapterId === PLACEABLE_BUILD_OWNER_IDS.well) {
+    return offsetRect(placement, WELL_PROFILE.collisionRect);
+  }
+  if (adapterId === PLACEABLE_BUILD_OWNER_IDS.tavernSign) {
+    return offsetRect(placement, TAVERN_SIGN.collisionRect);
+  }
+  if (adapterId === PLACEABLE_BUILD_OWNER_IDS.trainingDummy) {
+    return offsetRect(placement, TRAINING_DUMMY.asset.collision);
+  }
   return null;
 }
 
@@ -44,6 +87,20 @@ export function resolvePlaceablePlacementPose(scene, profileKey, placementPositi
   });
 }
 
+export function resolvePlaceablePlacementAnchor(scene, adapterId, value = {}, placementPosition = { x: 0, y: 0 }) {
+  const profileKey = profileKeyFor(adapterId, value);
+  if (!profileKey) return null;
+  const placement = point(placementPosition);
+  const baseCollider = basePlacementCollider(adapterId, value, placement);
+  if (!baseCollider) return null;
+  const pivotOffset = point(scene.assetProfiles?.[profileKey]?.snapAnchorOffset);
+  return placementMidpointOffset({
+    placementPosition: placement,
+    pivotOffset,
+    effectiveCollider: effectiveCollider(scene, baseCollider, profileKey),
+  });
+}
+
 function previewTint(blocked) {
   return blocked ? 0xff5364 : 0x7dff9a;
 }
@@ -52,11 +109,13 @@ function decorateTarget(scene, adapter, target) {
   if (!target) return null;
   const profileKey = profileKeyFor(adapter.id, target);
   if (!profileKey) return target;
-  const pose = resolvePlaceablePlacementPose(scene, profileKey, target.placementPosition ?? { x: 0, y: 0 });
+  const placementPosition = target.placementPosition ?? { x: 0, y: 0 };
+  const pose = resolvePlaceablePlacementPose(scene, profileKey, placementPosition);
+  const anchorOffset = resolvePlaceablePlacementAnchor(scene, adapter.id, target, placementPosition);
   return {
     ...target,
     profileKey,
-    snapAnchorOffset: { ...pose.pivotOffset },
+    snapAnchorOffset: anchorOffset ? { ...anchorOffset } : { ...pose.pivotOffset },
   };
 }
 
@@ -94,10 +153,9 @@ export function decoratePlaceablePlacementAdapters(scene, owners, adapters) {
     const decorated = {
       ...adapter,
       getPlacementAnchorOffset(value) {
-        const profileKey = profileKeyFor(adapter.id, value);
-        return profileKey
-          ? { ...resolvePlaceablePlacementPose(scene, profileKey, { x: 0, y: 0 }).pivotOffset }
-          : adapter.getPlacementAnchorOffset?.(value) ?? { x: 0, y: 0 };
+        return resolvePlaceablePlacementAnchor(scene, adapter.id, value, { x: 0, y: 0 })
+          ?? adapter.getPlacementAnchorOffset?.(value)
+          ?? { x: 0, y: 0 };
       },
       getTargetAt(value) {
         return decorateTarget(scene, adapter, originalGetTargetAt(value));
