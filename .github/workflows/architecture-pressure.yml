@@ -28,7 +28,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify architecture pressure
+      - name: Verify architecture pressure contract
+        run: node scripts/check-architecture-pressure-contract.mjs
+
+      - name: Verify architecture pressure declaration
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
