@@ -28,7 +28,8 @@ Task: `Task #<number> — <human-readable result>`
 
 ## Scope
 
-<!-- Confirm intended files/systems and absence of unrelated changes. -->
+<!-- Confirm intended files/systems and absence of unrelated changes. Architecture pressure must match the Lead brief: `none` or the addressed owner/trigger. -->
 
+- Architecture pressure: `none`
 - Branch: `task/<number>-<slug>`
 - Final head SHA: `<sha>`
