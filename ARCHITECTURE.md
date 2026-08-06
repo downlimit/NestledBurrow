@@ -102,6 +102,26 @@ Nest entry and terminal return call `WorldLocationCoordinator.transitionTo` with
 
 Геометрия Гнезда формируется в `src/world/nestWorldLayout.js` из одной модели острова для terrain render и collision. Геометрия арен Атолла формируется в `src/world/atollWorldLayout.js`. Домашний authoring остаётся привязан к capability `buildMode` локации `village`.
 
+## Архитектурные точки давления
+
+Это условные триггеры для последующих задач, а не отдельный backlog общего рефакторинга. Каждое техническое ТЗ объявляет `Architecture pressure: none` либо называет затронутый owner, сработавший триггер и локальное выделение, выполняемое в том же PR. Нельзя принять триггер и оставить его отдельным неопределённым follow-up.
+
+### `src/main.js`
+
+Изменение authoring workflow, sleep/time orchestration, frame-input arbitration или autosave cadence не расширяет соответствующую state machine внутри `WorldScene`. Затронутый workflow выделяется в owner/coordinator в той же задаче. Соблюдение лимита строк само по себе не доказывает корректную границу.
+
+### `src/build/worldBuildCoordinator.js`
+
+Новый entity-specific lifecycle `place → move → remove → restore` внутри координатора запрещён. Объект остаётся у своего runtime owner и подключается через placeable protocol/adapters. Встроенный lifecycle колодцев является принятой точкой давления: следующая задача, меняющая размещение, перенос, снос колодцев или farming/build integration, переносит его в farming/resources owner в том же PR. Структурные стены, поверхности, preview и grouped undo остаются обязанностью build coordinator.
+
+### `src/world/worldLocationRuntime.js`
+
+Runtime может выбирать factories, монтировать и уничтожать owners, задавать update order, rebind и проверять capabilities. Gameplay formulas, item recipes, economy/progression rules, encounter state, persistence normalization и presentation algorithms получают локального системного owner; добавлять их в location composition root запрещено.
+
+### Новые системные адреса
+
+Первое содержательное расширение боя за пределы текущего melee/loadout slice создаёт отдельный combat system contract и маршрут в `LIBRARY.md`. Первое межсистемное расширение экономики или persistent progression, связывающее tavern, resources, build и Atoll, создаёт явного owner и контракт. Эти выделения не выполняются заранее без соответствующего use case.
+
 ## Запрещённые преждевременные решения
 
 Без отдельного доказанного use case не вводятся:

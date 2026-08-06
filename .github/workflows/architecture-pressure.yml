@@ -1,0 +1,39 @@
+name: Architecture Pressure
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: architecture-pressure-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  declaration:
+    name: Verify Declaration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify architecture pressure contract
+        run: node scripts/check-architecture-pressure-contract.mjs
+
+      - name: Verify architecture pressure declaration
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-architecture-pressure.mjs
