@@ -1,4 +1,4 @@
-import { WORLD_DEPTH_BASE } from "../build/buildWorldGeometry.js";
+import { PLACEABLE_TARGETING_GROUP } from "../build/liveAssetGeometry.js";
 import { createMovementState } from "../character/characterMovement.js";
 import { getResourceObjectsForWorld } from "../resources/resourceConfig.js";
 import {
@@ -20,6 +20,7 @@ export class WorldLocationCoordinator {
     sessionState,
     createLayout,
     applyColliderOverrides = () => {},
+    getAssetProfiles = () => ({}),
     getPlayerCharacter = () => null,
     canTransition = () => true,
     beforeLocationChange = () => {},
@@ -36,6 +37,7 @@ export class WorldLocationCoordinator {
     this.sessionState = sessionState;
     this.createLayout = createLayout;
     this.applyColliderOverrides = applyColliderOverrides;
+    this.getAssetProfiles = getAssetProfiles;
     this.getPlayerCharacter = getPlayerCharacter;
     this.canTransition = canTransition;
     this.beforeLocationChange = beforeLocationChange;
@@ -83,12 +85,32 @@ export class WorldLocationCoordinator {
     return Boolean(this.activeDefinition?.capabilities?.[capability]);
   }
 
+  transitionInteraction(transition) {
+    if (!transition || !this.activeLayout) return null;
+    const collider = this.activeLayout.getWorldObjectColliders?.()
+      .find(({ id }) => id === transition.id)?.rect ?? transition.footprintBounds;
+    const profile = this.getAssetProfiles?.()?.[transition.profileKey] ?? {};
+    const interactionOffset = profile.interactionOffset ?? { x: 0, y: 0 };
+    const center = {
+      x: (collider.left + collider.right) / 2,
+      y: (collider.top + collider.bottom) / 2,
+    };
+    return Object.freeze({
+      point: Object.freeze({
+        x: center.x + Number(interactionOffset.x || 0),
+        y: center.y + Number(interactionOffset.y || 0),
+      }),
+      collider: Object.freeze({ ...collider }),
+      interactionDirections: profile.interactionDirections,
+    });
+  }
+
   update() {
     if (this.destroyed || this.switching || !this.activeLayout) return { status: "idle", transitioned: false };
     if (this.lockedTransportId) {
       const playerPosition = this.getPlayerCharacter()?.motor?.position;
       const destinationTransport = this.activeLayout.transitions.find(({ id }) => id === this.lockedTransportId);
-      if (!destinationTransport || playerPosition && !isWithinInteractionRange(destinationTransport, playerPosition)) {
+      if (!destinationTransport || playerPosition && !this.isWithinInteractionRange(destinationTransport, playerPosition)) {
         this.lockedTransportId = null;
       }
       return { status: this.lockedTransportId ? "locked" : "armed", transitioned: false };
@@ -100,19 +122,27 @@ export class WorldLocationCoordinator {
     if (this.destroyed || this.switching || !this.activeLayout || !this.canTransition()) return [];
     return this.activeLayout.transitions
       .filter(({ id }) => id !== this.lockedTransportId)
-      .map((transition) => Object.freeze({
-        id: `${transition.id}:interaction`,
-        entityId: transition.id,
-        roomId: this.activeDefinition?.id ?? this.sessionState.currentWorldId,
-        kind: WORLD_TRANSITION_INTERACTION_KIND,
-        position: Object.freeze(clonePoint(transition.interactionPosition)),
-        aimPosition: Object.freeze(clonePoint(transition.interactionPosition)),
-        radius: transition.interactionRadius,
-        priority: transition.priority,
-        requiresFacing: transition.requiresFacing,
-        prompt: transition.prompt,
-        payload: Object.freeze({ transitionId: transition.id }),
-      }));
+      .flatMap((transition) => {
+        const interaction = this.transitionInteraction(transition);
+        return interaction ? [Object.freeze({
+          id: `${transition.id}:interaction`,
+          entityId: transition.id,
+          roomId: this.activeDefinition?.id ?? this.sessionState.currentWorldId,
+          kind: WORLD_TRANSITION_INTERACTION_KIND,
+          profileKey: transition.profileKey,
+          position: interaction.point,
+          aimPosition: interaction.point,
+          radius: transition.interactionRadius,
+          priority: transition.priority,
+          requiresFacing: transition.requiresFacing,
+          facingDotThreshold: -1,
+          targetingMode: "facing-first",
+          targetingGroup: PLACEABLE_TARGETING_GROUP,
+          interactionDirections: interaction.interactionDirections,
+          prompt: transition.prompt,
+          payload: Object.freeze({ transitionId: transition.id }),
+        })] : [];
+      });
   }
 
   handleInteraction(candidate) {
@@ -186,6 +216,14 @@ export class WorldLocationCoordinator {
     player.visual?.setPresentationPose?.(null);
   }
 
+  isWithinInteractionRange(transition, point) {
+    const interaction = this.transitionInteraction(transition);
+    return Boolean(interaction) && Math.hypot(
+      interaction.point.x - point.x,
+      interaction.point.y - point.y,
+    ) <= transition.interactionRadius;
+  }
+
   getState() {
     return {
       worldId: this.activeDefinition?.id ?? WORLD_IDS.village,
@@ -217,17 +255,29 @@ export function applyTransportProfile(layout, definition) {
       right: left + placement.asset.width,
       bottom: top + placement.asset.height,
     });
+    const baseCollider = Object.freeze({
+      left: left + placement.collider.left,
+      right: left + placement.collider.right,
+      top: top + placement.collider.top,
+      bottom: top + placement.collider.bottom,
+    });
+    layout.setWorldObjectCollider?.(placement.id, baseCollider, placement.profileKey, {
+      kind: WORLD_TRANSITION_INTERACTION_KIND,
+      profileKey: placement.profileKey,
+    });
     transportTiles.push(Object.freeze({
-      id: `${placement.id}:visual`,
+      id: placement.id,
+      entityId: placement.id,
+      profileKey: placement.profileKey,
       worldX: left,
       worldY: top,
+      width: placement.asset.width,
+      height: placement.asset.height,
       textureKey: placement.asset.textureKey,
-      depth: WORLD_DEPTH_BASE - 1,
     }));
     transitions.push(Object.freeze({
       ...placement,
       footprintBounds,
-      interactionPosition: Object.freeze(clonePoint(placement.interactionPosition)),
       interactionRadius: TRANSPORT_PROFILE.interactionRadius,
       priority: TRANSPORT_PROFILE.priority,
       requiresFacing: TRANSPORT_PROFILE.requiresFacing,
@@ -240,13 +290,6 @@ export function applyTransportProfile(layout, definition) {
 }
 
 export { WORLD_LOCATION_DEFINITIONS };
-
-function isWithinInteractionRange(transition, point) {
-  return Math.hypot(
-    transition.interactionPosition.x - point.x,
-    transition.interactionPosition.y - point.y,
-  ) <= transition.interactionRadius;
-}
 
 function clonePoint(point) {
   return {
