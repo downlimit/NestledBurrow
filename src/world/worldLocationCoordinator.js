@@ -1,3 +1,4 @@
+import { WORLD_DEPTH_BASE } from "../build/buildWorldGeometry.js";
 import { createMovementState } from "../character/characterMovement.js";
 import { getResourceObjectsForWorld } from "../resources/resourceConfig.js";
 import {
@@ -221,7 +222,7 @@ export function applyTransportProfile(layout, definition) {
       worldX: left,
       worldY: top,
       textureKey: placement.asset.textureKey,
-      depth: 560 + placement.interactionPosition.y,
+      depth: WORLD_DEPTH_BASE - 1,
     }));
     transitions.push(Object.freeze({
       ...placement,
