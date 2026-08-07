@@ -6,6 +6,7 @@ import {
   TRANSPORT_PROFILE,
   WORLD_IDS,
   WORLD_LOCATION_DEFINITIONS,
+  WORLD_TRANSITION_INTERACTION_KIND,
 } from "./worldLocationConfig.js";
 import { TILE_SIZE } from "./worldConfig.js";
 
@@ -83,19 +84,42 @@ export class WorldLocationCoordinator {
 
   update() {
     if (this.destroyed || this.switching || !this.activeLayout) return { status: "idle", transitioned: false };
-    const player = this.getPlayerCharacter();
-    const position = player?.motor?.position;
-    if (!position) return { status: "idle", transitioned: false };
-
     if (this.lockedTransportId) {
+      const playerPosition = this.getPlayerCharacter()?.motor?.position;
       const destinationTransport = this.activeLayout.transitions.find(({ id }) => id === this.lockedTransportId);
-      if (!destinationTransport || !contains(destinationTransport.triggerBounds, position)) this.lockedTransportId = null;
+      if (!destinationTransport || playerPosition && !isWithinInteractionRange(destinationTransport, playerPosition)) {
+        this.lockedTransportId = null;
+      }
       return { status: this.lockedTransportId ? "locked" : "armed", transitioned: false };
     }
+    return { status: this.canTransition() ? "armed" : "suppressed", transitioned: false };
+  }
 
+  getInteractionDefinitions() {
+    if (this.destroyed || this.switching || !this.activeLayout || !this.canTransition()) return [];
+    return this.activeLayout.transitions
+      .filter(({ id }) => id !== this.lockedTransportId)
+      .map((transition) => Object.freeze({
+        id: `${transition.id}:interaction`,
+        entityId: transition.id,
+        roomId: this.activeDefinition?.id ?? this.sessionState.currentWorldId,
+        kind: WORLD_TRANSITION_INTERACTION_KIND,
+        position: Object.freeze(clonePoint(transition.interactionPosition)),
+        aimPosition: Object.freeze(clonePoint(transition.interactionPosition)),
+        radius: transition.interactionRadius,
+        priority: transition.priority,
+        requiresFacing: transition.requiresFacing,
+        prompt: transition.prompt,
+        payload: Object.freeze({ transitionId: transition.id }),
+      }));
+  }
+
+  handleInteraction(candidate) {
+    if (candidate?.kind !== WORLD_TRANSITION_INTERACTION_KIND) return { status: "ignored", transitioned: false };
+    const transitionId = candidate.payload?.transitionId;
+    const transition = this.activeLayout?.transitions?.find(({ id }) => id === transitionId);
+    if (!transition || transition.id === this.lockedTransportId) return { status: "invalid", transitioned: false };
     if (!this.canTransition()) return { status: "suppressed", transitioned: false };
-    const transition = this.activeLayout.transitions.find(({ triggerBounds }) => contains(triggerBounds, position));
-    if (!transition) return { status: "armed", transitioned: false };
     return this.transition(transition);
   }
 
@@ -189,42 +213,23 @@ export function applyTransportProfile(layout, definition) {
     const footprintBounds = Object.freeze({
       left,
       top,
-      right: left + TRANSPORT_PROFILE.footprint.width,
-      bottom: top + TRANSPORT_PROFILE.footprint.height,
+      right: left + placement.asset.width,
+      bottom: top + placement.asset.height,
     });
-    for (const shell of TRANSPORT_PROFILE.shell) {
-      layout.setWorldObjectCollider(
-        `${placement.id}:shell:${shell.id}`,
-        {
-          left: left + shell.left,
-          top: top + shell.top,
-          right: left + shell.right,
-          bottom: top + shell.bottom,
-        },
-        `transport:${TRANSPORT_PROFILE.id}`,
-        { fixed: true, transportId: placement.id },
-      );
-    }
-    for (const part of TRANSPORT_PROFILE.visuals) {
-      transportTiles.push(Object.freeze({
-        id: `${placement.id}:visual:${transportTiles.length}`,
-        worldX: left + part.x * TILE_SIZE,
-        worldY: top + part.y * TILE_SIZE,
-        textureKey: part.textureKey ?? TRANSPORT_PROFILE.textureKey,
-        frame: part.frame,
-        crop: part.crop ? { ...part.crop } : null,
-        depth: 560 + top + TRANSPORT_PROFILE.footprint.height,
-      }));
-    }
+    transportTiles.push(Object.freeze({
+      id: `${placement.id}:visual`,
+      worldX: left,
+      worldY: top,
+      textureKey: placement.asset.textureKey,
+      depth: 560 + placement.interactionPosition.y,
+    }));
     transitions.push(Object.freeze({
       ...placement,
       footprintBounds,
-      triggerBounds: Object.freeze({
-        left: left + TRANSPORT_PROFILE.trigger.left,
-        top: top + TRANSPORT_PROFILE.trigger.top,
-        right: left + TRANSPORT_PROFILE.trigger.right,
-        bottom: top + TRANSPORT_PROFILE.trigger.bottom,
-      }),
+      interactionPosition: Object.freeze(clonePoint(placement.interactionPosition)),
+      interactionRadius: TRANSPORT_PROFILE.interactionRadius,
+      priority: TRANSPORT_PROFILE.priority,
+      requiresFacing: TRANSPORT_PROFILE.requiresFacing,
       safeSpawn: Object.freeze(clonePoint(placement.safeSpawn)),
     }));
   }
@@ -235,9 +240,11 @@ export function applyTransportProfile(layout, definition) {
 
 export { WORLD_LOCATION_DEFINITIONS };
 
-function contains(bounds, point) {
-  return point.x >= bounds.left && point.x < bounds.right
-    && point.y >= bounds.top && point.y < bounds.bottom;
+function isWithinInteractionRange(transition, point) {
+  return Math.hypot(
+    transition.interactionPosition.x - point.x,
+    transition.interactionPosition.y - point.y,
+  ) <= transition.interactionRadius;
 }
 
 function clonePoint(point) {
