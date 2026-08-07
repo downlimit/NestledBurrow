@@ -23,6 +23,7 @@ import {
   TILE_SIZE,
   TREES_IMAGE_PATH,
   TREES_TEXTURE_KEY,
+  WORLD_TRANSITION_ASSETS,
 } from "./world/worldConfig.js";
 import { createWorldLayout } from "./world/worldLayout.js";
 import { WORLD_IDS } from "./world/worldLocationConfig.js";
@@ -96,6 +97,9 @@ class WorldScene extends Phaser.Scene {
     preloadLemonadeAssets(this, import.meta.env.BASE_URL);
     preloadMeleeAssets(this);
     preloadPuddleAsset(this, import.meta.env.BASE_URL);
+    for (const asset of Object.values(WORLD_TRANSITION_ASSETS)) {
+      this.load.image(asset.textureKey, `${import.meta.env.BASE_URL}${asset.path}`);
+    }
     this.load.spritesheet(TAVERN_SIGN_ASSET.key, `${import.meta.env.BASE_URL}${TAVERN_SIGN_ASSET.path}`, {
       frameWidth: TAVERN_SIGN_ASSET.frameWidth,
       frameHeight: TAVERN_SIGN_ASSET.frameHeight,
@@ -306,6 +310,8 @@ class WorldScene extends Phaser.Scene {
       getSelectedItem: () => this.gameHud?.getSelectedInventoryItem?.() ?? null,
       getNeedsRuntime: () => this.needsRuntime,
       getSleepingWakeInteraction: () => this.getSleepingWakeInteraction(),
+      getWorldTransitionDefinitions: () => this.worldLocationCoordinator?.getInteractionDefinitions?.() ?? [],
+      activateWorldTransition: (candidate) => this.worldLocationCoordinator?.handleInteraction?.(candidate) ?? { status: "ignored", transitioned: false },
       isSleeping: () => this.sleeping,
       isExhaustedSleeping: () => this.exhaustedSleeping,
       getWakeRandom: () => this.e2eWakeRandom ?? Math.random,
