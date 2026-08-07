@@ -59,11 +59,11 @@ export class WorldPresentationRuntime {
     const profile = this.transitionProfile(tile.profileKey);
     const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
     const pivot = profile.snapAnchorOffset ?? { x: tile.width / 2, y: tile.height };
-    sprite.setPosition(
+    sprite.setPosition?.(
       Math.round(tile.worldX + Number(visualOffset.x || 0)),
       Math.round(tile.worldY + Number(visualOffset.y || 0)),
     );
-    sprite.setDepth(assetDepthFromPivot(
+    sprite.setDepth?.(assetDepthFromPivot(
       { x: tile.worldX, y: tile.worldY },
       pivot,
       WORLD_DEPTH_BASE,
@@ -77,9 +77,9 @@ export class WorldPresentationRuntime {
       const bottom = Math.max(0, Number(crop.bottom) || 0);
       const width = Math.max(1, tile.width - left - right);
       const height = Math.max(1, tile.height - top - bottom);
-      sprite.setCrop(left, top, width, height);
+      sprite.setCrop?.(left, top, width, height);
     } else {
-      sprite.setCrop();
+      sprite.setCrop?.();
     }
   }
 
@@ -87,7 +87,7 @@ export class WorldPresentationRuntime {
     const sprite = tile.frame == null
       ? this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey)
       : this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey, tile.frame);
-    sprite.setOrigin(0, 0);
+    sprite.setOrigin?.(0, 0);
     const entry = { tile, sprite };
     this.syncTransportEntry(entry);
     return entry;
