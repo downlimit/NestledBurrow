@@ -57,6 +57,14 @@ function runtimeInstances(owners) {
   }));
 }
 
+function transitionInstances(scene) {
+  return (scene.worldPresentationRuntime?.getTransitionAuthoringInstances?.() ?? []).map((instance) => ({
+    ...instance,
+    visualBasePosition: instance.visualBasePosition ?? instance.anchor,
+    special: true,
+  }));
+}
+
 function wellInstances(owners) {
   const runtime = owners.worldBuildCoordinator?.wellOwner;
   if (!runtime?.getWellState || !runtime?.getMoveTargetAt) return [];
@@ -127,12 +135,14 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
 
   let pivotSelection = null;
   let visualSelection = null;
+  let interactionSelection = null;
   const getOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
 
   function getInstances() {
     const owners = getOwners();
     const instances = [
       ...runtimeInstances(owners),
+      ...transitionInstances(scene),
       ...wellInstances(owners),
       ...tavernSignInstances(owners),
       ...trainingDummyInstances(owners),
@@ -155,6 +165,19 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       })[0]?.instance ?? null;
   }
 
+  function colliderFor(instance) {
+    return scene.worldLayout?.getWorldObjectColliders?.()
+      .find(({ id }) => id === instance.id)?.rect ?? instance.bounds;
+  }
+
+  function colliderCenter(instance) {
+    const collider = colliderFor(instance);
+    return {
+      x: (collider.left + collider.right) / 2,
+      y: (collider.top + collider.bottom) / 2,
+    };
+  }
+
   function syncSpecialInstance(instance) {
     const visualOffset = profileOffset(scene, instance.profileKey, "visualOffset");
     const pivotOffset = profileOffset(scene, instance.profileKey, "snapAnchorOffset");
@@ -173,6 +196,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       if (!instance.special || (profileKey && instance.profileKey !== profileKey)) continue;
       syncSpecialInstance(instance);
     }
+    scene.worldPresentationRuntime?.applyTransitionAuthoringProfile?.(profileKey);
   }
 
   function applyVisualOffset(profileKey, value) {
@@ -195,6 +219,14 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       const depth = assetDepthFromPivot(instance.anchor, offset, 500, instance.id);
       instance.targets.forEach((target, index) => target.setDepth?.(depth + index * 0.01));
     }
+    scene.worldPresentationRuntime?.applyTransitionAuthoringProfile?.(profileKey);
+    return offset;
+  }
+
+  function applyInteractionOffset(profileKey, value) {
+    const offset = replaceProfilePoint(scene, profileKey, "interactionOffset", value);
+    if (!offset) return null;
+    scene.interactionRuntime?.refresh?.();
     return offset;
   }
 
@@ -221,6 +253,20 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     };
   }
 
+  function interactionState() {
+    if (!interactionSelection) return null;
+    const offset = profileOffset(scene, interactionSelection.profileKey, "interactionOffset");
+    const center = colliderCenter(interactionSelection);
+    return {
+      ...interactionSelection,
+      offset,
+      marker: {
+        x: center.x + offset.x,
+        y: center.y + offset.y,
+      },
+    };
+  }
+
   runtime.selectPivotAt = (value) => {
     const instance = findAt(value);
     pivotSelection = instance ? {
@@ -242,8 +288,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
   };
   runtime.alignPivotToCollider = (axis) => {
     if (!pivotSelection || !["x", "y"].includes(axis)) return null;
-    const collider = scene.worldLayout?.getWorldObjectColliders?.()
-      .find(({ id }) => id === pivotSelection.id)?.rect;
+    const collider = colliderFor(pivotSelection);
     if (!collider) return null;
     const current = profileOffset(scene, pivotSelection.profileKey, "snapAnchorOffset");
     const edgeA = axis === "x" ? "left" : "top";
@@ -286,6 +331,29 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     ));
   };
   runtime.clearVisualOffsetSelection = () => { visualSelection = null; };
+
+  runtime.selectInteractionPointAt = (value) => {
+    const instance = findAt(value);
+    interactionSelection = instance ? {
+      id: instance.id,
+      profileKey: instance.profileKey,
+      anchor: { ...instance.anchor },
+      bounds: { ...instance.bounds },
+    } : null;
+    return interactionState();
+  };
+  runtime.setInteractionOffset = (value) => {
+    if (!interactionSelection) return null;
+    applyInteractionOffset(interactionSelection.profileKey, value);
+    return interactionState();
+  };
+  runtime.nudgeInteractionOffset = (dx, dy) => {
+    if (!interactionSelection) return null;
+    const current = profileOffset(scene, interactionSelection.profileKey, "interactionOffset");
+    return runtime.setInteractionOffset({ x: current.x + dx, y: current.y + dy });
+  };
+  runtime.getInteractionPointSelection = interactionState;
+  runtime.clearInteractionPointSelection = () => { interactionSelection = null; };
 
   const onPostUpdate = () => syncSpecialInstances();
   scene.events?.on?.("postupdate", onPostUpdate);
