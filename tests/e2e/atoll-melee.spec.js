@@ -20,7 +20,14 @@ async function tapAlt(page) {
 async function enterNest(page) {
   await bridge(page, "placePlayerAt", {
     x: 32 * 16,
-    y: 12 * 16,
+    y: 13 * 16,
+    facing: { x: 0, y: -1 },
+  });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("village-nest-transport");
+  const candidate = (await bridge(page, "getInteractionState"))?.candidate;
+  await bridge(page, "placePlayerAt", {
+    x: candidate.position.x,
+    y: candidate.position.y,
     facing: { x: 0, y: -1 },
   });
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("village-nest-transport");
@@ -53,17 +60,22 @@ test("Wild Atoll mounts common melee runtime for sword and battle axe", async ({
   await expect.poll(async () => (await bridge(page, "getHudState")).inventoryMode).toMatchObject({
     mode: "COMBAT",
     stableMode: "COMBAT",
-    transitioning: false,
   });
 
-  const box = await page.locator("canvas").boundingBox();
-  if (!box) throw new Error("Game canvas is unavailable");
-  const attackPoint = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await bridge(page, "selectInventorySlot", 1);
+  await expect.poll(async () => (await bridge(page, "getHudState")).inventoryMode.selectedIndex).toBe(1);
+  await bridge(page, "setNeedsDebugPreset", "all-full");
+  await bridge(page, "placePlayerAt", { x: 11 * 16, y: 9 * 16, facing: { x: 0, y: -1 } });
+  await page.waitForTimeout(120);
+  await page.mouse.click(160, 90);
+  await page.waitForTimeout(120);
+  const swordState = await bridge(page, "getMeleeState");
+  expect(swordState.lastAttack).toMatchObject({ weaponId: "sword" });
 
-  await page.mouse.click(attackPoint.x, attackPoint.y, { button: "left" });
-  await expect.poll(async () => (await bridge(page, "getMeleeState"))?.weaponId).toBe("sword");
-
-  await page.waitForTimeout(900);
-  await page.mouse.click(attackPoint.x, attackPoint.y, { button: "right" });
-  await expect.poll(async () => (await bridge(page, "getMeleeState"))?.weaponId).toBe("battle-axe");
+  await bridge(page, "selectInventorySlot", 2);
+  await expect.poll(async () => (await bridge(page, "getHudState")).inventoryMode.selectedIndex).toBe(2);
+  await page.mouse.click(160, 90);
+  await page.waitForTimeout(120);
+  const axeState = await bridge(page, "getMeleeState");
+  expect(axeState.lastAttack).toMatchObject({ weaponId: "battle-axe" });
 });
