@@ -14,10 +14,12 @@ import { WORLD_TRANSITION_ASSETS } from "../src/world/worldConfig.js";
 const BURROW_TO_NEST_PATH = "public/assets/project/world/NestledBurrow_NestStairway.png";
 const NEST_TO_BURROW_PATH = "public/assets/project/world/NestledBurrow_HighgroundEntranceStairs.png";
 
-assert.equal(existsSync(BURROW_TO_NEST_PATH), true, "Burrow-to-Nest stair sprite must already exist in the base repository");
-assert.equal(existsSync(NEST_TO_BURROW_PATH), true, "Nest-to-Burrow stair sprite must already exist in the base repository");
+assert.equal(existsSync(BURROW_TO_NEST_PATH), true, "Burrow-to-Nest stair sprite must exist");
+assert.equal(existsSync(NEST_TO_BURROW_PATH), true, "Nest-to-Burrow stair sprite must exist");
 assert.deepEqual(pngSize(BURROW_TO_NEST_PATH), { width: 64, height: 128 }, "Nest stairway keeps its native 64x128 size");
 assert.deepEqual(pngSize(NEST_TO_BURROW_PATH), { width: 64, height: 48 }, "highground entrance stairs keep their native 64x48 size");
+assertCompletePng(BURROW_TO_NEST_PATH);
+assertCompletePng(NEST_TO_BURROW_PATH);
 assert.equal(WORLD_TRANSITION_ASSETS.burrowToNest.path, "assets/project/world/NestledBurrow_NestStairway.png");
 assert.equal(WORLD_TRANSITION_ASSETS.nestToBurrow.path, "assets/project/world/NestledBurrow_HighgroundEntranceStairs.png");
 
@@ -94,10 +96,35 @@ assert.equal(ruHud.interaction.enterBurrow, "Спуститься в нору");
 assert.equal(enHud.interaction.enterNest, "Go up to the Nest");
 assert.equal(enHud.interaction.enterBurrow, "Go down to the Burrow");
 
-console.log("Task #074 checks passed: native stair sprites, standalone image rendering, actor-safe depth, active Space transition contract, dispatcher wiring and localization");
+console.log("Task #074 checks passed: decodable stair PNG structure, standalone rendering, actor-safe depth and active Space transitions");
 
 function pngSize(path) {
   const bytes = readFileSync(path);
   assert.equal(bytes.subarray(1, 4).toString("ascii"), "PNG", `${path} must be a PNG file`);
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
+function assertCompletePng(path) {
+  const bytes = readFileSync(path);
+  assert.deepEqual(
+    [...bytes.subarray(0, 8)],
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+    `${path} must have a valid PNG signature`,
+  );
+  let offset = 8;
+  let sawIend = false;
+  while (offset < bytes.length) {
+    assert(offset + 12 <= bytes.length, `${path} has a truncated PNG chunk header`);
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
+    const end = offset + 12 + length;
+    assert(end <= bytes.length, `${path} has a truncated ${type} chunk`);
+    offset = end;
+    if (type === "IEND") {
+      sawIend = true;
+      break;
+    }
+  }
+  assert.equal(sawIend, true, `${path} must contain a complete IEND chunk`);
+  assert.equal(offset, bytes.length, `${path} must not contain bytes after IEND`);
 }
