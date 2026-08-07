@@ -8,6 +8,7 @@ import {
   WORLD_IDS,
   WORLD_LOCATION_DEFINITIONS,
   WORLD_LOCATION_IDS,
+  WORLD_TRANSITION_INTERACTION_KIND,
 } from "../src/world/worldLocationConfig.js";
 import { createWorldLocationCoordinator } from "../src/world/worldLocationCoordinator.js";
 import { getResourceObjectsForWorld, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
@@ -36,16 +37,8 @@ assert.deepEqual(
   [ATOLL_WORLD_MODEL.columns, ATOLL_WORLD_MODEL.rows],
   "Atoll owns a separate arena-sized collision space",
 );
-assert.deepEqual(
-  [TRANSPORT_PROFILE.footprint.widthTiles, TRANSPORT_PROFILE.footprint.heightTiles],
-  [2, 2],
-  "the shared transport profile has an exact 2x2 footprint",
-);
-assert.deepEqual(
-  TRANSPORT_PROFILE.visuals.map(({ x, y, crop }) => [x, y, crop ?? null]),
-  [[0, 0, null], [1, 0, null], [0, 1, null], [1, 1, null]],
-  "the transport visual occupies a clean uncropped 2x2 grid",
-);
+assert.equal(TRANSPORT_PROFILE.interactionRadius, 32, "paired Burrow/Nest transitions use a compact active-object radius");
+assert.equal(TRANSPORT_PROFILE.requiresFacing, false, "paired stairs only require proximity plus interact action");
 assert.deepEqual(
   OUTDOOR_FRAMES.islandCliff,
   { topLeft: 36, top: 37, topRight: 38, left: 48, right: 50, bottomLeft: 60, bottom: 61, bottomRight: 62 },
@@ -60,7 +53,7 @@ assert.deepEqual(
 const transitionPairs = Object.values(WORLD_LOCATION_DEFINITIONS).flatMap(({ id, transports }) => (
   transports.map(({ destinationWorldId }) => `${id}->${destinationWorldId}`)
 ));
-assert.deepEqual(transitionPairs.sort(), ["nest->village", "village->nest"], "automatic transports remain the village and Nest pair");
+assert.deepEqual(transitionPairs.sort(), ["nest->village", "village->nest"], "active stairs remain the village and Nest pair");
 assert.equal(WORLD_LOCATION_DEFINITIONS.nest.futureExit.destinationWorldId, WORLD_IDS.atoll, "the northern Nest dead end is assigned to the explicit Atoll entrance");
 assert.equal(WORLD_LOCATION_DEFINITIONS.atoll.transports.length, 0, "Atoll arenas contain no persistent transport assets");
 
@@ -109,20 +102,19 @@ for (const worldId of WORLD_LOCATION_IDS) {
     right: definition.columns * TILE_SIZE,
     bottom: definition.rows * TILE_SIZE,
   }, `${worldId} exposes its own bounds`);
+  assert.equal(layout.transportTiles.length, definition.transports.length, `${worldId} renders one native image per paired stair object`);
   for (const transition of layout.transitions) {
-    assert.equal(transition.footprintBounds.right - transition.footprintBounds.left, 2 * TILE_SIZE, `${transition.id} width is 2 tiles`);
-    assert.equal(transition.footprintBounds.bottom - transition.footprintBounds.top, 2 * TILE_SIZE, `${transition.id} height is 2 tiles`);
+    assert.equal(transition.footprintBounds.right - transition.footprintBounds.left, transition.asset.width, `${transition.id} keeps native sprite width`);
+    assert.equal(transition.footprintBounds.bottom - transition.footprintBounds.top, transition.asset.height, `${transition.id} keeps native sprite height`);
     const destination = createPreparedLayout(transition.destinationWorldId);
     const destinationTransport = destination.transitions.find(({ id }) => id === transition.destinationTransportId);
     assert(destinationTransport, `${transition.id} resolves its destination transport`);
-    assert.equal(contains(destinationTransport.triggerBounds, destinationTransport.safeSpawn), false, `${destinationTransport.id} spawn is outside its trigger`);
     assert.equal(collides(destinationTransport.safeSpawn, destination, 8, 5), false, `${destinationTransport.id} spawn is collision-safe`);
-    const triggerCenter = center(destinationTransport.triggerBounds);
-    const direction = Math.sign(triggerCenter.y - destinationTransport.safeSpawn.y);
-    for (let y = destinationTransport.safeSpawn.y; y !== triggerCenter.y; y += direction) {
-      assert.equal(collides({ x: triggerCenter.x, y }, destination, 8, 5), false, `${destinationTransport.id} is reachable from its safe spawn`);
+    assert.equal(collides(destinationTransport.interactionPosition, destination, 8, 5), false, `${destinationTransport.id} active edge is physically reachable`);
+    const direction = Math.sign(destinationTransport.interactionPosition.y - destinationTransport.safeSpawn.y);
+    for (let y = destinationTransport.safeSpawn.y; direction !== 0 && y !== destinationTransport.interactionPosition.y; y += direction) {
+      assert.equal(collides({ x: destinationTransport.interactionPosition.x, y }, destination, 8, 5), false, `${destinationTransport.id} stays reachable from its safe spawn`);
     }
-    assert.equal(collides(triggerCenter, destination, 8, 5), false, `${destinationTransport.id} trigger is physically enterable`);
   }
 }
 
@@ -179,13 +171,21 @@ const coordinator = createWorldLocationCoordinator({
 });
 activeLayout = coordinator.createInitialLayout();
 const villageTransport = activeLayout.transitions[0];
-player.motor.position = center(villageTransport.triggerBounds);
-assert.equal(coordinator.update().worldId, WORLD_IDS.nest, "crossing the village trigger enters Nest");
-assert.equal(sessionState.currentWorldId, WORLD_IDS.nest, "transition synchronizes currentWorldId");
-assert.equal(saveCount, 1, "transition initiates persistence once");
-assert.equal(coordinator.update().status, "armed", "destination spawn releases the lock only after it is outside the trigger");
-player.motor.position = center(activeLayout.transitions[0].triggerBounds);
-assert.equal(coordinator.update().worldId, WORLD_IDS.village, "the southern Nest transport returns to village");
+player.motor.position = { ...villageTransport.interactionPosition };
+assert.equal(coordinator.update().transitioned, false, "proximity alone never transitions locations");
+assert.equal(sessionState.currentWorldId, WORLD_IDS.village, "automatic transport behavior is removed");
+const villageInteraction = coordinator.getInteractionDefinitions()[0];
+assert.equal(villageInteraction.kind, WORLD_TRANSITION_INTERACTION_KIND);
+assert.equal(coordinator.handleInteraction(villageInteraction).worldId, WORLD_IDS.nest, "activating the village stair interaction enters Nest");
+assert.equal(sessionState.currentWorldId, WORLD_IDS.nest, "interactive transition synchronizes currentWorldId");
+assert.equal(saveCount, 1, "interactive transition initiates persistence once");
+assert.equal(coordinator.getInteractionDefinitions().length, 0, "destination stair remains locked immediately after arrival");
+const nestTransport = activeLayout.transitions[0];
+player.motor.position = { x: nestTransport.interactionPosition.x, y: nestTransport.interactionPosition.y - nestTransport.interactionRadius - 1 };
+assert.equal(coordinator.update().status, "armed", "leaving the destination stair radius releases the anti-bounce lock");
+const nestInteraction = coordinator.getInteractionDefinitions()[0];
+player.motor.position = { ...nestTransport.interactionPosition };
+assert.equal(coordinator.handleInteraction(nestInteraction).worldId, WORLD_IDS.village, "activating the Nest stair interaction returns to the Burrow");
 assert.equal(saveCount, 2, "return transition persists once without duplicate work");
 const explicitAtoll = coordinator.transitionTo(WORLD_IDS.atoll, ATOLL_WORLD_MODEL.spawn);
 assert.equal(explicitAtoll.worldId, WORLD_IDS.atoll, "the Nest entrance may explicitly enter the transport-free Atoll world");
@@ -197,21 +197,12 @@ assert.equal(explicitNest.worldId, WORLD_IDS.nest, "the edge arena may explicitl
 assert.deepEqual(player.motor.position, { x: NEST_RETURN_SPAWN_FIXTURE.x, y: NEST_RETURN_SPAWN_FIXTURE.y });
 assert.equal(saveCount, 4);
 
-console.log("Task #059 checks passed: registry, isolated Atoll, paired reachable transports, explicit arena transitions, safe spawns and collision");
+console.log("Task #059 checks passed: registry, isolated Atoll, paired active stairs, explicit arena transitions, safe spawns and collision");
 
 function createPreparedLayout(worldId) {
   const state = { currentWorldId: worldId };
   const coordinator = createWorldLocationCoordinator({ sessionState: state, createLayout: (id) => createWorldLayout(id) });
   return coordinator.createInitialLayout();
-}
-
-function center(bounds) {
-  return { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 };
-}
-
-function contains(bounds, point) {
-  return point.x >= bounds.left && point.x < bounds.right
-    && point.y >= bounds.top && point.y < bounds.bottom;
 }
 
 function overlaps(a, b) {
