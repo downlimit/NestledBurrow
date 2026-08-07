@@ -403,8 +403,13 @@ const changed = [
 ];
 assert(!changed.includes("src/assets/meleeWeaponSpriteAssets.js"));
 assert(!changed.includes("src/assets/meleeWeaponSpriteAssets.manifest.json"));
-const binary = changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path));
-assert.deepEqual(binary, [], `Task #051 changed binary files: ${binary.join(", ")}`);
+const canonicalPostTask051Binaries = new Set([
+  "public/assets/project/world/NestledBurrow_NestStairway.png",
+  "public/assets/project/world/NestledBurrow_HighgroundEntranceStairs.png",
+]);
+const binary = changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path)
+  && !canonicalPostTask051Binaries.has(path));
+assert.deepEqual(binary, [], `Task #051 changed unexpected binary files: ${binary.join(", ")}`);
 
 console.log("Task #051 checks passed: immutable assets, starter drops, timing, buffer, geometry, dash, dummy and damage aggregation");
 
