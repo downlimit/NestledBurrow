@@ -25,7 +25,14 @@ async function tapAlt(page) {
 async function enterNest(page) {
   await bridge(page, "placePlayerAt", {
     x: 32 * 16,
-    y: 12 * 16,
+    y: 13 * 16,
+    facing: { x: 0, y: -1 },
+  });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("village-nest-transport");
+  const candidate = (await bridge(page, "getInteractionState"))?.candidate;
+  await bridge(page, "placePlayerAt", {
+    x: candidate.position.x,
+    y: candidate.position.y,
     facing: { x: 0, y: -1 },
   });
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("village-nest-transport");
