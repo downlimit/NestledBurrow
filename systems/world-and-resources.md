@@ -34,6 +34,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - registered world IDs are `village`, `nest` and `atoll`; unknown saved IDs resolve to `village`;
 - paired Burrow/Nest stairs are active interaction objects: frame/proximity updates never transition automatically, successful interact activation runs the canonical location lifecycle, and destination locks prevent immediate bounce-back; explicit `transitionTo` runs the same lifecycle without a hidden transport or lock;
 - each paired stair renders from one committed project PNG at its native dimensions; it is not split into a constructor, tileset or build-mode profile;
+- paired stair PNGs use the standalone image render path without an atlas frame and are ground-affixed below depth-sorted actors, so they cannot globally cover the player;
 - every canonical resource has one `worldId`; only active-location resources mount;
 - transient Atoll definitions may register with `DebrisRuntime` but may not duplicate resource work logic;
 - location teardown unbinds interactions before destroying owners and presentation; mount reverses that order;
