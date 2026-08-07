@@ -25,11 +25,11 @@ async function waitForWorld(page, worldId) {
 async function activateStair(page, worldId, transportId) {
   const locations = {
     village: {
-      interaction: { x: 32 * 16, y: 13 * 16, facing: { x: 0, y: -1 } },
+      interaction: { x: 504, y: 200, facing: { x: 0, y: -1 } },
       retreat: { x: 32 * 16, y: 15 * 16, facing: { x: 0, y: -1 } },
     },
     nest: {
-      interaction: { x: 11 * 16, y: 12 * 16, facing: { x: 0, y: 1 } },
+      interaction: { x: 168, y: 200, facing: { x: 0, y: 1 } },
       retreat: { x: 11 * 16, y: 10 * 16, facing: { x: 0, y: 1 } },
     },
   };
@@ -40,13 +40,6 @@ async function activateStair(page, worldId, transportId) {
     await expect.poll(async () => (await bridge(page, "getLocationState"))?.transitionLocked).toBe(false);
   }
   await bridge(page, "placePlayerAt", route.interaction);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(transportId);
-  const candidate = (await bridge(page, "getInteractionState"))?.candidate;
-  await bridge(page, "placePlayerAt", {
-    x: candidate.position.x,
-    y: candidate.position.y,
-    facing: route.interaction.facing,
-  });
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(transportId);
   await page.keyboard.press("Space");
 }
