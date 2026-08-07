@@ -130,6 +130,7 @@ export class WorldLocationCoordinator {
           roomId: this.activeDefinition?.id ?? this.sessionState.currentWorldId,
           kind: WORLD_TRANSITION_INTERACTION_KIND,
           profileKey: transition.profileKey,
+          interactionWorldLayout: this.activeLayout,
           position: interaction.point,
           aimPosition: interaction.point,
           radius: transition.interactionRadius,
