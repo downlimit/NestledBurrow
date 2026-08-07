@@ -122,10 +122,8 @@ export function attachEditorAuthoringRuntime(scene, {
 } = {}) {
   if (!scene?.worldLayout) throw new Error("World scene is unavailable");
   const getLocationOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
-  const buildCoordinator = getLocationOwners().worldBuildCoordinator;
-  if (!buildCoordinator?.getPlacedObjects || !buildCoordinator?.placeBuildAsset) {
-    throw new Error("World build coordinator is unavailable");
-  }
+  const buildCoordinator = getLocationOwners().worldBuildCoordinator ?? null;
+  const hasBuildCoordinator = Boolean(buildCoordinator?.getPlacedObjects && buildCoordinator?.placeBuildAsset);
   const plants = new Map();
   const selectionBoundsById = new Map();
   let destroyed = false;
@@ -262,7 +260,7 @@ export function attachEditorAuthoringRuntime(scene, {
     scene.interactionRuntime?.refresh?.();
   }
 
-  const originalPlaceBuildAsset = buildCoordinator.placeBuildAsset?.bind(buildCoordinator);
+  const originalPlaceBuildAsset = buildCoordinator?.placeBuildAsset?.bind(buildCoordinator);
   if (originalPlaceBuildAsset) {
     buildCoordinator.placeBuildAsset = (item, point, context) => {
       const result = originalPlaceBuildAsset(item, point, context);
@@ -273,7 +271,7 @@ export function attachEditorAuthoringRuntime(scene, {
     };
   }
 
-  const originalRestoreBuildPlacedObject = buildCoordinator.restoreBuildPlacedObject?.bind(buildCoordinator);
+  const originalRestoreBuildPlacedObject = buildCoordinator?.restoreBuildPlacedObject?.bind(buildCoordinator);
   if (originalRestoreBuildPlacedObject) {
     buildCoordinator.restoreBuildPlacedObject = (placed) => {
       const plant = isPlantedTreeObject(placed);
@@ -284,7 +282,7 @@ export function attachEditorAuthoringRuntime(scene, {
     };
   }
 
-  const originalRemoveBuildPlacedObjectById = buildCoordinator.removeBuildPlacedObjectById?.bind(buildCoordinator);
+  const originalRemoveBuildPlacedObjectById = buildCoordinator?.removeBuildPlacedObjectById?.bind(buildCoordinator);
   if (originalRemoveBuildPlacedObjectById) {
     buildCoordinator.removeBuildPlacedObjectById = (id) => {
       const object = buildCoordinator.getPlacedObject(id);
@@ -294,7 +292,7 @@ export function attachEditorAuthoringRuntime(scene, {
     };
   }
 
-  const originalDemolitionType = buildCoordinator.getBuildObjectDemolitionType?.bind(buildCoordinator);
+  const originalDemolitionType = buildCoordinator?.getBuildObjectDemolitionType?.bind(buildCoordinator);
   if (originalDemolitionType) {
     buildCoordinator.getBuildObjectDemolitionType = (object) => (
       isPlantedTreeObject(object) ? "plant" : originalDemolitionType(object)
@@ -310,7 +308,9 @@ export function attachEditorAuthoringRuntime(scene, {
     ));
   }
 
-  for (const object of buildCoordinator.getPlacedObjects()) registerPlant(object);
+  if (hasBuildCoordinator) {
+    for (const object of buildCoordinator.getPlacedObjects()) registerPlant(object);
+  }
   for (const profileKey of Object.keys(scene.assetProfiles ?? {})) {
     applyProfileVisualOffset(profileKey, profileVisualOffset(profileKey));
   }
@@ -349,7 +349,7 @@ export function attachEditorAuthoringRuntime(scene, {
 
   return {
     restoreStartingLayout() {
-      if (destroyed) return null;
+      if (destroyed || !hasBuildCoordinator) return null;
       const layout = loadStartingLayout(storage, STARTING_LAYOUT_DEFAULT);
       if (layout) return applyStartingLayout(scene, layout);
       for (const object of STARTER_TREE_OBJECTS) {
@@ -362,6 +362,7 @@ export function attachEditorAuthoringRuntime(scene, {
     },
     saveStartingLayout() {
       if (destroyed) throw new Error("Authoring runtime is destroyed");
+      if (!hasBuildCoordinator) throw new Error("Starting layout authoring is unavailable in this location");
       return saveStartingLayoutToProject(scene, { storage, fetchImpl, baseUrl });
     },
     async applyColliderDraftToProject() {
@@ -369,11 +370,6 @@ export function attachEditorAuthoringRuntime(scene, {
       const result = confirmColliderDraft();
       if ((!result || result.status === "empty") && !pivotSelection && !visualOffsetSelection) return result ?? { status: "empty" };
       saveAssetProfiles(scene.assetProfiles, storage);
-      // The in-game authoring action is deliberately browser-local. Writing a
-      // source module makes Vite reload the whole game and invalidates the
-      // active authoring session. The development endpoint remains available
-      // for an explicit source-export flow, while this action updates every
-      // live instance of the selected profile without a restart.
       return { ...result, status: "saved-locally" };
     },
     selectPivotAt,
