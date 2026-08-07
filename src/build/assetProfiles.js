@@ -68,7 +68,7 @@ const BASE_ASSET_PROFILES = Object.freeze({
   ),
   [WORLD_TRANSITION_PROFILE_KEYS.nestToBurrow]: profile(
     "transition",
-    point(WORLD_TRANSITION_ASSETS.nestToBurrow.width / 2, 0),
+    point(WORLD_TRANSITION_ASSETS.nestToBurrow.width / 2, -TILE_SIZE - 1),
     { interactionDirections: ["top"] },
   ),
 });
