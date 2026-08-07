@@ -20,7 +20,28 @@ async function bootFresh(page) {
 
 async function waitForWorld(page, worldId) {
   await expect.poll(async () => (await bridge(page, "getLocationState"))?.worldId).toBe(worldId);
-  await expect.poll(async () => (await bridge(page, "getLocationState"))?.transitionLocked).toBe(false);
+}
+
+async function activateStair(page, worldId, transportId) {
+  const locations = {
+    village: {
+      interaction: { x: 32 * 16, y: 12 * 16, facing: { x: 0, y: -1 } },
+      retreat: { x: 32 * 16, y: 15 * 16, facing: { x: 0, y: -1 } },
+    },
+    nest: {
+      interaction: { x: 11 * 16, y: 13 * 16, facing: { x: 0, y: 1 } },
+      retreat: { x: 11 * 16, y: 10 * 16, facing: { x: 0, y: 1 } },
+    },
+  };
+  const route = locations[worldId];
+  if (!route) throw new Error(`Unknown stair world: ${worldId}`);
+  if ((await bridge(page, "getLocationState"))?.transitionLocked) {
+    await bridge(page, "placePlayerAt", route.retreat);
+    await expect.poll(async () => (await bridge(page, "getLocationState"))?.transitionLocked).toBe(false);
+  }
+  await bridge(page, "placePlayerAt", route.interaction);
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(transportId);
+  await page.keyboard.press("Space");
 }
 
 async function clearResource(page, resourceId, slotIndex) {
@@ -48,19 +69,6 @@ async function expectSharedTreeHighlight(page, resourceId) {
     highlightCopies: 0,
     spriteCount: 12,
   });
-}
-
-async function walkSouthThroughTransport(page, destinationWorldId) {
-  await page.keyboard.down("ArrowDown");
-  try {
-    await expect.poll(
-      async () => (await bridge(page, "getLocationState"))?.worldId,
-      { timeout: 5_000 },
-    ).toBe(destinationWorldId);
-  } finally {
-    await page.keyboard.up("ArrowDown");
-  }
-  await waitForWorld(page, destinationWorldId);
 }
 
 test("fresh Burrow places melee starters by the dummy and opens build mode without a selected asset", async ({ page }, testInfo) => {
@@ -100,7 +108,7 @@ test("village and Nest transition atomically and preserve location resource stat
   const village = await bridge(page, "getLocationState");
   expect(village.worldId).toBe("village");
   expect(village.layout.transitions).toHaveLength(1);
-  expect(village.layout.transitions[0].footprintBounds).toMatchObject({ left: 496, top: 64, right: 528, bottom: 96 });
+  expect(village.layout.transitions[0].footprintBounds).toMatchObject({ left: 480, top: 64, right: 544, bottom: 192 });
   expect(village.home).toMatchObject({ npcCount: 1, tavernPresent: true, farmingPresent: true, buildModePresent: true, bedPresent: true });
   await expect.poll(async () => (await bridge(page, "getDebrisState")).plantedTrees.length).toBe(2);
   const villageDebris = await bridge(page, "getDebrisState");
@@ -114,11 +122,11 @@ test("village and Nest transition atomically and preserve location resource stat
   await bridge(page, "interact");
   await expect.poll(async () => (await bridge(page, "getResourceNodeState", villageTreeId)).progress).toBeGreaterThan(0);
 
-  await bridge(page, "enterTransport", "village-nest-transport");
+  await activateStair(page, "village", "village-nest-transport");
   await waitForWorld(page, "nest");
   const nest = await bridge(page, "getLocationState");
   expect(nest.layout.bounds).toEqual({ left: 0, top: 0, right: 352, bottom: 256 });
-  expect(nest.layout.transitions[0].footprintBounds).toMatchObject({ left: 160, top: 208, right: 192, bottom: 240 });
+  expect(nest.layout.transitions[0].footprintBounds).toMatchObject({ left: 144, top: 208, right: 208, bottom: 256 });
   expect(nest.home).toEqual({ npcCount: 0, facilityCount: 0, tavernPresent: false, farmingPresent: false, buildModePresent: false, bedPresent: false });
   expect(await bridge(page, "getMeleeState")).toMatchObject({ dummy: null });
   const camera = await bridge(page, "getCameraState");
@@ -127,9 +135,10 @@ test("village and Nest transition atomically and preserve location resource stat
   await page.waitForTimeout(150);
   expect((await bridge(page, "getLocationState")).worldId).toBe("nest");
 
-  await walkSouthThroughTransport(page, "village");
+  await activateStair(page, "nest", "nest-village-transport");
+  await waitForWorld(page, "village");
   expect((await bridge(page, "getMeleeState")).dummy.id).toBe("training-dummy-01");
-  await bridge(page, "enterTransport", "village-nest-transport");
+  await activateStair(page, "village", "village-nest-transport");
   await waitForWorld(page, "nest");
 
   const nestResources = (await bridge(page, "getDebrisState")).definitions;
@@ -139,10 +148,10 @@ test("village and Nest transition atomically and preserve location resource stat
   await expectSharedTreeHighlight(page, "nest-tree-02");
   await clearResource(page, "nest-tree-01", 0);
 
-  await bridge(page, "enterTransport", "nest-village-transport");
+  await activateStair(page, "nest", "nest-village-transport");
   await waitForWorld(page, "village");
   expect((await bridge(page, "getLocationState")).home).toMatchObject({ npcCount: 1, tavernPresent: true, farmingPresent: true, buildModePresent: true, bedPresent: true });
-  await bridge(page, "enterTransport", "village-nest-transport");
+  await activateStair(page, "village", "village-nest-transport");
   await waitForWorld(page, "nest");
   expect((await bridge(page, "getResourceNodeState", "nest-tree-01")).cleared).toBe(true);
   expect(await bridge(page, "getResourceVisualState", "nest-tree-01")).toBeNull();
@@ -157,7 +166,8 @@ test("village and Nest transition atomically and preserve location resource stat
   expect((await bridge(page, "getResourceNodeState", "nest-tree-01")).cleared).toBe(true);
   expect(await bridge(page, "getResourceVisualState", "nest-tree-01")).toBeNull();
 
-  await walkSouthThroughTransport(page, "village");
+  await activateStair(page, "nest", "nest-village-transport");
+  await waitForWorld(page, "village");
   expect((await bridge(page, "getLocationState")).home).toMatchObject({ npcCount: 1, facilityCount: expect.any(Number), tavernPresent: true, farmingPresent: true, buildModePresent: true, bedPresent: true });
 });
 
@@ -166,7 +176,7 @@ test("new game from Nest tears down the location and boots one fresh village", a
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await bootFresh(page);
-  await bridge(page, "enterTransport", "village-nest-transport");
+  await activateStair(page, "village", "village-nest-transport");
   await waitForWorld(page, "nest");
   await page.evaluate(() => { window.__NESTLED_BURROW_E2E__.__task059PreviousBridge = true; });
 
