@@ -22,6 +22,17 @@ async function tapAlt(page) {
   await tapGameKey(page, "Alt");
 }
 
+async function enterNest(page) {
+  await bridge(page, "placePlayerAt", {
+    x: 32 * 16,
+    y: 12 * 16,
+    facing: { x: 0, y: -1 },
+  });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe("village-nest-transport");
+  await tapGameKey(page, "Space");
+  await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("nest");
+}
+
 async function collapseWithGuaranteedWake(page) {
   await bridge(page, "setWakeRandomValue", 0);
   await bridge(page, "setEnergy", 0);
@@ -72,8 +83,7 @@ test("Wild Atoll knockout exposes no manual wake interaction", async ({ page }, 
   test.skip(testInfo.project.name.startsWith("mobile"), "Atoll keyboard route is covered on desktop");
   await boot(page);
 
-  await bridge(page, "enterTransport", "village-nest-transport");
-  await expect.poll(async () => (await bridge(page, "getLocationState")).worldId).toBe("nest");
+  await enterNest(page);
   await bridge(page, "placePlayerAt", { x: 11 * 16, y: 7 * 16, facing: { x: 0, y: -1 } });
   await page.waitForTimeout(120);
   await tapGameKey(page, "Space");
