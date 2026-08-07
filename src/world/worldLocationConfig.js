@@ -3,6 +3,7 @@ import {
   WORLD_COLUMNS,
   WORLD_ROWS,
   WORLD_TRANSITION_ASSETS,
+  WORLD_TRANSITION_PROFILE_KEYS,
 } from "./worldConfig.js";
 
 export const WORLD_IDS = Object.freeze({
@@ -24,7 +25,13 @@ const villageTransport = transport({
   id: "village-nest-transport",
   tile: { x: 30, y: 4 },
   asset: WORLD_TRANSITION_ASSETS.burrowToNest,
-  interactionPosition: { x: 32 * TILE_SIZE, y: 12 * TILE_SIZE },
+  profileKey: WORLD_TRANSITION_PROFILE_KEYS.burrowToNest,
+  collider: {
+    left: 0,
+    right: WORLD_TRANSITION_ASSETS.burrowToNest.width,
+    top: WORLD_TRANSITION_ASSETS.burrowToNest.height - 4,
+    bottom: WORLD_TRANSITION_ASSETS.burrowToNest.height,
+  },
   prompt: "hud:interaction.enterNest",
   destinationWorldId: WORLD_IDS.nest,
   destinationTransportId: "nest-village-transport",
@@ -35,7 +42,13 @@ const nestTransport = transport({
   id: "nest-village-transport",
   tile: { x: 9, y: 13 },
   asset: WORLD_TRANSITION_ASSETS.nestToBurrow,
-  interactionPosition: { x: 11 * TILE_SIZE, y: 13 * TILE_SIZE },
+  profileKey: WORLD_TRANSITION_PROFILE_KEYS.nestToBurrow,
+  collider: {
+    left: 0,
+    right: WORLD_TRANSITION_ASSETS.nestToBurrow.width,
+    top: 0,
+    bottom: 4,
+  },
   prompt: "hud:interaction.enterBurrow",
   destinationWorldId: WORLD_IDS.village,
   destinationTransportId: "village-nest-transport",
