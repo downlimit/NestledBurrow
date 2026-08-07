@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { WORLD_DEPTH_BASE } from "../src/build/buildWorldGeometry.js";
 import { createWorldInteractionCoordinator } from "../src/interaction/worldInteractionCoordinator.js";
 import { createWorldLayout } from "../src/world/worldLayout.js";
 import {
@@ -37,6 +38,7 @@ const villageLayout = villageCoordinator.createInitialLayout();
 assert.equal(villageLayout.transportTiles.length, 1, "Burrow transition renders as one native image object");
 assert.equal(villageLayout.transportTiles[0].textureKey, WORLD_TRANSITION_ASSETS.burrowToNest.textureKey);
 assert.equal(villageLayout.transportTiles[0].frame, undefined, "native stair PNG is not split into atlas frames");
+assert.equal(villageLayout.transportTiles[0].depth, WORLD_DEPTH_BASE - 1, "Burrow stair stays below depth-sorted actors");
 assert.deepEqual(
   [villageLayout.transitions[0].footprintBounds.right - villageLayout.transitions[0].footprintBounds.left,
     villageLayout.transitions[0].footprintBounds.bottom - villageLayout.transitions[0].footprintBounds.top],
@@ -72,6 +74,7 @@ const nestCoordinator = createWorldLocationCoordinator({
 const nestLayout = nestCoordinator.createInitialLayout();
 assert.equal(nestLayout.transportTiles.length, 1, "Nest transition renders as one native image object");
 assert.equal(nestLayout.transportTiles[0].textureKey, WORLD_TRANSITION_ASSETS.nestToBurrow.textureKey);
+assert.equal(nestLayout.transportTiles[0].depth, WORLD_DEPTH_BASE - 1, "Nest stair stays below depth-sorted actors");
 assert.deepEqual(
   [nestLayout.transitions[0].footprintBounds.right - nestLayout.transitions[0].footprintBounds.left,
     nestLayout.transitions[0].footprintBounds.bottom - nestLayout.transitions[0].footprintBounds.top],
@@ -82,6 +85,8 @@ const mainSource = readFileSync("src/main.js", "utf8");
 assert(mainSource.includes("WORLD_TRANSITION_ASSETS"), "WorldScene must preload the two native transition images");
 assert(mainSource.includes("getWorldTransitionDefinitions"), "WorldScene must wire location transition definitions into interaction dispatch");
 assert(mainSource.includes("activateWorldTransition"), "WorldScene must wire interaction activation back to the location coordinator");
+const presentationSource = readFileSync("src/world/worldPresentationRuntime.js", "utf8");
+assert(presentationSource.includes("tile.frame == null"), "standalone transition PNGs bypass atlas-frame rendering");
 const ruHud = JSON.parse(readFileSync("public/locales/ru/hud.json", "utf8"));
 const enHud = JSON.parse(readFileSync("public/locales/en/hud.json", "utf8"));
 assert.equal(ruHud.interaction.enterNest, "Подняться в гнездо");
@@ -89,7 +94,7 @@ assert.equal(ruHud.interaction.enterBurrow, "Спуститься в нору");
 assert.equal(enHud.interaction.enterNest, "Go up to the Nest");
 assert.equal(enHud.interaction.enterBurrow, "Go down to the Burrow");
 
-console.log("Task #074 checks passed: native stair sprites, active Space transition contract, dispatcher wiring and localization");
+console.log("Task #074 checks passed: native stair sprites, standalone image rendering, actor-safe depth, active Space transition contract, dispatcher wiring and localization");
 
 function pngSize(path) {
   const bytes = readFileSync(path);
