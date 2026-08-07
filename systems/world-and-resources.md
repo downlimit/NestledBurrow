@@ -26,6 +26,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - inventory: `src/inventory/inventoryDomain.js`, `src/inventory/inventoryRuntime.js`;
 - farming: `src/resources/farmingDomain.js`, `src/resources/farmingRuntime.js`, `src/resources/farmingConfig.js`;
 - interaction dispatch: `src/interaction/interactionRuntime.js`, `src/interaction/worldInteractionCoordinator.js`;
+- transition authoring profile/bridge: `src/build/assetProfiles.js`, `src/build/universalPlaceableAuthoring.js`, `src/build/worldTransitionAuthoringBridge.js`;
 - Atoll topology: `systems/wild-atoll.md`;
 - build and persistence: `systems/build-and-authoring.md`, `systems/persistence.md`.
 
@@ -35,7 +36,11 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - paired Burrow/Nest stairs are active objects: proximity never transitions automatically, successful interact runs the canonical location lifecycle, and destination locks prevent immediate bounce-back;
 - each stair renders from one complete and decodable project PNG at native dimensions, without constructor, tileset or build-mode profile;
 - stair PNG validation rejects truncated chunks and requires a terminal `IEND` chunk;
-- stair PNGs use the standalone image path without an atlas frame and stay on a ground layer below depth-sorted actors;
+- each stair has a normal asset-authoring profile: effective collider, pivot, visual offset, crop, interaction-point offset and approach directions are live editable values;
+- stair colliders register in the active world layout under their transition profile keys, so the normal collider editor changes collision and interaction perimeter immediately;
+- stair targeting uses the common `world-placeable` perimeter contract; its aim point is the effective collider centre plus the authored interaction offset;
+- stair depth is derived from the authored pivot like other world objects instead of using a hard-coded overlay layer;
+- transition authoring does not make stairs constructible, movable or demolishable through gameplay build mode;
 - explicit `transitionTo` runs the location lifecycle without a hidden transport or lock;
 - every canonical resource has one `worldId`; only active-location resources mount;
 - transient Atoll definitions may register with `DebrisRuntime` but may not duplicate resource work logic;
@@ -49,7 +54,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 ## Current baseline
 
-The Burrow is `64x48`; its upward Nest entrance is `public/assets/project/world/NestledBurrow_NestStairway.png` (`64x128`). Island Nest is `22x16`; its downward Burrow entrance is `public/assets/project/world/NestledBurrow_HighgroundEntranceStairs.png` (`64x48`). The Atoll is a separate `22x18` transport-free layout with transient arena topology. Its logs, stones and berries remain ordinary `DebrisRuntime` resources. Canonical resource progress persists through travel/reload; a new Atoll run resets transient arena state. Inventory supports reorder, stacking, throwing and pickup; potato and lemon crops persist.
+The Burrow is `64x48`; its upward Nest entrance is `public/assets/project/world/NestledBurrow_NestStairway.png` (`64x128`) with profile `transition:burrow-to-nest`. Island Nest is `22x16`; its downward Burrow entrance is `public/assets/project/world/NestledBurrow_HighgroundEntranceStairs.png` (`64x48`) with profile `transition:nest-to-burrow`. Both locations expose the same developer profile authoring controls for their active stair while keeping the transition itself fixed in the world. The Atoll is a separate `22x18` transport-free layout with transient arena topology. Its logs, stones and berries remain ordinary `DebrisRuntime` resources. Canonical resource progress persists through travel/reload; a new Atoll run resets transient arena state. Inventory supports reorder, stacking, throwing and pickup; potato and lemon crops persist.
 
 ## Not yet
 
