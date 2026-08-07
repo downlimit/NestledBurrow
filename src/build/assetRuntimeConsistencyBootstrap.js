@@ -4,6 +4,7 @@ import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
 import { installPlaceableBuildContract } from "./placeableBuildContract.js";
 import { installUniversalPlaceableAuthoring } from "./universalPlaceableAuthoring.js";
+import { installWorldTransitionAuthoringBridge } from "./worldTransitionAuthoringBridge.js";
 import {
   canonicalBedDefinition,
   derivedFacilityUsePosition,
@@ -75,6 +76,7 @@ function installCurrentAssetRuntime(scene) {
   patchFacilityRuntime(owners.facilityRuntime, scene);
   patchBedRuntime(owners.debrisRuntime, scene);
   patchFarmingRuntime(owners.farmingRuntime, scene);
+  installWorldTransitionAuthoringBridge(scene);
   installPlaceableBuildContract(scene, owners);
   installUniversalPlaceableAuthoring(scene?.movementDebugPanel, scene);
   scene?.interactionRuntime?.refresh?.();
