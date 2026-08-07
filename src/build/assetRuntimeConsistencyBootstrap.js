@@ -45,9 +45,15 @@ if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
 if (!WorldLocationRuntime.prototype[LOCATION_RUNTIME_PATCH]) {
   const originalMount = WorldLocationRuntime.prototype.mount;
   WorldLocationRuntime.prototype.mount = function mountWithCurrentAssetGeometry(...args) {
-    const result = originalMount.apply(this, args);
+    originalMount.apply(this, args);
+    if (!this.owners.movementDebugPanel
+      && this.movementDebugEnabled
+      && (this.activeDefinition?.transports?.length ?? 0) > 0) {
+      this.mountMovementDebugPanel();
+      this.updateOwnerSnapshot();
+    }
     installCurrentAssetRuntime(this.renderingHost);
-    return result;
+    return this.getOwners();
   };
   Object.defineProperty(WorldLocationRuntime.prototype, LOCATION_RUNTIME_PATCH, { value: true });
 }
@@ -154,12 +160,13 @@ function patchFacilityRuntime(runtime, scene) {
     runtime.getInteractionDefinitions = () => originalGetInteractionDefinitions().map((definition) => {
       const raw = originalGetDefinition(definition.id) ?? originalGetDefinition(definition.entityId);
       const current = facilityInteraction(raw ?? definition, currentGeometry(raw ?? definition));
+      const profileKey = raw?.facilityType ? `facility:${raw.facilityType}` : null;
       return Object.freeze({
         ...definition,
         ...current,
         prompt: definition.prompt,
         stopPrompt: definition.stopPrompt,
-        interactionDirections: definition.interactionDirections,
+        interactionDirections: scene.assetProfiles?.[profileKey]?.interactionDirections ?? definition.interactionDirections,
       });
     });
   }
@@ -246,7 +253,7 @@ function patchBedRuntime(runtime, scene) {
           ...definition,
           ...current,
           prompt: definition.prompt,
-          interactionDirections: definition.interactionDirections,
+          interactionDirections: scene.assetProfiles?.[BED_PROFILE_KEY]?.interactionDirections ?? definition.interactionDirections,
         });
       });
     };
