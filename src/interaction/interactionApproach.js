@@ -17,7 +17,7 @@ function usesPlaceablePerimeter(definition, collider) {
 
 export function createInteractionApproachResolver({ worldLayout, getWorldLayout = null, getPlayer }) {
   const probeWallsBySource = new WeakMap();
-  const currentWorldLayout = () => getWorldLayout?.() ?? worldLayout;
+  const currentWorldLayout = (definition = null) => definition?.interactionWorldLayout ?? getWorldLayout?.() ?? worldLayout;
 
   function probeWalls(sourceSnapshot, activeLayout) {
     if (sourceSnapshot && typeof sourceSnapshot === "object" && probeWallsBySource.has(sourceSnapshot)) {
@@ -32,7 +32,7 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
   }
 
   function probe(definition, sourceSnapshot) {
-    const activeLayout = currentWorldLayout();
+    const activeLayout = currentWorldLayout(definition);
     if (!activeLayout) return null;
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
@@ -81,7 +81,7 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
 
   function resolve(definition, sourceSnapshot) {
     if (definition.__interactionProbe) return probe(definition, sourceSnapshot);
-    const activeLayout = currentWorldLayout();
+    const activeLayout = currentWorldLayout(definition);
     if (!activeLayout) return null;
     const collider = interactionCollider(activeLayout, definition);
     if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
