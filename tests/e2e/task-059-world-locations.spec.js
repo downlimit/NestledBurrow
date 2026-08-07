@@ -41,7 +41,7 @@ async function activateStair(page, worldId, transportId) {
   }
   await bridge(page, "placePlayerAt", route.interaction);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(transportId);
-  await page.keyboard.press("Space");
+  await bridge(page, "interact");
 }
 
 async function clearResource(page, resourceId, slotIndex) {
