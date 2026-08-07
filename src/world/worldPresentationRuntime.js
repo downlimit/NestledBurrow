@@ -1,4 +1,8 @@
-import { worldDepthFromAnchorY } from "../build/buildWorldGeometry.js";
+import {
+  assetDepthFromPivot,
+  worldDepthFromAnchorY,
+  WORLD_DEPTH_BASE,
+} from "../build/buildWorldGeometry.js";
 import {
   HOUSE_TEXTURE_KEY,
   OUTDOOR_TEXTURE_KEY,
@@ -18,6 +22,7 @@ export class WorldPresentationRuntime {
     this.activeLayout = null;
     this.worldRenderSprites = [];
     this.transportSprites = [];
+    this.transportEntries = [];
     this.groundSprites = new Map();
     this.floorSprites = new Map();
     this.wallSprites = new Map();
@@ -39,21 +44,77 @@ export class WorldPresentationRuntime {
       this.wallSprites.set(tile.id, this.createCanonicalWallEntry(tile));
     }
     for (const tile of layout.decorationTiles) this.addCanonicalTile(tile, TREES_TEXTURE_KEY, tile.depth);
-    this.transportSprites = (layout.transportTiles ?? []).map((tile) => {
-      const sprite = this.addTransportImage(tile);
-      this.worldRenderSprites.push(sprite);
-      return sprite;
-    });
+    this.transportEntries = (layout.transportTiles ?? []).map((tile) => this.addTransportImage(tile));
+    this.transportSprites = this.transportEntries.map(({ sprite }) => sprite);
+    this.worldRenderSprites.push(...this.transportSprites);
     return this.getBuildSurfaceRegistries();
+  }
+
+  transitionProfile(profileKey) {
+    return this.renderingHost?.assetProfiles?.[profileKey] ?? {};
+  }
+
+  syncTransportEntry(entry) {
+    const { tile, sprite } = entry;
+    const profile = this.transitionProfile(tile.profileKey);
+    const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
+    const pivot = profile.snapAnchorOffset ?? { x: tile.width / 2, y: tile.height };
+    sprite.setPosition(
+      Math.round(tile.worldX + Number(visualOffset.x || 0)),
+      Math.round(tile.worldY + Number(visualOffset.y || 0)),
+    );
+    sprite.setDepth(assetDepthFromPivot(
+      { x: tile.worldX, y: tile.worldY },
+      pivot,
+      WORLD_DEPTH_BASE,
+      tile.id,
+    ));
+    const crop = profile.visualCropInsets;
+    if (crop) {
+      const left = Math.max(0, Number(crop.left) || 0);
+      const right = Math.max(0, Number(crop.right) || 0);
+      const top = Math.max(0, Number(crop.top) || 0);
+      const bottom = Math.max(0, Number(crop.bottom) || 0);
+      const width = Math.max(1, tile.width - left - right);
+      const height = Math.max(1, tile.height - top - bottom);
+      sprite.setCrop(left, top, width, height);
+    } else {
+      sprite.setCrop();
+    }
   }
 
   addTransportImage(tile) {
     const sprite = tile.frame == null
       ? this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey)
       : this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey, tile.frame);
-    sprite.setOrigin(0, 0).setDepth(tile.depth);
-    if (tile.crop) sprite.setCrop(tile.crop.x, 0, tile.crop.width, TILE_SIZE);
-    return sprite;
+    sprite.setOrigin(0, 0);
+    const entry = { tile, sprite };
+    this.syncTransportEntry(entry);
+    return entry;
+  }
+
+  getTransitionAuthoringInstances() {
+    return this.transportEntries.map(({ tile, sprite }) => ({
+      id: tile.id,
+      profileKey: tile.profileKey,
+      anchor: { x: tile.worldX, y: tile.worldY },
+      bounds: {
+        left: tile.worldX,
+        right: tile.worldX + tile.width,
+        top: tile.worldY,
+        bottom: tile.worldY + tile.height,
+      },
+      visualBasePosition: { x: tile.worldX, y: tile.worldY },
+      targets: [sprite],
+      special: true,
+    }));
+  }
+
+  applyTransitionAuthoringProfile(profileKey = null) {
+    for (const entry of this.transportEntries) {
+      if (profileKey && entry.tile.profileKey !== profileKey) continue;
+      this.syncTransportEntry(entry);
+    }
   }
 
   addCanonicalTile(tile, textureKey, depth) {
@@ -89,6 +150,7 @@ export class WorldPresentationRuntime {
     for (const sprite of this.worldRenderSprites) sprite?.destroy?.();
     this.worldRenderSprites = [];
     this.transportSprites = [];
+    this.transportEntries = [];
     this.groundSprites.clear();
     this.floorSprites.clear();
     this.wallSprites.clear();
