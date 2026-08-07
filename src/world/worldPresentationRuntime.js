@@ -40,14 +40,20 @@ export class WorldPresentationRuntime {
     }
     for (const tile of layout.decorationTiles) this.addCanonicalTile(tile, TREES_TEXTURE_KEY, tile.depth);
     this.transportSprites = (layout.transportTiles ?? []).map((tile) => {
-      const sprite = this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey, tile.frame)
-        .setOrigin(0, 0)
-        .setDepth(tile.depth);
-      if (tile.crop) sprite.setCrop(tile.crop.x, 0, tile.crop.width, TILE_SIZE);
+      const sprite = this.addTransportImage(tile);
       this.worldRenderSprites.push(sprite);
       return sprite;
     });
     return this.getBuildSurfaceRegistries();
+  }
+
+  addTransportImage(tile) {
+    const sprite = tile.frame == null
+      ? this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey)
+      : this.renderingHost.add.image(tile.worldX, tile.worldY, tile.textureKey, tile.frame);
+    sprite.setOrigin(0, 0).setDepth(tile.depth);
+    if (tile.crop) sprite.setCrop(tile.crop.x, 0, tile.crop.width, TILE_SIZE);
+    return sprite;
   }
 
   addCanonicalTile(tile, textureKey, depth) {
