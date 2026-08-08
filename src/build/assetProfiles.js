@@ -71,6 +71,22 @@ const BASE_ASSET_PROFILES = Object.freeze({
     point(WORLD_TRANSITION_ASSETS.nestToBurrow.width / 2, -TILE_SIZE - 1),
     { interactionDirections: ["top"] },
   ),
+  [WORLD_TRANSITION_PROFILE_KEYS.atollPathNorth]: profile(
+    "transition",
+    point(WORLD_TRANSITION_ASSETS.atollPathNorth.width / 2, WORLD_TRANSITION_ASSETS.atollPathNorth.height),
+  ),
+  [WORLD_TRANSITION_PROFILE_KEYS.atollPathDiagonal]: profile(
+    "transition",
+    point(WORLD_TRANSITION_ASSETS.atollPathDiagonal.width / 2, WORLD_TRANSITION_ASSETS.atollPathDiagonal.height),
+  ),
+  [WORLD_TRANSITION_PROFILE_KEYS.atollTeleportPlatform]: profile(
+    "transition",
+    point(WORLD_TRANSITION_ASSETS.atollTeleportPlatform.width / 2, WORLD_TRANSITION_ASSETS.atollTeleportPlatform.height),
+  ),
+  [WORLD_TRANSITION_PROFILE_KEYS.atollTeleportConstruct]: profile(
+    "transition",
+    point(WORLD_TRANSITION_ASSETS.atollTeleportConstruct.width / 2, WORLD_TRANSITION_ASSETS.atollTeleportConstruct.height),
+  ),
 });
 
 function finite(value, fallback = 0) {

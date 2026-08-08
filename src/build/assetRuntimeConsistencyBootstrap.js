@@ -1,6 +1,8 @@
 import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { WorldLocationRuntime } from "../world/worldLocationRuntime.js";
+import { WORLD_IDS } from "../world/worldLocationConfig.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
+import { attachEditorAuthoringRuntime } from "./editorAuthoringRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
 import { installPlaceableBuildContract } from "./placeableBuildContract.js";
 import { installUniversalPlaceableAuthoring } from "./universalPlaceableAuthoring.js";
@@ -49,7 +51,7 @@ if (!WorldLocationRuntime.prototype[LOCATION_RUNTIME_PATCH]) {
     originalMount.apply(this, args);
     if (!this.owners.movementDebugPanel
       && this.movementDebugEnabled
-      && (this.activeDefinition?.transports?.length ?? 0) > 0) {
+      && ((this.activeDefinition?.transports?.length ?? 0) > 0 || this.owners.wildAtollRuntime)) {
       this.mountMovementDebugPanel();
       this.updateOwnerSnapshot();
     }
@@ -63,8 +65,25 @@ if (!MovementDebugPanel.prototype[PANEL_PATCH]) {
   const originalAttachSceneRuntime = MovementDebugPanel.prototype.attachSceneRuntime;
 
   MovementDebugPanel.prototype.attachSceneRuntime = async function attachCurrentAssetRuntime() {
-    const result = await originalAttachSceneRuntime.call(this);
-    installCurrentAssetRuntime(this.scene);
+    const scene = await this.resolveWorldScene?.();
+    const profileOnly = Boolean(
+      scene
+        && !scene.buildMode
+        && ((scene.worldLocationRuntime?.activeDefinition?.transports?.length ?? 0) > 0
+          || scene.worldLocationRuntime?.activeDefinition?.id === WORLD_IDS.atoll),
+    );
+    let result = null;
+    if (profileOnly) {
+      this.scene = scene;
+      this.authoringRuntime ??= attachEditorAuthoringRuntime(scene, {
+        storage: this.storage,
+        confirmColliderDraft: this.onColliderDraftConfirm,
+      });
+      result = this.authoringRuntime;
+    } else {
+      result = await originalAttachSceneRuntime.call(this);
+    }
+    installCurrentAssetRuntime(this.scene ?? scene);
     return result;
   };
 
