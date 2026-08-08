@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #084`.
+**Следующий свободный номер:** `Task #085`.
 
 ## Сейчас
 
-### Task #083 — Запретить перспективную трактовку rough sketch
+### Task #084 — Обновить визуалы переходов и телепорта
 
-**Результат:** для world assets rough sketch задаёт geometry/layout, но не perspective. Canonical project camera имеет приоритет над случайным taper/convergence; лестницы, рампы и мосты не получают vanishing point или 3/4 из-за сужения на наброске. Painterly/high-resolution generation не показывается как приемлемый pixel-art candidate.
+**Результат:** вход из Норы в Гнездо использует `NestledBurrow_NestStairway.png` как ground-overlay; пути и межсегментные выходы Атолла используют native glider-platform sprites по направлению; возвратный телепорт состоит из отдельной каменной площадки и голубой кристальной конструкции. Для новых fixed world assets сохраняются редактируемые collider/pivot/visual profiles; только кристальная конструкция участвует в pivot-based depth sorting, остальные лежат над землёй и под персонажем.
 
 ## Следующий продуктовый вопрос
 

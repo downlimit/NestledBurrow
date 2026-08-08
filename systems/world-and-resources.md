@@ -34,13 +34,16 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 - registered world IDs are `village`, `nest` and `atoll`; unknown saved IDs resolve to `village`;
 - paired Burrow/Nest stairs are active objects: proximity never transitions automatically, successful interact runs the canonical location lifecycle, and destination locks prevent immediate bounce-back;
-- each stair renders from one complete and decodable project PNG at native dimensions; PNG validation rejects truncated chunks and requires terminal `IEND`;
+- transition/teleport project PNGs referenced by runtime must be structurally complete and fully IDAT-decodable at canonical dimensions; validation rejects truncated chunks, missing terminal `IEND`, incomplete scanlines and invalid PNG row filters;
 - stairs use normal asset profiles: collider, pivot, visual offset, crop, interaction offset and approach directions are authorable without making them build-library objects;
 - stair collision is registered in the active layout; targeting uses the common `world-placeable` perimeter and collider-centre-plus-offset aim point;
-- stair depth follows the authored pivot;
+- the Burrow-to-Nest stair is a fixed ground-overlay above terrain and below the player; its pivot remains authorable but does not change that depth class;
+- the Nest-to-Burrow stair keeps pivot-based world depth;
 - explicit `transitionTo` runs the location lifecycle without a hidden transport or lock;
 - every canonical resource has one `worldId`; only active-location resources mount;
 - transient Atoll definitions may register with `DebrisRuntime` but may not duplicate resource work logic;
+- Atoll path/transition platforms and teleport pieces are transient fixed world assets with normal asset profiles and registered editable colliders;
+- Atoll glider platforms and the stone teleport platform render at ground-overlay depth; the blue crystal construct alone follows its authored pivot for player-relative depth sorting;
 - location teardown unbinds interactions before destroying owners and presentation; mount reverses that order;
 - inventory has exactly ten slots; a fresh game owns one axe, pickaxe, hoe and bucket;
 - migration restores missing tools without duplication;
@@ -51,7 +54,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 ## Current baseline
 
-The Burrow is `64x48`; its upward Nest entrance is `NestledBurrow_NestStairway.png` (`64x128`, profile `transition:burrow-to-nest`). Island Nest is `22x16`; its downward Burrow entrance is `NestledBurrow_HighgroundEntranceStairs.png` (`64x48`, profile `transition:nest-to-burrow`). Both expose the shared developer profile editor. The Atoll is a separate `22x18` transport-free layout with transient arena topology. Canonical resource progress persists through travel/reload; a new Atoll run resets transient arena state.
+The Burrow is `64x48`; its upward Nest entrance is `NestledBurrow_NestStairway.png` (`64x128`, profile `transition:burrow-to-nest`) and renders as a ground-overlay. Island Nest is `22x16`; its downward Burrow entrance is `NestledBurrow_HighgroundEntranceStairs.png` (`64x48`, profile `transition:nest-to-burrow`). Both expose the shared developer profile editor. The Atoll is a separate `22x18` transport-free layout with transient arena topology; its native path platforms and two-part crystal teleport are also exposed through the same profile authoring contract. Canonical resource progress persists through travel/reload; a new Atoll run resets transient arena state.
 
 ## Not yet
 
