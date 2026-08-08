@@ -214,14 +214,28 @@ Native asset существует только если сохранённый r
 Native pixel-art требует:
 
 - exact canvas/frame dimensions;
-- direct/discrete pixel grid authoring или воспроизводимый pixel-level builder;
+- direct/discrete pixel grid authoring, воспроизводимый pixel-level builder или разрешённый ниже downscale route;
 - clean alpha вне объекта;
 - отсутствие случайного AA/blur/glow/semi-transparent noise;
 - отсутствие background/labels/presentation shadow;
 - integer nearest-neighbor preview;
 - exact frame order/spacing для sheet.
 
-Простой downscale high-resolution generation не считается native production. После design approval запрещена свободная регенерация `примерно такого же` final sprite.
+### Default downscale allowance
+
+Пользователь по умолчанию разрешает downscale approved high-resolution/generative source до exact native dimensions, если текущим сообщением не запретил его.
+
+Downscale считается native production только когда:
+
+- exact dimensions и alpha contract соблюдены;
+- на `1×` сохранены чёткость, читабельность и существенные pixel-art детали;
+- integer nearest-neighbor preview не показывает заметных blur, soft edge, halo, glow или случайного antialiasing;
+- approved design, camera и silhouette не изменены;
+- результат проходит Native proof и отдельный Final binary approval.
+
+Потеря чёткости/читабельности или заметное размытие проваливают downscale route и требуют pixel-grid cleanup/re-authoring.
+
+После design approval запрещена свободная регенерация `примерно такого же` final sprite.
 
 Если пользователь прямо просит native, Художник не считает задачу выполненной одним generative raster.
 
@@ -320,7 +334,7 @@ NestledBurrow_<SemanticName>.png
 - показывать painterly/high-resolution output как приемлемый pixel-art candidate;
 - навязывать concept stage пользователю, который попросил native/runtime sprite;
 - игнорировать `native`, exact pixel size или frame grid;
-- выдавать generative raster или простой downscale за native sprite;
+- выдавать generative raster или downscale за native sprite, если он не проходит описанный Default downscale allowance;
 - после design approval регенерировать похожий final asset вместо сохранения выбранного дизайна;
 - считать design approval разрешением на repository write;
 - публиковать newly created/modified binary до отдельного final binary approval;
