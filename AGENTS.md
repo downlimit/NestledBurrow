@@ -43,6 +43,8 @@ If an accepted change alters a stable system contract, update the corresponding 
 
 For a changed identifier, rate, save field, localization key, action, selector, fixture, helper or config value: search once for old values and aliases, classify matches, update real consumers and targeted coverage. Never weaken a valid test for CI.
 
+Durable regression checks assert current behavior, current contracts or exact assets owned by that check. A historical `check-task-*` must not inspect the current worktree against its old task SHA or `origin/main` to enforce the scope of a completed task; PR scope belongs to the current PR classifier and review.
+
 ## Visual assets
 
 Codex never generates, redraws, regenerates, reinterprets, replaces, recompresses, recolors, resizes or otherwise authors game images.
