@@ -12,6 +12,7 @@ assert.equal(classifyPaths(["AGENTS.md", "scripts/classify-pr-scope.mjs"]), "ci-
 assert.equal(classifyPaths(["scripts/manage-task-preview.mjs"]), "ci-meta");
 assert.equal(classifyPaths(["src/main.js", "docs/runtime-note.md"]), "runtime");
 assert.equal(classifyPaths([".github/workflows/pr-check.yml"]), "strict");
+assert.equal(classifyPaths(["playwright.config.js"]), "strict");
 assert.equal(classifyPaths(["src/main.js", "package-lock.json"]), "strict");
 
 assert.equal(requiresPreview(["GAME.md", "ROADMAP.md"]), false);
@@ -21,6 +22,8 @@ assert.equal(requiresPreview(["src/main.js"]), true);
 assert.equal(requiresPreview(["package-lock.json"]), true);
 assert.equal(requiresPreview([".github/workflows/pr-check.yml", "src/main.js"]), true);
 assert.equal(requiresBrowser([".github/workflows/pr-check.yml", "package.json"]), false);
+assert.equal(requiresBrowser(["playwright.config.js"]), true);
+assert.equal(requiresBrowser(["tests/e2e/task-059-world-locations.spec.js"]), true);
 assert.equal(requiresBrowser(["src/build/worldBuildCoordinator.js", "package.json"]), true);
 assert.equal(requiresBrowser(["public/locales/en/translation.json"]), true);
 
@@ -55,4 +58,4 @@ assert.equal(malformed.metadata.valid, false);
 assert.equal(malformed.preview, true);
 assert.equal(malformed.autoMerge, false);
 
-console.log("PR scope classifier passed: lanes and fail-safe delivery metadata are stable");
+console.log("PR scope classifier passed: lanes, browser coverage and fail-safe delivery metadata are stable");
