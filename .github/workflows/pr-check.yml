@@ -49,6 +49,7 @@ jobs:
   build:
     name: Validate
     needs: scope
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
     steps:
@@ -115,7 +116,9 @@ jobs:
   browser:
     name: Browser E2E
     needs: scope
-    if: needs.scope.outputs.browser == 'true'
+    if: >-
+      github.event.pull_request.draft == false &&
+      needs.scope.outputs.browser == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -160,6 +163,7 @@ jobs:
     needs: scope
     if: >-
       github.event.action != 'closed' &&
+      github.event.action != 'ready_for_review' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.scope.outputs.preview == 'true'
     runs-on: ubuntu-latest

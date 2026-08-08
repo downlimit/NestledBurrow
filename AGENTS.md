@@ -6,7 +6,8 @@
 - Normal flow: compact Lead brief → implementation → public PR preview acceptance when visible → one Ready PR → final-head CI → merge.
 - Never ask the user to operate GitHub.
 - Stop before merge only for explicit `не сливать`, report-only work or a real blocker.
-- Draft PR before acceptance is allowed only by explicit user command; it is not a development or CI gate.
+- Draft PR before acceptance is allowed only by explicit user command; it is a preview carrier, not a development or final-CI gate.
+- Acceptance, Ready state, PR number and merge status never justify a source/documentation commit. Never create an empty commit.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
 - Late Task-number collision: when a number was free at work start and becomes occupied on `origin/main` before publication finishes, Codex may assign the current `ROADMAP.md` next-free number without further confirmation. Rebase onto current `origin/main` and update the Task identity, task-specific files/checks, branch, commit and PR consistently while preserving the accepted name and scope.
 - If the collided number already has a PR, close that obsolete PR, establish one replacement Ready PR, and then remove the obsolete remote branch. Treat this replacement as the same publication cycle.
@@ -81,11 +82,11 @@ Environment:
 Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
 1. Use `npm run preview:task` only for local health: exact URL, HTTP, page errors and 320×180 canvas.
-2. After an explicitly authorized Draft exception, push the task branch. The PR workflow must build and publish a direct static preview from the exact current head.
+2. After an explicitly authorized Draft exception, push the task branch. The PR workflow publishes the direct static preview from the exact current head while final validation remains deferred.
 3. Give the user only the stable public link posted by the PR workflow. StackBlitz, Codespaces and other links that first construct a development environment are forbidden as acceptance previews.
 4. Reuse the same PR URL through feedback; every synchronize event updates its contents.
 5. Before `принято`: no Ready PR, auto-merge or merge. For ChatGPT direct implementation, `препроверка принята` authorizes only the task branch and Draft preview carrier.
-6. After `принято`: applicable publication route once, Ready PR, native auto-merge and final-head CI.
+6. After `принято`: preserve the accepted head unless a real repair or rebase is required; mark the same SHA Ready, run one final-head CI, then merge. Do not hand the task to another role unless the user explicitly asks.
 7. Player-visible repair returns to preview only when it changes the accepted experience.
 8. Private-repository preview fallback: after accepted managed preview, PR CI verifies and uploads the exact-head static `dist` artifact and posts its authenticated link. Anonymous CDN publication remains the public-repository route.
 
@@ -93,11 +94,11 @@ Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and
 
 Prefer the connector. Fill the `nestled-burrow-delivery:v1` PR metadata with explicit values; incomplete metadata falls back to path-based preview routing. Create one non-draft PR after acceptance/local validation, enable native auto-merge through the connector when metadata permits it, verify the exact PR head SHA, then use one bounded final-head CI wait.
 
+When ChatGPT direct implementation has no local worktree, a coherent multi-file edit is published atomically: create one Git tree, one commit and move the task branch once. Contents API `create_file` / `update_file` publication is reserved for a genuinely single-file change. Never push one commit per edited file.
+
 Before repair, wait until every job for current head is terminal and collect failures in one pass. Load only failing steps. Poll at least 45 seconds apart; prefer auto-merge and one bounded wait.
 
 After green CI, merge and update local `main` unless prohibited. Never create review requests, issues, replacement PRs or extra branches without request.
-
-For the next three delivered tasks, record phase evidence with `npm run delivery:timing -- start <task>` and marks for `implementation`, `local-validation`, `git-github`, `remote-ci` and `cleanup`. The state lives in OS temp and must stay out of commits.
 
 ## Special
 
