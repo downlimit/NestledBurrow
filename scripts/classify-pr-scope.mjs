@@ -47,6 +47,7 @@ const isBrowserRelevant = (path) =>
   path.startsWith("tests/e2e/") ||
   path.startsWith("e2e/") ||
   path.startsWith("public/") ||
+  path === ".github/workflows/pr-check.yml" ||
   path === "index.html" ||
   path === "vite.config.js" ||
   path === "playwright.config.js" ||

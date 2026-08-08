@@ -15,12 +15,19 @@ auto-merge: yes
 -->`;
 
 assert.equal(parseDeliveryMetadata(metadata).valid, true);
-const routed = classifyPullRequest(["package.json", ".github/workflows/pr-check.yml"], metadata);
-assert.equal(routed.lane, "strict");
-assert.equal(routed.fullValidation, true);
-assert.equal(routed.browser, false, "process-only Strict changes must skip Browser E2E");
-assert.equal(routed.preview, false);
-assert.equal(routed.autoMerge, true);
+const processOnly = classifyPullRequest(["package.json"], metadata);
+assert.equal(processOnly.lane, "strict");
+assert.equal(processOnly.fullValidation, true);
+assert.equal(processOnly.browser, false, "non-browser Strict process changes skip Browser E2E");
+assert.equal(processOnly.preview, false);
+assert.equal(processOnly.autoMerge, true);
+
+const browserWorkflow = classifyPullRequest([".github/workflows/pr-check.yml"], metadata);
+assert.equal(browserWorkflow.lane, "strict");
+assert.equal(browserWorkflow.fullValidation, true);
+assert.equal(browserWorkflow.browser, true, "the PR browser workflow self-validates through Browser E2E");
+assert.equal(browserWorkflow.preview, false);
+assert.equal(browserWorkflow.autoMerge, true);
 
 const invalid = classifyPullRequest(["src/main.js"], metadata.replace("player-visible: no", "player-visible: maybe"));
 assert.equal(invalid.metadata.valid, false);

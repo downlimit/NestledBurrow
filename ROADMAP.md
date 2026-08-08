@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #078`.
+**Следующий свободный номер:** `Task #079`.
 
 ## Сейчас
 
-### Task #077 — Ускорить Browser E2E без сокращения покрытия
+### Task #078 — Распараллелить полный Browser E2E по runner-ам
 
-**Результат:** canonical Browser E2E сохраняет стабильный Playwright parallelism, оба проекта и полный набор specs. Длинные guest/service сценарии используют E2E-only fast-forward через тот же production `runWorldStep` и 50 ms substeps вместо ожидания реального времени; изменения `playwright.config.js` и `tests/e2e/` сами запускают browser gate.
+**Результат:** полный Playwright suite делится на три независимых shard-runner-а; все shard-а обязательны и сводятся в прежний `Browser E2E` gate. Количество tests, desktop/mobile projects и стабильный per-runner parallelism не меняются. Изменение самого `pr-check.yml` self-validates через Browser E2E, остальные process-only Strict изменения по-прежнему его пропускают.
 
 ## Следующий продуктовый вопрос
 
