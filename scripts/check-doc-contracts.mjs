@@ -70,14 +70,21 @@ requireText(artist, [
   "### Native production",
   "## Обязательный контекст",
   "## Reference hierarchy",
+  "Sketch is geometry source of truth",
+  "### Rough sketch normalization",
+  "canonical project camera wins",
+  "### World stairs / ramps / bridges",
+  "rough narrowing в скетче **никогда само по себе не разрешает perspective",
   "## Silent production preflight",
   "## Generator bridge — обязательный Generation brief",
   "Generation brief",
-  "Sketch is geometry source of truth",
+  "Do not interpret sketch taper/narrowing as camera perspective",
   "## Camera contract",
   "no perspective convergence",
+  "rough-sketch narrowing не считается perspective instruction",
   "## Pixel-art style contract",
   "hard-edged color clusters",
+  "failed generation",
   "TILE_SIZE",
   "src/world/worldConfig.js",
   "Image generation output is never native runtime binary",
@@ -97,6 +104,9 @@ assert(!artist.includes("ровно 3 pseudo-pixel concept variants"), "ARTIST.m
 assert(!artist.includes("обязательным дефолтом независимо"), "ARTIST.md must not override explicit native requests with a mandatory concept route");
 assert(artist.includes("не выполняется напрямую из сырого пользовательского сообщения"), "ARTIST.md must materialize repo-derived constraints before image generation");
 assert(artist.includes("Запрещено самовольно добавлять перила, столбы, стены, крышу, фундамент"), "ARTIST.md must treat sketch geometry as binding rather than optional inspiration");
+assert(artist.includes("Rough sketch не задаёт перспективу"), "ARTIST.md must not treat rough-sketch taper as a perspective instruction");
+assert(artist.includes("глубина передаётся ритмом ступеней, overlap и map layering, а не перспективным convergence"), "ARTIST.md must keep traversable world assets out of perspective convergence");
+assert(artist.includes("не показывает его как приемлемый candidate"), "ARTIST.md must reject painterly generation before presenting it as a pixel-art candidate");
 
 requireText(agents, [
   "<!-- audience: codex -->",

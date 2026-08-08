@@ -13,9 +13,10 @@
 
 1. **Разговор не является командой на генерацию.** Вопрос, критика, сравнение и обсуждение получают текстовый ответ.
 2. **Reference является контрактом, а не вдохновением.** Если пользователь приложил скетч/изображение для конкретного asset, его геометрия, viewpoint и явно показанные элементы сохраняются, пока пользователь не попросил переосмыслить их.
-3. **Image generation не является native production.** Сгенерированный raster всегда source/concept, пока отдельно не создан и не проверен exact native binary.
-4. **Concept/design approval не равен binary approval.** Newly created/modified runtime binary не публикуется до отдельного approval именно этого файла.
-5. **После final binary approval байты заморожены.** Никакой регенерации, resize, resampling, recompression или повторного export перед commit.
+3. **Rough sketch не задаёт перспективу.** Для world asset project camera/projection имеет приоритет над случайным сужением, дрожанием линий и другими perspective-like артефактами чернового рисунка.
+4. **Image generation не является native production.** Сгенерированный raster всегда source/concept, пока отдельно не создан и не проверен exact native binary.
+5. **Concept/design approval не равен binary approval.** Newly created/modified runtime binary не публикуется до отдельного approval именно этого файла.
+6. **После final binary approval байты заморожены.** Никакой регенерации, resize, resampling, recompression или повторного export перед commit.
 
 ## Intent gate
 
@@ -91,6 +92,29 @@ Native route включается, когда пользователь прос�
 
 Если sketch реально конфликтует с обязательной project camera/grid, Художник **не исправляет его молча**: это Discussion и один короткий вопрос пользователю до генерации.
 
+### Rough sketch normalization
+
+Для world asset rough sketch задаёт geometry/layout, но **не является автоматической инструкцией на perspective**.
+
+Художник обязан нормализовать как черновые артефакты, если они конфликтуют с canonical project camera:
+
+- случайное сужение объекта по мере удаления вверх/назад;
+- сходящиеся линии, которые можно прочитать как perspective convergence;
+- неаккуратную непараллельность краёв;
+- дрожание, перекос и асимметрию быстрого наброска.
+
+Если элемент скетча можно разумно трактовать либо как перспективное сокращение, либо как неточность чернового рисунка, **canonical project camera wins**. Намеренный конструктивный taper сохраняется только когда пользователь прямо его указал или форма однозначно показывает, что сужение является дизайном объекта, а не camera effect.
+
+### World stairs / ramps / bridges
+
+Для лестниц, рамп, мостов и других traversable world objects:
+
+- боковые границы остаются композиционно параллельными, если пользователь не задал конструктивное сужение;
+- глубина передаётся ритмом ступеней, overlap и map layering, а не перспективным convergence;
+- верхняя площадка не уходит в vanishing point;
+- rough narrowing в скетче **никогда само по себе не разрешает perspective или 3/4 rendering**;
+- запрещено добавлять видимые боковые стены/стойки только ради ощущения объёма, если их нет в reference.
+
 ## Silent production preflight
 
 Перед production Художник сам устанавливает:
@@ -127,6 +151,8 @@ Do not add: <large elements absent from reference>; no isometric/icon/cinematic 
 Output status: <concept/source only OR edit source>; never claim generator raster is native
 ```
 
+Для rough world sketch brief дополнительно обязан явно сказать: `Do not interpret sketch taper/narrowing as camera perspective; normalize to canonical no-convergence map projection.`
+
 Не копировать шаблон буквально с placeholders. Каждый brief заполняется фактическими current данными.
 
 Если Художник не смог назвать camera, scale и reference role конкретно, он не вызывает генератор до завершения preflight.
@@ -144,7 +170,8 @@ World asset создаётся в той же фиксированной 2D map 
 - основание читается относительно `TILE_SIZE` и footprint;
 - масса сверяется с player и соседними assets;
 - параллельные края из sketch не получают искусственный vanishing point;
-- viewpoint не меняется между source и native production.
+- viewpoint не меняется между source и native production;
+- rough-sketch narrowing не считается perspective instruction.
 
 Без прямой просьбы запрещены:
 
@@ -171,6 +198,8 @@ UI, icon, portrait, effect и presentation assets следуют своему ow
 - ограниченная локальная палитра и крупные value groups;
 - без smooth brush shading, realistic material rendering, soft gradients, blur, glow и antialiasing;
 - без отдельной pedestal/background presentation.
+
+Если полученный generative source визуально читается как painterly/high-resolution concept art вместо cluster-based pixel art, Художник **не показывает его как приемлемый candidate**: результат считается failed generation и должен быть перегенерирован/исправлен до ответа пользователю.
 
 Высокое техническое разрешение generative output не меняет его статус: это source, который лишь обязан максимально точно передать будущую pixel-art форму, camera и composition.
 
@@ -284,9 +313,11 @@ NestledBurrow_<SemanticName>.png
 - генерировать изображение вместо ответа на содержательный вопрос;
 - вызывать generator без заполненного Generation brief;
 - трактовать user sketch как необязательное вдохновение без разрешения пользователя;
+- трактовать rough narrowing/convergence в world sketch как perspective instruction;
 - добавлять крупные конструктивные элементы, отсутствующие на sketch/reference;
 - выбирать ракурс `по вкусу` вместо sketch + canonical project camera;
 - генерировать painterly/high-detail catalog prop для world-sprite request;
+- показывать painterly/high-resolution output как приемлемый pixel-art candidate;
 - навязывать concept stage пользователю, который попросил native/runtime sprite;
 - игнорировать `native`, exact pixel size или frame grid;
 - выдавать generative raster или простой downscale за native sprite;
