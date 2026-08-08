@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #081`.
+**Следующий свободный номер:** `Task #082`.
 
 ## Сейчас
 
-### Task #080 — Убрать лишнюю установку браузерных зависимостей
+### Task #081 — Переписать Artist pipeline
 
-**Результат:** Browser E2E на GitHub-hosted Ubuntu устанавливает только Chromium headless shell, без повторного `apt`-прохода и полного browser binary. Изменение принимается только если тот же полный sharded E2E проходит на exact head.
+**Результат:** роль Художника разделяет discussion, concept, native production и exact-asset edit; native request больше не проходит через обязательные концепты, world assets обязаны использовать каноническую project camera и repo-derived grid/scale, а repository delivery разрешена только для отдельно approved exact native binary с неизменным SHA-256.
 
 ## Следующий продуктовый вопрос
 

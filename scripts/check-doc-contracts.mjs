@@ -64,21 +64,30 @@ requireText(lead, [
 
 requireText(artist, [
   "<!-- audience: artist-chat -->",
+  "## Intent gate",
+  "### Discussion",
+  "### Concept production",
+  "### Native production",
   "## Обязательный контекст",
-  "## Stage 0 — repository and art-direction preflight",
-  "## Stage 1 — pseudo-pixel concept variants",
-  "## Stage 2 — pre-native cleanup выбранного варианта",
-  "## Stage 3 — honest native production",
-  "## Stage 4 — native cleanup and visual proof",
+  "## Silent production preflight",
+  "## Camera contract",
+  "Stardew Valley",
   "TILE_SIZE",
   "src/world/worldConfig.js",
-  "Stardew Valley",
+  "## Image prompt discipline",
+  "## Native request means exact native binary",
+  "## Native proof",
+  "## Approval boundary",
+  "### Final binary approval",
+  "exact approved bytes",
   "public/assets/project/<owner>/",
   "NestledBurrow_<SemanticName>.png",
   "asset-inbox/incoming",
   "SHA-256",
   "code-only integration task",
 ], "ARTIST.md");
+assert(!artist.includes("ровно 3 pseudo-pixel concept variants"), "ARTIST.md must not force every new asset through three concepts");
+assert(!artist.includes("обязательным дефолтом независимо"), "ARTIST.md must not override explicit native requests with a mandatory concept route");
 
 requireText(agents, [
   "<!-- audience: codex -->",
@@ -196,7 +205,7 @@ requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"codex:validat
 for (const [label, text, limit] of [
   ["PROJECT.md", project, 7000],
   ["LEAD.md", lead, 7500],
-  ["ARTIST.md", artist, 32000],
+  ["ARTIST.md", artist, 18000],
   ["AGENTS.md", agents, 11000],
   ["REVIEW.md", review, 5000],
   ["GAME.md", game, 7000],
