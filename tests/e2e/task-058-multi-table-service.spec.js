@@ -9,6 +9,17 @@ async function bridge(page, method, argument) {
   );
 }
 
+async function advanceUntil(page, read, predicate, { maxMs = 45_000, stepMs = 250 } = {}) {
+  for (let elapsedMs = 0; elapsedMs <= maxMs; elapsedMs += stepMs) {
+    const value = await read();
+    if (predicate(value)) return value;
+    await bridge(page, "advanceWorldSimulation", stepMs);
+  }
+  const value = await read();
+  expect(predicate(value)).toBe(true);
+  return value;
+}
+
 async function bootFresh(page) {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./?movementDebug=1");
@@ -78,16 +89,18 @@ test("two dine-in guests reserve distinct serving and dining tables", async ({ p
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-2");
 
-  await expect.poll(async () => {
-    const guests = (await bridge(page, "getTavernState")).guest.guests;
-    return {
-      count: guests.length,
-      serving: new Set(guests.map(({ servingTableId }) => servingTableId)).size,
-      dining: new Set(guests.map(({ diningTableId }) => diningTableId)).size,
-    };
+  const guests = (await bridge(page, "getTavernState")).guest.guests;
+  expect({
+    count: guests.length,
+    serving: new Set(guests.map(({ servingTableId }) => servingTableId)).size,
+    dining: new Set(guests.map(({ diningTableId }) => diningTableId)).size,
   }).toEqual({ count: 2, serving: 2, dining: 2 });
 
-  await expect.poll(async () => (await bridge(page, "getCoinState")).length, { timeout: 45_000 }).toBe(2);
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getCoinState")).length,
+    (count) => count === 2,
+  );
   const coins = await bridge(page, "getCoinState");
   expect(coins.map(({ value }) => value)).toEqual([4, 4]);
   expect(dining.facility.facilityType).toBe("table");

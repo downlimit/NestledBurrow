@@ -273,6 +273,18 @@ export function installWorldE2EBridge(scene) {
       const deltaMs = Math.max(0, Number(milliseconds) || 0);
       scene.worldLocationRuntime?.updateRealTime?.(deltaMs);
     },
+    advanceWorldSimulation: (milliseconds) => {
+      let remainingMs = Math.max(0, Number(milliseconds) || 0);
+      while (remainingMs > 0) {
+        const stepMs = Math.min(50, remainingMs);
+        scene.worldLocationRuntime?.runWorldStep?.(
+          stepMs,
+          (deltaMs) => scene.characterSystem?.update?.(deltaMs),
+        );
+        remainingMs -= stepMs;
+      }
+      return true;
+    },
     getRuntimeState: () => ({
       sleeping: scene.sleeping,
       exhaustedSleeping: scene.exhaustedSleeping,

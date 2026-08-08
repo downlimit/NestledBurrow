@@ -7,6 +7,17 @@ async function bridge(page, method, argument) {
   );
 }
 
+async function advanceUntil(page, read, predicate, { maxMs = 30_000, stepMs = 250 } = {}) {
+  for (let elapsedMs = 0; elapsedMs <= maxMs; elapsedMs += stepMs) {
+    const value = await read();
+    if (predicate(value)) return value;
+    await bridge(page, "advanceWorldSimulation", stepMs);
+  }
+  const value = await read();
+  expect(predicate(value)).toBe(true);
+  return value;
+}
+
 async function bootFresh(page) {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./?movementDebug=1");
@@ -218,21 +229,31 @@ test("lemonade guests take out and pay two coins", async ({ page }, testInfo) =>
   await interactWith(page, "tavern-open-sign");
   expect((await bridge(page, "getTavernState")).open).toBe(true);
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
-  await expect.poll(async () => (await bridge(page, "getTavernState")).guest.guests[0]?.itemId, { timeout: 25_000 })
-    .toBe("lemonade");
-  await expect.poll(async () => {
-    const guest = (await bridge(page, "getTavernState")).guest.guests[0];
-    const coins = await bridge(page, "getCoinState");
-    return guest?.state === "leaving" && coins.length === 1;
-  }, { timeout: 25_000 }).toBe(true);
-  await expect.poll(async () => (await bridge(page, "getCoinState"))[0]?.landed, { timeout: 30_000 }).toBe(true);
+  expect((await bridge(page, "getTavernState")).guest.guests[0]?.itemId).toBe("lemonade");
+  await advanceUntil(
+    page,
+    async () => {
+      const guest = (await bridge(page, "getTavernState")).guest.guests[0];
+      const coins = await bridge(page, "getCoinState");
+      return { leaving: guest?.state === "leaving", coinCount: coins.length };
+    },
+    ({ leaving, coinCount }) => leaving && coinCount === 1,
+    { maxMs: 25_000 },
+  );
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getCoinState"))[0]?.landed,
+    (landed) => landed === true,
+    { maxMs: 30_000 },
+  );
   expect((await bridge(page, "getTavernState")).guest.guests.some(({ state }) => state === "eating")).toBe(false);
   const coinsBefore = (await bridge(page, "getSession")).gameplay.coins;
   const [coin] = await bridge(page, "getCoinState");
   expect(coin.value).toBe(2);
   await bridge(page, "placePlayerAt", { x: coin.x, y: coin.y });
-  await expect.poll(async () => (await bridge(page, "getSession")).gameplay.coins).toBe(coinsBefore + 2);
-  await expect.poll(async () => (await bridge(page, "getHudState")).resources.coinDelta.text).toBe("+2");
+  await bridge(page, "advanceWorldSimulation", 50);
+  expect((await bridge(page, "getSession")).gameplay.coins).toBe(coinsBefore + 2);
+  expect((await bridge(page, "getHudState")).resources.coinDelta.text).toBe("+2");
 });
 
 test("wallet drag drops and recollects exactly one coin", async ({ page }, testInfo) => {
@@ -270,9 +291,18 @@ test("fried potato guests dine in and pay four coins", async ({ page }, testInfo
   await bridge(page, "setServingStock", { itemId: "fried-potato-dish", quantity: 1 });
   await interactWith(page, "tavern-open-sign");
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
-  await expect.poll(async () => (await bridge(page, "getTavernState")).guest.guests[0]?.state, { timeout: 30_000 })
-    .toBe("eating");
-  await expect.poll(async () => (await bridge(page, "getCoinState"))[0]?.landed, { timeout: 15_000 }).toBe(true);
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getTavernState")).guest.guests[0]?.state,
+    (state) => state === "eating",
+    { maxMs: 30_000 },
+  );
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getCoinState"))[0]?.landed,
+    (landed) => landed === true,
+    { maxMs: 15_000 },
+  );
   const [coin] = await bridge(page, "getCoinState");
   expect(coin.value).toBe(4);
 });

@@ -9,7 +9,8 @@ const isStrict = (path) =>
   path === "package.json" ||
   path === "package-lock.json" ||
   path === "requirements-dev.txt" ||
-  path === "vite.config.js";
+  path === "vite.config.js" ||
+  path === "playwright.config.js";
 
 const isCiMeta = (path) =>
   [
@@ -43,10 +44,12 @@ const isPreviewRelevant = (path) =>
 
 const isBrowserRelevant = (path) =>
   path.startsWith("src/") ||
+  path.startsWith("tests/e2e/") ||
   path.startsWith("e2e/") ||
   path.startsWith("public/") ||
   path === "index.html" ||
   path === "vite.config.js" ||
+  path === "playwright.config.js" ||
   path.endsWith(".css");
 
 export function classifyPaths(paths) {

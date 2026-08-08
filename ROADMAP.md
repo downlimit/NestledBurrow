@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #077`.
+**Следующий свободный номер:** `Task #078`.
 
 ## Сейчас
 
-### Task #076 — Убрать исторические scope-guards из regression checks
+### Task #077 — Ускорить Browser E2E без сокращения покрытия
 
-**Результат:** старые `check-task-*` проверяют только актуальное поведение, контракты и owned-assets; завершённая задача больше не анализирует diff будущих PR относительно своего старого SHA или `origin/main`. Scope текущей работы остаётся обязанностью PR classifier/review.
+**Результат:** canonical Browser E2E сохраняет стабильный Playwright parallelism, оба проекта и полный набор specs. Длинные guest/service сценарии используют E2E-only fast-forward через тот же production `runWorldStep` и 50 ms substeps вместо ожидания реального времени; изменения `playwright.config.js` и `tests/e2e/` сами запускают browser gate.
 
 ## Следующий продуктовый вопрос
 
