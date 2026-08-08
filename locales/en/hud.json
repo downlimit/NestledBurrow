@@ -1,0 +1,240 @@
+{
+  "fullscreen": {
+    "enter": "Enter fullscreen",
+    "exit": "Exit fullscreen",
+    "unsupported": "Fullscreen unavailable"
+  },
+  "language": {
+    "toggle": "Switch language",
+    "current": "EN"
+  },
+  "options": {
+    "title": "Options"
+  },
+  "buildMode": {
+    "title": "BUILD MODE",
+    "groups": {
+      "tools": "Tools",
+      "ground": "Ground and paths",
+      "walls": "Walls and corners",
+      "expedition": "Expedition",
+      "furniture": "Furniture",
+      "plants": "Plants"
+    },
+    "assets": {
+      "demolish": "Demolish",
+      "move": "Move",
+      "grass": "Grass",
+      "path": "Path",
+      "parquet": "Parquet",
+      "carpet": "Carpet",
+      "wall": "Wall",
+      "privacyScreen": "Field privacy screen",
+      "bed": "Bed",
+      "shower": "Shower",
+      "toilet": "Toilet",
+      "table": "Table",
+      "well": "Well",
+      "tree": "Tree"
+    }
+  },
+  "interaction": {
+    "talk": "Talk",
+    "next": "Next",
+    "close": "Close",
+    "enterNest": "Go up to the Nest",
+    "enterBurrow": "Go down to the Burrow",
+    "clear": "Chop",
+    "notEnoughEnergy": "Not enough energy",
+    "hit": "Hit",
+    "sleep": "Sleep",
+    "wake": "Wake up",
+    "tryWake": "Try to wake up",
+    "wakeFailed": "Could not wake up",
+    "energyRestored": "Energy restored",
+    "chop": "Chop",
+    "mine": "Mine",
+    "gatherBerries": "Gather berries",
+    "shower": "Use shower",
+    "leaveShower": "Leave shower",
+    "toilet": "Use toilet",
+    "leaveToilet": "Get off toilet",
+    "eat": "Eat",
+    "stopEating": "Stop eating",
+    "startPreparation": "Start preparation",
+    "startFrying": "Start frying",
+    "serveDish": "Serve dish",
+    "takeDish": "Take dish back",
+    "noRawPotatoes": "No raw potatoes",
+    "noPreparedPotatoes": "No prepared potatoes",
+    "noCookedDish": "No cooked dish",
+    "servingTableOccupied": "Serving table occupied",
+    "openTavern": "Open tavern",
+    "closeTavern": "Close tavern",
+    "openSeedShop": "Seed shop",
+    "tillSoil": "Till soil",
+    "plantPotato": "Plant potato",
+    "plantLemon": "Plant lemon",
+    "waterSoil": "Water soil",
+    "harvestPotato": "Harvest",
+    "harvestLemon": "Harvest lemons",
+    "clearRottenCrop": "Clear rotten crop",
+    "destroyCrop": "Cut down crop",
+    "destroySoil": "Remove garden bed",
+    "refillWaterBucket": "Fill water bucket",
+    "waterBucketRequired": "Select the water bucket",
+    "waterBucketEmpty": "Water bucket is empty",
+    "waterBucketFull": "Water bucket is already full",
+    "waterBucketRefilled": "Water bucket filled: 8",
+    "noPotatoSeed": "No potato seeds",
+    "noLemonSeed": "No lemon seeds",
+    "invalidSoil": "This ground cannot be tilled",
+    "makeLemonade": "Make lemonade",
+    "noLemon": "A lemon is required",
+    "noWater": "Water is required",
+    "inventoryFull": "Inventory has no room",
+    "takeLemons": "Take lemons",
+    "lemonSackEmpty": "The lemon sack is empty",
+    "serveItem": "Stock serving table",
+    "takeItem": "Take item back",
+    "servingTableDifferentItem": "A different item is on the table",
+    "servingTableFull": "The table already has a portion",
+    "servingTableEmpty": "The serving table is empty",
+    "repairStove": "Repair: 10 wood, 8 stone, 10 coins",
+    "repairMissing": "Missing: {categories}",
+    "repairCategory": {
+      "wood": "wood",
+      "stone": "stone",
+      "coins": "coins"
+    },
+    "servingStock": {
+      "lemonade1": "Lemonade 1/4 — take",
+      "lemonade2": "Lemonade 2/4 — take",
+      "lemonade3": "Lemonade 3/4 — take",
+      "lemonade4": "Lemonade 4/4 — take",
+      "friedPotatoDish1": "Potato dish 1/4 — take",
+      "friedPotatoDish2": "Potato dish 2/4 — take",
+      "friedPotatoDish3": "Potato dish 3/4 — take",
+      "friedPotatoDish4": "Potato dish 4/4 — take"
+    }
+  },
+  "atoll": {
+    "arrival": "The first paths begin here.",
+    "leftRun": "You returned to Island Nest.",
+    "promptEnter": "SPACE - WILD ATOLL",
+    "segmentStarter": "THE FIRST PATHS",
+    "arenas": {
+      "root": "FRINGE",
+      "meadow": "MEADOW",
+      "stones": "STONES",
+      "pond": "POND",
+      "thicket": "THICKET",
+      "roots": "ROOTS",
+      "slope": "SCREE",
+      "edge": "PASS"
+    },
+    "paths": {
+      "meadow": "SPACE - TO MEADOW",
+      "stones": "SPACE - TO STONES",
+      "pond": "SPACE - TO POND",
+      "thicket": "SPACE - TO THICKET",
+      "roots": "SPACE - TO ROOTS",
+      "slope": "SPACE - TO SCREE",
+      "edge": "SPACE - TO PASS",
+      "forestT1": "SPACE - FOREST T1",
+      "mineT1": "SPACE - MINES T1",
+      "nest": "SPACE - TO NEST"
+    },
+    "segmentLocked": {
+      "forestT1": "The forest trail is still closed.",
+      "mineT1": "The mine descent is still closed."
+    }
+  },
+  "quickUse": {
+    "empty": "The slot is empty",
+    "unsupported": "This item cannot be used on the character",
+    "needFull": "The relevant need is already full",
+    "bucketEmpty": "The bucket is empty",
+    "ateRation": "Ration eaten: satiety restored",
+    "washed": "Bucket water used: lustre restored"
+  },
+  "progress": {
+    "newGame": "New game",
+    "confirmNewGame": "Erase saved quest progress and begin again?",
+    "confirm": "Start over",
+    "cancel": "Cancel"
+  },
+  "sound": {
+    "title": "Sound",
+    "master": "Master",
+    "music": "Music",
+    "effects": "Effects"
+  },
+  "resources": {
+    "energy": "EN {current}/{max}"
+  },
+  "merchant": {
+    "title": "SEED MERCHANT",
+    "offer": "Potato seed - 1 coin",
+    "potato-seed": "POTATO",
+    "lemon-seed": "LEMON",
+    "balance": "Coins: {count}",
+    "balance_one": "Coins: {count}",
+    "balance_few": "Coins: {count}",
+    "balance_many": "Coins: {count}",
+    "balance_other": "Coins: {count}",
+    "buy": "BUY 1",
+    "buyPrice": "BUY · {count}",
+    "buyPrice_one": "BUY · {count}",
+    "buyPrice_few": "BUY · {count}",
+    "buyPrice_many": "BUY · {count}",
+    "buyPrice_other": "BUY · {count}",
+    "exit": "SPACE - CLOSE",
+    "not-enough-coins": "Not enough coins",
+    "inventory-full": "Inventory is full"
+  },
+  "kitchen": {
+    "facilities": {
+      "cuttingTable": "Cutting table",
+      "gasStove": "Gas stove",
+      "servingTable": "Serving table",
+      "juicer": "Juicer",
+      "lemonSack": "Lemon sack"
+    }
+  },
+  "migration": {
+    "task049": "For a clean game, it is better to start a new game."
+  },
+  "cooking": {
+    "attempt": "Try hard",
+    "preparation": "Preparation",
+    "frying": "Frying",
+    "time": "TIME",
+    "combo": "COMBO",
+    "success": "Success!",
+    "miss": "Miss"
+  },
+  "needs": {
+    "toiletAccidentPrivate": "Could not hold it. Time to clean up.",
+    "toiletAccidentWitnessed": "An awkward accident happened in front of others.",
+    "urgentLongAction": "Use the toilet before starting a long task.",
+    "novelty": {
+      "tooltip": "Novelty - fresh, enjoyable experiences. Repeated labour lowers it; new events restore."
+    },
+    "energy": {
+      "tooltip": "Energy - the reserve of strength for movement, work, and other actions."
+    },
+    "satiety": {
+      "tooltip": "Satiety - how well fed the character is. A low value means hunger."
+    },
+    "toilet": {
+      "tooltip": "Toilet - how soon the character needs relief. A low value means urgency."
+    },
+    "lustre": {
+      "tooltip": "Lustre - the character is clean, fresh, and well-groomed."
+    },
+    "dialogue": {
+      "tooltip": "Dialogue - how much conversation and social contact the character is getting."
+    }
+  }
+}

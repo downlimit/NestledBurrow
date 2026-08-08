@@ -1,0 +1,23 @@
+{
+  "groups": {
+    "facilities": "Furniture and objects",
+    "resources": "Resources"
+  },
+  "assets": {
+    "cuttingTable": "Cutting table",
+    "gasStove": "Gas stove",
+    "servingTable": "Food serving table",
+    "juicer": "Juicer",
+    "lemonSack": "Lemon sack",
+    "well": "Well",
+    "tavernSign": "Tavern sign",
+    "trainingDummy": "Training dummy",
+    "tree": "Tree",
+    "berryBush": "Wild berry bush",
+    "smallLog": "Small log",
+    "largeLog": "Large log",
+    "smallStone": "Small stone",
+    "largeStone": "Large stone",
+    "rubyNode": "Ruby vein"
+  }
+}

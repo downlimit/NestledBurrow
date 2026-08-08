@@ -1,0 +1,240 @@
+{
+  "fullscreen": {
+    "enter": "На весь экран",
+    "exit": "Выйти из полноэкранного режима",
+    "unsupported": "Полноэкранный режим недоступен"
+  },
+  "language": {
+    "toggle": "Сменить язык",
+    "current": "RU"
+  },
+  "options": {
+    "title": "Опции"
+  },
+  "buildMode": {
+    "title": "РЕЖИМ СТРОИТЕЛЬСТВА",
+    "groups": {
+      "tools": "Инструменты",
+      "ground": "Земля и дорожки",
+      "walls": "Стены и углы",
+      "expedition": "Походные",
+      "furniture": "Мебель",
+      "plants": "Растения"
+    },
+    "assets": {
+      "demolish": "Снос",
+      "move": "Переставить",
+      "grass": "Трава",
+      "path": "Дорожка",
+      "parquet": "Паркет",
+      "carpet": "Ковёр",
+      "wall": "Стена",
+      "privacyScreen": "Походная ширма",
+      "bed": "Кровать",
+      "shower": "Душ",
+      "toilet": "Туалет",
+      "table": "Стол",
+      "well": "Колодец",
+      "tree": "Дерево"
+    }
+  },
+  "interaction": {
+    "talk": "Говорить",
+    "next": "Дальше",
+    "close": "Закрыть",
+    "enterNest": "Подняться в гнездо",
+    "enterBurrow": "Спуститься в нору",
+    "clear": "Рубить",
+    "notEnoughEnergy": "Не хватает энергии",
+    "hit": "Ударить",
+    "sleep": "Спать",
+    "wake": "Проснуться",
+    "tryWake": "Попытаться проснуться",
+    "wakeFailed": "Не удалось проснуться",
+    "energyRestored": "Энергия восстановлена",
+    "chop": "Рубить",
+    "mine": "Добыть",
+    "gatherBerries": "Собрать ягоды",
+    "shower": "Принять душ",
+    "leaveShower": "Выйти из душа",
+    "toilet": "Использовать туалет",
+    "leaveToilet": "Слезть с туалета",
+    "eat": "Поесть",
+    "stopEating": "Перестать есть",
+    "startPreparation": "Начать подготовку",
+    "startFrying": "Начать жарку",
+    "serveDish": "Выставить блюдо",
+    "takeDish": "Снять блюдо",
+    "noRawPotatoes": "Нет сырого картофеля",
+    "noPreparedPotatoes": "Нет подготовленного картофеля",
+    "noCookedDish": "Нет готового блюда",
+    "servingTableOccupied": "Сервировочный стол занят",
+    "openTavern": "Открыть таверну",
+    "closeTavern": "Закрыть таверну",
+    "openSeedShop": "Магазин семян",
+    "tillSoil": "Вскопать землю",
+    "plantPotato": "Посадить картофель",
+    "plantLemon": "Посадить лимон",
+    "waterSoil": "Полить землю",
+    "harvestPotato": "Собрать урожай",
+    "harvestLemon": "Собрать лимоны",
+    "clearRottenCrop": "Убрать сгнившее растение",
+    "destroyCrop": "Срубить растение",
+    "destroySoil": "Убрать грядку",
+    "refillWaterBucket": "Наполнить ведро",
+    "waterBucketRequired": "Нужно выбрать ведро",
+    "waterBucketEmpty": "Ведро пусто",
+    "waterBucketFull": "Ведро уже полно",
+    "waterBucketRefilled": "Ведро наполнено: 8",
+    "noPotatoSeed": "Нет семян картофеля",
+    "noLemonSeed": "Нет семян лимона",
+    "invalidSoil": "Здесь нельзя вскопать землю",
+    "makeLemonade": "Сделать лимонад",
+    "noLemon": "Нужен лимон",
+    "noWater": "Нужна вода в ведре",
+    "inventoryFull": "В инвентаре нет места",
+    "takeLemons": "Взять лимоны",
+    "lemonSackEmpty": "Мешок лимонов пуст",
+    "serveItem": "Выставить товар",
+    "takeItem": "Забрать товар",
+    "servingTableDifferentItem": "На столе другой товар",
+    "servingTableFull": "На столе уже есть порция",
+    "servingTableEmpty": "Сервировочный стол пуст",
+    "repairStove": "Починить: 10 дерева, 8 камня, 10 монет",
+    "repairMissing": "Не хватает: {categories}",
+    "repairCategory": {
+      "wood": "дерево",
+      "stone": "камень",
+      "coins": "монеты"
+    },
+    "servingStock": {
+      "lemonade1": "Лимонад 1/4 — забрать",
+      "lemonade2": "Лимонад 2/4 — забрать",
+      "lemonade3": "Лимонад 3/4 — забрать",
+      "lemonade4": "Лимонад 4/4 — забрать",
+      "friedPotatoDish1": "Картофель 1/4 — забрать",
+      "friedPotatoDish2": "Картофель 2/4 — забрать",
+      "friedPotatoDish3": "Картофель 3/4 — забрать",
+      "friedPotatoDish4": "Картофель 4/4 — забрать"
+    }
+  },
+  "atoll": {
+    "arrival": "Первые тропы начинаются здесь.",
+    "leftRun": "Вы вернулись в Островное Гнездо.",
+    "promptEnter": "SPACE - ДИКИЙ АТОЛЛ",
+    "segmentStarter": "ПЕРВЫЕ ТРОПЫ",
+    "arenas": {
+      "root": "КРАЙ",
+      "meadow": "ПОЛЯНА",
+      "stones": "КАМНИ",
+      "pond": "ПРУД",
+      "thicket": "ЗАРОСЛИ",
+      "roots": "КОРНИ",
+      "slope": "ОСЫПЬ",
+      "edge": "ПЕРЕВАЛ"
+    },
+    "paths": {
+      "meadow": "SPACE - К ПОЛЯНЕ",
+      "stones": "SPACE - К КАМНЯМ",
+      "pond": "SPACE - К ПРУДУ",
+      "thicket": "SPACE - В ЗАРОСЛИ",
+      "roots": "SPACE - К КОРНЯМ",
+      "slope": "SPACE - К ОСЫПИ",
+      "edge": "SPACE - НА ПЕРЕВАЛ",
+      "forestT1": "SPACE - ЛЕС T1",
+      "mineT1": "SPACE - ШАХТЫ T1",
+      "nest": "SPACE - В ГНЕЗДО"
+    },
+    "segmentLocked": {
+      "forestT1": "Тропа в лес еще закрыта.",
+      "mineT1": "Спуск в шахты еще закрыт."
+    }
+  },
+  "quickUse": {
+    "empty": "Ячейка пуста",
+    "unsupported": "Этот предмет нельзя применить на себе",
+    "needFull": "Соответствующая потребность уже заполнена",
+    "bucketEmpty": "Ведро пусто",
+    "ateRation": "Паёк съеден: сытость восстановлена",
+    "washed": "Вода из ведра использована: лоск восстановлен"
+  },
+  "progress": {
+    "newGame": "Новая игра",
+    "confirmNewGame": "Удалить сохранённый прогресс и начать заново?",
+    "confirm": "Начать",
+    "cancel": "Отмена"
+  },
+  "sound": {
+    "title": "Звук",
+    "master": "Общая",
+    "music": "Музыка",
+    "effects": "Эффекты"
+  },
+  "resources": {
+    "energy": "ЭН {current}/{max}"
+  },
+  "merchant": {
+    "title": "ТОРГОВЕЦ СЕМЕНАМИ",
+    "offer": "Семя картофеля - 1 монета",
+    "potato-seed": "КАРТОФЕЛЬ",
+    "lemon-seed": "ЛИМОН",
+    "balance": "Монеты: {count}",
+    "balance_one": "Монеты: {count}",
+    "balance_few": "Монеты: {count}",
+    "balance_many": "Монеты: {count}",
+    "balance_other": "Монеты: {count}",
+    "buy": "КУПИТЬ 1",
+    "buyPrice": "КУПИТЬ · {count}",
+    "buyPrice_one": "КУПИТЬ · {count}",
+    "buyPrice_few": "КУПИТЬ · {count}",
+    "buyPrice_many": "КУПИТЬ · {count}",
+    "buyPrice_other": "КУПИТЬ · {count}",
+    "exit": "ПРОБЕЛ - ЗАКРЫТЬ",
+    "not-enough-coins": "Не хватает монет",
+    "inventory-full": "Инвентарь заполнен"
+  },
+  "kitchen": {
+    "facilities": {
+      "cuttingTable": "Разделочный стол",
+      "gasStove": "Газовая плита",
+      "servingTable": "Сервировочный стол",
+      "juicer": "Соковыжималка",
+      "lemonSack": "Мешок лимонов"
+    }
+  },
+  "migration": {
+    "task049": "Для чистой игры лучше начать новую игру."
+  },
+  "cooking": {
+    "attempt": "Постараться",
+    "preparation": "Подготовка",
+    "frying": "Жарка",
+    "time": "ВРЕМЯ",
+    "combo": "КОМБО",
+    "success": "Успех!",
+    "miss": "Промах"
+  },
+  "needs": {
+    "toiletAccidentPrivate": "Не удалось дотерпеть. Лучше привести себя в порядок.",
+    "toiletAccidentWitnessed": "Случилась неловкость на виду у окружающих.",
+    "urgentLongAction": "Сначала нужно срочно в туалет.",
+    "novelty": {
+      "tooltip": "Новизна - свежие и приятные впечатления. Повторяющаяся работа снижает её, новые события восстанавливают."
+    },
+    "energy": {
+      "tooltip": "Энергия - запас сил для движения, работы и других действий."
+    },
+    "satiety": {
+      "tooltip": "Сытость - насколько персонаж накормлен. Низкое значение означает голод."
+    },
+    "toilet": {
+      "tooltip": "Туалет - насколько скоро персонажу понадобится облегчиться. Низкое значение означает срочную потребность."
+    },
+    "lustre": {
+      "tooltip": "Лоск - чистота, свежесть и ухоженность персонажа."
+    },
+    "dialogue": {
+      "tooltip": "Диалог - насколько персонажу хватает общения и живого контакта."
+    }
+  }
+}

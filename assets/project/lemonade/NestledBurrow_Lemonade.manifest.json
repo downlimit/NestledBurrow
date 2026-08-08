@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "frameWidth": 16,
+  "frameHeight": 16,
+  "sheetWidth": 288,
+  "sheetHeight": 16,
+  "frameOrder": [
+    "axe",
+    "pickaxe",
+    "hoe",
+    "water-bucket-empty",
+    "water-bucket-full",
+    "lemon-seeds",
+    "lemon",
+    "sliced-potato",
+    "lemonade",
+    "lemon-sack-full",
+    "lemon-sack-empty",
+    "juicer",
+    "lemon-crop-planted",
+    "lemon-crop-planted-rotten",
+    "lemon-crop-sprout",
+    "lemon-crop-young",
+    "lemon-crop-mature",
+    "lemon-crop-rotten"
+  ],
+  "brokenStove": {
+    "path": "public/assets/project/lemonade/NestledBurrow_GasStoveBroken.png",
+    "width": 16,
+    "height": 32
+  }
+}
