@@ -33,7 +33,9 @@ When resuming accepted local work, reread current `origin/main:AGENTS.md`, fetch
 - **Fast:** gameplay, UI, content, config and bounded refactors.
 - **Strict:** persistence/schema, central ownership, broad input/collision, dependencies, workflows/security, external assets or dependent PRs.
 
-Use the smallest clean solution. In plain terms: src/main.js is composition only. New domain logic, state machines, persistence, build/editor workflow or service orchestration belongs in a system owner/coordinator. `npm run check:architecture` enforces the current line ceiling; do not bypass it by minifying or compressing code.
+Use the smallest clean solution. Explicit exclusions in the task are hard scope limits: do not add authoring/editor/build/persistence/configurability or a generalized lifecycle merely because such a system already exists. Add an excluded capability only when the prompt requests it or a current invariant required for the requested observable result makes it unavoidable; report that concrete conflict instead of silently broadening scope.
+
+In plain terms: src/main.js is composition only. New domain logic, state machines, persistence, build/editor workflow or service orchestration belongs in a system owner/coordinator. `npm run check:architecture` enforces the current line ceiling; do not bypass it by minifying or compressing code.
 
 The Lead brief contains `Architecture pressure: none` or a concrete owner/trigger. Treat this declaration as binding Integration metadata. For a concrete pressure, read the relevant `ARCHITECTURE.md` section and perform the named local extraction in the same PR together with its system-contract update and targeted proof; do not defer it to an unspecified cleanup task. For `none`, do not invent a broad refactor, but report if the actual implementation necessarily crosses a documented trigger before proceeding.
 
