@@ -8,6 +8,8 @@ import {
   OUTDOOR_TEXTURE_KEY,
   TILE_SIZE,
   TREES_TEXTURE_KEY,
+  WORLD_GROUND_OVERLAY_DEPTH,
+  WORLD_TRANSITION_PROFILE_KEYS,
 } from "./worldConfig.js";
 
 export function createWorldPresentationRuntime(options) {
@@ -63,12 +65,14 @@ export class WorldPresentationRuntime {
       Math.round(tile.worldX + Number(visualOffset.x || 0)),
       Math.round(tile.worldY + Number(visualOffset.y || 0)),
     );
-    sprite.setDepth?.(assetDepthFromPivot(
-      { x: tile.worldX, y: tile.worldY },
-      pivot,
-      WORLD_DEPTH_BASE,
-      tile.id,
-    ));
+    sprite.setDepth?.(isGroundOverlayTransition(tile.profileKey)
+      ? WORLD_GROUND_OVERLAY_DEPTH
+      : assetDepthFromPivot(
+          { x: tile.worldX, y: tile.worldY },
+          pivot,
+          WORLD_DEPTH_BASE,
+          tile.id,
+        ));
     const crop = profile.visualCropInsets;
     if (crop) {
       const left = Math.max(0, Number(crop.left) || 0);
@@ -107,6 +111,9 @@ export class WorldPresentationRuntime {
       visualBasePosition: { x: tile.worldX, y: tile.worldY },
       targets: [sprite],
       special: true,
+      ...(isGroundOverlayTransition(tile.profileKey)
+        ? { depthMode: "fixed", fixedDepth: WORLD_GROUND_OVERLAY_DEPTH }
+        : {}),
     }));
   }
 
@@ -163,6 +170,10 @@ export class WorldPresentationRuntime {
     this.destroyed = true;
     this.renderingHost = null;
   }
+}
+
+function isGroundOverlayTransition(profileKey) {
+  return profileKey === WORLD_TRANSITION_PROFILE_KEYS.burrowToNest;
 }
 
 function worldCellKey(point) {

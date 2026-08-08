@@ -1,3 +1,4 @@
+import { assetDepthFromPivot, WORLD_DEPTH_BASE } from "../build/buildWorldGeometry.js";
 import { HUD_COLORS, HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import {
@@ -15,6 +16,9 @@ import {
   OUTDOOR_FRAMES,
   OUTDOOR_TEXTURE_KEY,
   TILE_SIZE,
+  WORLD_GROUND_OVERLAY_DEPTH,
+  WORLD_TRANSITION_ASSETS,
+  WORLD_TRANSITION_PROFILE_KEYS,
 } from "./worldConfig.js";
 
 const INTERACTION_RADIUS = 44;
@@ -30,6 +34,10 @@ const COLLAPSE_BLACK_HOLD_MS = 2000;
 const COLLAPSE_FADE_IN_MS = 3000;
 const COLLAPSE_SIMULATION_STEP_MS = 1000;
 const COLLAPSE_SIMULATION_MAX_STEPS = 360;
+
+const GLIDER_BASE_COLLIDER = Object.freeze({ left: 8, right: 40, top: 40, bottom: 48 });
+const TELEPORT_PLATFORM_BASE_COLLIDER = Object.freeze({ left: 10, right: 54, top: 52, bottom: 60 });
+const TELEPORT_CONSTRUCT_BASE_COLLIDER = Object.freeze({ left: 24, right: 40, top: 50, bottom: 62 });
 
 export function createWildAtollRuntime(scene, {
   localization,
@@ -71,6 +79,7 @@ export function createWildAtollRuntime(scene, {
   let arenaId = null;
   let candidate = null;
   let arenaVisuals = [];
+  let arenaAuthoringInstances = [];
   let activeResourceIds = [];
   let destroyed = false;
   let runSerial = 0;
@@ -175,6 +184,8 @@ export function createWildAtollRuntime(scene, {
       }
     }
     activeResourceIds = [];
+    for (const instance of arenaAuthoringInstances) scene.worldLayout?.clearWorldObjectCollider?.(instance.id);
+    arenaAuthoringInstances = [];
     for (const object of arenaVisuals) object.destroy?.();
     arenaVisuals = [];
     if (resetCandidate) scene.interactionRuntime?.resetCandidate?.();
@@ -191,19 +202,139 @@ export function createWildAtollRuntime(scene, {
 
   function createExitVisual(exit) {
     const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
-    if (exit.kind === "segment") {
-      arenaVisuals.push(...createCave(scene, point.x, point.y - TILE_SIZE));
-      return;
-    }
     if (exit.kind === "teleport") {
-      const glow = scene.add.graphics().setPosition(point.x, point.y).setDepth(570 + point.y);
-      glow.fillStyle(0xffffff, 0.16).fillCircle(0, 0, 8);
-      glow.fillStyle(0xeef8ff, 0.42).fillCircle(0, 0, 5);
-      glow.fillStyle(0xffffff, 1).fillCircle(0, 0, 2);
-      arenaVisuals.push(glow);
+      createTeleportVisual(exit, point);
       return;
     }
-    arenaVisuals.push(...createTrailExit(scene, point.x, point.y));
+    createGliderVisual(exit, point);
+  }
+
+  function createGliderVisual(exit, point) {
+    const diagonal = exit.direction !== "north";
+    const profileKey = diagonal
+      ? WORLD_TRANSITION_PROFILE_KEYS.atollPathDiagonal
+      : WORLD_TRANSITION_PROFILE_KEYS.atollPathNorth;
+    const asset = diagonal
+      ? WORLD_TRANSITION_ASSETS.atollPathDiagonal
+      : WORLD_TRANSITION_ASSETS.atollPathNorth;
+    createAuthoredAssetVisual({
+      id: `atoll:${arenaId}:${exit.id}:glider`,
+      profileKey,
+      asset,
+      center: point,
+      baseCollider: GLIDER_BASE_COLLIDER,
+      depthMode: "fixed",
+      fixedDepth: WORLD_GROUND_OVERLAY_DEPTH,
+      flipX: exit.direction === "north-east",
+    });
+  }
+
+  function createTeleportVisual(exit, point) {
+    createAuthoredAssetVisual({
+      id: `atoll:${arenaId}:${exit.id}:platform`,
+      profileKey: WORLD_TRANSITION_PROFILE_KEYS.atollTeleportPlatform,
+      asset: WORLD_TRANSITION_ASSETS.atollTeleportPlatform,
+      center: point,
+      baseCollider: TELEPORT_PLATFORM_BASE_COLLIDER,
+      depthMode: "fixed",
+      fixedDepth: WORLD_GROUND_OVERLAY_DEPTH,
+    });
+    createAuthoredAssetVisual({
+      id: `atoll:${arenaId}:${exit.id}:construct`,
+      profileKey: WORLD_TRANSITION_PROFILE_KEYS.atollTeleportConstruct,
+      asset: WORLD_TRANSITION_ASSETS.atollTeleportConstruct,
+      center: point,
+      baseCollider: TELEPORT_CONSTRUCT_BASE_COLLIDER,
+      authoringBounds: Object.freeze({ left: 16, right: 48, top: 0, bottom: 64 }),
+      depthMode: "pivot",
+    });
+  }
+
+  function createAuthoredAssetVisual({
+    id,
+    profileKey,
+    asset,
+    center,
+    baseCollider,
+    authoringBounds = null,
+    depthMode = "pivot",
+    fixedDepth = null,
+    flipX = false,
+  }) {
+    const anchor = {
+      x: Math.round(center.x - asset.width / 2),
+      y: Math.round(center.y - asset.height / 2),
+    };
+    const sprite = scene.add.image(anchor.x, anchor.y, asset.textureKey).setOrigin(0, 0);
+    sprite.setFlipX?.(Boolean(flipX));
+    const instance = {
+      id,
+      profileKey,
+      anchor,
+      bounds: authoringBounds
+        ? {
+            left: anchor.x + authoringBounds.left,
+            right: anchor.x + authoringBounds.right,
+            top: anchor.y + authoringBounds.top,
+            bottom: anchor.y + authoringBounds.bottom,
+          }
+        : {
+            left: anchor.x,
+            right: anchor.x + asset.width,
+            top: anchor.y,
+            bottom: anchor.y + asset.height,
+          },
+      visualBasePosition: { ...anchor },
+      targets: [sprite],
+      special: true,
+      depthMode,
+      ...(fixedDepth === null ? {} : { fixedDepth }),
+    };
+    syncAuthoredAssetVisual(instance, asset);
+    const collider = {
+      left: anchor.x + baseCollider.left,
+      right: anchor.x + baseCollider.right,
+      top: anchor.y + baseCollider.top,
+      bottom: anchor.y + baseCollider.bottom,
+    };
+    scene.worldLayout?.setWorldObjectCollider?.(id, collider, profileKey, {
+      kind: "wild-atoll-transition",
+      profileKey,
+    });
+    arenaAuthoringInstances.push(instance);
+    arenaVisuals.push(sprite);
+    return instance;
+  }
+
+  function syncAuthoredAssetVisual(instance, asset) {
+    const profile = scene.assetProfiles?.[instance.profileKey] ?? {};
+    const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
+    const pivot = profile.snapAnchorOffset ?? { x: asset.width / 2, y: asset.height };
+    instance.targets.forEach((target, index) => {
+      target.setPosition?.(
+        Math.round(instance.visualBasePosition.x + Number(visualOffset.x || 0)),
+        Math.round(instance.visualBasePosition.y + Number(visualOffset.y || 0)),
+      );
+      const depth = instance.depthMode === "fixed"
+        ? Number(instance.fixedDepth ?? WORLD_GROUND_OVERLAY_DEPTH)
+        : assetDepthFromPivot(instance.anchor, pivot, WORLD_DEPTH_BASE, instance.id);
+      target.setDepth?.(depth + index * 0.01);
+      const crop = profile.visualCropInsets;
+      if (crop) {
+        const left = Math.max(0, Number(crop.left) || 0);
+        const right = Math.max(0, Number(crop.right) || 0);
+        const top = Math.max(0, Number(crop.top) || 0);
+        const bottom = Math.max(0, Number(crop.bottom) || 0);
+        target.setCrop?.(
+          left,
+          top,
+          Math.max(1, asset.width - left - right),
+          Math.max(1, asset.height - top - bottom),
+        );
+      } else {
+        target.setCrop?.();
+      }
+    });
   }
 
   function activateCandidate() {
@@ -466,6 +597,13 @@ export function createWildAtollRuntime(scene, {
       activeResourceIds: [...activeResourceIds],
       collapseRecoveryActive,
     }),
+    getAuthoringInstances: () => arenaAuthoringInstances.map((instance) => ({
+      ...instance,
+      anchor: { ...instance.anchor },
+      bounds: { ...instance.bounds },
+      visualBasePosition: { ...instance.visualBasePosition },
+      targets: [...instance.targets],
+    })),
     startArena(nextArenaId, { seed = `${Date.now()}` } = {}) {
       if (getWorldId() !== WORLD_IDS.atoll) return { status: "wrong-world", started: false };
       observedWorldId = WORLD_IDS.atoll;
@@ -502,21 +640,6 @@ export function createWildAtollRuntime(scene, {
       blackout.destroy();
     },
   };
-}
-
-function createTrailExit(scene, centerX, centerY) {
-  const ground = scene.add.graphics().setPosition(centerX, centerY).setDepth(555 + centerY);
-  ground.fillStyle(0x2a211b, 0.92).fillRect(-18, -7, 36, 14);
-  ground.fillStyle(0x735a3d, 1).fillRect(-14, -5, 28, 10);
-  ground.fillStyle(0xb9a06a, 0.9).fillRect(-3, -6, 6, 12);
-  ground.lineStyle(1, 0xd8cfaa, 0.75).strokeRect(-18.5, -7.5, 37, 15);
-  const leftPost = scene.add.graphics().setPosition(centerX - 22, centerY).setDepth(556 + centerY);
-  leftPost.fillStyle(0x3c3328, 1).fillRect(-2, -10, 4, 20);
-  leftPost.fillStyle(0xa18c67, 1).fillRect(-3, -10, 6, 4);
-  const rightPost = scene.add.graphics().setPosition(centerX + 22, centerY).setDepth(556 + centerY);
-  rightPost.fillStyle(0x3c3328, 1).fillRect(-2, -10, 4, 20);
-  rightPost.fillStyle(0xa18c67, 1).fillRect(-3, -10, 6, 4);
-  return [ground, leftPost, rightPost];
 }
 
 function createCave(scene, centerX, topY) {
