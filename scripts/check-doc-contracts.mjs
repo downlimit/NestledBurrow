@@ -69,17 +69,24 @@ requireText(artist, [
   "### Concept production",
   "### Native production",
   "## Обязательный контекст",
+  "## Reference hierarchy",
   "## Silent production preflight",
+  "## Generator bridge — обязательный Generation brief",
+  "Generation brief",
+  "Sketch is geometry source of truth",
   "## Camera contract",
-  "Stardew Valley",
+  "no perspective convergence",
+  "## Pixel-art style contract",
+  "hard-edged color clusters",
   "TILE_SIZE",
   "src/world/worldConfig.js",
-  "## Image prompt discipline",
+  "Image generation output is never native runtime binary",
   "## Native request means exact native binary",
   "## Native proof",
   "## Approval boundary",
   "### Final binary approval",
   "exact approved bytes",
+  "repository SHA-256 == approved SHA-256",
   "public/assets/project/<owner>/",
   "NestledBurrow_<SemanticName>.png",
   "asset-inbox/incoming",
@@ -88,6 +95,8 @@ requireText(artist, [
 ], "ARTIST.md");
 assert(!artist.includes("ровно 3 pseudo-pixel concept variants"), "ARTIST.md must not force every new asset through three concepts");
 assert(!artist.includes("обязательным дефолтом независимо"), "ARTIST.md must not override explicit native requests with a mandatory concept route");
+assert(artist.includes("не выполняется напрямую из сырого пользовательского сообщения"), "ARTIST.md must materialize repo-derived constraints before image generation");
+assert(artist.includes("Запрещено самовольно добавлять перила, столбы, стены, крышу, фундамент"), "ARTIST.md must treat sketch geometry as binding rather than optional inspiration");
 
 requireText(agents, [
   "<!-- audience: codex -->",
