@@ -6,7 +6,7 @@ Owns repeatable expeditions connecting home preparation, compact arenas, route d
 
 ## Terms
 
-A **segment** is a literary named zone containing connected arenas. An **arena** is one compact playable location inside that segment.
+A **segment** is a literary named zone containing connected arenas. An **arena** is one compact playable location inside the segment.
 
 A **path** connects two arenas inside one segment. A **threshold** is the final arena of a segment. A **transition** is an onward transport on a threshold that enters another segment. A **teleport** returns the player from a threshold to Island Nest.
 
@@ -45,7 +45,7 @@ Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -
 
 - the first seven arenas contain a lightweight mixture of ordinary resource nodes;
 - the eighth arena is the threshold and may contain no resources;
-- every threshold contains a white teleport to Island Nest;
+- every threshold contains a blue crystal teleport on its own circular stone platform;
 - starter, T1 and T2 thresholds also expose their canonical onward transitions;
 - NPC, automation and T3 thresholds expose only the teleport;
 - entering a transition resets the player to the next segment's entry arena while preserving the same transient run.
@@ -57,6 +57,8 @@ A two-path arena presents one straight northern path plus one diagonal path:
 - a left-side arena uses north and north-east;
 - a right-side arena uses north-west and north;
 - the entry arena and threshold transitions use north plus the diagonal selected by that segment's composition.
+
+Native path presentation follows the direction exactly: north uses `NestledBurrow_GliderPlatform_N.png`; north-west uses `NestledBurrow_GliderPlatform_NE.png` as authored; north-east reuses that same NE sprite with horizontal mirroring. Both ordinary paths and onward segment transitions use this mapping.
 
 This keeps the route readable and varies the composition between arenas.
 
@@ -88,7 +90,10 @@ Path tips display only `SPACE - <next arena>`. Transition tips display the canon
 - berries use the same resource pipeline without requiring a tool;
 - paths and transitions never subtract an estimated cost or reveal resource counts in text;
 - travel is forward-only: a chosen path or transition cannot be reversed;
-- every threshold exposes the white return teleport.
+- every threshold exposes the crystal return teleport;
+- path platforms and the teleport's stone platform render above terrain but below the character;
+- the blue crystal construct uses a base pivot and the common world-depth rule, so the player can render in front of or behind it;
+- glider platforms, teleport platform and crystal construct expose normal editable collider, pivot and visual profiles without becoming build-library objects.
 
 `src/world/atollWorldLayout.js` owns the isolated transport-free collision space. `src/world/wildAtollDomain.js` generates the complete segment graph, path composition, transitions and deterministic common resource definitions. `src/world/wildAtollRuntime.js` owns transient traversal, exit presentation, resource registration, transitions, teleports and collapse return. Player-facing Atoll copy lives in the dedicated `atoll` localization namespace.
 
@@ -118,13 +123,15 @@ Collapsing on the Atoll starts sleep immediately so movement stops, but visible 
 - Глубокий Грот transitions to Голубая дыра and Реликтовый Грот;
 - NPC, automation and T3 thresholds contain no onward transitions;
 - represented resources use the common resource owner and never overlap spawn corridors;
+- all transient exit colliders are removed before the next arena presentation is mounted;
+- north-east reuses the north-west diagonal platform through horizontal mirroring; no third diagonal binary is required;
 - paths and transitions do not mutate needs directly;
 - transient run state is not serialized;
 - expedition capacity remains slot-based.
 
 ## Current baseline
 
-The production slice contains the complete canonical route tree, ordinary common-resource harvesting, literary arena titles, composed path placement, short path and transition tips, white threshold teleports, collapse return, numbered combat self-use and expedition build grouping. Filling is intentionally provisional.
+The production slice contains the complete canonical route tree, ordinary common-resource harvesting, literary arena titles, native directional glider platforms for path/segment exits, a two-part crystal return teleport, collapse return, numbered combat self-use and expedition build grouping. Filling is intentionally provisional.
 
 ## Evidence
 

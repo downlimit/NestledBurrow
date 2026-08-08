@@ -5,6 +5,7 @@ export const WORLD_COLUMNS = 64;
 export const WORLD_ROWS = 48;
 export const WORLD_WIDTH = WORLD_COLUMNS * TILE_SIZE;
 export const WORLD_HEIGHT = WORLD_ROWS * TILE_SIZE;
+export const WORLD_GROUND_OVERLAY_DEPTH = 40;
 
 export const BASIC_VILLAGE_ASSET_PATH = "assets/third-party/basic-village";
 export const OUTDOOR_TEXTURE_KEY = "basic-village-outdoor";
@@ -17,6 +18,10 @@ export const TREES_IMAGE_PATH = "Trees_and_bushes.png";
 export const WORLD_TRANSITION_PROFILE_KEYS = Object.freeze({
   burrowToNest: "transition:burrow-to-nest",
   nestToBurrow: "transition:nest-to-burrow",
+  atollPathNorth: "transition:atoll-path-north",
+  atollPathDiagonal: "transition:atoll-path-diagonal",
+  atollTeleportPlatform: "transition:atoll-teleport-platform",
+  atollTeleportConstruct: "transition:atoll-teleport-construct",
 });
 
 export const WORLD_TRANSITION_ASSETS = Object.freeze({
@@ -31,6 +36,30 @@ export const WORLD_TRANSITION_ASSETS = Object.freeze({
     path: "assets/project/world/NestledBurrow_HighgroundEntranceStairs.png",
     width: 64,
     height: 48,
+  }),
+  atollPathNorth: Object.freeze({
+    textureKey: "world-transition-atoll-path-north",
+    path: "assets/project/world/NestledBurrow_GliderPlatform_N.png",
+    width: 48,
+    height: 48,
+  }),
+  atollPathDiagonal: Object.freeze({
+    textureKey: "world-transition-atoll-path-diagonal",
+    path: "assets/project/world/NestledBurrow_GliderPlatform_NE.png",
+    width: 48,
+    height: 48,
+  }),
+  atollTeleportPlatform: Object.freeze({
+    textureKey: "world-transition-atoll-teleport-platform",
+    path: "assets/project/world/NestledBurrow_CrystalPlatform.png",
+    width: 64,
+    height: 64,
+  }),
+  atollTeleportConstruct: Object.freeze({
+    textureKey: "world-transition-atoll-teleport-construct",
+    path: "assets/project/world/NestledBurrow_BlueCrystalConstruct.png",
+    width: 64,
+    height: 64,
   }),
 });
 

@@ -25,6 +25,8 @@ import { createTavernServiceRuntime } from "../tavern/tavernServiceRuntime.js";
 import { createTavernSignRuntime } from "../tavern/tavernSignRuntime.js";
 import { createWorldBuildCoordinator } from "../build/worldBuildCoordinator.js";
 import { createPuddleRuntime } from "./puddleRuntime.js";
+import { createWildAtollRuntime } from "./wildAtollRuntime.js";
+import { WORLD_IDS } from "./worldLocationConfig.js";
 
 const EMPTY_OWNERS = Object.freeze(createEmptyOwners());
 
@@ -43,6 +45,7 @@ const DEFAULT_FACTORIES = Object.freeze({
   movementDebugPanel: (options) => new MovementDebugPanel(options),
   worldBuildCoordinator: createWorldBuildCoordinator,
   puddle: createPuddleRuntime,
+  wildAtoll: createWildAtollRuntime,
 });
 
 export function createWorldLocationRuntime(options) {
@@ -86,6 +89,7 @@ export class WorldLocationRuntime {
     this.npcMovementConfigs = [];
     this.authoringListeners = null;
     this.unregisterMerchantVisibility = null;
+    this.wildAtollRuntime = null;
     this.activeDefinition = null;
     this.activeLayout = null;
     this.destroyed = false;
@@ -106,6 +110,7 @@ export class WorldLocationRuntime {
         this.mountMerchant();
       }
       this.mountDebris(capabilities.homeSystems);
+      this.mountWildAtoll(definition.id);
       if (capabilities.meleeWeapons) this.mountMelee(capabilities.trainingDummy);
       if (capabilities.facilities) this.mountFacilities();
       if (capabilities.tavernService) this.mountTavern();
@@ -152,6 +157,7 @@ export class WorldLocationRuntime {
     this.owners.facilityRuntime = null;
     this.owners.meleeRuntime?.destroy?.();
     this.owners.meleeRuntime = null;
+    this.owners.wildAtollRuntime = null;
     this.owners.debrisRuntime?.destroy?.();
     this.owners.debrisRuntime = null;
     this.unregisterMerchantVisibility?.();
@@ -212,6 +218,8 @@ export class WorldLocationRuntime {
   destroy() {
     if (this.destroyed) return;
     this.unmount();
+    this.wildAtollRuntime?.destroy?.();
+    this.wildAtollRuntime = null;
     this.destroyed = true;
     this.renderingHost = null;
     this.inputHost = null;
@@ -311,6 +319,16 @@ export class WorldLocationRuntime {
         this.callbacks.saveSession?.();
       },
     });
+  }
+
+  mountWildAtoll(worldId) {
+    if (worldId !== WORLD_IDS.nest && worldId !== WORLD_IDS.atoll) return;
+    if (!this.wildAtollRuntime) {
+      this.wildAtollRuntime = this.factories.wildAtoll(this.renderingHost, {
+        localization: this.localization,
+      });
+    }
+    this.owners.wildAtollRuntime = this.wildAtollRuntime;
   }
 
   mountMelee(includeTrainingDummy) {
@@ -663,5 +681,6 @@ function createEmptyOwners() {
     worldBuildCoordinator: null,
     buildModeRuntime: null,
     puddleRuntime: null,
+    wildAtollRuntime: null,
   };
 }

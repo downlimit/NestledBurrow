@@ -65,6 +65,14 @@ function transitionInstances(scene) {
   }));
 }
 
+function wildAtollInstances(owners) {
+  return (owners.wildAtollRuntime?.getAuthoringInstances?.() ?? []).map((instance) => ({
+    ...instance,
+    visualBasePosition: instance.visualBasePosition ?? instance.anchor,
+    special: true,
+  }));
+}
+
 function wellInstances(owners) {
   const runtime = owners.worldBuildCoordinator?.wellOwner;
   if (!runtime?.getWellState || !runtime?.getMoveTargetAt) return [];
@@ -145,6 +153,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     const instances = [
       ...runtimeInstances(owners),
       ...transitionInstances(scene),
+      ...wildAtollInstances(owners),
       ...wellInstances(owners),
       ...tavernSignInstances(owners),
       ...trainingDummyInstances(owners),
@@ -180,16 +189,22 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     };
   }
 
+  function depthFor(instance, pivotOffset, index = 0) {
+    const depth = instance.depthMode === "fixed"
+      ? Number(instance.fixedDepth ?? 0)
+      : assetDepthFromPivot(instance.anchor, pivotOffset, 500, instance.id);
+    return depth + index * 0.01;
+  }
+
   function syncSpecialInstance(instance) {
     const visualOffset = profileOffset(scene, instance.profileKey, "visualOffset");
     const pivotOffset = profileOffset(scene, instance.profileKey, "snapAnchorOffset");
-    const depth = assetDepthFromPivot(instance.anchor, pivotOffset, 500, instance.id);
     instance.targets.forEach((target, index) => {
       target.setPosition?.(
         instance.visualBasePosition.x + visualOffset.x,
         instance.visualBasePosition.y + visualOffset.y,
       );
-      target.setDepth?.(depth + index * 0.01);
+      target.setDepth?.(depthFor(instance, pivotOffset, index));
     });
   }
 
@@ -218,8 +233,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     owners.facilityRuntime?.syncKitchenVisuals?.();
     for (const instance of getInstances()) {
       if (instance.profileKey !== profileKey) continue;
-      const depth = assetDepthFromPivot(instance.anchor, offset, 500, instance.id);
-      instance.targets.forEach((target, index) => target.setDepth?.(depth + index * 0.01));
+      instance.targets.forEach((target, index) => target.setDepth?.(depthFor(instance, offset, index)));
     }
     scene.worldPresentationRuntime?.applyTransitionAuthoringProfile?.(profileKey);
     return offset;
@@ -366,6 +380,39 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     return { ...result, status: "saved-locally" };
   };
 
+  function colliderSelectionPoint(instance) {
+    const target = colliderFor(instance);
+    if (!target) return null;
+    const insetX = Math.min(1, Math.max(0, (target.right - target.left) / 4));
+    const insetY = Math.min(1, Math.max(0, (target.bottom - target.top) / 4));
+    const candidates = [
+      colliderCenter(instance),
+      { x: target.left + insetX, y: (target.top + target.bottom) / 2 },
+      { x: target.right - insetX, y: (target.top + target.bottom) / 2 },
+      { x: (target.left + target.right) / 2, y: target.top + insetY },
+      { x: (target.left + target.right) / 2, y: target.bottom - insetY },
+    ];
+    const others = (scene.worldLayout?.getWorldObjectColliders?.() ?? [])
+      .filter(({ id }) => id !== instance.id)
+      .map(({ rect }) => rect);
+    return candidates.find((candidate) => !others.some((rect) => contains(rect, candidate))) ?? candidates[0];
+  }
+
+  const originalBeginColliderEditPointer = scene.beginColliderEditPointer?.bind(scene);
+  let patchedBeginColliderEditPointer = null;
+  if (originalBeginColliderEditPointer) {
+    patchedBeginColliderEditPointer = (pointer) => {
+      const worldPoint = point({ x: pointer.worldX ?? pointer.x, y: pointer.worldY ?? pointer.y });
+      const instance = findAt(worldPoint);
+      if (!instance) return originalBeginColliderEditPointer(pointer);
+      const selectionPoint = colliderSelectionPoint(instance);
+      return selectionPoint
+        ? originalBeginColliderEditPointer({ ...pointer, worldX: selectionPoint.x, worldY: selectionPoint.y })
+        : originalBeginColliderEditPointer(pointer);
+    };
+    scene.beginColliderEditPointer = patchedBeginColliderEditPointer;
+  }
+
   const interactionGraphics = scene.add.graphics().setDepth(8975).setVisible(false);
   const documentRef = panel.documentRef ?? globalThis.document;
   const interactionLabel = documentRef.createElement("label");
@@ -486,19 +533,27 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
   const onPostUpdate = () => syncSpecialInstances();
   scene.events?.on?.("postupdate", onPostUpdate);
   const originalDestroy = runtime.destroy?.bind(runtime);
+  const onSceneShutdown = () => runtime.destroy?.();
+  let universalDestroyed = false;
   runtime.destroy = () => {
+    if (universalDestroyed) return;
+    universalDestroyed = true;
     scene.input?.off?.("pointerdown", onPointerDown);
     scene.input?.off?.("pointermove", onPointerMove);
     scene.input?.off?.("pointerup", onPointerUp);
     scene.input?.keyboard?.off?.("keydown", onKeyDown);
     scene.events?.off?.("postupdate", onPostUpdate);
+    scene.events?.off?.("shutdown", onSceneShutdown);
     otherCheckboxes.forEach((checkbox) => checkbox.removeEventListener("change", disableInteractionFromOtherMode));
+    if (patchedBeginColliderEditPointer && scene.beginColliderEditPointer === patchedBeginColliderEditPointer) {
+      scene.beginColliderEditPointer = originalBeginColliderEditPointer;
+    }
     interactionLabel.remove?.();
     interactionGraphics.destroy?.();
     scene.interactionPointEditEnabled = false;
     originalDestroy?.();
   };
-  scene.events?.once?.("shutdown", () => runtime.destroy?.());
+  scene.events?.once?.("shutdown", onSceneShutdown);
   syncSpecialInstances();
   installAuthoringCanonExport(panel, scene);
 
