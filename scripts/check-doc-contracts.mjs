@@ -21,6 +21,7 @@ const taskTemplate = read("tasks/TEMPLATE.md");
 const taskReadme = read("tasks/README.md");
 const prTemplate = read(".github/pull_request_template.md");
 const prWorkflow = read(".github/workflows/pr-check.yml");
+const architecturePressureWorkflow = read(".github/workflows/architecture-pressure.yml");
 const focusedE2E = read("scripts/run-focused-e2e.mjs");
 const managedPreview = read("scripts/manage-task-preview.mjs");
 const pythonLauncher = read("scripts/run-python-check.mjs");
@@ -99,7 +100,7 @@ requireText(agents, [
   "npm run codex:validate",
   "nestled-burrow-delivery:v1",
   "native auto-merge through the connector",
-  "npm run delivery:timing",
+  "Never create an empty commit.",
 ], "AGENTS.md");
 
 const forbiddenImagePermission = "Codex image generation explicitly allowed";
@@ -182,7 +183,9 @@ requireText(taskTemplate, [
 requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
 requireText(prTemplate, ["nestled-burrow-delivery:v1", "player-visible: choose", "preview-acceptance: choose", "auto-merge: choose", "# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
 
-assert(!prWorkflow.includes("github.event.pull_request.draft == false"), "PR CI may run for an explicitly requested Draft");
+assert(prWorkflow.includes("github.event.pull_request.draft == false"), "Draft PR must defer final validation until Ready");
+assert(architecturePressureWorkflow.includes("github.event.pull_request.draft == false"), "Draft PR must defer architecture gate until Ready");
+assert(prWorkflow.includes("github.event.action != 'ready_for_review'"), "Ready transition must not republish an unchanged accepted preview");
 requireText(prWorkflow, ["Classify Scope", "PR_BODY", "metadata_valid", "needs: scope", "Run metadata checks"], "PR workflow");
 
 requireText(focusedE2E, ["mkdtempSync", "tmpdir()", "PW_OUTPUT_DIR", "PW_REPORT_DIR"], "focused E2E");

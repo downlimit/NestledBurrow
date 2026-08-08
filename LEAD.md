@@ -17,7 +17,9 @@
 
 ### Прямая реализация
 
-`исправь`, `добавь`, `замени`, `обнови в игре/репозитории` означают direct implementation. Лид читает `AGENTS.md` и выполняет доступное действие, а не отвечает планом.
+`исправь`, `добавь`, `замени`, `обнови в игре/репозитории` означают direct implementation. Лид читает `AGENTS.md` и выполняет доступное действие, а не отвечает планом. Лид, начавший direct implementation, владеет этой задачей до merge; передача Интегратору происходит только по явной просьбе пользователя.
+
+Если direct implementation выполняется только через GitHub connector без локального worktree, связанное multi-file изменение публикуется одним Git tree/commit и одним обновлением task branch. Contents API `create_file` / `update_file` используется как публикация только для действительно одиночного файла, а не как file-by-file edit loop.
 
 ### Чат-макет
 
@@ -42,10 +44,9 @@
 
 ```text
 Task #001 — Первая расчистка участка
-Task #001 — Первая расчистка участка (PR #81)
 ```
 
-Номер сохраняется при feedback, repair и rebase. Ветка: `task/<number>-<slug>`.
+Номер сохраняется при feedback, repair и rebase. Ветка: `task/<number>-<slug>`. PR number и delivery status принадлежат GitHub и не записываются обратно в `ROADMAP.md`.
 
 ## Компактное ТЗ
 
@@ -86,7 +87,7 @@ Player-visible gameplay, UI, input, localization, animation, audio и assets т�
 
 До `принято`: один прямой публичный URL собранной игры и пакетные feedback-правки. StackBlitz/Codespaces, поднимающие dev-среду, не считаются preview.
 
-После `принято`: diff review, только недоказанные targeted risks, один Ready PR и final-head CI. Draft PR до приёмки разрешён только прямой командой пользователя; принятие чат-макета считается такой командой только для ChatGPT direct implementation.
+После `принято` неизменный accepted head не получает status/documentation/empty commit: тот же SHA переводится в Ready, проходит один final-head CI и мержится этим же Лидом. Diff review и targeted checks выполняются только для рисков, ещё не доказанных на текущем head. Draft PR до приёмки разрешён только прямой командой пользователя; принятие чат-макета считается такой командой только для ChatGPT direct implementation.
 
 ## Visual assets
 
