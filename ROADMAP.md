@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #083`.
+**Следующий свободный номер:** `Task #084`.
 
 ## Сейчас
 
-### Task #082 — Передавать генератору реальный art contract
+### Task #083 — Запретить перспективную трактовку rough sketch
 
-**Результат:** Художник не вызывает image generation напрямую из сырого запроса. Перед каждым вызовом он материализует из актуального `main` короткий Generation brief с binding sketch/reference, project camera, tile/player scale, pixel-art style и запретами; user sketch является geometry source of truth, а generative raster никогда не считается native runtime binary.
+**Результат:** для world assets rough sketch задаёт geometry/layout, но не perspective. Canonical project camera имеет приоритет над случайным taper/convergence; лестницы, рампы и мосты не получают vanishing point или 3/4 из-за сужения на наброске. Painterly/high-resolution generation не показывается как приемлемый pixel-art candidate.
 
 ## Следующий продуктовый вопрос
 
