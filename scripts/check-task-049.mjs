@@ -280,8 +280,13 @@ const changed = [
   ...lines(execFileSync("git", ["-c", trustedWorktree, "diff", "--name-only", "46e2428c8e39f3c9874005da478c34828d91ae5a"], { encoding: "utf8" })),
   ...lines(execFileSync("git", ["-c", trustedWorktree, "ls-files", "--others", "--exclude-standard"], { encoding: "utf8" })),
 ];
-const binary = changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path));
-assert.deepEqual(binary, [], `Task #049 changed binary files: ${binary.join(", ")}`);
+const canonicalPostTask049Binaries = new Set([
+  "public/assets/project/world/NestledBurrow_NestStairway.png",
+  "public/assets/project/world/NestledBurrow_HighgroundEntranceStairs.png",
+]);
+const binary = changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path)
+  && !canonicalPostTask049Binaries.has(path));
+assert.deepEqual(binary, [], `Task #049 changed unexpected binary files: ${binary.join(", ")}`);
 
 console.log("Task #049 checks passed: tools, water, recipes, service, guests, migration, feedback and immutable assets");
 

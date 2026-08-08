@@ -72,10 +72,14 @@ assert(facilitySource.includes("const platedDishVisuals = new Map()"));
 
 const trustedWorktree = `safe.directory=${process.cwd().replaceAll("\\", "/")}`;
 const changed = lines(execFileSync("git", ["-c", trustedWorktree, "diff", "--name-only", "origin/main"], { encoding: "utf8" }));
+const canonicalTask074BinaryRepair = new Set([
+  "public/assets/project/world/NestledBurrow_NestStairway.png",
+]);
 assert.deepEqual(
-  changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path)),
+  changed.filter((path) => /\.(?:png|jpe?g|webp|gif|mp3|wav|ogg|ttf|woff2?)$/i.test(path)
+    && !canonicalTask074BinaryRepair.has(path)),
   [],
-  "Task #058 must not change binary assets",
+  "Task #058 must not change unexpected binary assets",
 );
 
 console.log("Task #058 checks passed: table-owned stock, routed reservations, migration and immutable assets");

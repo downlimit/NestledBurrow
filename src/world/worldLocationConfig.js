@@ -1,11 +1,9 @@
 import {
-  HOUSE_FRAMES,
-  HOUSE_TEXTURE_KEY,
-  OUTDOOR_FRAMES,
-  OUTDOOR_TEXTURE_KEY,
   TILE_SIZE,
   WORLD_COLUMNS,
   WORLD_ROWS,
+  WORLD_TRANSITION_ASSETS,
+  WORLD_TRANSITION_PROFILE_KEYS,
 } from "./worldConfig.js";
 
 export const WORLD_IDS = Object.freeze({
@@ -14,37 +12,47 @@ export const WORLD_IDS = Object.freeze({
   atoll: "atoll",
 });
 
+export const WORLD_TRANSITION_INTERACTION_KIND = "world-transition";
+
 export const TRANSPORT_PROFILE = deepFreeze({
-  id: "atoll-transport",
-  footprint: { widthTiles: 2, heightTiles: 2, width: 2 * TILE_SIZE, height: 2 * TILE_SIZE },
-  trigger: { left: 8, top: 17, right: 24, bottom: 31 },
-  shell: [
-    { id: "left", left: 0, top: 8, right: 8, bottom: 32 },
-    { id: "right", left: 24, top: 8, right: 32, bottom: 32 },
-  ],
-  visuals: [
-    { x: 0, y: 0, frame: HOUSE_FRAMES.transport.topLeft },
-    { x: 1, y: 0, frame: HOUSE_FRAMES.transport.topRight },
-    { x: 0, y: 1, textureKey: OUTDOOR_TEXTURE_KEY, frame: OUTDOOR_FRAMES.transport.entranceLeft },
-    { x: 1, y: 1, textureKey: OUTDOOR_TEXTURE_KEY, frame: OUTDOOR_FRAMES.transport.entranceRight },
-  ],
-  textureKey: HOUSE_TEXTURE_KEY,
+  id: "paired-world-transition",
+  interactionRadius: 32,
+  priority: 80,
+  requiresFacing: false,
 });
 
 const villageTransport = transport({
   id: "village-nest-transport",
-  tile: { x: 31, y: 4 },
+  tile: { x: 30, y: 4 },
+  asset: WORLD_TRANSITION_ASSETS.burrowToNest,
+  profileKey: WORLD_TRANSITION_PROFILE_KEYS.burrowToNest,
+  collider: {
+    left: 0,
+    right: WORLD_TRANSITION_ASSETS.burrowToNest.width,
+    top: WORLD_TRANSITION_ASSETS.burrowToNest.height - 4,
+    bottom: WORLD_TRANSITION_ASSETS.burrowToNest.height,
+  },
+  prompt: "hud:interaction.enterNest",
   destinationWorldId: WORLD_IDS.nest,
   destinationTransportId: "nest-village-transport",
-  safeSpawn: { x: 32 * TILE_SIZE, y: 7 * TILE_SIZE - 4, facing: { x: 0, y: 1 } },
+  safeSpawn: { x: 32 * TILE_SIZE, y: 13 * TILE_SIZE, facing: { x: 0, y: 1 } },
 });
 
 const nestTransport = transport({
   id: "nest-village-transport",
-  tile: { x: 10, y: 13 },
+  tile: { x: 9, y: 13 },
+  asset: WORLD_TRANSITION_ASSETS.nestToBurrow,
+  profileKey: WORLD_TRANSITION_PROFILE_KEYS.nestToBurrow,
+  collider: {
+    left: 0,
+    right: WORLD_TRANSITION_ASSETS.nestToBurrow.width,
+    top: 0,
+    bottom: 4,
+  },
+  prompt: "hud:interaction.enterBurrow",
   destinationWorldId: WORLD_IDS.village,
   destinationTransportId: "village-nest-transport",
-  safeSpawn: { x: 11 * TILE_SIZE, y: 13 * TILE_SIZE - 8, facing: { x: 0, y: -1 } },
+  safeSpawn: { x: 11 * TILE_SIZE, y: 12 * TILE_SIZE, facing: { x: 0, y: -1 } },
 });
 
 export const NEST_ISLAND_MODEL = deepFreeze({

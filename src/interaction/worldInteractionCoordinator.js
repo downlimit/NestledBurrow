@@ -5,7 +5,7 @@ import { hitResourceDefinition } from "../session/gameSessionState.js";
 import { TAVERN_SIGN_KIND } from "../tavern/guestConfig.js";
 import { RESOURCE_INTERACTION_KIND } from "../resources/resourceConfig.js";
 import { getResourceProfile, resourceActionForTool, resourceEffectType } from "../resources/resourceDomain.js";
-import { WORLD_IDS } from "../world/worldLocationConfig.js";
+import { WORLD_IDS, WORLD_TRANSITION_INTERACTION_KIND } from "../world/worldLocationConfig.js";
 
 const IGNORED = Object.freeze({ status: "ignored", mutated: false });
 
@@ -15,6 +15,8 @@ export function createWorldInteractionCoordinator({
   getSelectedItem = () => null,
   getNeedsRuntime = () => null,
   getSleepingWakeInteraction = () => null,
+  getWorldTransitionDefinitions = () => [],
+  activateWorldTransition = () => IGNORED,
   isSleeping = () => false,
   isExhaustedSleeping = () => false,
   getWakeRandom = () => Math.random,
@@ -64,6 +66,7 @@ export function createWorldInteractionCoordinator({
       ? createExhaustedWakeInteraction(getSleepingWakeInteraction(), sessionState.currentWorldId)
       : null;
     return [
+      ...getWorldTransitionDefinitions(),
       ...(locationOwners.debrisRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.facilityRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
@@ -83,7 +86,9 @@ export function createWorldInteractionCoordinator({
 
   function handle(candidate) {
     if (destroyed) return IGNORED;
-    let result = handleMerchant(candidate);
+    let result = handleWorldTransition(candidate);
+    if (isHandled(result)) return result;
+    result = handleMerchant(candidate);
     if (isHandled(result)) return result;
     result = handleFarming(candidate);
     if (isHandled(result)) return result;
@@ -98,6 +103,13 @@ export function createWorldInteractionCoordinator({
     result = handleExhaustedWake(candidate);
     if (isHandled(result)) return result;
     return handleResource(candidate);
+  }
+
+  function handleWorldTransition(candidate) {
+    if (candidate.kind !== WORLD_TRANSITION_INTERACTION_KIND) return IGNORED;
+    const result = activateWorldTransition(candidate) ?? IGNORED;
+    if (isHandled(result)) suppressNextInteract();
+    return result;
   }
 
   function handleMerchant(candidate) {

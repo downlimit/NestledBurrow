@@ -8,11 +8,11 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 - geometry and collision derive from the same semantic layout;
 - saved `currentWorldId` selects layout, camera bounds and lifecycle;
-- paired `2x2` transports connect the Burrow and Island Nest;
+- one native stair sprite in the Burrow enters Island Nest and one in Island Nest returns to the Burrow; proximity exposes the normal prompt and only the canonical interact action (`Space`) changes location;
 - explicit safe-spawn transitions connect the Nest entrance and transport-free Atoll arenas;
 - axe, pickaxe, hoe and bucket have strict actions; mismatched tools cannot mutate targets;
 - logs and stones keep the same HP, outline, cooldown, hit feedback, energy and reward flow in every location;
-- tool-free berries still use the common resource definition, targeting, inventory and teardown pipeline;
+- tool-free berries use the common resource targeting, inventory and teardown pipeline;
 - resource removal clears presentation and collision, then delivers its reward atomically;
 - ten inventory slots hold tools and stackable loot; world drops remain pickable;
 - the canonical well refills the eight-use bucket;
@@ -22,17 +22,23 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 - location registry/lifecycle/presentation: `src/world/worldLocationConfig.js`, `src/world/worldLocationCoordinator.js`, `src/world/worldLocationRuntime.js`, `src/world/worldPresentationRuntime.js`;
 - layouts: `src/world/worldLayout.js`, `src/world/nestWorldLayout.js`, `src/world/atollWorldLayout.js`, `src/world/worldConfig.js`;
-- resource rules/definitions/instances/visuals: `src/resources/resourceDomain.js`, `src/resources/resourceConfig.js`, `src/resources/debrisRuntime.js`, `src/resources/resourceVisuals.js`;
+- resources: `src/resources/resourceDomain.js`, `src/resources/resourceConfig.js`, `src/resources/debrisRuntime.js`, `src/resources/resourceVisuals.js`;
 - inventory: `src/inventory/inventoryDomain.js`, `src/inventory/inventoryRuntime.js`;
 - farming: `src/resources/farmingDomain.js`, `src/resources/farmingRuntime.js`, `src/resources/farmingConfig.js`;
 - interaction dispatch: `src/interaction/interactionRuntime.js`, `src/interaction/worldInteractionCoordinator.js`;
-- Atoll topology and transient resource registration: `systems/wild-atoll.md`;
+- transition authoring: `src/build/assetProfiles.js`, `src/build/universalPlaceableAuthoring.js`, `src/build/worldTransitionAuthoringBridge.js`;
+- Atoll topology: `systems/wild-atoll.md`;
 - build and persistence: `systems/build-and-authoring.md`, `systems/persistence.md`.
 
 ## Invariants
 
 - registered world IDs are `village`, `nest` and `atoll`; unknown saved IDs resolve to `village`;
-- paired transports retain destination locks; explicit `transitionTo` runs the canonical lifecycle without a hidden transport or lock;
+- paired Burrow/Nest stairs are active objects: proximity never transitions automatically, successful interact runs the canonical location lifecycle, and destination locks prevent immediate bounce-back;
+- each stair renders from one complete and decodable project PNG at native dimensions; PNG validation rejects truncated chunks and requires terminal `IEND`;
+- stairs use normal asset profiles: collider, pivot, visual offset, crop, interaction offset and approach directions are authorable without making them build-library objects;
+- stair collision is registered in the active layout; targeting uses the common `world-placeable` perimeter and collider-centre-plus-offset aim point;
+- stair depth follows the authored pivot;
+- explicit `transitionTo` runs the location lifecycle without a hidden transport or lock;
 - every canonical resource has one `worldId`; only active-location resources mount;
 - transient Atoll definitions may register with `DebrisRuntime` but may not duplicate resource work logic;
 - location teardown unbinds interactions before destroying owners and presentation; mount reverses that order;
@@ -45,7 +51,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 
 ## Current baseline
 
-The Burrow is `64x48`. Island Nest is a `22x16` oval island with its village transport, northern Atoll entrance, four trees and three stones. The Atoll is a separate `22x18` bounded layout with no static transports. Its arena topology is transient, while its logs, stones and berries are ordinary `DebrisRuntime` resources registered for the active arena and removed on forward travel. Canonical world-resource progress persists through travel and reload; a new Atoll run resets transient arena state. The inventory supports reorder, stacking, throwing and pickup; potato and lemon crops persist their farming state.
+The Burrow is `64x48`; its upward Nest entrance is `NestledBurrow_NestStairway.png` (`64x128`, profile `transition:burrow-to-nest`). Island Nest is `22x16`; its downward Burrow entrance is `NestledBurrow_HighgroundEntranceStairs.png` (`64x48`, profile `transition:nest-to-burrow`). Both expose the shared developer profile editor. The Atoll is a separate `22x18` transport-free layout with transient arena topology. Canonical resource progress persists through travel/reload; a new Atoll run resets transient arena state.
 
 ## Not yet
 
@@ -53,4 +59,4 @@ Containers, stack splitting, tool progression, durability and seasonal rules.
 
 ## Evidence
 
-`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-059`, `check:task-064`, `check:task-065`, `check:task-068`, focused location E2E.
+`check:inventory`, `check:world`, `check:interaction`, `check:progress`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-059`, `check:task-064`, `check:task-065`, `check:task-068`, `check:task-074`, focused location E2E.

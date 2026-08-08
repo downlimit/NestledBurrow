@@ -4,7 +4,7 @@ import { TAVERN_SIGN } from "../tavern/guestConfig.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { installAuthoringCanonExport } from "./authoringCanonExport.js";
 import { canonicalVisualOffsetAtCurrentPivot } from "./assetProfileRelations.js";
-import { DEFAULT_ASSET_PROFILES } from "./assetProfiles.js";
+import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
 
 const UNIVERSAL_AUTHORING_PATCH = Symbol("nestledBurrowUniversalPlaceableAuthoring");
 
@@ -54,6 +54,14 @@ function runtimeInstances(owners) {
   ].map((instance) => ({
     ...instance,
     visualBasePosition: instance.visualBasePosition ?? instance.anchor,
+  }));
+}
+
+function transitionInstances(scene) {
+  return (scene.worldPresentationRuntime?.getTransitionAuthoringInstances?.() ?? []).map((instance) => ({
+    ...instance,
+    visualBasePosition: instance.visualBasePosition ?? instance.anchor,
+    special: true,
   }));
 }
 
@@ -127,12 +135,16 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
 
   let pivotSelection = null;
   let visualSelection = null;
+  let interactionSelection = null;
+  let interactionDrag = null;
+  let interactionEditEnabled = false;
   const getOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
 
   function getInstances() {
     const owners = getOwners();
     const instances = [
       ...runtimeInstances(owners),
+      ...transitionInstances(scene),
       ...wellInstances(owners),
       ...tavernSignInstances(owners),
       ...trainingDummyInstances(owners),
@@ -155,6 +167,19 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       })[0]?.instance ?? null;
   }
 
+  function colliderFor(instance) {
+    return scene.worldLayout?.getWorldObjectColliders?.()
+      .find(({ id }) => id === instance.id)?.rect ?? instance.bounds;
+  }
+
+  function colliderCenter(instance) {
+    const collider = colliderFor(instance);
+    return {
+      x: (collider.left + collider.right) / 2,
+      y: (collider.top + collider.bottom) / 2,
+    };
+  }
+
   function syncSpecialInstance(instance) {
     const visualOffset = profileOffset(scene, instance.profileKey, "visualOffset");
     const pivotOffset = profileOffset(scene, instance.profileKey, "snapAnchorOffset");
@@ -173,6 +198,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       if (!instance.special || (profileKey && instance.profileKey !== profileKey)) continue;
       syncSpecialInstance(instance);
     }
+    scene.worldPresentationRuntime?.applyTransitionAuthoringProfile?.(profileKey);
   }
 
   function applyVisualOffset(profileKey, value) {
@@ -195,6 +221,14 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       const depth = assetDepthFromPivot(instance.anchor, offset, 500, instance.id);
       instance.targets.forEach((target, index) => target.setDepth?.(depth + index * 0.01));
     }
+    scene.worldPresentationRuntime?.applyTransitionAuthoringProfile?.(profileKey);
+    return offset;
+  }
+
+  function applyInteractionOffset(profileKey, value) {
+    const offset = replaceProfilePoint(scene, profileKey, "interactionOffset", value);
+    if (!offset) return null;
+    scene.interactionRuntime?.refresh?.();
     return offset;
   }
 
@@ -221,6 +255,20 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     };
   }
 
+  function interactionState() {
+    if (!interactionSelection) return null;
+    const offset = profileOffset(scene, interactionSelection.profileKey, "interactionOffset");
+    const center = colliderCenter(interactionSelection);
+    return {
+      ...interactionSelection,
+      offset,
+      marker: {
+        x: center.x + offset.x,
+        y: center.y + offset.y,
+      },
+    };
+  }
+
   runtime.selectPivotAt = (value) => {
     const instance = findAt(value);
     pivotSelection = instance ? {
@@ -242,8 +290,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
   };
   runtime.alignPivotToCollider = (axis) => {
     if (!pivotSelection || !["x", "y"].includes(axis)) return null;
-    const collider = scene.worldLayout?.getWorldObjectColliders?.()
-      .find(({ id }) => id === pivotSelection.id)?.rect;
+    const collider = colliderFor(pivotSelection);
     if (!collider) return null;
     const current = profileOffset(scene, pivotSelection.profileKey, "snapAnchorOffset");
     const edgeA = axis === "x" ? "left" : "top";
@@ -287,9 +334,171 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
   };
   runtime.clearVisualOffsetSelection = () => { visualSelection = null; };
 
+  runtime.selectInteractionPointAt = (value) => {
+    const instance = findAt(value);
+    interactionSelection = instance ? {
+      id: instance.id,
+      profileKey: instance.profileKey,
+      anchor: { ...instance.anchor },
+      bounds: { ...instance.bounds },
+    } : null;
+    return interactionState();
+  };
+  runtime.setInteractionOffset = (value) => {
+    if (!interactionSelection) return null;
+    applyInteractionOffset(interactionSelection.profileKey, value);
+    return interactionState();
+  };
+  runtime.nudgeInteractionOffset = (dx, dy) => {
+    if (!interactionSelection) return null;
+    const current = profileOffset(scene, interactionSelection.profileKey, "interactionOffset");
+    return runtime.setInteractionOffset({ x: current.x + dx, y: current.y + dy });
+  };
+  runtime.getInteractionPointSelection = interactionState;
+  runtime.clearInteractionPointSelection = () => { interactionSelection = null; };
+
+  const originalApplyProfile = runtime.applyColliderDraftToProject?.bind(runtime);
+  runtime.applyColliderDraftToProject = async () => {
+    const hasProfileSelection = Boolean(pivotSelection || visualSelection || interactionSelection);
+    const result = await originalApplyProfile?.() ?? { status: "empty" };
+    if (!hasProfileSelection || result.status !== "empty") return result;
+    saveAssetProfiles(scene.assetProfiles, panel.storage ?? globalThis.localStorage);
+    return { ...result, status: "saved-locally" };
+  };
+
+  const interactionGraphics = scene.add.graphics().setDepth(8975).setVisible(false);
+  const documentRef = panel.documentRef ?? globalThis.document;
+  const interactionLabel = documentRef.createElement("label");
+  const interactionName = documentRef.createElement("span");
+  interactionName.textContent = "Редактировать точку взаимодействия";
+  const interactionCheckbox = documentRef.createElement("input");
+  interactionCheckbox.type = "checkbox";
+  interactionLabel.append(interactionName, interactionCheckbox);
+  panel.panel?.insertBefore?.(interactionLabel, panel.authoringStatus ?? null);
+  if (!interactionLabel.parentNode) panel.panel?.append?.(interactionLabel);
+  panel.interactionPointEditCheckbox = interactionCheckbox;
+
+  const originalSetEditorMode = panel.setEditorMode?.bind(panel);
+  panel.setEditorMode = (mode) => {
+    originalSetEditorMode?.(mode);
+    if (mode === "interaction-point" && panel.colliderConfirmButton) {
+      panel.colliderConfirmButton.textContent = "Сохранить точку взаимодействия";
+    }
+  };
+  panel.setInteractionPointEditorState = (state) => {
+    if (!panel.colliderEditorStatus) return;
+    panel.colliderEditorStatus.textContent = state?.profileKey
+      ? `${state.profileKey}\nточка ${state.offset.x}, ${state.offset.y} px\nстрелки: 1 px`
+      : "Кликните по объекту для редактуры точки взаимодействия";
+  };
+
+  function renderInteractionPoint() {
+    interactionGraphics.clear();
+    interactionGraphics.setVisible(interactionEditEnabled);
+    if (!interactionEditEnabled) return;
+    const marker = interactionState()?.marker;
+    if (!marker) return;
+    const x = Math.round(marker.x);
+    const y = Math.round(marker.y);
+    interactionGraphics.fillStyle(0xff4dff, 1);
+    interactionGraphics.fillRect(x - 2, y, 5, 1);
+    interactionGraphics.fillRect(x, y - 2, 1, 5);
+  }
+
+  function disableOtherModes() {
+    const modes = [
+      [panel.colliderEditCheckbox, () => scene.setColliderEditMode?.(false)],
+      [panel.pivotEditCheckbox, () => scene.setPivotEditMode?.(false)],
+      [panel.visualOffsetEditCheckbox, () => scene.setVisualOffsetEditMode?.(false)],
+    ];
+    for (const [checkbox, disable] of modes) {
+      if (!checkbox?.checked) continue;
+      checkbox.checked = false;
+      disable();
+    }
+  }
+
+  function setInteractionEditMode(active) {
+    interactionEditEnabled = Boolean(active);
+    scene.interactionPointEditEnabled = interactionEditEnabled;
+    interactionDrag = null;
+    if (interactionEditEnabled) {
+      disableOtherModes();
+      panel.setEditorMode?.("interaction-point");
+      panel.setInteractionPointEditorState?.(null);
+    } else {
+      interactionSelection = null;
+      panel.setEditorMode?.(null);
+      panel.setInteractionPointEditorState?.(null);
+    }
+    renderInteractionPoint();
+  }
+
+  interactionCheckbox.addEventListener("change", () => setInteractionEditMode(interactionCheckbox.checked));
+  const otherCheckboxes = [panel.colliderEditCheckbox, panel.pivotEditCheckbox, panel.visualOffsetEditCheckbox].filter(Boolean);
+  const disableInteractionFromOtherMode = (event) => {
+    if (!event.currentTarget?.checked || !interactionEditEnabled) return;
+    interactionCheckbox.checked = false;
+    setInteractionEditMode(false);
+  };
+  otherCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", disableInteractionFromOtherMode));
+
+  const onPointerDown = (pointer) => {
+    if (!interactionEditEnabled || scene.buildMode?.isActive?.()) return;
+    const worldPoint = point({ x: pointer.worldX ?? pointer.x, y: pointer.worldY ?? pointer.y });
+    const selection = runtime.selectInteractionPointAt(worldPoint);
+    panel.setInteractionPointEditorState?.(selection);
+    interactionDrag = selection ? { startPoint: worldPoint, startOffset: { ...selection.offset } } : null;
+    renderInteractionPoint();
+  };
+  const onPointerMove = (pointer) => {
+    if (!interactionEditEnabled || !interactionDrag || !pointer.isDown) return;
+    const worldPoint = point({ x: pointer.worldX ?? pointer.x, y: pointer.worldY ?? pointer.y });
+    const selection = runtime.setInteractionOffset({
+      x: interactionDrag.startOffset.x + worldPoint.x - interactionDrag.startPoint.x,
+      y: interactionDrag.startOffset.y + worldPoint.y - interactionDrag.startPoint.y,
+    });
+    panel.setInteractionPointEditorState?.(selection);
+    renderInteractionPoint();
+  };
+  const onPointerUp = () => { interactionDrag = null; };
+  const onKeyDown = (event) => {
+    if (!interactionEditEnabled) return;
+    const delta = {
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+    }[event?.key];
+    if (!delta) return;
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    event.stopImmediatePropagation?.();
+    const selection = runtime.nudgeInteractionOffset(delta.x, delta.y);
+    panel.setInteractionPointEditorState?.(selection);
+    renderInteractionPoint();
+  };
+  scene.input?.on?.("pointerdown", onPointerDown);
+  scene.input?.on?.("pointermove", onPointerMove);
+  scene.input?.on?.("pointerup", onPointerUp);
+  scene.input?.keyboard?.on?.("keydown", onKeyDown);
+
   const onPostUpdate = () => syncSpecialInstances();
   scene.events?.on?.("postupdate", onPostUpdate);
-  scene.events?.once?.("shutdown", () => scene.events?.off?.("postupdate", onPostUpdate));
+  const originalDestroy = runtime.destroy?.bind(runtime);
+  runtime.destroy = () => {
+    scene.input?.off?.("pointerdown", onPointerDown);
+    scene.input?.off?.("pointermove", onPointerMove);
+    scene.input?.off?.("pointerup", onPointerUp);
+    scene.input?.keyboard?.off?.("keydown", onKeyDown);
+    scene.events?.off?.("postupdate", onPostUpdate);
+    otherCheckboxes.forEach((checkbox) => checkbox.removeEventListener("change", disableInteractionFromOtherMode));
+    interactionLabel.remove?.();
+    interactionGraphics.destroy?.();
+    scene.interactionPointEditEnabled = false;
+    originalDestroy?.();
+  };
+  scene.events?.once?.("shutdown", () => runtime.destroy?.());
   syncSpecialInstances();
   installAuthoringCanonExport(panel, scene);
 

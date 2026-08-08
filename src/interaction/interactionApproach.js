@@ -15,23 +15,29 @@ function usesPlaceablePerimeter(definition, collider) {
   return Boolean(collider && definition?.targetingGroup === PLACEABLE_TARGETING_GROUP);
 }
 
-export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
+export function createInteractionApproachResolver({ worldLayout, getWorldLayout = null, getPlayer }) {
   const probeWallsBySource = new WeakMap();
+  const currentWorldLayout = (definition = null) => definition?.interactionWorldLayout ?? getWorldLayout?.() ?? worldLayout;
 
-  function probeWalls(sourceSnapshot) {
+  function probeWalls(sourceSnapshot, activeLayout) {
     if (sourceSnapshot && typeof sourceSnapshot === "object" && probeWallsBySource.has(sourceSnapshot)) {
-      return probeWallsBySource.get(sourceSnapshot);
+      const cached = probeWallsBySource.get(sourceSnapshot);
+      if (cached.layout === activeLayout) return cached.walls;
     }
-    const walls = (worldLayout.getWorldObjectColliders?.() ?? []).filter(isWallBarrier);
-    if (sourceSnapshot && typeof sourceSnapshot === "object") probeWallsBySource.set(sourceSnapshot, walls);
+    const walls = (activeLayout.getWorldObjectColliders?.() ?? []).filter(isWallBarrier);
+    if (sourceSnapshot && typeof sourceSnapshot === "object") {
+      probeWallsBySource.set(sourceSnapshot, { layout: activeLayout, walls });
+    }
     return walls;
   }
 
   function probe(definition, sourceSnapshot) {
+    const activeLayout = currentWorldLayout(definition);
+    if (!activeLayout) return null;
     const aimPosition = definition.aimPosition ?? definition.position;
     const targetId = definition.entityId ?? definition.id;
-    const walls = probeWalls(sourceSnapshot);
-    const collider = interactionCollider(worldLayout, definition);
+    const walls = probeWalls(sourceSnapshot, activeLayout);
+    const collider = interactionCollider(activeLayout, definition);
     if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
       const distance = Math.hypot(
         definition.position.x - sourceSnapshot.position.x,
@@ -75,7 +81,9 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
 
   function resolve(definition, sourceSnapshot) {
     if (definition.__interactionProbe) return probe(definition, sourceSnapshot);
-    const collider = interactionCollider(worldLayout, definition);
+    const activeLayout = currentWorldLayout(definition);
+    if (!activeLayout) return null;
+    const collider = interactionCollider(activeLayout, definition);
     if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
       return probe(definition, sourceSnapshot);
     }
@@ -88,11 +96,11 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
         point.x - sourceSnapshot.position.x,
         point.y - sourceSnapshot.position.y,
       ) <= definition.radius
-      && hasDirectInteractionReach(worldLayout, point, aimPosition, targetId)
+      && hasDirectInteractionReach(activeLayout, point, aimPosition, targetId)
     ));
     if (nearbyPoints.length === 0) return null;
 
-    const navigation = createActorNavigation(worldLayout, {
+    const navigation = createActorNavigation(activeLayout, {
       cellSize: INTERACTION_NAVIGATION_CELL_SIZE,
       footWidth: player.footWidth,
       footDepth: player.footDepth,
@@ -102,7 +110,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
       const path = findGridPath({
         start: sourceSnapshot.position,
         goal: point,
-        bounds: worldLayout.bounds,
+        bounds: activeLayout.bounds,
         cellSize: INTERACTION_NAVIGATION_CELL_SIZE,
         ...navigation,
       });
@@ -111,7 +119,7 @@ export function createInteractionApproachResolver({ worldLayout, getPlayer }) {
       if (!route) return [];
       const distance = pathDistance(sourceSnapshot.position, route);
       return distance <= definition.radius
-        && hasDirectInteractionReach(worldLayout, point, aimPosition, targetId)
+        && hasDirectInteractionReach(activeLayout, point, aimPosition, targetId)
         ? [{ point, path: route, distance }]
         : [];
     }).sort((a, b) => a.distance - b.distance || a.point.y - b.point.y || a.point.x - b.point.x);

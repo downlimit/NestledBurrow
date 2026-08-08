@@ -147,7 +147,7 @@ assert.deepEqual(
 );
 assert.notDeepEqual(signAnchor, pose.pivotOffset, "cursor cannot attach directly to the pivot");
 
-assert.equal(ASSET_PROFILES_VERSION, 4, "direct special-placeable pivot basis is a versioned profile migration");
+assert.equal(ASSET_PROFILES_VERSION, 5, "interaction-point authoring is a versioned profile migration");
 const migratedSignProfile = normalizeAssetProfiles({
   version: 3,
   profiles: {
@@ -159,6 +159,7 @@ const migratedSignProfile = normalizeAssetProfiles({
 })["facility:tavern-sign"];
 assert.deepEqual(migratedSignProfile.snapAnchorOffset, { x: 9, y: 13 }, "legacy sign pivot keeps the same world position after removing its hidden 8 px origin");
 assert.deepEqual(migratedSignProfile.visualOffset, { x: 4, y: -3 });
+assert.deepEqual(migratedSignProfile.interactionOffset, { x: 0, y: 0 }, "legacy profiles acquire the neutral interaction-point offset");
 
 const contractSource = fs.readFileSync(new URL("../src/build/placeableBuildContract.js", import.meta.url), "utf8");
 for (const required of [
@@ -223,6 +224,8 @@ const authoringSource = fs.readFileSync(new URL("../src/build/universalPlaceable
 for (const required of [
   "runtime.selectPivotAt =",
   "runtime.selectVisualOffsetAt =",
+  "runtime.selectInteractionPointAt =",
+  "interactionOffset",
   "wellInstances",
   "tavernSignInstances",
   "trainingDummyInstances",

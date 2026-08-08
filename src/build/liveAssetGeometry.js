@@ -51,6 +51,13 @@ export function rectCenter(rect) {
   });
 }
 
+export function offsetPoint(value, offset = {}) {
+  return Object.freeze({
+    x: finite(value?.x) + finite(offset?.x),
+    y: finite(value?.y) + finite(offset?.y),
+  });
+}
+
 export function facilityFootprintBounds(definition) {
   const footprint = definition?.footprint;
   if (!footprint) return null;
@@ -131,7 +138,7 @@ export function liveFacilityGeometry(definition, profile = {}, collider = null) 
       x: visualOrigin.x + visualSize.width / 2,
       y: visualOrigin.y + visualSize.height / 2,
     }),
-    interactionCenter: rectCenter(currentCollider),
+    interactionCenter: offsetPoint(rectCenter(currentCollider), profile.interactionOffset),
     pivotOffset: Object.freeze({ x: finite(pivotOffset.x), y: finite(pivotOffset.y) }),
     visualSize,
   });
@@ -148,7 +155,7 @@ export function liveBedGeometry(footprint, profile = {}, collider = null) {
       x: (finite(footprint.left) + finite(footprint.right)) / 2 + finite(visualOffset.x),
       y: (finite(footprint.top) + finite(footprint.bottom)) / 2 + finite(visualOffset.y),
     }),
-    interactionCenter: rectCenter(currentCollider),
+    interactionCenter: offsetPoint(rectCenter(currentCollider), profile.interactionOffset),
   });
 }
 

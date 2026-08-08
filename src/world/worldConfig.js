@@ -14,6 +14,26 @@ export const OUTDOOR_IMAGE_PATH = "Outdoor_tileset.png";
 export const HOUSE_IMAGE_PATH = "House_tileset.png";
 export const TREES_IMAGE_PATH = "Trees_and_bushes.png";
 
+export const WORLD_TRANSITION_PROFILE_KEYS = Object.freeze({
+  burrowToNest: "transition:burrow-to-nest",
+  nestToBurrow: "transition:nest-to-burrow",
+});
+
+export const WORLD_TRANSITION_ASSETS = Object.freeze({
+  burrowToNest: Object.freeze({
+    textureKey: "world-transition-burrow-to-nest",
+    path: "assets/project/world/NestledBurrow_NestStairway.png",
+    width: 64,
+    height: 128,
+  }),
+  nestToBurrow: Object.freeze({
+    textureKey: "world-transition-nest-to-burrow",
+    path: "assets/project/world/NestledBurrow_HighgroundEntranceStairs.png",
+    width: 64,
+    height: 48,
+  }),
+});
+
 export const HOUSE = Object.freeze({
   x: 19,
   y: 11,

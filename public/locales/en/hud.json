@@ -42,6 +42,8 @@
     "talk": "Talk",
     "next": "Next",
     "close": "Close",
+    "enterNest": "Go up to the Nest",
+    "enterBurrow": "Go down to the Burrow",
     "clear": "Chop",
     "notEnoughEnergy": "Not enough energy",
     "hit": "Hit",
