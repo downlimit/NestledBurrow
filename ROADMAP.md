@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #082`.
+**Следующий свободный номер:** `Task #083`.
 
 ## Сейчас
 
-### Task #081 — Переписать Artist pipeline
+### Task #082 — Передавать генератору реальный art contract
 
-**Результат:** роль Художника разделяет discussion, concept, native production и exact-asset edit; native request больше не проходит через обязательные концепты, world assets обязаны использовать каноническую project camera и repo-derived grid/scale, а repository delivery разрешена только для отдельно approved exact native binary с неизменным SHA-256.
+**Результат:** Художник не вызывает image generation напрямую из сырого запроса. Перед каждым вызовом он материализует из актуального `main` короткий Generation brief с binding sketch/reference, project camera, tile/player scale, pixel-art style и запретами; user sketch является geometry source of truth, а generative raster никогда не считается native runtime binary.
 
 ## Следующий продуктовый вопрос
 
