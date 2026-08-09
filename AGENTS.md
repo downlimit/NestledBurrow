@@ -65,11 +65,24 @@ Use one strong proof per material risk. A successful proof remains valid until r
 
 **Micro-feedback:** presentation-only value changes may reuse prior proof and preview health. Hidden contract changes still receive one targeted check.
 
-**Fast publication after `принято`:** acknowledge acceptance, stop local preview, inspect files/full diff once, run only still-unproven targeted checks for code changed since the last proof. Skip local full check, full/focused E2E and standalone build unless a specific bundling/dependency/hidden risk requires them.
+**Fast publication after `принято`:** acknowledge acceptance, stop local preview and inspect files/full diff once. Before the first push, run the publication gate below from the final candidate head. Do not use PR CI to discover failures that the local gate covers.
 
-**Strict publication:** run `npm run check` once plus only missing task-specific proof. Local E2E is exceptional; full E2E belongs to PR CI.
+**Strict publication:** run the same publication gate with `codex:validate --full` plus only missing task-specific proof.
 
 Use `npm run codex:validate -- --base <sha> --task <number>` for the local syntax/task/direct-check ladder. Add `--full` exactly once for Strict work. The ladder discovers source-address contract checks; do not rerun successful levels manually.
+
+### Publication gate
+
+After acceptance, player-visible or cross-system work gets one complete local gate before the first push:
+
+1. `git diff --check`;
+2. `npm run codex:validate -- --base <sha> --task <number>` (`--full` for Strict);
+3. `npm run check` when the change affects shared runtime, interaction, persistence, build/authoring, world transitions or CI-sensitive contracts;
+4. full Playwright through `npm run check:e2e:focused -- --workers=3`, which owns an ephemeral Vite port and sets `VITE_E2E=1`.
+
+Collect every failure from the complete run before editing. Repair confirmed causes as one batch, run the failing specs for fast feedback, then rerun only the invalidated gate levels. Push one final candidate head. The target is one local gate and one final-head CI cycle, normally 5–10 minutes for Fast work.
+
+Never point local Playwright at the persistent preview on port `4173`; it may lack the E2E bridge or serve another checkout. Validate required PR metadata and Architecture pressure before marking the PR Ready. Static source-contract checks must normalize CRLF/LF before exact multiline matching.
 
 Environment:
 
