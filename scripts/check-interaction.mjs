@@ -14,7 +14,14 @@ import {
   SESSION_STATE_VERSION,
 } from "../src/session/gameSessionState.js";
 import { createInteractionTarget, findBestInteractionTarget } from "../src/interaction/interaction.js";
-import { createInteractionApproachResolver, hasDirectInteractionReach, perimeterInteractionPoints } from "../src/interaction/interactionApproach.js";
+import { createInteractionRuntime } from "../src/interaction/interactionRuntime.js";
+import {
+  createInteractionApproachResolver,
+  hasDirectInteractionReach,
+  interactionAttentionMetrics,
+  perimeterInteractionPoints,
+} from "../src/interaction/interactionApproach.js";
+import { WORLD_OBJECT_ATTENTION_GROUP } from "../src/interaction/interactionConfig.js";
 import { EXTRACTABLE_TARGETING_GROUP, RESOURCE_OBJECTS } from "../src/resources/resourceConfig.js";
 
 function assertPlainSerializable(value, label) {
@@ -164,6 +171,88 @@ const closerOffAxisResource = createInteractionTarget({
   targetingMode: "facing-first", targetingGroup: EXTRACTABLE_TARGETING_GROUP,
 });
 assert.equal(findBestInteractionTarget(source, [closerOffAxisResource, lookedAtResource]).targetId, "looked-at-resource", "extractables rank visual aim alignment before edge distance and local priority");
+const attentionSack = createInteractionTarget({
+  ...baseTarget,
+  id: "lemon-sack",
+  entityId: "lemon-sack",
+  kind: "use-facility",
+  position: { x: 8, y: 0 },
+  attentionPosition: { x: 8, y: 0 },
+  selectionDistance: 6,
+  priority: 20,
+  targetingMode: "facing-first",
+  targetingGroup: "world-placeable",
+  attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
+});
+const attentionSign = createInteractionTarget({
+  ...baseTarget,
+  id: "tavern-sign",
+  entityId: "tavern-sign",
+  kind: "toggle-tavern",
+  position: { x: 5, y: 6 },
+  attentionPosition: { x: 5, y: 6 },
+  selectionDistance: 4,
+  priority: 30,
+  targetingMode: "facing-first",
+  targetingGroup: "world-placeable",
+  attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
+});
+assert.equal(
+  findBestInteractionTarget(source, [attentionSign, attentionSack])?.targetId,
+  "lemon-sack",
+  "the collider centred in the attention vector beats a higher-priority off-axis tavern sign",
+);
+assert.equal(
+  findBestInteractionTarget(source, [attentionSack, createInteractionTarget({
+    ...attentionSack,
+    id: "far-sack",
+    entityId: "far-sack",
+    position: { x: 12, y: 0 },
+    attentionPosition: { x: 12, y: 0 },
+    selectionDistance: 10,
+    priority: 99,
+  })])?.targetId,
+  "lemon-sack",
+  "closest collider wins when attention angles are equal",
+);
+{
+  let staticDefinitions = [{
+    id: "stale-sign",
+    entityId: "stale-sign",
+    kind: "toggle-tavern",
+    position: { x: 8, y: 0 },
+    radius: 20,
+    priority: 30,
+    requiresFacing: false,
+    facingDotThreshold: -1,
+    prompt: "close-tavern",
+    payload: {},
+  }];
+  const activated = [];
+  const runtime = createInteractionRuntime({
+    sessionState: createGameSessionState(),
+    characterSystem: {
+      has: () => false,
+      getSnapshot: () => source,
+    },
+    getInteractionDefinitions: () => [],
+    worldInteractionCoordinator: {
+      isInteractionAllowed: () => true,
+      getStaticInteractionDefinitions: () => staticDefinitions,
+      handle: (candidateValue) => {
+        activated.push(candidateValue.entityId);
+        return { status: "handled" };
+      },
+    },
+    resolveInteractionTarget: (definition) => definition,
+    presenter: { hidePrompt() {}, showPrompt() {}, isMessageVisible: () => false },
+  });
+  runtime.update();
+  staticDefinitions = [{ ...staticDefinitions[0], id: "fresh-sack", entityId: "fresh-sack", prompt: "take-lemons" }];
+  runtime.update({ actions: { interact: true } });
+  assert.deepEqual(activated, ["fresh-sack"], "Space resolves the current-frame candidate instead of activating the stale prompt target");
+  runtime.destroy();
+}
 const closeSame = createInteractionTarget({ ...baseTarget, id: "close-same", position: { x: 2, y: 0 } });
 const farSame = createInteractionTarget({ ...baseTarget, id: "far-same", position: { x: 3, y: 0 } });
 assert.equal(findBestInteractionTarget(source, [farSame, closeSame]).targetId, "close-same", "distance breaks equal priority");
@@ -208,6 +297,39 @@ approachWorld.isBlockedBox = (box) => overlaps(box, targetCollider);
 const reachableApproach = approachResolver.resolve(blockedDefinition, { position: { x: 24, y: 40 } });
 assert(reachableApproach?.payload.approachPath.length > 0, "reachable side resolves an approach route");
 assert.deepEqual(reachableApproach.aimPosition, blockedDefinition.position, "route use point never replaces the object's visual aim point");
+assert.deepEqual(interactionAttentionMetrics(targetCollider, blockedDefinition.position, { x: 24, y: 40 }), {
+  attentionPosition: { x: 56, y: 40 },
+  selectionDistance: 24,
+}, "attention ranks the collider centre by angle and its closest point by distance");
+const liveTargetLayout = {
+  ...approachWorld,
+  getResourceCollider: () => targetCollider,
+  getWorldObjectColliders: () => [],
+};
+let activeInteractionLayout = liveTargetLayout;
+const liveLayoutResolver = createInteractionApproachResolver({
+  getWorldLayout: () => activeInteractionLayout,
+  getPlayer: () => ({ footWidth: 4, footDepth: 4 }),
+});
+const placeableDefinition = {
+  ...blockedDefinition,
+  targetingMode: "facing-first",
+  targetingGroup: "world-placeable",
+};
+assert(liveLayoutResolver.probe(placeableDefinition, { position: { x: 24, y: 40 } }), "nearby collider is available on the current layout");
+assert.equal(liveLayoutResolver.probe(placeableDefinition, { position: { x: 0, y: 40 } }), null, "a placeable outside closest-collider range cannot publish a prompt");
+activeInteractionLayout = {
+  ...liveTargetLayout,
+  getWorldObjectColliders: () => [{
+    id: "wall-live-layout",
+    groupKey: "wall:vertical",
+    rect: { left: 39, right: 41, top: 0, bottom: 80 },
+    wallEdge: { x: 40, y: 40 },
+  }],
+};
+assert.equal(liveLayoutResolver.probe(placeableDefinition, { position: { x: 24, y: 40 } }), null, "a collider behind a wall cannot publish a prompt");
+activeInteractionLayout = liveTargetLayout;
+assert(liveLayoutResolver.probe(placeableDefinition, { position: { x: 24, y: 40 } }), "the resolver reads the live layout after a location change");
 const finalReachWall = { left: 44, right: 46, top: 0, bottom: 80 };
 approachWorld.isBlockedBox = (box) => overlaps(box, targetCollider) || overlaps(box, finalReachWall);
 approachWorld.getWorldObjectColliders = () => [{ id: "wall-final-reach", groupKey: "wall:vertical", rect: finalReachWall, wallEdge: { x: 45, y: 40 } }];
@@ -217,7 +339,10 @@ approachWorld.getResourceCollider = () => null;
 approachWorld.getWorldObjectColliders = () => [{ id: "farm-well-1", rect: targetCollider }];
 const reachableWorldObject = approachResolver.resolve({ ...blockedDefinition, id: "refill-farm-well-1", entityId: "farm-well-1" }, { position: { x: 24, y: 40 } });
 assert(reachableWorldObject?.payload.approachPath.length > 0, "generic interaction routing uses the target world-object collider instead of its blocked center");
-assert(RESOURCE_OBJECTS.every((definition) => definition.targetingMode === "facing-first" && definition.targetingGroup === EXTRACTABLE_TARGETING_GROUP), "all resource and planted-resource definitions share systemic facing-first targeting");
+assert(RESOURCE_OBJECTS.every((definition) => definition.targetingMode === "facing-first"
+  && definition.targetingGroup === EXTRACTABLE_TARGETING_GROUP
+  && definition.attentionGroup === WORLD_OBJECT_ATTENTION_GROUP
+  && definition.requiresFacing), "all resource and planted-resource definitions share the physical-object attention cone");
 const directReachWorld = {
   getWorldObjectColliders: () => [{ id: "wall-1", groupKey: "wall:vertical", rect: blockingWall, wallEdge: { x: 32, y: 40 } }],
 };

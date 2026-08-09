@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { BUILD_ASSET_GROUPS, BUILD_CARPET_FRAME_BY_MASK, BUILD_SURFACE_CUSTOM_MASKS, BUILD_SURFACE_FRAME_BY_MASK, getBuildSurfaceMask, getBuildVerticalWallFrame, getBuildVerticalWallOffset, getBuildWallColumnDepthOffset, getBuildWallColumnOffset, getBuildWallFrames } from "../src/build/buildAssetCatalog.js";
+import { BUILD_ASSET_GROUPS, BUILD_CARPET_FRAME_BY_MASK, BUILD_SURFACE_CUSTOM_MASKS, BUILD_SURFACE_FRAME_BY_MASK, BUILD_WALL_TOPOLOGY_FRAMES, doesBuildWallTopologyOwnHorizontalHalf, getBuildHorizontalWallBodyCrop, getBuildHorizontalWallVisualOffset, getBuildSurfaceMask, getBuildVerticalWallFrame, getBuildVerticalWallOffset, getBuildWallColumnDepthOffset, getBuildWallColumnFrame, getBuildWallColumnOffset, getBuildWallFrames, getBuildWallHorizontalOverlayDepth, getBuildWallJunctionFrameDepthOffset, hasBuildWallJunctionColumn, isBuildWallHorizontalOverlayFrame } from "../src/build/buildAssetCatalog.js";
 import { BUILD_GRID, BuildModeRuntime, getBuildDragPoints, getBuildWallDragAxis, shouldToggleBuildMode, snapBuildPoint, snapBuildSurfacePoint, snapBuildWallDragPoint, snapBuildWallEdge } from "../src/build/buildModeRuntime.js";
 import { HOUSE_FRAMES, TILE_SIZE, WORLD_HEIGHT, WORLD_WIDTH } from "../src/world/worldConfig.js";
 import { HUD_DEPTH } from "../src/ui/hud.js";
@@ -19,6 +19,7 @@ class DisplayStub {
   setOrigin() { return this; }
   setPosition(x, y) { this.x = x; this.y = y; return this; }
   setScale(value) { this.scale = value; return this; }
+  setCrop(x, y, width, height) { this.crop = { x, y, width, height }; return this; }
   clear() { this.lines = []; return this; }
   lineStyle(width, color, alpha) { this.lastLineStyle = { width, color, alpha }; return this; }
   lineBetween(...line) { this.lines.push(line); return this; }
@@ -122,6 +123,17 @@ assert.deepEqual(getBuildDragPoints({ x: 32, y: 48 }, { x: 80, y: 48 }), [
 assert.deepEqual(BUILD_ASSET_GROUPS.map((group) => group.id), ["tools", "ground", "walls", "furniture", "decorations"]);
 assert.deepEqual(BUILD_ASSET_GROUPS.find((group) => group.id === "tools").items.map((item) => item.id), ["demolish"], "moving existing objects needs no catalog tool");
 assert.deepEqual(BUILD_ASSET_GROUPS.find((group) => group.id === "walls").items.map((item) => item.id), ["wall"], "the library exposes one automatic wall brush");
+const typedWallItem = BUILD_ASSET_GROUPS.find((group) => group.id === "walls").items[0];
+runtime.drag = {
+  mode: "place",
+  item: typedWallItem,
+  points: [{ x: 32, y: 48, rawX: 35, rawY: 50 }],
+  pendingPoint: { x: 32, y: 48, rawX: 35, rawY: 50 },
+  lastPoint: null,
+  wallAxis: null,
+};
+assert.equal(runtime.updateWallPlacementDrag({ worldX: 83, worldY: 50 }, { requirePointerDown: false }), true, "a live/HMR wall drag reconstructs a missing startRaw from its typed first point");
+runtime.drag = null;
 assert(BUILD_ASSET_GROUPS.find((group) => group.id === "ground").items.some((item) => item.id === "parquet"), "parquet is buildable");
 assert(BUILD_ASSET_GROUPS.find((group) => group.id === "ground").items.some((item) => item.id === "carpet"), "carpet is buildable");
 assert.deepEqual([
@@ -130,19 +142,127 @@ assert.deepEqual([
   BUILD_CARPET_FRAME_BY_MASK[2],
   BUILD_CARPET_FRAME_BY_MASK[1],
 ], [57, 59, 81, 83], "one carpet click uses the four actual atlas corner sprites");
-assert.deepEqual(getBuildWallFrames({ explicit: true }), [HOUSE_FRAMES.sideLeft], "an explicit column uses frame 3 without flipping");
-assert.deepEqual(getBuildWallFrames({ north: true }), [HOUSE_FRAMES.sideLeft], "a vertical wall terminus receives a column");
-assert.deepEqual(getBuildWallFrames({ south: true }), [HOUSE_FRAMES.sideLeft], "both vertical wall ends use the same upright column");
-assert.deepEqual(getBuildWallFrames({ north: true, east: true, west: true }), [HOUSE_FRAMES.sideLeft], "a three-way junction receives a column");
+assert.equal(getBuildWallColumnFrame(), BUILD_WALL_TOPOLOGY_FRAMES.soloColumn, "atlas cell 16 owns standalone and lower-terminus columns");
+assert.deepEqual(getBuildWallFrames({ explicit: true }), [BUILD_WALL_TOPOLOGY_FRAMES.soloColumn]);
+assert.deepEqual(getBuildWallFrames({ north: true }), [BUILD_WALL_TOPOLOGY_FRAMES.soloColumn]);
+assert.deepEqual(getBuildWallFrames({ south: true }), [BUILD_WALL_TOPOLOGY_FRAMES.verticalTop]);
+assert.deepEqual(getBuildWallFrames({ north: true, east: true, west: true }), [BUILD_WALL_TOPOLOGY_FRAMES.branchNorth]);
 assert.deepEqual(getBuildWallFrames({ north: true, south: true }), [], "the middle of a vertical wall keeps its wall-body sprite visible");
-assert.deepEqual(getBuildWallFrames({ east: true }), [], "a horizontal end already carries its column in the cap sprite");
-assert.equal(getBuildVerticalWallFrame(), HOUSE_FRAMES.wallRightCap, "an isolated vertical edge uses a visible wall-body frame");
-assert.equal(getBuildVerticalWallFrame({ joinsEast: true }), HOUSE_FRAMES.wallLeftCap, "a joined vertical edge selects the matching wall-body side");
-assert.equal(getBuildWallColumnOffset({ verticalTerminus: true }), -TILE_SIZE, "vertical end columns keep their bases on their grid intersections");
-assert.equal(getBuildWallColumnOffset({ explicit: true }), -TILE_SIZE, "a clicked standalone column keeps its base on the intersection");
-assert.equal(getBuildVerticalWallOffset(), 0, "the vertical wall body stays on its whole grid tile");
-assert.equal(getBuildWallColumnDepthOffset({ verticalTerminus: true }), -1, "the upper endpoint column stays behind the wall body");
-assert.equal(getBuildWallColumnDepthOffset({ verticalTerminus: true, isBottom: true }), 1, "the lower endpoint column renders in front of the wall body");
+assert.deepEqual(getBuildWallFrames({ east: true }), [BUILD_WALL_TOPOLOGY_FRAMES.horizontalLeft]);
+assert.deepEqual(getBuildWallFrames({ east: true, west: true }), [], "the middle of a horizontal wall keeps only its wall-body sprite");
+assert.deepEqual(getBuildWallFrames({ east: true, south: true }), [BUILD_WALL_TOPOLOGY_FRAMES.northWestCorner]);
+const expectedWallTopologyFrames = new Map([
+  [0, []],
+  [1, [15]],
+  [2, [24]],
+  [3, [24]],
+  [4, [3]],
+  [5, []],
+  [6, [0]],
+  [7, [0]],
+  [8, [26]],
+  [9, [26]],
+  [10, []],
+  [11, [27]],
+  [12, [2]],
+  [13, [2]],
+  [14, [3]],
+  [15, [27, 3]],
+]);
+const eastHalfOwnerMasks = new Set([2, 3, 6, 7, 11, 15]);
+const westHalfOwnerMasks = new Set([8, 9, 11, 12, 13, 15]);
+for (let mask = 0; mask < 16; mask += 1) {
+  const incidents = {
+    north: Boolean(mask & 1),
+    east: Boolean(mask & 2),
+    south: Boolean(mask & 4),
+    west: Boolean(mask & 8),
+  };
+  const expectedFrames = expectedWallTopologyFrames.get(mask);
+  assert.equal(hasBuildWallJunctionColumn(incidents), expectedFrames.length > 0, `wall topology mask ${mask} resolves its typed junction state`);
+  assert.deepEqual(getBuildWallFrames(incidents), expectedFrames, `wall topology mask ${mask} resolves the authored atlas composition`);
+  assert.equal(
+    doesBuildWallTopologyOwnHorizontalHalf(incidents, "east"),
+    eastHalfOwnerMasks.has(mask),
+    `wall topology mask ${mask} types ownership of its east horizontal half`,
+  );
+  assert.equal(
+    doesBuildWallTopologyOwnHorizontalHalf(incidents, "west"),
+    westHalfOwnerMasks.has(mask),
+    `wall topology mask ${mask} types ownership of its west horizontal half`,
+  );
+}
+assert.equal(
+  doesBuildWallTopologyOwnHorizontalHalf({ south: true, east: true, west: true }, "east"),
+  false,
+  "cell 4 overlays the east half of continuous cell-2 wall body in a downward T junction",
+);
+assert.equal(
+  doesBuildWallTopologyOwnHorizontalHalf({ south: true, east: true, west: true }, "west"),
+  false,
+  "cell 4 overlays the west half of continuous cell-2 wall body in a downward T junction",
+);
+const downwardTIncidents = { south: true, east: true, west: true };
+assert.equal(
+  isBuildWallHorizontalOverlayFrame(downwardTIncidents, BUILD_WALL_TOPOLOGY_FRAMES.verticalTop),
+  true,
+  "cell 4 is explicitly typed as the downward-T overlay",
+);
+assert.equal(
+  getBuildWallJunctionFrameDepthOffset({
+    incidents: downwardTIncidents,
+    frame: BUILD_WALL_TOPOLOGY_FRAMES.verticalTop,
+    nodePivotOffset: -8,
+    horizontalPivotOffset: 12,
+  }),
+  13,
+  "cell 4 stays above the continuous horizontal body even after independent pivot authoring",
+);
+assert.equal(
+  getBuildWallHorizontalOverlayDepth({
+    incidents: downwardTIncidents,
+    frame: BUILD_WALL_TOPOLOGY_FRAMES.verticalTop,
+    junctionDepth: 100,
+    horizontalDepths: [102.25, 103.75],
+  }),
+  104.75,
+  "cell 4 renders fully above the actual depth of both continuous cell-2 body sprites",
+);
+assert.equal(
+  isBuildWallHorizontalOverlayFrame(
+    { north: true, south: true, east: true, west: true },
+    BUILD_WALL_TOPOLOGY_FRAMES.verticalTop,
+  ),
+  true,
+  "cell 4 also overlays the horizontal branch in the authored 28-plus-4 cross junction",
+);
+assert.equal(getBuildVerticalWallFrame(), BUILD_WALL_TOPOLOGY_FRAMES.verticalBody, "atlas cell 13 owns every vertical body segment");
+assert.equal(getBuildVerticalWallFrame({ joinsEast: true }), BUILD_WALL_TOPOLOGY_FRAMES.verticalBody, "junction shape never changes the typed vertical body frame");
+assert.equal(getBuildWallColumnOffset({ verticalTerminus: true }), -TILE_SIZE + getBuildHorizontalWallVisualOffset(), "vertical end columns share the lowered horizontal-wall baseline");
+assert.equal(getBuildWallColumnOffset({ explicit: true }), -TILE_SIZE + getBuildHorizontalWallVisualOffset(), "a clicked standalone column shares the lowered horizontal-wall baseline");
+assert.equal(getBuildVerticalWallOffset(), 2, "atlas cell 13 shares the requested 2 px wall-visual offset");
+assert.deepEqual(
+  getBuildHorizontalWallBodyCrop(),
+  { visible: true, x: 0, y: 0, width: 16, height: 16 },
+  "atlas cell 2 owns an entire segment between two plain horizontal vertices",
+);
+assert.deepEqual(
+  getBuildHorizontalWallBodyCrop({ leftJunction: true }),
+  { visible: true, x: 8, y: 0, width: 8, height: 16 },
+  "atlas cell 25 owns the left half of the first horizontal segment",
+);
+assert.deepEqual(
+  getBuildHorizontalWallBodyCrop({ rightJunction: true }),
+  { visible: true, x: 0, y: 0, width: 8, height: 16 },
+  "atlas cell 27 owns the right half of the final horizontal segment",
+);
+assert.deepEqual(
+  getBuildHorizontalWallBodyCrop({ leftJunction: true, rightJunction: true }),
+  { visible: false, x: 8, y: 0, width: 0, height: 16 },
+  "adjacent atlas edge sprites meet without a duplicate cell-2 body",
+);
+assert.equal(getBuildWallColumnDepthOffset({ verticalTerminus: true }), 2, "the shared column layer stays above every horizontal wall body");
+assert.equal(getBuildWallColumnDepthOffset({ verticalTerminus: true, isBottom: true }), 2, "the shared column layer stays above walls that terminate into it");
 assert.equal(getBuildSurfaceMask({ northWest: true }), 1);
 assert.equal(getBuildSurfaceMask({ northWest: true, northEast: true, southWest: true }), 7, "a grass island requests an inner-corner mask");
 assert.equal(getBuildSurfaceMask({ northWest: true, northEast: true, southWest: true, southEast: true }), 15);

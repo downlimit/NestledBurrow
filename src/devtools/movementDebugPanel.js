@@ -1,6 +1,5 @@
 import { DEFAULT_GAMEPLAY_TUNING, normalizeGameplayTuning } from "../resources/resourceConfig.js";
 import { clearGameplayDebugTuning, saveGameplayDebugTuning } from "./gameplayDebugTuning.js";
-import { LARGE_RESOURCE_HP_MULTIPLIER } from "../resources/resourceDomain.js";
 import { attachEditorAuthoringRuntime } from "../build/editorAuthoringRuntime.js";
 import {
   AUTHORING_BACKUP_FILENAME,
@@ -25,12 +24,11 @@ const FIELDS = Object.freeze([
 export function loadMovementDebugConfig() { return {}; }
 
 export class MovementDebugPanel {
-  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onRefillEnergy = () => {}, onSetNeedsDebugPreset = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onBuildGridVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onVisualOffsetEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onColliderRound = () => ({ status: "empty" }), onPivotAlign = () => null, onVisualOffsetReset = () => null, onResetBalanceRun = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
+  constructor({ enabled, gameplayTuning, onGameplayTuningChange = () => {}, onAddCookedDish = () => {}, onColliderVisibilityChange = () => {}, onBuildGridVisibilityChange = () => {}, onColliderEditModeChange = () => {}, onPivotEditModeChange = () => {}, onVisualOffsetEditModeChange = () => {}, onColliderDraftConfirm = () => {}, onColliderRound = () => ({ status: "empty" }), onPivotAlign = () => null, onVisualOffsetReset = () => null, onOpenChange = () => {}, getStatusSnapshot = () => null, documentRef = globalThis.document, storage = globalThis.localStorage } = {}) {
     this.enabled = Boolean(enabled);
     this.gameplayTuning = gameplayTuning;
     this.onGameplayTuningChange = onGameplayTuningChange;
-    this.onRefillEnergy = onRefillEnergy;
-    this.onResetBalanceRun = onResetBalanceRun;
+    this.onOpenChange = onOpenChange;
     this.onColliderDraftConfirm = onColliderDraftConfirm;
     this.onColliderRound = onColliderRound;
     this.onPivotAlign = onPivotAlign;
@@ -66,18 +64,13 @@ export class MovementDebugPanel {
     panel.append(title);
 
     for (const field of FIELDS) this.appendInput(panel, field);
-    const derived = documentRef.createElement("output");
-    derived.className = "balance-derived";
-    panel.append(derived);
-    this.derived = derived;
-
     this.status = documentRef.createElement("output");
     this.status.className = "movement-debug-status";
     panel.append(this.status);
 
     const colliderLabel = documentRef.createElement("label");
     const colliderName = documentRef.createElement("span");
-    colliderName.textContent = "Показывать коллайдеры";
+    colliderName.textContent = "Дебаг рендер";
     const colliderCheckbox = documentRef.createElement("input");
     colliderCheckbox.type = "checkbox";
     colliderCheckbox.addEventListener("change", () => onColliderVisibilityChange(Boolean(colliderCheckbox.checked)));
@@ -229,12 +222,6 @@ export class MovementDebugPanel {
     const actions = documentRef.createElement("div");
     actions.className = "movement-debug-actions";
     const actionDefinitions = [
-      ["Сбросить баланс-забег", onResetBalanceRun],
-      ["Восполнить энергию", onRefillEnergy],
-      ["Потребности: голод", () => onSetNeedsDebugPreset("hungry")],
-      ["Потребности: истощение", () => onSetNeedsDebugPreset("exhausted")],
-      ["Потребности: срочно в туалет", () => onSetNeedsDebugPreset("urgent-toilet")],
-      ["Потребности: убрать debug", () => onSetNeedsDebugPreset("clear")],
       ["Добавить готовое блюдо", onAddCookedDish],
       ["Вернуть значения по умолчанию", () => this.resetDefaults()],
       ["Сохранить топологию и расстановку", () => void this.persistStartingLayout()],
@@ -445,9 +432,12 @@ export class MovementDebugPanel {
   }
 
   setOpen(value) {
-    this.open = Boolean(value);
+    const next = Boolean(value);
+    if (this.open === next) return;
+    this.open = next;
     if (this.panel) this.panel.hidden = !this.open;
     this.toggleButton?.setAttribute("aria-expanded", String(this.open));
+    this.onOpenChange(this.open);
   }
 
   setSuppressed(value) {
@@ -469,12 +459,11 @@ export class MovementDebugPanel {
       const input = this.inputs.get(field.key);
       if (input) input.value = String(this.gameplayTuning[field.key]);
     }
-    if (this.derived) this.derived.textContent = `Прочность большого бревна: ${Math.round(this.gameplayTuning.smallLogChopHp * LARGE_RESOURCE_HP_MULTIPLIER)}`;
   }
 
   updateStatus(snapshot = this.getStatusSnapshot()) {
     if (!this.status || !snapshot) return;
-    this.status.textContent = [`время ${snapshot.clock ?? "--:--"}`, `энергия ${Math.floor(snapshot.energy ?? 0)}`, `малые брёвна ${snapshot.smallLogsCleared ?? 0}`, `дерево ${snapshot.wood ?? 0} камень ${snapshot.stone ?? 0} рубины ${snapshot.rubies ?? 0}`].join("\n");
+    this.status.textContent = `время ${snapshot.clock ?? "--:--"}`;
   }
 
   setColliderEditorState(state) {
@@ -501,6 +490,10 @@ export class MovementDebugPanel {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.open) {
+      this.open = false;
+      this.onOpenChange(false);
+    }
     if (this.startingLayoutRestoreListener) this.scene?.events?.off?.("update", this.startingLayoutRestoreListener);
     this.authoringRuntime?.destroy?.();
     this.toggleButton?.remove(); this.panel?.remove(); this.inputs.clear();

@@ -77,13 +77,19 @@ function createDynamicLayout({ bounds, blocked }) {
     bounds,
     cellSize: PLACEMENT_CELL_SIZE,
     isBlockedCell: (x, y) => blocked.has(cellKey(x, y)),
-    isBlockedBox: (box) => [...colliders.values()].some((rect) => overlaps(box, rect)),
+    isBlockedBox: (box) => [...colliders].some(([id, rect]) => (
+      colliderMetadata.get(id)?.collisionEnabled !== false && overlaps(box, rect)
+    )),
   });
 
   return {
     ...environment,
     bounds,
-    get objectColliders() { return [...colliders.values()]; },
+    get objectColliders() {
+      return [...colliders]
+        .filter(([id]) => colliderMetadata.get(id)?.collisionEnabled !== false)
+        .map(([, rect]) => rect);
+    },
     getWorldObjectColliders() {
       return [...colliders].map(([id, rect]) => ({
         id,
@@ -94,7 +100,8 @@ function createDynamicLayout({ bounds, blocked }) {
       }));
     },
     getBlockingColliders(box) {
-      return this.getWorldObjectColliders().filter((entry) => overlaps(box, entry.rect));
+      return this.getWorldObjectColliders()
+        .filter((entry) => entry.collisionEnabled !== false && overlaps(box, entry.rect));
     },
     getEffectiveCollider(rect, groupKey = null) {
       return applyColliderOffsets(rect, colliderOverrides.get(groupKey));

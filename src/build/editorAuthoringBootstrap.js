@@ -2,10 +2,16 @@ import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { INTERACTION_APPROACH_DIRECTIONS } from "../interaction/interactionDirections.js";
 import { perimeterInteractionPointEntries } from "../interaction/interactionApproach.js";
 import {
+  ASSET_RENDER_MODES,
   ASSET_PROFILES_VERSION,
   DEFAULT_ASSET_PROFILES,
+  INTERACTION_TIMELINE_FACING_MODES,
+  INTERACTION_TIMELINE_SCREEN_ORIENTATIONS,
+  normalizeAssetRenderMode,
+  normalizeInteractionPadding,
+  normalizeInteractionTimeline,
   normalizeVisualCropInsets,
-  saveAssetProfilesToProject,
+  saveAssetProfiles,
 } from "./assetProfiles.js";
 import {
   applyVisualCrop,
@@ -19,6 +25,10 @@ import {
   resizeColliderDraft,
 } from "./colliderResize.js";
 import { getCurrentWorldScene } from "./worldSceneRegistry.js";
+import {
+  assetAuthoringColliderSelectionPoint,
+  collectAssetAuthoringInstances,
+} from "./assetAuthoringRegistry.js";
 
 const retryDelayMs = 50;
 const originalAttachSceneRuntime = MovementDebugPanel.prototype.attachSceneRuntime;
@@ -32,6 +42,27 @@ const MODE_LABELS = Object.freeze({
   "visual-offset": "Оффсет визуала",
   crop: "Обрезка визуала",
   interaction: "Точки подхода",
+  "interaction-point": "Точка взаимодействия",
+  render: "Режим рендера",
+  timeline: "Таймлайн взаимодействия",
+});
+const RENDER_MODE_LABELS = Object.freeze({
+  [ASSET_RENDER_MODES.belowCharacter]: "Всегда под персонажем",
+  [ASSET_RENDER_MODES.pivotDepth]: "По глубине пивота",
+  [ASSET_RENDER_MODES.aboveCharacter]: "Всегда поверх персонажа",
+});
+const TIMELINE_FACING_LABELS = Object.freeze({
+  [INTERACTION_TIMELINE_FACING_MODES.keepCurrent]: "Как в момент взаимодействия",
+  [INTERACTION_TIMELINE_FACING_MODES.up]: "Вверх",
+  [INTERACTION_TIMELINE_FACING_MODES.down]: "Вниз",
+  [INTERACTION_TIMELINE_FACING_MODES.left]: "Влево",
+  [INTERACTION_TIMELINE_FACING_MODES.right]: "Вправо",
+});
+const TIMELINE_SCREEN_ORIENTATION_LABELS = Object.freeze({
+  [INTERACTION_TIMELINE_SCREEN_ORIENTATIONS.original]: "Исходная",
+  [INTERACTION_TIMELINE_SCREEN_ORIENTATIONS.clockwise90]: "90° по часовой",
+  [INTERACTION_TIMELINE_SCREEN_ORIENTATIONS.counterClockwise90]: "90° против часовой",
+  [INTERACTION_TIMELINE_SCREEN_ORIENTATIONS.rotate180]: "180°",
 });
 const DIRECTION_BUTTONS = Object.freeze([
   ["top-left", "↖"], ["top", "↑"], ["top-right", "↗"],
@@ -46,10 +77,7 @@ function delay(milliseconds) {
 
 function isAuthoringSceneReady(scene) {
   return Boolean(
-    scene?.buildMode
-      && scene?.worldBuildCoordinator?.getPlacedObjects
-      && scene?.facilityRuntime
-      && scene?.debrisRuntime
+    scene?.worldBuildCoordinator?.getPlacedObjects
       && scene?.worldLayout,
   );
 }
@@ -116,15 +144,18 @@ MovementDebugPanel.prototype.persistStartingLayout = async function persistStart
   return originalPersistStartingLayout.call(this);
 };
 
-MovementDebugPanel.prototype.applyColliderDraftToProject = async function saveCanonicalAssetProfiles() {
+MovementDebugPanel.prototype.applyColliderDraftToProject = async function applyAssetProfileLive() {
   if (!this.authoringRuntime) await this.attachSceneRuntime();
   const state = this.assetAuthoringEnhancement;
   const hasSelection = Boolean(
     this.scene?.colliderEditSelection
       || this.authoringRuntime?.getPivotSelection?.()
       || this.authoringRuntime?.getVisualOffsetSelection?.()
+      || this.authoringRuntime?.getInteractionPointSelection?.()
       || state?.cropSelection
-      || state?.interactionSelection,
+      || state?.interactionSelection
+      || state?.renderSelection
+      || state?.timelineSelection,
   );
   if (!hasSelection) {
     this.setAuthoringStatus("Сначала выберите ассет", true);
@@ -132,21 +163,15 @@ MovementDebugPanel.prototype.applyColliderDraftToProject = async function saveCa
   }
 
   if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = true;
-  this.setAuthoringStatus("Запись канонического профиля ассета…");
+  this.setAuthoringStatus("Применение профиля ассета…");
   try {
     this.scene?.confirmColliderDraft?.();
-    await saveAssetProfilesToProject(this.scene?.assetProfiles ?? {}, {
-      storage: this.storage,
-      baseUrl: import.meta.env?.BASE_URL ?? "/",
-    });
-    this.setAuthoringStatus("Профили ассетов записаны в исходники проекта; браузерные оффсеты очищены");
+    saveAssetProfiles(this.scene?.assetProfiles ?? {}, this.storage);
+    this.scene?.interactionRuntime?.refresh?.();
+    this.setAuthoringStatus("Профиль применён в живой сцене и сохранён локально — перезагрузка не требуется");
   } catch (error) {
-    console.warn("Asset profile project save failed", error);
-    if (error?.localSaved) {
-      this.setAuthoringStatus("Профиль сохранён в браузере. Статический веб-билд не может записать репозиторий.");
-    } else {
-      this.setAuthoringStatus("Ошибка сохранения профиля ассета", true);
-    }
+    console.warn("Asset profile live apply failed", error);
+    this.setAuthoringStatus("Ошибка применения профиля ассета", true);
   } finally {
     if (this.colliderConfirmButton) this.colliderConfirmButton.disabled = false;
   }
@@ -158,12 +183,18 @@ MovementDebugPanel.prototype.setEditorMode = function setExtendedEditorMode(mode
   if (!state) return;
   if (state.cropResetButton) state.cropResetButton.hidden = mode !== "crop";
   if (state.directionGrid) state.directionGrid.hidden = mode !== "interaction";
+  if (state.interactionControls) state.interactionControls.hidden = mode !== "interaction";
+  if (state.renderControls) state.renderControls.hidden = mode !== "render";
+  if (state.timelineControls) state.timelineControls.hidden = mode !== "timeline";
   if (this.colliderConfirmButton) this.colliderConfirmButton.textContent = {
-    collider: "Сохранить коллайдер в проект",
-    pivot: "Сохранить пивот в проект",
-    "visual-offset": "Сохранить оффсет в проект",
-    crop: "Сохранить обрезку в проект",
-    interaction: "Сохранить точки подхода",
+    collider: "Применить коллайдер",
+    pivot: "Применить пивот",
+    "visual-offset": "Применить оффсет",
+    crop: "Применить обрезку",
+    interaction: "Применить точки подхода",
+    "interaction-point": "Применить точку взаимодействия",
+    render: "Применить режим рендера",
+    timeline: "Применить таймлайн",
   }[mode] ?? "Сохранить профиль ассета";
 };
 
@@ -177,9 +208,30 @@ MovementDebugPanel.prototype.setCropEditorState = function setCropEditorState(st
 MovementDebugPanel.prototype.setInteractionEditorState = function setInteractionEditorState(state) {
   if (!this.colliderEditorStatus) return;
   this.colliderEditorStatus.textContent = state?.profileKey
-    ? `${state.profileKey}\nразрешено направлений: ${state.directions.length}/8\nкликните по маркеру или кнопке направления`
+    ? `${state.profileKey}\nдистанция: ${state.interactionPadding} px от коллайдера\nразрешено направлений: ${state.directions.length}/8\nкликните по маркеру или кнопке направления`
     : "Кликните по объекту для настройки точек подхода";
   syncDirectionButtons(this, state?.directions ?? []);
+};
+
+MovementDebugPanel.prototype.setInteractionPointEditorState = function setInteractionPointEditorState(state) {
+  if (!this.colliderEditorStatus) return;
+  this.colliderEditorStatus.textContent = state?.profileKey
+    ? `${state.profileKey}\nточка ${state.offset.x}, ${state.offset.y} px\nстрелки: 1 px`
+    : "Кликните по спрайту для редактирования точки взаимодействия";
+};
+
+MovementDebugPanel.prototype.setRenderEditorState = function setRenderEditorState(state) {
+  if (!this.colliderEditorStatus) return;
+  this.colliderEditorStatus.textContent = state?.profileKey
+    ? `${state.profileKey}\n${RENDER_MODE_LABELS[state.renderMode]}`
+    : "Кликните по спрайту для выбора режима рендера";
+};
+
+MovementDebugPanel.prototype.setTimelineEditorState = function setTimelineEditorState(state) {
+  if (!this.colliderEditorStatus) return;
+  this.colliderEditorStatus.textContent = state?.profileKey
+    ? `${state.profileKey}\nточка ${state.timeline.positionOffset.x}, ${state.timeline.positionOffset.y} px\nстрелки: 1 px`
+    : "Кликните по спрайту для настройки таймлайна взаимодействия";
 };
 
 MovementDebugPanel.prototype.destroy = function destroyExtendedAuthoringPanel() {
@@ -197,6 +249,12 @@ function installAssetAuthoringEnhancements(panel, scene) {
     cropSelection: null,
     cropDrag: null,
     interactionSelection: null,
+    interactionPointSelection: null,
+    interactionPointDrag: null,
+    renderSelection: null,
+    timelineSelection: null,
+    timelineDrag: null,
+    selectedAsset: null,
     frame: 0,
     graphics: scene.add?.graphics?.().setDepth?.(8978) ?? null,
   };
@@ -222,11 +280,15 @@ function installCompactAuthoringUi(panel, state) {
   visibilityTitle.textContent = "Отображение";
   const visibility = documentRef.createElement("div");
   visibility.className = "authoring-option-list";
-  renameCheckboxLabel(panel.colliderCheckbox, "Коллайдеры");
+  renameCheckboxLabel(panel.colliderCheckbox, "Дебаг рендер");
   renameCheckboxLabel(panel.buildGridCheckbox, "Строительная сетка");
   appendExistingLabel(visibility, panel.colliderCheckbox);
   appendExistingLabel(visibility, panel.buildGridCheckbox);
   section.append(visibilityTitle, visibility);
+  panel.colliderCheckbox?.addEventListener?.("change", () => {
+    if (!panel.colliderCheckbox.checked) setAuthoringMode(panel, null);
+    renderEnhancedAuthoring(panel);
+  });
 
   const modeTitle = documentRef.createElement("span");
   modeTitle.className = "authoring-debug-caption";
@@ -241,6 +303,9 @@ function installCompactAuthoringUi(panel, state) {
   registerModeCheckbox(panel, state, modes, "visual-offset", panel.visualOffsetEditCheckbox);
   registerModeCheckbox(panel, state, modes, "crop", createModeCheckbox(documentRef, MODE_LABELS.crop));
   registerModeCheckbox(panel, state, modes, "interaction", createModeCheckbox(documentRef, MODE_LABELS.interaction));
+  registerModeCheckbox(panel, state, modes, "interaction-point", createModeCheckbox(documentRef, MODE_LABELS["interaction-point"]));
+  registerModeCheckbox(panel, state, modes, "render", createModeCheckbox(documentRef, MODE_LABELS.render));
+  registerModeCheckbox(panel, state, modes, "timeline", createModeCheckbox(documentRef, MODE_LABELS.timeline));
   section.append(modeTitle, modes);
   panel.panel.insertBefore?.(section, panel.colliderEditor ?? null);
   state.section = section;
@@ -256,6 +321,8 @@ function installCompactAuthoringUi(panel, state) {
 
   const directionGrid = documentRef.createElement("div");
   directionGrid.className = "interaction-direction-grid";
+  directionGrid.style.gridColumn = "1 / -1";
+  directionGrid.style.gridTemplateColumns = "repeat(3, 32px)";
   directionGrid.hidden = true;
   for (const [direction, label] of DIRECTION_BUTTONS) {
     const button = documentRef.createElement("button");
@@ -274,6 +341,122 @@ function installCompactAuthoringUi(panel, state) {
   }
   panel.colliderEditor?.append?.(directionGrid);
   state.directionGrid = directionGrid;
+
+  const interactionControls = documentRef.createElement("div");
+  interactionControls.className = "authoring-profile-controls";
+  interactionControls.hidden = true;
+  const interactionPadding = appendTimelineNumber(
+    documentRef,
+    interactionControls,
+    "Дистанция интеракта от коллайдера, px",
+  );
+  interactionPadding.min = "1";
+  interactionPadding.max = "128";
+  interactionPadding.step = "1";
+  interactionPadding.addEventListener("input", () => applySelectedInteractionPadding(panel));
+  panel.colliderEditor?.append?.(interactionControls);
+  state.interactionControls = interactionControls;
+  state.interactionPadding = interactionPadding;
+
+  const renderControls = documentRef.createElement("div");
+  renderControls.className = "authoring-profile-controls";
+  renderControls.hidden = true;
+  const renderLabel = documentRef.createElement("label");
+  const renderName = documentRef.createElement("span");
+  renderName.textContent = "Порядок";
+  const renderSelect = documentRef.createElement("select");
+  for (const [value, label] of Object.entries(RENDER_MODE_LABELS)) {
+    const option = documentRef.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    renderSelect.append(option);
+  }
+  renderSelect.addEventListener("change", () => applySelectedRenderMode(panel, renderSelect.value));
+  renderLabel.append(renderName, renderSelect);
+  renderControls.append(renderLabel);
+  panel.colliderEditor?.append?.(renderControls);
+  state.renderControls = renderControls;
+  state.renderSelect = renderSelect;
+
+  const timelineControls = documentRef.createElement("div");
+  timelineControls.className = "authoring-profile-controls";
+  timelineControls.hidden = true;
+  const timelineEnabled = appendTimelineCheckbox(documentRef, timelineControls, "Есть таймлайн");
+  const timelineWalk = appendTimelineCheckbox(
+    documentRef,
+    timelineControls,
+    "Перс играет анимацию ходьбы во время релокейта",
+  );
+  const timelineEnter = appendTimelineNumber(documentRef, timelineControls, "Вход, мс");
+  const timelineExit = appendTimelineNumber(documentRef, timelineControls, "Выход, мс");
+  const timelineFacing = appendTimelineSelect(
+    documentRef,
+    timelineControls,
+    "Куда смотрит персонаж",
+    TIMELINE_FACING_LABELS,
+  );
+  const timelineScreenOrientation = appendTimelineSelect(
+    documentRef,
+    timelineControls,
+    "Ориентация в скринспейсе",
+    TIMELINE_SCREEN_ORIENTATION_LABELS,
+  );
+  const syncTimeline = () => applySelectedTimelineControls(panel);
+  timelineEnabled.addEventListener("change", syncTimeline);
+  timelineWalk.addEventListener("change", syncTimeline);
+  timelineEnter.addEventListener("input", syncTimeline);
+  timelineExit.addEventListener("input", syncTimeline);
+  timelineFacing.addEventListener("change", syncTimeline);
+  timelineScreenOrientation.addEventListener("change", syncTimeline);
+  panel.colliderEditor?.append?.(timelineControls);
+  state.timelineControls = timelineControls;
+  state.timelineEnabled = timelineEnabled;
+  state.timelineWalk = timelineWalk;
+  state.timelineEnter = timelineEnter;
+  state.timelineExit = timelineExit;
+  state.timelineFacing = timelineFacing;
+  state.timelineScreenOrientation = timelineScreenOrientation;
+}
+
+function appendTimelineCheckbox(documentRef, container, text) {
+  const label = documentRef.createElement("label");
+  const name = documentRef.createElement("span");
+  name.textContent = text;
+  const input = documentRef.createElement("input");
+  input.type = "checkbox";
+  label.append(name, input);
+  container.append(label);
+  return input;
+}
+
+function appendTimelineNumber(documentRef, container, text) {
+  const label = documentRef.createElement("label");
+  const name = documentRef.createElement("span");
+  name.textContent = text;
+  const input = documentRef.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.max = "10000";
+  input.step = "50";
+  label.append(name, input);
+  container.append(label);
+  return input;
+}
+
+function appendTimelineSelect(documentRef, container, text, options) {
+  const label = documentRef.createElement("label");
+  const name = documentRef.createElement("span");
+  name.textContent = text;
+  const select = documentRef.createElement("select");
+  for (const [value, optionText] of Object.entries(options)) {
+    const option = documentRef.createElement("option");
+    option.value = value;
+    option.textContent = optionText;
+    select.append(option);
+  }
+  label.append(name, select);
+  container.append(label);
+  return select;
 }
 
 function createModeCheckbox(documentRef, labelText) {
@@ -313,6 +496,10 @@ function setAuthoringMode(panel, mode) {
   state.mode = mode;
   for (const [candidate, checkbox] of state.modeCheckboxes) checkbox.checked = candidate === mode;
   const scene = state.scene;
+  if (mode && !panel.colliderCheckbox?.checked) {
+    panel.colliderCheckbox.checked = true;
+    scene.setColliderDebugVisible?.(true);
+  }
   scene.setColliderEditMode?.(mode === "collider");
   scene.setPivotEditMode?.(mode === "pivot");
   scene.setVisualOffsetEditMode?.(mode === "visual-offset");
@@ -321,10 +508,82 @@ function setAuthoringMode(panel, mode) {
     state.cropDrag = null;
   }
   if (mode !== "interaction") state.interactionSelection = null;
+  if (mode !== "interaction-point") {
+    state.interactionPointSelection = null;
+    state.interactionPointDrag = null;
+  }
+  if (mode !== "render") state.renderSelection = null;
+  if (mode !== "timeline") {
+    state.timelineSelection = null;
+    state.timelineDrag = null;
+  }
+  scene.interactionPointEditEnabled = mode === "interaction-point" || mode === "timeline";
   panel.setEditorMode(mode);
-  if (mode === "crop") panel.setCropEditorState(cropSelectionState(panel));
+  restoreSelectedAssetForMode(panel, mode);
+  panel.syncCollisionToggle?.();
+  if (mode === "collider") scene.syncColliderEditorPanel?.();
+  else if (mode === "pivot") panel.setPivotEditorState(panel.authoringRuntime?.getPivotSelection?.());
+  else if (mode === "visual-offset") panel.setVisualOffsetEditorState(panel.authoringRuntime?.getVisualOffsetSelection?.());
+  else if (mode === "crop") panel.setCropEditorState(cropSelectionState(panel));
   else if (mode === "interaction") panel.setInteractionEditorState(interactionSelectionState(panel));
+  else if (mode === "interaction-point") panel.setInteractionPointEditorState(interactionPointSelectionState(panel));
+  else if (mode === "render") panel.setRenderEditorState(renderSelectionState(panel));
+  else if (mode === "timeline") panel.setTimelineEditorState(timelineSelectionState(panel));
+  syncRenderControls(panel);
+  syncTimelineControls(panel);
+  syncInteractionControls(panel);
   renderEnhancedAuthoring(panel);
+}
+
+function rememberSelectedAsset(state, instance) {
+  state.selectedAsset = instance ? { id: instance.id, profileKey: instance.profileKey } : null;
+}
+
+function restoreSelectedAssetForMode(panel, mode) {
+  const state = panel.assetAuthoringEnhancement;
+  const instance = selectedInstance(state?.scene, state?.selectedAsset);
+  if (!instance || !mode) return;
+  const scene = state.scene;
+  const visualBounds = instanceWorldBounds(scene, instance);
+  const visualPoint = {
+    x: (visualBounds.left + visualBounds.right) / 2,
+    y: (visualBounds.top + visualBounds.bottom) / 2,
+  };
+  if (mode === "collider") {
+    const colliderPoint = assetAuthoringColliderSelectionPoint(scene, instance) ?? visualPoint;
+    scene.beginColliderEditPointer?.({ worldX: colliderPoint.x, worldY: colliderPoint.y });
+    return;
+  }
+  if (mode === "pivot") {
+    panel.setPivotEditorState(panel.authoringRuntime?.selectPivotAt?.(visualPoint));
+    scene.renderPivotDebug?.();
+    return;
+  }
+  if (mode === "visual-offset") {
+    panel.setVisualOffsetEditorState(panel.authoringRuntime?.selectVisualOffsetAt?.(visualPoint));
+    scene.renderVisualOffsetDebug?.();
+    return;
+  }
+  if (mode === "crop") {
+    state.cropSelection = cropTargetForInstance(instance)
+      ? { id: instance.id, profileKey: instance.profileKey }
+      : null;
+    return;
+  }
+  if (mode === "interaction") {
+    state.interactionSelection = { id: instance.id, profileKey: instance.profileKey };
+    return;
+  }
+  if (mode === "interaction-point") {
+    const selection = panel.authoringRuntime?.selectInteractionPointAt?.(visualPoint);
+    state.interactionPointSelection = selection ? { id: selection.id, profileKey: selection.profileKey } : null;
+    return;
+  }
+  if (mode === "render") {
+    state.renderSelection = { id: instance.id, profileKey: instance.profileKey };
+    return;
+  }
+  if (mode === "timeline") state.timelineSelection = { id: instance.id, profileKey: instance.profileKey };
 }
 
 function installAuthoringInput(panel, state) {
@@ -334,7 +593,11 @@ function installAuthoringInput(panel, state) {
   const listeners = {
     down: (pointer) => handleEnhancedPointerDown(panel, pointer),
     move: (pointer) => handleEnhancedPointerMove(panel, pointer),
-    up: () => { state.cropDrag = null; },
+    up: () => {
+      state.cropDrag = null;
+      state.interactionPointDrag = null;
+      state.timelineDrag = null;
+    },
     key: (event) => handleEnhancedKeyDown(panel, event),
     update: () => {
       state.frame += 1;
@@ -342,7 +605,7 @@ function installAuthoringInput(panel, state) {
         patchInteractionOwners(scene);
         applyAllProfileCrops(scene);
       }
-      if (state.mode && state.frame % 8 === 0) renderEnhancedAuthoring(panel);
+      if ((state.mode || scene.colliderDebugVisible) && state.frame % 8 === 0) renderEnhancedAuthoring(panel);
     },
   };
   input.on("pointerdown", listeners.down);
@@ -378,7 +641,11 @@ function teardownAssetAuthoringEnhancements(panel) {
   state.graphics?.destroy?.();
   state.section?.remove?.();
   state.directionGrid?.remove?.();
+  state.interactionControls?.remove?.();
   state.cropResetButton?.remove?.();
+  state.renderControls?.remove?.();
+  state.timelineControls?.remove?.();
+  if (scene) scene.interactionPointEditEnabled = false;
   panel.assetAuthoringEnhancement = null;
 }
 
@@ -395,6 +662,7 @@ function handleEnhancedPointerDown(panel, pointer) {
       return;
     }
     const instance = findAuthoringInstanceAt(scene, point, { requireCrop: true });
+    rememberSelectedAsset(state, instance);
     state.cropSelection = instance ? { id: instance.id, profileKey: instance.profileKey } : null;
     const selection = cropSelectionState(panel);
     panel.setCropEditorState(selection);
@@ -410,15 +678,69 @@ function handleEnhancedPointerDown(panel, pointer) {
       return;
     }
     const instance = findAuthoringInstanceAt(scene, point);
+    rememberSelectedAsset(state, instance);
     state.interactionSelection = instance ? { id: instance.id, profileKey: instance.profileKey } : null;
     panel.setInteractionEditorState(interactionSelectionState(panel));
+    syncInteractionControls(panel);
+    renderEnhancedAuthoring(panel);
+    return;
+  }
+  if (state.mode === "interaction-point") {
+    const selection = panel.authoringRuntime?.selectInteractionPointAt?.(point) ?? null;
+    rememberSelectedAsset(state, selectedInstance(scene, selection));
+    state.interactionPointSelection = selection ? { id: selection.id, profileKey: selection.profileKey } : null;
+    state.interactionPointDrag = selection ? { startPoint: point, startOffset: { ...selection.offset } } : null;
+    panel.setInteractionPointEditorState(interactionPointSelectionState(panel));
+    renderEnhancedAuthoring(panel);
+    return;
+  }
+  if (state.mode === "render") {
+    const instance = findAuthoringInstanceAt(scene, point);
+    rememberSelectedAsset(state, instance);
+    state.renderSelection = instance ? { id: instance.id, profileKey: instance.profileKey } : null;
+    panel.setRenderEditorState(renderSelectionState(panel));
+    syncRenderControls(panel);
+    renderEnhancedAuthoring(panel);
+    return;
+  }
+  if (state.mode === "timeline") {
+    const instance = findAuthoringInstanceAt(scene, point);
+    rememberSelectedAsset(state, instance);
+    state.timelineSelection = instance ? { id: instance.id, profileKey: instance.profileKey } : null;
+    const selection = timelineSelectionState(panel);
+    state.timelineDrag = selection?.timeline.enabled
+      ? { startPoint: point, startOffset: { ...selection.timeline.positionOffset } }
+      : null;
+    panel.setTimelineEditorState(selection);
+    syncTimelineControls(panel);
     renderEnhancedAuthoring(panel);
   }
 }
 
 function handleEnhancedPointerMove(panel, pointer) {
   const state = panel.assetAuthoringEnhancement;
-  if (state?.mode !== "crop" || !state.cropDrag || !pointer?.isDown) return;
+  if (!state || !pointer?.isDown) return;
+  if (state.mode === "interaction-point" && state.interactionPointDrag) {
+    const point = pointerPoint(pointer);
+    const selection = panel.authoringRuntime?.setInteractionOffset?.({
+      x: state.interactionPointDrag.startOffset.x + point.x - state.interactionPointDrag.startPoint.x,
+      y: state.interactionPointDrag.startOffset.y + point.y - state.interactionPointDrag.startPoint.y,
+    });
+    panel.setInteractionPointEditorState(interactionPointSelectionState(panel) ?? selection);
+    renderEnhancedAuthoring(panel);
+    return;
+  }
+  if (state.mode === "timeline" && state.timelineDrag) {
+    const point = pointerPoint(pointer);
+    applyTimelinePatch(panel, {
+      positionOffset: {
+        x: state.timelineDrag.startOffset.x + point.x - state.timelineDrag.startPoint.x,
+        y: state.timelineDrag.startOffset.y + point.y - state.timelineDrag.startPoint.y,
+      },
+    });
+    return;
+  }
+  if (state.mode !== "crop" || !state.cropDrag) return;
   const selection = cropSelectionState(panel);
   if (!selection) return;
   const point = pointerPoint(pointer);
@@ -433,6 +755,30 @@ function handleEnhancedPointerMove(panel, pointer) {
 function handleEnhancedKeyDown(panel, event) {
   const state = panel.assetAuthoringEnhancement;
   if (!state?.mode) return;
+  if (state.mode === "interaction-point") {
+    const delta = arrowDelta(event);
+    if (!delta || !interactionPointSelectionState(panel)) return;
+    consumeArrowEvent(event);
+    event?.stopImmediatePropagation?.();
+    panel.authoringRuntime?.nudgeInteractionOffset?.(delta.x, delta.y);
+    panel.setInteractionPointEditorState(interactionPointSelectionState(panel));
+    renderEnhancedAuthoring(panel);
+    return;
+  }
+  if (state.mode === "timeline") {
+    const delta = arrowDelta(event);
+    const selection = timelineSelectionState(panel);
+    if (!delta || !selection?.timeline.enabled) return;
+    consumeArrowEvent(event);
+    event?.stopImmediatePropagation?.();
+    applyTimelinePatch(panel, {
+      positionOffset: {
+        x: selection.timeline.positionOffset.x + delta.x,
+        y: selection.timeline.positionOffset.y + delta.y,
+      },
+    });
+    return;
+  }
   if (state.mode === "collider") {
     const selection = state.scene.colliderEditSelection;
     if (!selection) return;
@@ -469,11 +815,16 @@ function pointerPoint(pointer) {
 }
 
 function authoringInstances(scene) {
-  const owners = scene.worldLocationRuntime?.getOwners?.() ?? {};
-  return [
-    ...(owners.debrisRuntime?.getAuthoringInstances?.() ?? []),
-    ...(owners.facilityRuntime?.getAuthoringInstances?.() ?? []),
-  ].filter((instance) => scene.assetProfiles?.[instance.profileKey]);
+  return collectAssetAuthoringInstances(scene);
+}
+
+function arrowDelta(event) {
+  return {
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 },
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 },
+  }[event?.key] ?? null;
 }
 
 function findAuthoringInstanceAt(scene, point, { requireCrop = false } = {}) {
@@ -587,6 +938,115 @@ function applyAllProfileCrops(scene, onlyProfileKey = null) {
   }
 }
 
+function selectedInstance(scene, selection) {
+  if (!selection) return null;
+  return authoringInstances(scene).find(({ id, profileKey }) => (
+    id === selection.id && profileKey === selection.profileKey
+  )) ?? null;
+}
+
+function interactionPointSelectionState(panel) {
+  const state = panel.assetAuthoringEnhancement;
+  if (!state?.interactionPointSelection) return null;
+  return panel.authoringRuntime?.getInteractionPointSelection?.() ?? null;
+}
+
+function renderSelectionState(panel) {
+  const state = panel.assetAuthoringEnhancement;
+  const instance = selectedInstance(state?.scene, state?.renderSelection);
+  if (!instance) return null;
+  return {
+    id: instance.id,
+    profileKey: instance.profileKey,
+    renderMode: normalizeAssetRenderMode(state.scene.assetProfiles?.[instance.profileKey]?.renderMode),
+  };
+}
+
+function applySelectedRenderMode(panel, value) {
+  const selection = renderSelectionState(panel);
+  if (!selection) return;
+  const renderMode = normalizeAssetRenderMode(value, selection.renderMode);
+  applyProfilePatch(panel.assetAuthoringEnhancement.scene, selection.profileKey, { renderMode });
+  panel.setRenderEditorState(renderSelectionState(panel));
+  syncRenderControls(panel);
+  panel.setAuthoringStatus(`Режим рендера: ${RENDER_MODE_LABELS[renderMode]}`);
+  renderEnhancedAuthoring(panel);
+}
+
+function syncRenderControls(panel) {
+  const state = panel.assetAuthoringEnhancement;
+  if (!state?.renderSelect) return;
+  const selection = renderSelectionState(panel);
+  state.renderSelect.disabled = !selection;
+  state.renderSelect.value = selection?.renderMode ?? ASSET_RENDER_MODES.pivotDepth;
+}
+
+function timelineSelectionState(panel) {
+  const state = panel.assetAuthoringEnhancement;
+  const instance = selectedInstance(state?.scene, state?.timelineSelection);
+  if (!instance) return null;
+  const timeline = normalizeInteractionTimeline(state.scene.assetProfiles?.[instance.profileKey]?.interactionTimeline);
+  const collider = interactionColliderForInstance(state.scene, instance);
+  const center = {
+    x: (collider.left + collider.right) / 2,
+    y: (collider.top + collider.bottom) / 2,
+  };
+  return {
+    id: instance.id,
+    profileKey: instance.profileKey,
+    timeline,
+    collider,
+    marker: {
+      x: center.x + timeline.positionOffset.x,
+      y: center.y + timeline.positionOffset.y,
+    },
+  };
+}
+
+function applyTimelinePatch(panel, patch) {
+  const selection = timelineSelectionState(panel);
+  if (!selection) return;
+  const interactionTimeline = normalizeInteractionTimeline({ ...selection.timeline, ...patch }, selection.timeline);
+  applyProfilePatch(panel.assetAuthoringEnhancement.scene, selection.profileKey, { interactionTimeline });
+  const next = timelineSelectionState(panel);
+  panel.setTimelineEditorState(next);
+  syncTimelineControls(panel);
+  renderEnhancedAuthoring(panel);
+}
+
+function applySelectedTimelineControls(panel) {
+  const state = panel.assetAuthoringEnhancement;
+  const selection = timelineSelectionState(panel);
+  if (!selection) return;
+  applyTimelinePatch(panel, {
+    enabled: Boolean(state.timelineEnabled?.checked),
+    walkDuringRelocation: Boolean(state.timelineWalk?.checked),
+    enterMs: Number(state.timelineEnter?.value),
+    exitMs: Number(state.timelineExit?.value),
+    facing: state.timelineFacing?.value,
+    screenOrientation: state.timelineScreenOrientation?.value,
+  });
+}
+
+function syncTimelineControls(panel) {
+  const state = panel.assetAuthoringEnhancement;
+  if (!state?.timelineEnabled) return;
+  const selection = timelineSelectionState(panel);
+  state.timelineEnabled.disabled = !selection;
+  state.timelineEnabled.checked = Boolean(selection?.timeline.enabled);
+  state.timelineWalk.disabled = !selection || !selection.timeline.enabled;
+  state.timelineWalk.checked = Boolean(selection?.timeline.walkDuringRelocation);
+  state.timelineEnter.disabled = !selection || !selection.timeline.enabled;
+  state.timelineExit.disabled = !selection || !selection.timeline.enabled;
+  state.timelineFacing.disabled = !selection || !selection.timeline.enabled;
+  state.timelineScreenOrientation.disabled = !selection || !selection.timeline.enabled;
+  state.timelineEnter.value = String(selection?.timeline.enterMs ?? 0);
+  state.timelineExit.value = String(selection?.timeline.exitMs ?? 0);
+  state.timelineFacing.value = selection?.timeline.facing ?? INTERACTION_TIMELINE_FACING_MODES.keepCurrent;
+  state.timelineScreenOrientation.value = selection?.timeline.screenOrientation
+    ?? INTERACTION_TIMELINE_SCREEN_ORIENTATIONS.original;
+}
+
 function interactionSelectionState(panel) {
   const state = panel.assetAuthoringEnhancement;
   if (!state?.interactionSelection) return null;
@@ -600,6 +1060,7 @@ function interactionSelectionState(panel) {
     id: instance.id,
     profileKey: instance.profileKey,
     directions: [...(profile?.interactionDirections ?? INTERACTION_APPROACH_DIRECTIONS)],
+    interactionPadding: normalizeInteractionPadding(profile?.interactionPadding),
     collider,
     entries: perimeterInteractionPointEntries(collider),
   };
@@ -653,6 +1114,12 @@ function applyProfilePatch(scene, profileKey, patch) {
     ...patch,
     visualCropInsets: normalizeVisualCropInsets(patch.visualCropInsets ?? current.visualCropInsets),
     interactionDirections: Object.freeze([...(patch.interactionDirections ?? current.interactionDirections ?? INTERACTION_APPROACH_DIRECTIONS)]),
+    interactionPadding: normalizeInteractionPadding(patch.interactionPadding ?? current.interactionPadding),
+    renderMode: normalizeAssetRenderMode(patch.renderMode ?? current.renderMode),
+    interactionTimeline: normalizeInteractionTimeline(
+      patch.interactionTimeline ?? current.interactionTimeline,
+      current.interactionTimeline,
+    ),
   });
   scene.assetProfiles = Object.freeze({ ...scene.assetProfiles, [profileKey]: next });
   return next;
@@ -684,6 +1151,7 @@ function renderEnhancedAuthoring(panel) {
   const graphics = state?.graphics;
   if (!graphics) return;
   graphics.clear?.();
+  if (state.scene.colliderDebugVisible) renderAssetDebugMarkers(state.scene, graphics);
   if (state.mode === "crop") {
     const selection = cropSelectionState(panel);
     if (!selection) return;
@@ -707,6 +1175,9 @@ function renderEnhancedAuthoring(panel) {
     const selection = interactionSelectionState(panel);
     if (!selection) return;
     const enabled = new Set(selection.directions);
+    const interactionBounds = paddedCollider(selection.collider, selection.interactionPadding);
+    graphics.lineStyle?.(1, 0x58d7ff, 0.65);
+    drawInteractionRange(graphics, interactionBounds, selection.interactionPadding);
     graphics.lineStyle?.(1, 0xffffff, 0.35);
     graphics.strokeRect?.(
       selection.collider.left,
@@ -718,7 +1189,111 @@ function renderEnhancedAuthoring(panel) {
       graphics.fillStyle?.(enabled.has(entry.direction) ? 0x63f59a : 0xff5f6d, 0.95);
       graphics.fillRect?.(Math.round(entry.point.x) - 1, Math.round(entry.point.y) - 1, 3, 3);
     }
+    return;
   }
+  if (state.mode === "interaction-point") {
+    const selection = interactionPointSelectionState(panel);
+    if (!selection?.marker) return;
+    drawCross(graphics, selection.marker, 0xff4dff);
+    return;
+  }
+  if (state.mode === "timeline") {
+    const selection = timelineSelectionState(panel);
+    if (!selection) return;
+    graphics.lineStyle?.(1, 0xffffff, 0.35);
+    graphics.strokeRect?.(
+      selection.collider.left,
+      selection.collider.top,
+      selection.collider.right - selection.collider.left,
+      selection.collider.bottom - selection.collider.top,
+    );
+    if (selection.timeline.enabled) drawCross(graphics, selection.marker, 0x58d7ff);
+    return;
+  }
+  if (state.mode === "render") {
+    const selection = renderSelectionState(panel);
+    const instance = selectedInstance(state.scene, selection);
+    const bounds = instance ? instanceWorldBounds(state.scene, instance) : null;
+    if (!bounds) return;
+    graphics.lineStyle?.(1, 0xffd166, 0.95);
+    graphics.strokeRect?.(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+  }
+}
+
+function applySelectedInteractionPadding(panel) {
+  const selection = interactionSelectionState(panel);
+  if (!selection) return;
+  const interactionPadding = normalizeInteractionPadding(
+    panel.assetAuthoringEnhancement?.interactionPadding?.value,
+    selection.interactionPadding,
+  );
+  applyProfilePatch(panel.assetAuthoringEnhancement.scene, selection.profileKey, { interactionPadding });
+  panel.assetAuthoringEnhancement.scene.interactionRuntime?.refresh?.();
+  panel.setInteractionEditorState(interactionSelectionState(panel));
+  syncInteractionControls(panel);
+  renderEnhancedAuthoring(panel);
+}
+
+function syncInteractionControls(panel) {
+  const input = panel.assetAuthoringEnhancement?.interactionPadding;
+  if (!input) return;
+  const selection = interactionSelectionState(panel);
+  input.disabled = !selection;
+  input.value = String(selection?.interactionPadding ?? 16);
+}
+
+function renderAssetDebugMarkers(scene, graphics) {
+  for (const instance of authoringInstances(scene)) {
+    const profile = scene.assetProfiles?.[instance.profileKey] ?? {};
+    const collider = interactionColliderForInstance(scene, instance);
+    const pivot = {
+      x: instance.anchor.x + Number(profile.snapAnchorOffset?.x || 0),
+      y: instance.anchor.y + Number(profile.snapAnchorOffset?.y || 0),
+    };
+    const interactionPoint = {
+      x: (collider.left + collider.right) / 2 + Number(profile.interactionOffset?.x || 0),
+      y: (collider.top + collider.bottom) / 2 + Number(profile.interactionOffset?.y || 0),
+    };
+    const interactionBounds = paddedCollider(collider, normalizeInteractionPadding(profile.interactionPadding));
+    graphics.lineStyle?.(1, 0x58d7ff, 0.3);
+    drawInteractionRange(graphics, interactionBounds, normalizeInteractionPadding(profile.interactionPadding));
+    drawCross(graphics, pivot, 0xffff3b, 0.3, 1);
+    drawCross(graphics, interactionPoint, 0xff4dff, 0.3, 2);
+    const enabledDirections = new Set(profile.interactionDirections ?? INTERACTION_APPROACH_DIRECTIONS);
+    for (const { direction, point } of perimeterInteractionPointEntries(collider)) {
+      if (!enabledDirections.has(direction)) continue;
+      graphics.fillStyle?.(0x63f59a, 0.3);
+      graphics.fillRect?.(Math.round(point.x) - 1, Math.round(point.y) - 1, 3, 3);
+    }
+  }
+}
+
+function paddedCollider(collider, padding) {
+  const value = normalizeInteractionPadding(padding);
+  return {
+    left: collider.left - value,
+    right: collider.right + value,
+    top: collider.top - value,
+    bottom: collider.bottom + value,
+  };
+}
+
+function drawInteractionRange(graphics, bounds, padding) {
+  const width = bounds.right - bounds.left;
+  const height = bounds.bottom - bounds.top;
+  if (graphics.strokeRoundedRect) {
+    graphics.strokeRoundedRect(bounds.left, bounds.top, width, height, normalizeInteractionPadding(padding));
+    return;
+  }
+  graphics.strokeRect?.(bounds.left, bounds.top, width, height);
+}
+
+function drawCross(graphics, marker, color, alpha = 1, radius = 2) {
+  const x = Math.round(marker.x);
+  const y = Math.round(marker.y);
+  graphics.fillStyle?.(color, alpha);
+  graphics.fillRect?.(x - radius, y, radius * 2 + 1, 1);
+  graphics.fillRect?.(x, y - radius, 1, radius * 2 + 1);
 }
 
 function constrainVisibleBounds(rect, bounds) {

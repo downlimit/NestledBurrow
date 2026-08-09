@@ -1,5 +1,10 @@
 import { PLACEABLE_TARGETING_GROUP } from "../build/liveAssetGeometry.js";
+import { resolveFixedWorldInstance } from "../build/fixedWorldAuthoringState.js";
 import { createMovementState } from "../character/characterMovement.js";
+import {
+  WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
+  WORLD_OBJECT_ATTENTION_GROUP,
+} from "../interaction/interactionConfig.js";
 import { getResourceObjectsForWorld } from "../resources/resourceConfig.js";
 import {
   getWorldLocationDefinition,
@@ -10,6 +15,7 @@ import {
   WORLD_TRANSITION_INTERACTION_KIND,
 } from "./worldLocationConfig.js";
 import { TILE_SIZE } from "./worldConfig.js";
+import { createAuthoredTransitionTimelineRuntime } from "../needs/interactionTimelineRuntime.js";
 
 export function createWorldLocationCoordinator(options) {
   return new WorldLocationCoordinator(options);
@@ -52,6 +58,10 @@ export class WorldLocationCoordinator {
     this.destroyed = false;
     this.activeDefinition = null;
     this.activeLayout = null;
+    this.transitionTimeline = createAuthoredTransitionTimelineRuntime({
+      getPlayer: () => this.getPlayerCharacter(),
+      getAssetProfile: (profileKey) => this.getAssetProfiles?.()?.[profileKey] ?? null,
+    });
   }
 
   createInitialLayout() {
@@ -105,8 +115,9 @@ export class WorldLocationCoordinator {
     });
   }
 
-  update() {
+  update(deltaMs = 0) {
     if (this.destroyed || this.switching || !this.activeLayout) return { status: "idle", transitioned: false };
+    this.transitionTimeline.update(deltaMs);
     if (this.lockedTransportId) {
       const playerPosition = this.getPlayerCharacter()?.motor?.position;
       const destinationTransport = this.activeLayout.transitions.find(({ id }) => id === this.lockedTransportId);
@@ -119,9 +130,8 @@ export class WorldLocationCoordinator {
   }
 
   getInteractionDefinitions() {
-    if (this.destroyed || this.switching || !this.activeLayout || !this.canTransition()) return [];
+    if (this.destroyed || this.switching || this.transitionTimeline.isLocked() || !this.activeLayout || !this.canTransition()) return [];
     return this.activeLayout.transitions
-      .filter(({ id }) => id !== this.lockedTransportId)
       .flatMap((transition) => {
         const interaction = this.transitionInteraction(transition);
         return interaction ? [Object.freeze({
@@ -136,10 +146,12 @@ export class WorldLocationCoordinator {
           radius: transition.interactionRadius,
           priority: transition.priority,
           requiresFacing: transition.requiresFacing,
-          facingDotThreshold: -1,
+          facingDotThreshold: transition.requiresFacing ? WORLD_OBJECT_ATTENTION_DOT_THRESHOLD : -1,
           targetingMode: "facing-first",
           targetingGroup: PLACEABLE_TARGETING_GROUP,
+          attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
           interactionDirections: interaction.interactionDirections,
+          requiresApproach: false,
           prompt: transition.prompt,
           payload: Object.freeze({ transitionId: transition.id }),
         })] : [];
@@ -150,9 +162,16 @@ export class WorldLocationCoordinator {
     if (candidate?.kind !== WORLD_TRANSITION_INTERACTION_KIND) return { status: "ignored", transitioned: false };
     const transitionId = candidate.payload?.transitionId;
     const transition = this.activeLayout?.transitions?.find(({ id }) => id === transitionId);
-    if (!transition || transition.id === this.lockedTransportId) return { status: "invalid", transitioned: false };
+    if (!transition) return { status: "invalid", transitioned: false };
+    if (this.transitionTimeline.isLocked()) return { status: "busy", transitioned: false };
     if (!this.canTransition()) return { status: "suppressed", transitioned: false };
-    return this.transition(transition);
+    const interaction = this.transitionInteraction(transition);
+    return this.transitionTimeline.begin({
+      profileKey: transition.profileKey,
+      collider: interaction?.collider,
+      metadata: { kind: "world-transition", id: transition.id },
+      activate: () => this.transition(transition),
+    });
   }
 
   transition(transition) {
@@ -219,10 +238,16 @@ export class WorldLocationCoordinator {
 
   isWithinInteractionRange(transition, point) {
     const interaction = this.transitionInteraction(transition);
-    return Boolean(interaction) && Math.hypot(
-      interaction.point.x - point.x,
-      interaction.point.y - point.y,
-    ) <= transition.interactionRadius;
+    if (!interaction) return false;
+    const authoredPadding = Number(this.getAssetProfiles?.()?.[transition.profileKey]?.interactionPadding);
+    const maximumDistance = Number.isFinite(authoredPadding)
+      ? Math.max(1, authoredPadding)
+      : transition.interactionRadius;
+    const closest = {
+      x: Math.min(interaction.collider.right, Math.max(interaction.collider.left, point.x)),
+      y: Math.min(interaction.collider.bottom, Math.max(interaction.collider.top, point.y)),
+    };
+    return Math.hypot(closest.x - point.x, closest.y - point.y) <= maximumDistance;
   }
 
   getState() {
@@ -232,11 +257,17 @@ export class WorldLocationCoordinator {
       transitionLocked: Boolean(this.lockedTransportId),
       lockedTransportId: this.lockedTransportId,
       transportCount: this.activeLayout?.transitions?.length ?? 0,
+      interactionTimeline: this.transitionTimeline.getState(),
       resourceIds: this.activeLayout?.resourceDefinitions?.map(({ id }) => id) ?? [],
     };
   }
 
+  isInteractionLocked() {
+    return this.transitionTimeline.isLocked();
+  }
+
   destroy() {
+    this.transitionTimeline.destroy();
     this.destroyed = true;
     this.activeDefinition = null;
     this.activeLayout = null;
@@ -248,8 +279,10 @@ export function applyTransportProfile(layout, definition) {
   const transportTiles = [];
   const transitions = [];
   for (const placement of definition.transports) {
-    const left = placement.tile.x * TILE_SIZE;
-    const top = placement.tile.y * TILE_SIZE;
+    const canonical = { x: placement.tile.x * TILE_SIZE, y: placement.tile.y * TILE_SIZE };
+    const authored = resolveFixedWorldInstance(placement.id, canonical);
+    const left = authored.x;
+    const top = authored.y;
     const footprintBounds = Object.freeze({
       left,
       top,
@@ -265,6 +298,7 @@ export function applyTransportProfile(layout, definition) {
     layout.setWorldObjectCollider?.(placement.id, baseCollider, placement.profileKey, {
       kind: WORLD_TRANSITION_INTERACTION_KIND,
       profileKey: placement.profileKey,
+      collisionEnabled: authored.collisionEnabled,
     });
     transportTiles.push(Object.freeze({
       id: placement.id,

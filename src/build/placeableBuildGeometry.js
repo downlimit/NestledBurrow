@@ -16,6 +16,17 @@ export function resourceVisualBoundsAt(point, profile) {
   return Object.freeze({ left: point.x, right: point.x + width, top: point.y, bottom: point.y + height });
 }
 
+export function resourcePlacementPoint(definition = {}) {
+  const explicit = definition.visualPosition;
+  return Object.freeze(explicit ? {
+    x: Number(explicit.x),
+    y: Number(explicit.y),
+  } : {
+    x: Number(definition.cell?.x) * PLACEMENT_CELL_SIZE,
+    y: Number(definition.cell?.y) * PLACEMENT_CELL_SIZE,
+  });
+}
+
 export function resourceColliderAt(point, profile) {
   const base = profile?.collisionRect ?? {
     left: 0,

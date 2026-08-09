@@ -1,3 +1,5 @@
+import { resolveInteractionTimelinePresentation } from "../build/assetProfiles.js";
+
 export const INTERACTION_PHASE = Object.freeze({
   free: "free",
   enter: "enter",
@@ -19,19 +21,24 @@ export function createInteractionTimelineRuntime({
 } = {}) {
   let state = freeState();
 
-  function begin({ profileId, targetPose, onActivate = () => {}, onDeactivate = () => {}, onComplete = () => {}, metadata = null } = {}) {
-    const profile = INTERACTION_TIMELINE_PROFILES[profileId];
-    if (!profile) return { status: "unknown-profile", mutated: false };
+  function begin({ profileId, profileOverride = null, targetPose, onActivate = () => {}, onDeactivate = () => {}, onComplete = () => {}, metadata = null } = {}) {
+    const canonicalProfile = INTERACTION_TIMELINE_PROFILES[profileId]
+      ?? (profileOverride?.enabled ? profile(null, profileOverride.enterMs, profileOverride.exitMs, 0) : null);
+    if (!canonicalProfile) return { status: "unknown-profile", mutated: false };
+    const resolvedProfile = profileWithOverride(canonicalProfile, profileOverride);
     if (state.phase !== INTERACTION_PHASE.free) return { status: "busy", mutated: false };
     const start = poseFrom(getPresentationPosition());
-    const target = poseFrom(targetPose, start);
+    const target = {
+      ...poseFrom(targetPose, start),
+      walking: Boolean(resolvedProfile.walkDuringRelocation),
+    };
     state = {
-      phase: INTERACTION_PHASE.enter, profileId, profile, elapsedMs: 0, durationMs: profile.enterMs,
+      phase: INTERACTION_PHASE.enter, profileId, profile: resolvedProfile, elapsedMs: 0, durationMs: resolvedProfile.enterMs,
       startPose: start, targetPose: target, onActivate, onDeactivate, onComplete,
       metadata, effectActive: false,
     };
     setPresentationPose(start);
-    return { status: "entering", mutated: false, phase: state.phase, protectedNeed: profile.protectedNeed };
+    return { status: "entering", mutated: false, phase: state.phase, protectedNeed: resolvedProfile.protectedNeed };
   }
 
   function update(deltaMs) {
@@ -43,6 +50,7 @@ export function createInteractionTimelineRuntime({
     if (state.phase === INTERACTION_PHASE.enter) {
       state.phase = INTERACTION_PHASE.active;
       state.effectActive = true;
+      state.targetPose = { ...state.targetPose, walking: false };
       setPresentationPose(state.targetPose);
       state.onActivate();
       return getState();
@@ -80,7 +88,10 @@ export function createInteractionTimelineRuntime({
     state.elapsedMs = 0;
     state.durationMs = durationMs;
     state.startPose = poseFrom(getPresentationPosition(), state.targetPose);
-    state.targetPose = poseFrom(getMotorPosition(), { facing: "down", angle: 0, originX: 0.5, originY: 1, showSleepMarker: false });
+    state.targetPose = {
+      ...poseFrom(getMotorPosition(), { facing: "down", angle: 0, originX: 0.5, originY: 1, showSleepMarker: false }),
+      walking: Boolean(state.profile.walkDuringRelocation),
+    };
   }
 
   function getState() {
@@ -94,13 +105,104 @@ export function createInteractionTimelineRuntime({
     });
   }
 
+  function reset() {
+    setPresentationPose(null);
+    state = freeState();
+    return getState();
+  }
+
   return Object.freeze({
     begin,
     update,
     requestExit,
+    reset,
     getState,
     getProtectedNeed: () => state.profile?.protectedNeed ?? null,
     isLocked: () => state.phase !== INTERACTION_PHASE.free,
+  });
+}
+
+export function createAuthoredTransitionTimelineRuntime({
+  getPlayer = () => null,
+  getAssetProfile = () => null,
+} = {}) {
+  const getPlayerPresentationPose = () => {
+    const player = getPlayer();
+    return {
+      x: player?.sprite?.x ?? player?.motor?.position?.x ?? 0,
+      y: player?.sprite?.y ?? player?.motor?.position?.y ?? 0,
+      facing: player?.visual?.presentationPose?.facing ?? player?.visual?.lastFacing ?? "down",
+      angle: Number(player?.sprite?.angle) || 0,
+      originX: player?.sprite?.originX,
+      originY: player?.sprite?.originY,
+    };
+  };
+  const timeline = createInteractionTimelineRuntime({
+    getPresentationPosition: getPlayerPresentationPose,
+    getMotorPosition: () => getPlayer()?.motor?.position ?? { x: 0, y: 0 },
+    setPresentationPose: (pose) => getPlayer()?.visual?.setPresentationPose?.(pose),
+  });
+
+  function begin({ profileKey, collider, activate = () => ({ status: "ignored" }), metadata = null } = {}) {
+    const profile = getAssetProfile(profileKey) ?? {};
+    const authored = profile.interactionTimeline;
+    if (!authored?.enabled || !collider || !getPlayer()?.motor) return activate();
+    if (timeline.isLocked()) return { status: "busy", transitioned: false };
+
+    const offset = authored.positionOffset ?? { x: 0, y: 0 };
+    const presentation = resolveInteractionTimelinePresentation(authored, getPlayerPresentationPose());
+    const targetPose = presentationPoseAtBodyCenter({
+      x: (Number(collider.left) + Number(collider.right)) / 2 + Number(offset.x || 0),
+      y: (Number(collider.top) + Number(collider.bottom)) / 2 + Number(offset.y || 0),
+      ...presentation,
+    }, getPlayer()?.sprite);
+    const movement = getPlayer()?.motor?.movement;
+    if (movement?.velocity) {
+      movement.velocity.x = 0;
+      movement.velocity.y = 0;
+    }
+    return timeline.begin({
+      profileId: "transition",
+      profileOverride: authored,
+      targetPose,
+      metadata: metadata ?? { profileKey },
+      onActivate: () => {
+        try {
+          activate();
+        } finally {
+          timeline.reset();
+        }
+      },
+    });
+  }
+
+  return Object.freeze({
+    begin,
+    update: (deltaMs) => timeline.update(deltaMs),
+    getState: () => timeline.getState(),
+    isLocked: () => timeline.isLocked(),
+    reset: () => timeline.reset(),
+    destroy: () => timeline.reset(),
+  });
+}
+
+export function resolveAuthoredTimelineSource(instances = [], preferred = null, getAssetProfile = () => null) {
+  if (!preferred) return null;
+  if (getAssetProfile(preferred.profileKey)?.interactionTimeline?.enabled) return preferred;
+  if (!preferred.moveGroupId) return preferred;
+  return instances.find((candidate) => (
+    candidate?.moveGroupId === preferred.moveGroupId
+      && getAssetProfile(candidate.profileKey)?.interactionTimeline?.enabled
+  )) ?? preferred;
+}
+
+function profileWithOverride(canonical, override) {
+  if (!override?.enabled) return canonical;
+  return Object.freeze({
+    ...canonical,
+    enterMs: finiteNonNegative(override.enterMs),
+    exitMs: finiteNonNegative(override.exitMs),
+    walkDuringRelocation: Boolean(override.walkDuringRelocation),
   });
 }
 
@@ -121,7 +223,27 @@ function poseFrom(position, fallback = {}) {
     originY: Number(position?.originY ?? fallback?.originY ?? 0.5),
     depth: position?.depth ?? fallback?.depth,
     showSleepMarker: Boolean(position?.showSleepMarker ?? fallback?.showSleepMarker),
+    walking: Boolean(position?.walking ?? fallback?.walking),
   };
+}
+
+export function presentationPoseAtBodyCenter(targetPose, sprite = {}) {
+  const originX = Number(sprite?.originX ?? targetPose?.originX ?? 0.5);
+  const originY = Number(sprite?.originY ?? targetPose?.originY ?? 1);
+  const width = Math.max(1, Number(sprite?.displayWidth ?? sprite?.width ?? 16) || 16);
+  const height = Math.max(1, Number(sprite?.displayHeight ?? sprite?.height ?? 16) || 16);
+  const radians = (Number(targetPose?.angle) || 0) * Math.PI / 180;
+  const localX = (0.5 - originX) * width;
+  const localY = (0.5 - originY) * height;
+  const rotatedX = localX * Math.cos(radians) - localY * Math.sin(radians);
+  const rotatedY = localX * Math.sin(radians) + localY * Math.cos(radians);
+  return Object.freeze({
+    ...targetPose,
+    x: Number(targetPose?.x || 0) - rotatedX,
+    y: Number(targetPose?.y || 0) - rotatedY,
+    originX,
+    originY,
+  });
 }
 
 function interpolatePose(from, to, amount) {

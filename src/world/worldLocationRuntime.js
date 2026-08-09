@@ -7,7 +7,7 @@ import { createCookingRuntime } from "../tavern/cookingRuntime.js";
 import { createDebrisRuntime } from "../resources/debrisRuntime.js";
 import { createFacilityRuntime } from "../facilities/facilityRuntime.js";
 import { createFarmingRuntime } from "../resources/farmingRuntime.js";
-import { applyGameplayTuning, refillEnergy, resetBalanceRun } from "../session/gameSessionState.js";
+import { applyGameplayTuning } from "../session/gameSessionState.js";
 import { formatClock } from "../session/gameClock.js";
 import { GUEST_CONFIG } from "../tavern/guestConfig.js";
 import { addInventoryItem, createInventoryItem } from "../inventory/inventoryDomain.js";
@@ -17,7 +17,6 @@ import { createMerchantRuntime } from "../resources/merchantRuntime.js";
 import { getFootBox } from "../character/movement.js";
 import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { createNeedsInteractionCoordinator } from "../needs/needsInteractionCoordinator.js";
-import { needMeterValues } from "../needs/needsFlowRuntime.js";
 import { NPCS } from "../character/npcConfig.js";
 import { getResourceProfile } from "../resources/resourceDomain.js";
 import { RESOURCE_OBJECTS } from "../resources/resourceConfig.js";
@@ -27,6 +26,7 @@ import { createWorldBuildCoordinator } from "../build/worldBuildCoordinator.js";
 import { createPuddleRuntime } from "./puddleRuntime.js";
 import { createWildAtollRuntime } from "./wildAtollRuntime.js";
 import { WORLD_IDS } from "./worldLocationConfig.js";
+import { clearCurrentWorldScene, setCurrentWorldScene } from "../build/worldSceneRegistry.js";
 
 const EMPTY_OWNERS = Object.freeze(createEmptyOwners());
 
@@ -102,6 +102,7 @@ export class WorldLocationRuntime {
     if (this.activeDefinition) this.unmount();
     this.activeDefinition = definition;
     this.activeLayout = layout;
+    setCurrentWorldScene(this.renderingHost);
     this.presentationRuntime.mount(layout);
     try {
       this.mountPuddle();
@@ -116,9 +117,9 @@ export class WorldLocationRuntime {
       if (capabilities.tavernService) this.mountTavern();
       if (capabilities.farming) this.mountFarming();
       if (capabilities.cooking) this.mountCooking();
-      if (capabilities.buildMode) {
+      if (capabilities.buildMode || capabilities.fixedWorldAuthoring) {
         this.mountMovementDebugPanel();
-        this.mountBuildCoordinator();
+        this.mountBuildCoordinator({ constructionEnabled: capabilities.buildMode });
       }
       this.updateOwnerSnapshot();
       this.globalOwners.worldInteractionCoordinator?.rebindLocationOwners?.(this.interactionOwners());
@@ -168,6 +169,7 @@ export class WorldLocationRuntime {
     this.owners.puddleRuntime?.destroy?.();
     this.owners.puddleRuntime = null;
     this.presentationRuntime.unmount();
+    clearCurrentWorldScene(this.renderingHost);
     this.activeDefinition = null;
     this.activeLayout = null;
     this.updateOwnerSnapshot();
@@ -324,9 +326,8 @@ export class WorldLocationRuntime {
   mountWildAtoll(worldId) {
     if (worldId !== WORLD_IDS.nest && worldId !== WORLD_IDS.atoll) return;
     if (!this.wildAtollRuntime) {
-      this.wildAtollRuntime = this.factories.wildAtoll(this.renderingHost, {
-        localization: this.localization,
-      });
+      this.wildAtollRuntime = this.renderingHost.wildAtollRuntime
+        ?? this.factories.wildAtoll(this.renderingHost, { localization: this.localization });
     }
     this.owners.wildAtollRuntime = this.wildAtollRuntime;
   }
@@ -484,20 +485,7 @@ export class WorldLocationRuntime {
         this.callbacks.syncPlayerEnergyTarget?.();
         this.globalOwners.gameHud?.render?.();
       },
-      onRefillEnergy: () => {
-        refillEnergy(this.sessionState);
-        this.globalOwners.needsFlowRuntime?.reset?.(needMeterValues(this.sessionState.gameplay));
-        this.callbacks.syncPlayerEnergyTarget?.();
-        this.globalOwners.gameHud?.render?.();
-        this.callbacks.saveSession?.();
-      },
-      onSetNeedsDebugPreset: (preset) => {
-        if (preset === "clear") this.globalOwners.needsRuntime?.clearDebugPreset?.();
-        else this.globalOwners.needsRuntime?.setDebugPreset?.(preset);
-        this.globalOwners.needsFlowRuntime?.reset?.(needMeterValues(this.sessionState.gameplay));
-        this.callbacks.syncPlayerEnergyTarget?.();
-        this.globalOwners.gameHud?.render?.();
-      },
+      onOpenChange: (active) => this.callbacks.setDebugPanelOpen?.(active),
       onAddCookedDish: () => {
         const result = addInventoryItem(this.sessionState.gameplay.inventory, createInventoryItem("fried-potato-dish", 1));
         if (result.mutated) this.globalOwners.gameHud?.notifyInventoryGain?.(result);
@@ -514,21 +502,12 @@ export class WorldLocationRuntime {
       onColliderRound: () => this.authoring.roundSelectedCollider?.(),
       onPivotAlign: (axis) => this.authoring.alignSelectedPivot?.(axis),
       onVisualOffsetReset: () => this.authoring.resetSelectedVisualOffset?.(),
-      onResetBalanceRun: () => {
-        resetBalanceRun(this.sessionState);
-        this.globalOwners.worldInteractionCoordinator?.resetResourceActivity?.();
-        this.owners.debrisRuntime?.rebuild?.();
-        this.callbacks.syncPlayerEnergyTarget?.();
-        this.globalOwners.gameHud?.render?.();
-        this.globalOwners.interactionRuntime?.refresh?.();
-        this.callbacks.saveSession?.();
-      },
       getStatusSnapshot: () => this.getDebugStatusSnapshot(),
     });
     this.mountAuthoringInput();
   }
 
-  mountBuildCoordinator() {
+  mountBuildCoordinator({ constructionEnabled = true } = {}) {
     const registries = this.presentationRuntime.getBuildSurfaceRegistries();
     this.owners.worldBuildCoordinator = this.factories.worldBuildCoordinator({
       renderingHost: this.renderingHost,
@@ -560,6 +539,11 @@ export class WorldLocationRuntime {
         this.callbacks.getMobileJoystick?.()?.reset?.();
         if (!active) this.globalOwners.interactionRuntime?.refresh?.();
       },
+      constructionEnabled,
+      getFixedWorldAuthoringInstances: () => [
+        ...(this.presentationRuntime.getTransitionAuthoringInstances?.() ?? []),
+        ...(this.owners.wildAtollRuntime?.getAuthoringInstances?.() ?? []),
+      ],
     });
     this.owners.buildModeRuntime = this.owners.worldBuildCoordinator.getBuildModeRuntime();
     this.owners.farmingRuntime?.attachWorldBuildCoordinator?.(this.owners.worldBuildCoordinator);
@@ -653,6 +637,7 @@ export function validateLocationCapabilities(capabilities = {}) {
     farming: Boolean(capabilities.farming),
     cooking: Boolean(capabilities.cooking),
     buildMode: Boolean(capabilities.buildMode),
+    fixedWorldAuthoring: Boolean(capabilities.fixedWorldAuthoring),
   });
   if (normalized.tavernService && !normalized.facilities) {
     throw new Error("Invalid location capabilities: tavernService requires facilities");

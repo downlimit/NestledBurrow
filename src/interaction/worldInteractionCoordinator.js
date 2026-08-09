@@ -9,6 +9,10 @@ import { WORLD_IDS, WORLD_TRANSITION_INTERACTION_KIND } from "../world/worldLoca
 
 const IGNORED = Object.freeze({ status: "ignored", mutated: false });
 
+export function isInteractionBlockedByInventoryMode({ inventoryBlocked = false, candidateKind = null } = {}) {
+  return Boolean(inventoryBlocked) && candidateKind !== WORLD_TRANSITION_INTERACTION_KIND;
+}
+
 export function createWorldInteractionCoordinator({
   sessionState,
   getGameplayTuning,

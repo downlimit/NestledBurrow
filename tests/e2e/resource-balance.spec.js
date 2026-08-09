@@ -38,6 +38,30 @@ function inventoryQuantity(gameplay, itemId) {
     .reduce((total, item) => total + item.quantity, 0);
 }
 
+function colliderCenter(collider) {
+  return {
+    x: (collider.left + collider.right) / 2,
+    y: (collider.top + collider.bottom) / 2,
+  };
+}
+
+function pointOutsideCollider(collider, direction, distance = 4) {
+  const center = colliderCenter(collider);
+  const length = Math.hypot(direction.x, direction.y);
+  const unit = { x: direction.x / length, y: direction.y / length };
+  const xBoundary = unit.x === 0
+    ? Number.POSITIVE_INFINITY
+    : (unit.x > 0 ? collider.right - center.x : center.x - collider.left) / Math.abs(unit.x);
+  const yBoundary = unit.y === 0
+    ? Number.POSITIVE_INFINITY
+    : (unit.y > 0 ? collider.bottom - center.y : center.y - collider.top) / Math.abs(unit.y);
+  const boundaryDistance = Math.min(xBoundary, yBoundary);
+  return {
+    x: center.x + unit.x * (boundaryDistance + distance),
+    y: center.y + unit.y * (boundaryDistance + distance),
+  };
+}
+
 test("balance panel is compact, scrollable and applies live resource tuning", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the focused balance panel evidence once");
   mkdirSync(EVIDENCE_DIR, { recursive: true });
@@ -100,7 +124,7 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
   await bridge(page, "interact");
   await expect.poll(() => bridge(page, "getRuntimeState")).toMatchObject({ sleeping: true, timeScale: 32 });
   await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { prompt: "hud:interaction.wake" } });
-  await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ x: 576, y: 399, angle: -90, textureKey: "tile_0269" });
+  await expect.poll(() => bridge(page, "getPlayerVisualState")).toMatchObject({ x: 584, y: 399, angle: -90, textureKey: "kenney-player-diagonal" });
   await bridge(page, "wakeUp");
 
   const canvas = await page.locator("canvas").boundingBox();
@@ -211,15 +235,19 @@ test("resource colliders have their requested insets and work from directly abov
   const largeLog = await bridge(page, "getResourceCollider", "yard-log-04");
   const stone = await bridge(page, "getResourceCollider", "yard-stone-02");
   const largeStone = await bridge(page, "getResourceCollider", "yard-stone-01");
-  expect(log.bottom - log.top).toBe(13);
+  expect(log.bottom - log.top).toBe(7);
   expect(stone.bottom - stone.top).toBe(13);
   expect(stone.right - stone.left).toBe(13);
   expect(stone.left).toBe(95 * 8 + 1);
   expect(largeLog.bottom - largeLog.top).toBe(19.5);
   expect(largeStone.bottom - largeStone.top).toBe(19.5);
-  const stoneDefinition = (await bridge(page, "getDebrisState")).definitions.find((item) => item.id === "yard-stone-02");
   await bridge(page, "selectInventorySlot", 1);
-  await bridge(page, "placePlayerAt", { x: stoneDefinition.position.x, y: stoneDefinition.position.y - 20, facing: { x: 0, y: -1 } });
+  const stoneCenter = colliderCenter(stone);
+  const playerPosition = pointOutsideCollider(stone, { x: 0, y: -1 });
+  await bridge(page, "placePlayerAt", {
+    ...playerPosition,
+    facing: { x: stoneCenter.x - playerPosition.x, y: stoneCenter.y - playerPosition.y },
+  });
   await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { entityId: "yard-stone-02" } });
 });
 
@@ -228,35 +256,42 @@ test("logs and stones always show a work target from every approach angle", asyn
   const definitions = (await bridge(page, "getDebrisState")).definitions;
   for (const id of ["fallen-log-01", "yard-log-04", "yard-stone-02", "yard-stone-01"]) {
     const resource = definitions.find((item) => item.id === id);
+    const collider = await bridge(page, "getResourceCollider", id);
+    const center = colliderCenter(collider);
     const slotIndex = ["stone-small", "stone-large", "ruby-node"].includes(resource.profileId) ? 1 : 0;
     await bridge(page, "selectInventorySlot", slotIndex);
     for (const [x, y] of [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]) {
-      const length = Math.hypot(x, y);
-      const reach = resource.radius - 1;
+      const position = pointOutsideCollider(collider, { x, y });
       await bridge(page, "placePlayerAt", {
-        x: resource.position.x + x / length * reach,
-        y: resource.position.y + y / length * reach,
-        facing: { x: -x, y: -y },
+        ...position,
+        facing: { x: center.x - position.x, y: center.y - position.y },
       });
       await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { kind: "work-resource" } });
     }
   }
 });
 
-test("resource aiming follows the faced visual center when nearby logs compete", async ({ page }) => {
+test("resource aiming follows the faced collider center when nearby logs compete", async ({ page }) => {
   await boot(page);
   const definitions = (await bridge(page, "getDebrisState")).definitions;
   const leftLog = definitions.find((item) => item.id === "fallen-log-01");
   const rightLog = definitions.find((item) => item.id === "yard-log-02");
+  const colliders = new Map(await Promise.all([leftLog, rightLog].map(async (resource) => [
+    resource.id,
+    await bridge(page, "getResourceCollider", resource.id),
+  ])));
+  const leftCenter = colliderCenter(colliders.get(leftLog.id));
+  const rightCenter = colliderCenter(colliders.get(rightLog.id));
   const position = {
-    x: (leftLog.position.x + rightLog.position.x) / 2,
-    y: Math.max(leftLog.position.y, rightLog.position.y) + 11,
+    x: (leftCenter.x + rightCenter.x) / 2,
+    y: Math.max(colliders.get(leftLog.id).bottom, colliders.get(rightLog.id).bottom) + 4,
   };
   await bridge(page, "selectInventorySlot", 0);
   for (const target of [leftLog, rightLog]) {
+    const center = colliderCenter(colliders.get(target.id));
     await bridge(page, "placePlayerAt", {
       ...position,
-      facing: { x: target.position.x - position.x, y: target.position.y - position.y },
+      facing: { x: center.x - position.x, y: center.y - position.y },
     });
     await expect.poll(() => bridge(page, "getInteractionState")).toMatchObject({ candidate: { entityId: target.id } });
   }

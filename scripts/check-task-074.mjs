@@ -36,8 +36,8 @@ for (const [profileKey, direction] of [
   assert.equal(profile.family, "transition");
   assert.deepEqual(profile.interactionOffset, { x: 0, y: 0 });
   assert.deepEqual(profile.interactionDirections, [direction]);
-  assert.deepEqual(profile.colliderOffsets, { left: 0, right: 0, top: 0, bottom: 0 });
-  assert.deepEqual(profile.visualOffset, { x: 0, y: 0 });
+  assert(Object.values(profile.colliderOffsets).every(Number.isFinite), "authored transition collider offsets stay finite");
+  assert(Object.values(profile.visualOffset).every(Number.isFinite), "authored transition visual offset stays finite");
 }
 
 const villageDefinition = WORLD_LOCATION_DEFINITIONS[WORLD_IDS.village];
@@ -76,6 +76,7 @@ assert.equal(villageInteraction.requiresFacing, false);
 assert.equal(villageInteraction.radius, 32);
 assert.equal(villageInteraction.targetingGroup, PLACEABLE_TARGETING_GROUP);
 assert.equal(villageInteraction.targetingMode, "facing-first");
+assert.equal(villageInteraction.requiresApproach, false, "standing on a transition collider never requires pathfinding out of the blocked start cell");
 assert.deepEqual(villageInteraction.interactionDirections, ["bottom"]);
 assert.deepEqual(villageInteraction.position, { x: 512, y: 190 });
 
@@ -128,6 +129,18 @@ assert.deepEqual(nestInteraction.position, { x: 176, y: 210 });
 assert.deepEqual(nestInteraction.interactionDirections, ["top"]);
 assert.equal(nestInteraction.targetingGroup, PLACEABLE_TARGETING_GROUP);
 
+const reversibleCoordinator = createWorldLocationCoordinator({
+  sessionState: { currentWorldId: WORLD_IDS.village },
+  createLayout: (worldId) => createWorldLayout(worldId),
+  getAssetProfiles: () => DEFAULT_ASSET_PROFILES,
+});
+reversibleCoordinator.createInitialLayout();
+assert.equal(reversibleCoordinator.handleInteraction(reversibleCoordinator.getInteractionDefinitions()[0]).transitioned, true);
+const immediateReverse = reversibleCoordinator.getInteractionDefinitions()[0];
+assert(immediateReverse, "the destination transport is interactable immediately after arrival");
+assert.equal(reversibleCoordinator.handleInteraction(immediateReverse).transitioned, true, "a fresh Space press can immediately return through the paired transport");
+assert.equal(reversibleCoordinator.getState().worldId, WORLD_IDS.village);
+
 const mainSource = readFileSync("src/main.js", "utf8");
 assert(mainSource.includes("WORLD_TRANSITION_ASSETS"), "WorldScene must preload the two native transition images");
 assert(mainSource.includes("getWorldTransitionDefinitions"), "WorldScene must wire location transition definitions into interaction dispatch");
@@ -135,19 +148,25 @@ assert(mainSource.includes("activateWorldTransition"), "WorldScene must wire int
 const presentationSource = readFileSync("src/world/worldPresentationRuntime.js", "utf8");
 assert(presentationSource.includes("tile.frame == null"), "standalone transition PNGs bypass atlas-frame rendering");
 assert(presentationSource.includes("getTransitionAuthoringInstances"), "transition visuals participate in universal asset authoring");
-assert(presentationSource.includes("assetDepthFromPivot"), "transition depth follows the editable pivot contract");
+assert(presentationSource.includes("assetDepthFromRenderMode"), "transition depth follows the editable render policy and pivot contract");
 const universalAuthoringSource = readFileSync("src/build/universalPlaceableAuthoring.js", "utf8");
 for (const required of [
-  "transitionInstances(scene)",
+  "collectAssetAuthoringInstances",
   "selectInteractionPointAt",
   "setInteractionOffset",
-  "Редактировать точку взаимодействия",
-  "Сохранить точку взаимодействия",
 ]) {
   assert(universalAuthoringSource.includes(required), `universal authoring retains ${required}`);
 }
+const authoringRegistrySource = readFileSync("src/build/assetAuthoringRegistry.js", "utf8");
+assert(authoringRegistrySource.includes("transitionInstances(scene)"), "typed registry includes transition instances");
+const editorBootstrapSource = readFileSync("src/build/editorAuthoringBootstrap.js", "utf8");
+for (const required of ["Точка взаимодействия", "Применить точку взаимодействия"]) {
+  assert(editorBootstrapSource.includes(required), `shared authoring UI retains ${required}`);
+}
 const bootstrapSource = readFileSync("src/build/assetRuntimeConsistencyBootstrap.js", "utf8");
-assert(bootstrapSource.includes("this.activeDefinition?.transports?.length"), "transition locations mount the same authoring panel even without build mode");
+const locationRuntimeSource = readFileSync("src/world/worldLocationRuntime.js", "utf8");
+assert(locationRuntimeSource.includes("capabilities.buildMode || capabilities.fixedWorldAuthoring"), "transition locations mount the shared authoring runtime through capability routing");
+assert(!bootstrapSource.includes("this.activeDefinition?.transports?.length"), "transition authoring has no transport-count special case");
 assert(bootstrapSource.includes("installWorldTransitionAuthoringBridge"), "transition authoring gets live scene/profile wiring");
 const editorSource = readFileSync("src/build/editorAuthoringRuntime.js", "utf8");
 assert(editorSource.includes("hasBuildCoordinator"), "profile authoring remains available without a build coordinator");

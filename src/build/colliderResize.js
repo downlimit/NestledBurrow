@@ -1,14 +1,27 @@
+export function getColliderResizeHandles(rect) {
+  const pixelBounds = getPixelColliderBounds(rect);
+  const centerX = Math.round((pixelBounds.left + pixelBounds.right) / 2);
+  const centerY = Math.round((pixelBounds.top + pixelBounds.bottom) / 2);
+  return [
+    { x: pixelBounds.left, y: pixelBounds.top, edges: { left: true, right: false, top: true, bottom: false } },
+    { x: centerX, y: pixelBounds.top, edges: { left: false, right: false, top: true, bottom: false } },
+    { x: pixelBounds.right, y: pixelBounds.top, edges: { left: false, right: true, top: true, bottom: false } },
+    { x: pixelBounds.left, y: centerY, edges: { left: true, right: false, top: false, bottom: false } },
+    { x: pixelBounds.right, y: centerY, edges: { left: false, right: true, top: false, bottom: false } },
+    { x: pixelBounds.left, y: pixelBounds.bottom, edges: { left: true, right: false, top: false, bottom: true } },
+    { x: centerX, y: pixelBounds.bottom, edges: { left: false, right: false, top: false, bottom: true } },
+    { x: pixelBounds.right, y: pixelBounds.bottom, edges: { left: false, right: true, top: false, bottom: true } },
+  ];
+}
+
 export function getColliderResizeEdges(point, rect, tolerance = 3) {
-  const withinX = point.x >= rect.left - tolerance && point.x <= rect.right + tolerance;
-  const withinY = point.y >= rect.top - tolerance && point.y <= rect.bottom + tolerance;
-  if (!withinX || !withinY) return null;
-  const edges = {
-    left: Math.abs(point.x - rect.left) <= tolerance,
-    right: Math.abs(point.x - rect.right) <= tolerance,
-    top: Math.abs(point.y - rect.top) <= tolerance,
-    bottom: Math.abs(point.y - rect.bottom) <= tolerance,
-  };
-  return Object.values(edges).some(Boolean) ? edges : null;
+  const handle = getColliderResizeHandles(rect)
+    .filter(({ x, y }) => Math.abs(point.x - x) <= tolerance && Math.abs(point.y - y) <= tolerance)
+    .sort((left, right) => (
+      ((point.x - left.x) ** 2 + (point.y - left.y) ** 2)
+      - ((point.x - right.x) ** 2 + (point.y - right.y) ** 2)
+    ))[0];
+  return handle ? { ...handle.edges } : null;
 }
 
 export function resizeColliderDraft(start, edges, delta, minimumSize = 1) {

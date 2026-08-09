@@ -70,6 +70,7 @@ export function installWorldE2EBridge(scene) {
         bedPresent: Boolean(getLocationOwners().debrisRuntime?.getBedDefinition?.()),
       },
     }),
+    getWildAtollState: () => clone(scene.wildAtollRuntime?.getState?.() ?? null),
     saveSession: () => scene.saveSession(),
     getInteractionState: () => ({
       candidate: getForcedFacility()
@@ -362,13 +363,28 @@ function placePlayerNear(scene, entityId) {
   const bed = owners.debrisRuntime?.getBedDefinition?.(entityId);
   const well = owners.worldBuildCoordinator?.getWellState?.().find((item) => item.id === entityId);
   const sign = entityId === TAVERN_SIGN.id ? { position: owners.tavernSignRuntime?.getState?.().interactionPosition } : null;
-  const target = resource
-    ? { position: resource.position }
+  const atollInstance = scene.wildAtollRuntime?.getAuthoringInstances?.().find((instance) => instance.id === entityId);
+  const interactionDefinition = scene.worldInteractionCoordinator?.getStaticInteractionDefinitions?.().find((definition) => (
+    definition.id === entityId || definition.entityId === entityId
+  ));
+  const target = atollInstance
+    ? { position: atollInstance.anchor }
+    : interactionDefinition
+    ? { position: interactionDefinition.aimPosition ?? interactionDefinition.position }
+    : resource ? { position: resource.position }
     : bed ? { position: bed.position }
       : facility ? { position: facility.position }
         : well ? { position: { x: well.x + 8, y: well.y + 8 } }
-        : sign ?? scene.characterSystem.getSnapshot(entityId);
+        : sign ?? (scene.characterSystem.has(entityId) ? scene.characterSystem.getSnapshot(entityId) : null);
   if (!target?.position) throw new Error(`Unknown E2E placement target: ${entityId}`);
+  const collider = scene.worldLayout?.getResourceCollider?.(entityId)
+    ?? scene.worldLayout?.getWorldObjectColliders?.().find((entry) => (
+      entry.id === entityId || entry.id === interactionDefinition?.id || entry.id === interactionDefinition?.entityId
+    ))?.rect
+    ?? null;
+  const attentionPosition = collider
+    ? { x: (collider.left + collider.right) / 2, y: (collider.top + collider.bottom) / 2 }
+    : target.position;
   const player = scene.characterSystem.require(scene.sessionState.playerId);
   const directions = [
     { x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
@@ -376,14 +392,23 @@ function placePlayerNear(scene, entityId) {
     { x: -Math.SQRT1_2, y: Math.SQRT1_2 }, { x: Math.SQRT1_2, y: Math.SQRT1_2 },
   ];
   let placed = false;
-  for (const distance of [12, 20, 28, 34]) {
+  for (const distance of [4, 8, 12, 20, 28, 34]) {
     for (const direction of directions) {
-      player.motor.position = {
-        x: target.position.x + direction.x * distance,
-        y: target.position.y + direction.y * distance,
-      };
+      player.motor.position = collider
+        ? pointOutsideRect(collider, attentionPosition, direction, distance)
+        : {
+          x: attentionPosition.x + direction.x * distance,
+          y: attentionPosition.y + direction.y * distance,
+        };
       if (collides(player.motor.position, scene.worldLayout, player.motor.footWidth, player.motor.footDepth)) continue;
-      player.motor.movement = createMovementState({ facing: { x: -direction.x, y: -direction.y } });
+      player.motor.movement = createMovementState({ facing: {
+        x: attentionPosition.x - player.motor.position.x,
+        y: attentionPosition.y - player.motor.position.y,
+      } });
+      if (atollInstance) {
+        placed = true;
+        break;
+      }
       scene.interactionRuntime?.update?.({ actions: { interact: false, primary: false, secondary: false } });
       if (scene.interactionRuntime?.getCurrentCandidate?.()?.entityId === entityId) {
         placed = true;
@@ -396,6 +421,20 @@ function placePlayerNear(scene, entityId) {
   scene.cameraRuntime?.reset(player.motor.position);
   if (!placed) scene.interactionRuntime?.refresh?.();
   return placed;
+}
+
+function pointOutsideRect(rect, center, direction, distance) {
+  const xBoundary = direction.x === 0
+    ? Number.POSITIVE_INFINITY
+    : (direction.x > 0 ? rect.right - center.x : center.x - rect.left) / Math.abs(direction.x);
+  const yBoundary = direction.y === 0
+    ? Number.POSITIVE_INFINITY
+    : (direction.y > 0 ? rect.bottom - center.y : center.y - rect.top) / Math.abs(direction.y);
+  const boundaryDistance = Math.min(xBoundary, yBoundary);
+  return {
+    x: center.x + direction.x * (boundaryDistance + distance),
+    y: center.y + direction.y * (boundaryDistance + distance),
+  };
 }
 
 function clone(value) {

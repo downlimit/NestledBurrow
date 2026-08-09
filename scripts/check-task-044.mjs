@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   ASSET_PROFILES_STORAGE_KEY,
   ASSET_PROFILES_VERSION,
+  DEFAULT_ASSET_PROFILES,
   normalizeAssetProfiles,
   saveAssetProfiles,
 } from "../src/build/assetProfiles.js";
@@ -136,7 +137,8 @@ assert(500 + 211 < assetDepth && 500 + 213 > assetDepth, "the player crosses the
 const legacyProfiles = normalizeAssetProfiles({
   "facility:table": { visualOffset: { x: 3, y: -1 }, colliderOffsets: { left: 1, right: 0, top: 0, bottom: 0 } },
 });
-assert.deepEqual(legacyProfiles["facility:table"].snapAnchorOffset, { x: 24, y: 16 }, "legacy profile payloads gain the former bottom-edge depth pivot");
+const canonicalTablePivot = DEFAULT_ASSET_PROFILES["facility:table"].snapAnchorOffset;
+assert.deepEqual(legacyProfiles["facility:table"].snapAnchorOffset, canonicalTablePivot, "legacy profile payloads gain the current canonical depth pivot");
 const storage = { value: null, setItem(key, value) { if (key === ASSET_PROFILES_STORAGE_KEY) this.value = value; } };
 saveAssetProfiles(legacyProfiles, storage);
 assert.equal(JSON.parse(storage.value).version, ASSET_PROFILES_VERSION, "profile saves use the migrated version in the existing storage key");
@@ -147,7 +149,7 @@ const backup = normalizeAuthoringBackup({
   assetProfiles: legacyProfiles,
 });
 assert.equal(backup.version, AUTHORING_BACKUP_VERSION);
-assert.deepEqual(backup.assetProfiles["facility:table"].snapAnchorOffset, { x: 24, y: 16 });
+assert.deepEqual(backup.assetProfiles["facility:table"].snapAnchorOffset, canonicalTablePivot);
 assert.deepEqual(backup.colliderOverrides[WALL_COLLIDER_GROUPS.horizontal], legacyWall);
 assert.deepEqual(backup.colliderOverrides[WALL_COLLIDER_GROUPS.vertical], legacyWall, "v2 backups migrate both wall directions and the new anchor field");
 
@@ -196,7 +198,10 @@ assert.deepEqual(visualScene.worldLayout.getWorldObjectColliders()[0].rect, visu
 assert.deepEqual(authoringRuntime.nudgeVisualOffset(-1, 1).offset, { x: 4, y: -2 }, "visual-offset arrow nudging moves exactly one pixel per axis");
 assert.deepEqual(authoringRuntime.resetVisualOffset().offset, { x: 0, y: 0 }, "visual offset resets to the profile default");
 assert(authoringRuntime.selectPivotAt({ x: 110, y: 205 }));
-assert.deepEqual(authoringRuntime.nudgePivot(1, -1).offset, { x: 25, y: 15 }, "pivot arrow nudging moves exactly one pixel per axis");
+assert.deepEqual(authoringRuntime.nudgePivot(1, -1).offset, {
+  x: pivotBeforeVisualMove.x + 1,
+  y: pivotBeforeVisualMove.y - 1,
+}, "pivot arrow nudging moves exactly one pixel per axis");
 authoringRuntime.destroy();
 
 console.log("Task #044 contracts passed: directional walls, effective colliders, pivot depth, visual offsets, midpoint placement, topology joins, implicit drag anchors, and profile migrations");

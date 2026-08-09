@@ -1,6 +1,11 @@
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
+import {
+  WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
+  WORLD_OBJECT_ATTENTION_GROUP,
+  WORLD_PLACEABLE_TARGETING_GROUP,
+} from "../interaction/interactionConfig.js";
 
-export const PLACEABLE_TARGETING_GROUP = "world-placeable";
+export const PLACEABLE_TARGETING_GROUP = WORLD_PLACEABLE_TARGETING_GROUP;
 
 const FACILITY_DERIVED_FIELDS = Object.freeze([
   "position",
@@ -11,6 +16,9 @@ const FACILITY_DERIVED_FIELDS = Object.freeze([
   "facingDotThreshold",
   "targetingMode",
   "targetingGroup",
+  "attentionGroup",
+  "interactionTimeline",
+  "timelineTarget",
 ]);
 
 const BED_DERIVED_FIELDS = Object.freeze([
@@ -20,6 +28,9 @@ const BED_DERIVED_FIELDS = Object.freeze([
   "presentationPose",
   "targetingMode",
   "targetingGroup",
+  "attentionGroup",
+  "interactionTimeline",
+  "timelineTarget",
 ]);
 
 const FACILITY_USE_OFFSETS = Object.freeze({
@@ -100,10 +111,11 @@ export function hydrateFacilityRuntimeDefinition(definition) {
     position: center,
     usePosition: derivedFacilityUsePosition(canonical),
     presentationPose: null,
-    requiresFacing: false,
-    facingDotThreshold: -1,
+    requiresFacing: true,
+    facingDotThreshold: WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
     targetingMode: "facing-first",
     targetingGroup: PLACEABLE_TARGETING_GROUP,
+    attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
   });
 }
 
@@ -126,6 +138,7 @@ export function liveFacilityGeometry(definition, profile = {}, collider = null) 
     height: Math.max(1, finite(visual.height, footprint.bottom - footprint.top)),
   });
   const currentCollider = collider ?? footprint;
+  const interactionTimeline = profile.interactionTimeline ?? null;
   const pivotOffset = profile.snapAnchorOffset ?? {
     x: visualSize.width / 2,
     y: visualSize.height,
@@ -139,6 +152,8 @@ export function liveFacilityGeometry(definition, profile = {}, collider = null) 
       y: visualOrigin.y + visualSize.height / 2,
     }),
     interactionCenter: offsetPoint(rectCenter(currentCollider), profile.interactionOffset),
+    interactionTimeline,
+    timelineTarget: offsetPoint(rectCenter(currentCollider), interactionTimeline?.positionOffset),
     pivotOffset: Object.freeze({ x: finite(pivotOffset.x), y: finite(pivotOffset.y) }),
     visualSize,
   });
@@ -148,6 +163,7 @@ export function liveBedGeometry(footprint, profile = {}, collider = null) {
   if (!footprint) return null;
   const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
   const currentCollider = collider ?? footprint;
+  const interactionTimeline = profile.interactionTimeline ?? null;
   return Object.freeze({
     footprint: Object.freeze({ ...footprint }),
     collider: Object.freeze({ ...currentCollider }),
@@ -156,6 +172,8 @@ export function liveBedGeometry(footprint, profile = {}, collider = null) {
       y: (finite(footprint.top) + finite(footprint.bottom)) / 2 + finite(visualOffset.y),
     }),
     interactionCenter: offsetPoint(rectCenter(currentCollider), profile.interactionOffset),
+    interactionTimeline,
+    timelineTarget: offsetPoint(rectCenter(currentCollider), interactionTimeline?.positionOffset),
   });
 }
 
@@ -171,18 +189,21 @@ export function livePlaceableInteraction(definition, geometry, { position = "int
     ...canonical,
     position: position === "visual" ? geometry.visualCenter : geometry.interactionCenter,
     aimPosition: geometry.interactionCenter,
-    requiresFacing: false,
-    facingDotThreshold: -1,
+    requiresFacing: true,
+    facingDotThreshold: WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
     targetingMode: "facing-first",
     targetingGroup: PLACEABLE_TARGETING_GROUP,
+    attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
+    interactionTimeline: geometry.interactionTimeline,
+    timelineTarget: geometry.timelineTarget,
   });
 }
 
 export function liveFacilityPresentationPose(definition, geometry) {
   if (!definition || !geometry || !["shower", "toilet"].includes(definition.facilityType)) return null;
   return Object.freeze({
-    x: geometry.visualCenter.x,
-    y: geometry.visualCenter.y,
+    x: geometry.interactionTimeline?.enabled ? geometry.timelineTarget.x : geometry.visualCenter.x,
+    y: geometry.interactionTimeline?.enabled ? geometry.timelineTarget.y : geometry.visualCenter.y,
     facing: "down",
     angle: 0,
     depth: assetDepthFromPivot(

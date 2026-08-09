@@ -147,7 +147,7 @@ assert.deepEqual(
 );
 assert.notDeepEqual(signAnchor, pose.pivotOffset, "cursor cannot attach directly to the pivot");
 
-assert.equal(ASSET_PROFILES_VERSION, 5, "interaction-point authoring is a versioned profile migration");
+assert.equal(ASSET_PROFILES_VERSION, 10, "collision, render and timeline authoring are a versioned profile migration");
 const migratedSignProfile = normalizeAssetProfiles({
   version: 3,
   profiles: {
@@ -212,7 +212,7 @@ for (const required of [
   "restoreBuildTarget",
   "isBuildPlacementBlocked",
   "visualPositionAt",
-  "assetDepthFromPivot(position, pivot",
+  "assetDepthFromRenderMode",
 ]) {
   assert(signSource.includes(required), `tavern sign runtime retains ${required}`);
 }
@@ -226,14 +226,16 @@ for (const required of [
   "runtime.selectVisualOffsetAt =",
   "runtime.selectInteractionPointAt =",
   "interactionOffset",
-  "wellInstances",
-  "tavernSignInstances",
-  "trainingDummyInstances",
+  "collectAssetAuthoringInstances",
   "canonicalVisualOffsetAtCurrentPivot",
   "syncSpecialInstances",
   "installAuthoringCanonExport",
 ]) {
   assert(authoringSource.includes(required), `universal authoring retains ${required}`);
+}
+const authoringRegistrySource = fs.readFileSync(new URL("../src/build/assetAuthoringRegistry.js", import.meta.url), "utf8");
+for (const required of ["wellInstances", "tavernSignInstances", "trainingDummyInstances", "authoringCapabilities"]) {
+  assert(authoringRegistrySource.includes(required), `typed authoring registry retains ${required}`);
 }
 assert(!authoringSource.includes("DEFAULT_ASSET_PROFILES[visualSelection.profileKey]?.visualOffset"));
 assert(!authoringSource.includes("state.position.x - TAVERN_SIGN.snapAnchorOffset.x"), "sign authoring cannot revive a hidden profile origin");

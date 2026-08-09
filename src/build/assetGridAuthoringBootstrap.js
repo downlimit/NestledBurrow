@@ -159,7 +159,7 @@ function handleAuthoringNavigationKey(panel, event) {
     state.scene.renderColliderDebug?.();
     return;
   }
-  if (mode === "crop") {
+  if (["crop", "interaction-point", "timeline"].includes(mode)) {
     state.listeners?.key?.(mapped);
     return;
   }

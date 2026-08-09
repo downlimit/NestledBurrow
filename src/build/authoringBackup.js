@@ -16,8 +16,14 @@ import {
   saveAssetProfiles,
 } from "./assetProfiles.js";
 import { migrateDirectionalWallOverrides } from "./buildWorldGeometry.js";
+import {
+  clearFixedWorldAuthoring,
+  loadFixedWorldAuthoring,
+  normalizeFixedWorldAuthoring,
+  saveFixedWorldAuthoring,
+} from "./fixedWorldAuthoringState.js";
 
-export const AUTHORING_BACKUP_VERSION = 3;
+export const AUTHORING_BACKUP_VERSION = 4;
 export const AUTHORING_BACKUP_FILENAME = "nestledburrow-authoring-backup.json";
 export const AUTHORING_CANON_FILENAME = "nestledburrow-authoring-canon.json";
 
@@ -41,6 +47,7 @@ export function normalizeAuthoringBackup(value) {
       startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
       colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
       assetProfiles: loadAssetProfiles(null, value.colliderOverrides ?? {}),
+      fixedWorldAuthoring: normalizeFixedWorldAuthoring(),
     };
   }
   if (value.version === 2) {
@@ -50,6 +57,17 @@ export function normalizeAuthoringBackup(value) {
       startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
       colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
       assetProfiles: normalizeAssetProfiles(value.assetProfiles ?? {}),
+      fixedWorldAuthoring: normalizeFixedWorldAuthoring(),
+    };
+  }
+  if (value.version === 3) {
+    return {
+      version: AUTHORING_BACKUP_VERSION,
+      savedAt: typeof value.savedAt === "string" ? value.savedAt : null,
+      startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
+      colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
+      assetProfiles: normalizeAssetProfiles(value.assetProfiles ?? {}),
+      fixedWorldAuthoring: normalizeFixedWorldAuthoring(),
     };
   }
   if (value.version !== AUTHORING_BACKUP_VERSION) {
@@ -61,6 +79,7 @@ export function normalizeAuthoringBackup(value) {
     startingLayout: value.startingLayout ? normalizeStartingLayout(value.startingLayout) : null,
     colliderOverrides: migrateDirectionalWallOverrides(normalizeColliderOverrides(value.colliderOverrides ?? {})),
     assetProfiles: normalizeAssetProfiles(value.assetProfiles ?? {}),
+    fixedWorldAuthoring: normalizeFixedWorldAuthoring(value.fixedWorldAuthoring ?? {}),
   };
 }
 
@@ -71,6 +90,7 @@ export function createAuthoringBackup(storage = globalThis.localStorage, now = n
     startingLayout: readStoredLayout(storage),
     colliderOverrides: loadColliderDebugOverrides(storage),
     assetProfiles: loadAssetProfiles(storage, loadColliderDebugOverrides(storage)),
+    fixedWorldAuthoring: loadFixedWorldAuthoring(storage),
   });
 }
 
@@ -92,6 +112,7 @@ export function createLiveAuthoringCanon(scene, storage = globalThis.localStorag
     startingLayout,
     colliderOverrides,
     assetProfiles,
+    fixedWorldAuthoring: loadFixedWorldAuthoring(storage),
   });
 }
 
@@ -108,6 +129,7 @@ export function restoreAuthoringBackup(value, storage = globalThis.localStorage)
   }
   saveColliderDebugOverrides(backup.colliderOverrides, storage);
   saveAssetProfiles(backup.assetProfiles, storage);
+  saveFixedWorldAuthoring(backup.fixedWorldAuthoring, storage);
   return backup;
 }
 
@@ -115,4 +137,5 @@ export function clearAuthoringBackupDraft(storage = globalThis.localStorage) {
   storage?.removeItem?.(STARTING_LAYOUT_STORAGE_KEY);
   storage?.removeItem?.(COLLIDER_DEBUG_STORAGE_KEY);
   storage?.removeItem?.(ASSET_PROFILES_STORAGE_KEY);
+  clearFixedWorldAuthoring(storage);
 }

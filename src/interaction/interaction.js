@@ -98,8 +98,11 @@ export function createInteractionTarget(options) {
   const selectionDistance = options?.selectionDistance;
   const explicitAimPosition = options?.aimPosition;
   const aimPosition = explicitAimPosition ?? position;
+  const explicitAttentionPosition = options?.attentionPosition;
+  const attentionPosition = explicitAttentionPosition ?? aimPosition;
   const targetingMode = options?.targetingMode ?? "priority-distance";
   const targetingGroup = options?.targetingGroup ?? null;
+  const attentionGroup = options?.attentionGroup ?? targetingGroup;
 
   assertNonEmptyString(id, "Interaction target ID");
   assertNonEmptyString(entityId, "Interaction entity ID");
@@ -112,6 +115,9 @@ export function createInteractionTarget(options) {
   if (!isPlainObject(aimPosition)) throw new Error("Interaction aim position must be a plain object");
   assertFiniteNumber(aimPosition.x, "Interaction aim position x");
   assertFiniteNumber(aimPosition.y, "Interaction aim position y");
+  if (!isPlainObject(attentionPosition)) throw new Error("Interaction attention position must be a plain object");
+  assertFiniteNumber(attentionPosition.x, "Interaction attention position x");
+  assertFiniteNumber(attentionPosition.y, "Interaction attention position y");
   assertFiniteNumber(radius, "Interaction radius");
   if (radius <= 0) {
     throw new Error("Interaction radius must be greater than 0");
@@ -129,6 +135,7 @@ export function createInteractionTarget(options) {
   if (selectionDistance !== undefined) assertFiniteNumber(selectionDistance, "Interaction selection distance");
   if (!["priority-distance", "facing-first"].includes(targetingMode)) throw new Error("Interaction targetingMode is invalid");
   if (targetingGroup !== null) assertNonEmptyString(targetingGroup, "Interaction targeting group");
+  if (attentionGroup !== null) assertNonEmptyString(attentionGroup, "Interaction attention group");
 
   const target = {
     id,
@@ -143,8 +150,10 @@ export function createInteractionTarget(options) {
     payload,
     targetingMode,
     targetingGroup,
+    attentionGroup,
   };
   if (explicitAimPosition !== undefined) target.aimPosition = { x: aimPosition.x, y: aimPosition.y };
+  if (explicitAttentionPosition !== undefined) target.attentionPosition = { x: attentionPosition.x, y: attentionPosition.y };
   if (availabilityDistance !== undefined) target.availabilityDistance = availabilityDistance;
   if (selectionDistance !== undefined) target.selectionDistance = selectionDistance;
   return deepFreeze(target);
@@ -159,7 +168,7 @@ function normalize(vector) {
 }
 
 function facingDot(source, target) {
-  const aimPosition = target.aimPosition ?? target.position;
+  const aimPosition = target.attentionPosition ?? target.aimPosition ?? target.position;
   const direction = normalize({
     x: aimPosition.x - source.position.x,
     y: aimPosition.y - source.position.y,
@@ -183,8 +192,9 @@ function isAvailable(source, target, distance, aimDot) {
   return aimDot !== null && aimDot >= target.facingDotThreshold;
 }
 
-export function findBestInteractionTarget(sourceSnapshot, targets) {
+export function findBestInteractionTarget(sourceSnapshot, targets, { preferredTargetId = null } = {}) {
   let best = null;
+  let preferred = null;
   for (const target of targets) {
     const dx = target.position.x - sourceSnapshot.position.x;
     const dy = target.position.y - sourceSnapshot.position.y;
@@ -205,7 +215,10 @@ export function findBestInteractionTarget(sourceSnapshot, targets) {
       aimDot: aimDot ?? -1,
       targetingMode: target.targetingMode,
       targetingGroup: target.targetingGroup,
+      attentionGroup: target.attentionGroup,
     };
+
+    if (candidate.targetId === preferredTargetId) preferred = { ...candidate, priority: target.priority };
 
     if (!best || isBetterCandidate(candidate, target.priority, best)) {
       best = { ...candidate, priority: target.priority };
@@ -215,17 +228,30 @@ export function findBestInteractionTarget(sourceSnapshot, targets) {
   if (!best) {
     return null;
   }
-  const { priority, aimDot, targetingMode, targetingGroup, ...snapshot } = best;
+  if (preferred && shouldKeepPreferredCandidate(preferred, best)) best = preferred;
+  const { priority, aimDot, targetingMode, targetingGroup, attentionGroup, ...snapshot } = best;
   return snapshot;
 }
 
 function isBetterCandidate(candidate, priority, best) {
-  const sharedFacingGroup = candidate.targetingMode === "facing-first"
+  const sharedAttentionGroup = candidate.targetingMode === "facing-first"
     && best.targetingMode === "facing-first"
-    && candidate.targetingGroup !== null
-    && candidate.targetingGroup === best.targetingGroup;
-  if (sharedFacingGroup && candidate.aimDot !== best.aimDot) return candidate.aimDot > best.aimDot;
+    && candidate.attentionGroup !== null
+    && candidate.attentionGroup === best.attentionGroup;
+  if (sharedAttentionGroup && candidate.aimDot !== best.aimDot) return candidate.aimDot > best.aimDot;
+  if (sharedAttentionGroup && candidate.distance !== best.distance) return candidate.distance < best.distance;
   if (priority !== best.priority) return priority > best.priority;
   if (candidate.distance !== best.distance) return candidate.distance < best.distance;
   return candidate.targetId < best.targetId;
+}
+
+function shouldKeepPreferredCandidate(preferred, best) {
+  if (preferred.targetId === best.targetId) return true;
+  const sharedAttentionGroup = preferred.targetingMode === "facing-first"
+    && best.targetingMode === "facing-first"
+    && preferred.attentionGroup !== null
+    && preferred.attentionGroup === best.attentionGroup;
+  return sharedAttentionGroup
+    && best.aimDot - preferred.aimDot <= 0.04
+    && preferred.distance - best.distance <= 4;
 }

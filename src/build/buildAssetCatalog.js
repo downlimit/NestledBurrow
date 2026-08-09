@@ -18,6 +18,18 @@ import {
   PLACEABLE_BUILD_OWNER_IDS,
 } from "./placeableBuildProtocol.js";
 
+export const BUILD_WALL_TOPOLOGY_FRAMES = Object.freeze({
+  northWestCorner: 0, // atlas cell 1
+  horizontalBody: 1, // atlas cell 2
+  northEastCorner: 2, // atlas cell 3
+  verticalTop: 3, // atlas cell 4
+  verticalBody: 12, // atlas cell 13
+  soloColumn: 15, // atlas cell 16; also the lower vertical terminus
+  horizontalLeft: 24, // atlas cell 25; also the south-west corner
+  horizontalRight: 26, // atlas cell 27; also the south-east corner
+  branchNorth: 27, // atlas cell 28
+});
+
 const RESOURCE_BUILD_ORDER = Object.freeze([
   "tree-planted",
   "berry-bush",
@@ -97,7 +109,7 @@ export const BUILD_ASSET_GROUPS = Object.freeze([
     id: "walls",
     labelKey: "hud:buildMode.groups.walls",
     items: Object.freeze([
-      Object.freeze({ id: "wall", placement: "wall", dragPaint: true, labelKey: "hud:buildMode.assets.wall", textureKey: HOUSE_TEXTURE_KEY, frame: HOUSE_FRAMES.bottom }),
+      Object.freeze({ id: "wall", placement: "wall", dragPaint: true, labelKey: "hud:buildMode.assets.wall", textureKey: HOUSE_TEXTURE_KEY, frame: BUILD_WALL_TOPOLOGY_FRAMES.horizontalBody }),
     ]),
   }),
   Object.freeze({
@@ -178,37 +190,164 @@ export function getBuildWallFrames({
   west = false,
   explicit = false,
 } = {}) {
+  if (explicit && !north && !east && !south && !west) return [BUILD_WALL_TOPOLOGY_FRAMES.soloColumn];
+  if (north && east && south && west) {
+    return [BUILD_WALL_TOPOLOGY_FRAMES.branchNorth, BUILD_WALL_TOPOLOGY_FRAMES.verticalTop];
+  }
+  if (north && east && south) return [BUILD_WALL_TOPOLOGY_FRAMES.northWestCorner];
+  if (north && south && west) return [BUILD_WALL_TOPOLOGY_FRAMES.northEastCorner];
+  if (north && east && west) return [BUILD_WALL_TOPOLOGY_FRAMES.branchNorth];
+  if (south && east && west) return [BUILD_WALL_TOPOLOGY_FRAMES.verticalTop];
+  if (south && east) return [BUILD_WALL_TOPOLOGY_FRAMES.northWestCorner];
+  if (south && west) return [BUILD_WALL_TOPOLOGY_FRAMES.northEastCorner];
+  if (north && east) return [BUILD_WALL_TOPOLOGY_FRAMES.horizontalLeft];
+  if (north && west) return [BUILD_WALL_TOPOLOGY_FRAMES.horizontalRight];
+  if (north && south) return [];
+  if (east && west) return [];
+  if (south) return [BUILD_WALL_TOPOLOGY_FRAMES.verticalTop];
+  if (north) return [BUILD_WALL_TOPOLOGY_FRAMES.soloColumn];
+  if (east) return [BUILD_WALL_TOPOLOGY_FRAMES.horizontalLeft];
+  if (west) return [BUILD_WALL_TOPOLOGY_FRAMES.horizontalRight];
+  return [];
+}
+
+export function hasBuildWallJunctionColumn({
+  north = false,
+  east = false,
+  south = false,
+  west = false,
+} = {}) {
   const count = [north, east, south, west].filter(Boolean).length;
-  const verticalTerminus = north !== south && !east && !west;
-  return explicit || count >= 3 || verticalTerminus
-    ? [HOUSE_FRAMES.sideLeft]
-    : [];
+  const straightVertical = north && south && !east && !west;
+  const straightHorizontal = east && west && !north && !south;
+  return count > 0 && !straightVertical && !straightHorizontal;
+}
+
+export function doesBuildWallTopologyOwnHorizontalHalf(incidents = {}, direction) {
+  const ownerFrames = direction === "east"
+    ? [
+        BUILD_WALL_TOPOLOGY_FRAMES.horizontalLeft,
+        BUILD_WALL_TOPOLOGY_FRAMES.northWestCorner,
+        BUILD_WALL_TOPOLOGY_FRAMES.branchNorth,
+      ]
+    : direction === "west"
+      ? [
+          BUILD_WALL_TOPOLOGY_FRAMES.horizontalRight,
+          BUILD_WALL_TOPOLOGY_FRAMES.northEastCorner,
+          BUILD_WALL_TOPOLOGY_FRAMES.branchNorth,
+        ]
+      : null;
+  if (!ownerFrames) throw new Error(`Unknown horizontal wall half: ${String(direction)}`);
+  return getBuildWallFrames(incidents).some((frame) => ownerFrames.includes(frame));
+}
+
+export function getBuildHorizontalWallBodyCrop({
+  leftJunction = false,
+  rightJunction = false,
+} = {}) {
+  const left = leftJunction ? TILE_SIZE / 2 : 0;
+  const right = rightJunction ? TILE_SIZE / 2 : 0;
+  return Object.freeze({
+    visible: left + right < TILE_SIZE,
+    x: left,
+    y: 0,
+    width: Math.max(0, TILE_SIZE - left - right),
+    height: TILE_SIZE,
+  });
+}
+
+export function getBuildWallColumnFrame() {
+  return BUILD_WALL_TOPOLOGY_FRAMES.soloColumn;
 }
 
 export function getBuildVerticalWallFrame({
-  joinsEast = false,
-  joinsWest = false,
+  joinsEast: _joinsEast = false,
+  joinsWest: _joinsWest = false,
 } = {}) {
-  return joinsEast && !joinsWest
-    ? HOUSE_FRAMES.wallLeftCap
-    : HOUSE_FRAMES.wallRightCap;
+  return BUILD_WALL_TOPOLOGY_FRAMES.verticalBody;
 }
 
 export function getBuildWallColumnOffset({
   verticalTerminus: _verticalTerminus = false,
   explicit: _explicit = false,
 } = {}) {
-  return -TILE_SIZE;
+  return -TILE_SIZE + getBuildHorizontalWallVisualOffset();
 }
 
 export function getBuildVerticalWallOffset() {
-  return 0;
+  return 2;
+}
+
+export function getBuildHorizontalWallVisualOffset() {
+  return 2;
+}
+
+export function getBuildWallEdgeVisualOffset(orientation) {
+  if (orientation === "horizontal") return getBuildHorizontalWallVisualOffset();
+  if (orientation === "vertical") return getBuildVerticalWallOffset();
+  throw new Error(`Unknown wall orientation: ${String(orientation)}`);
+}
+
+export function getBuildWallEdgeDepthOffset(orientation) {
+  if (orientation === "vertical") return TILE_SIZE;
+  if (orientation === "horizontal") return 0;
+  throw new Error(`Unknown wall orientation: ${String(orientation)}`);
 }
 
 export function getBuildWallColumnDepthOffset({
+  verticalTerminus: _verticalTerminus = false,
+  explicit: _explicit = false,
+  isBottom: _isBottom = false,
+} = {}) {
+  return 2;
+}
+
+export function isBuildWallHorizontalOverlayFrame(incidents = {}, frame) {
+  return incidents.east
+    && incidents.west
+    && frame === BUILD_WALL_TOPOLOGY_FRAMES.verticalTop;
+}
+
+export function getBuildWallJunctionFrameDepthOffset({
+  incidents = {},
+  frame,
+  nodePivotOffset = 0,
+  horizontalPivotOffset = 0,
   verticalTerminus = false,
   explicit = false,
   isBottom = false,
 } = {}) {
-  return verticalTerminus && !explicit && !isBottom ? -1 : 1;
+  const nodeDepth = getBuildWallColumnDepthOffset({ verticalTerminus, explicit, isBottom })
+    + Number(nodePivotOffset || 0);
+  if (!isBuildWallHorizontalOverlayFrame(incidents, frame)) return nodeDepth;
+  const horizontalDepth = getBuildWallEdgeDepthOffset("horizontal")
+    + Number(horizontalPivotOffset || 0);
+  return Math.max(nodeDepth, horizontalDepth + 1);
+}
+
+export function getBuildWallHorizontalOverlayDepth({
+  incidents = {},
+  frame,
+  junctionDepth,
+  horizontalDepths = [],
+} = {}) {
+  const baseDepth = Number(junctionDepth);
+  if (!Number.isFinite(baseDepth)) throw new Error("Wall junction depth must be finite");
+  if (!isBuildWallHorizontalOverlayFrame(incidents, frame)) return baseDepth;
+  const incidentDepths = horizontalDepths.map(Number).filter(Number.isFinite);
+  if (!incidentDepths.length) return baseDepth;
+  return Math.max(baseDepth, Math.max(...incidentDepths) + 1);
+}
+
+export function getBuildWallCapDepthOffset() {
+  return 1;
+}
+
+export function isBuildWallCapFrame(frame) {
+  return [
+    HOUSE_FRAMES.topLeft,
+    HOUSE_FRAMES.topRight,
+    HOUSE_FRAMES.bottomLeft,
+    HOUSE_FRAMES.bottomRight,
+  ].includes(frame);
 }

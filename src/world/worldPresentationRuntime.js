@@ -1,8 +1,16 @@
 import {
-  assetDepthFromPivot,
+  getBuildWallCapDepthOffset,
+  getBuildWallEdgeDepthOffset,
+  getBuildWallEdgeVisualOffset,
+  isBuildWallCapFrame,
+} from "../build/buildAssetCatalog.js";
+import {
+  assetDepthFromRenderMode,
+  WALL_COLLIDER_GROUPS,
   worldDepthFromAnchorY,
   WORLD_DEPTH_BASE,
 } from "../build/buildWorldGeometry.js";
+import { updateFixedWorldInstance } from "../build/fixedWorldAuthoringState.js";
 import {
   HOUSE_TEXTURE_KEY,
   OUTDOOR_TEXTURE_KEY,
@@ -17,9 +25,10 @@ export function createWorldPresentationRuntime(options) {
 }
 
 export class WorldPresentationRuntime {
-  constructor({ renderingHost } = {}) {
+  constructor({ renderingHost, authoringStorage = globalThis.localStorage } = {}) {
     if (!renderingHost?.add) throw new Error("WorldPresentationRuntime requires a Phaser rendering host");
     this.renderingHost = renderingHost;
+    this.authoringStorage = authoringStorage;
     this.destroyed = false;
     this.activeLayout = null;
     this.worldRenderSprites = [];
@@ -65,14 +74,14 @@ export class WorldPresentationRuntime {
       Math.round(tile.worldX + Number(visualOffset.x || 0)),
       Math.round(tile.worldY + Number(visualOffset.y || 0)),
     );
-    sprite.setDepth?.(isGroundOverlayTransition(tile.profileKey)
-      ? WORLD_GROUND_OVERLAY_DEPTH
-      : assetDepthFromPivot(
-          { x: tile.worldX, y: tile.worldY },
-          pivot,
-          WORLD_DEPTH_BASE,
-          tile.id,
-        ));
+    sprite.setDepth?.(assetDepthFromRenderMode({
+      placementPosition: { x: tile.worldX, y: tile.worldY },
+      pivotOffset: pivot,
+      renderMode: profile.renderMode ?? (isGroundOverlayTransition(tile.profileKey) ? "below-character" : "pivot-depth"),
+      fixedBelowDepth: WORLD_GROUND_OVERLAY_DEPTH,
+      baseDepth: WORLD_DEPTH_BASE,
+      stableId: tile.id,
+    }));
     const crop = profile.visualCropInsets;
     if (crop) {
       const left = Math.max(0, Number(crop.left) || 0);
@@ -98,7 +107,10 @@ export class WorldPresentationRuntime {
   }
 
   getTransitionAuthoringInstances() {
-    return this.transportEntries.map(({ tile, sprite }) => ({
+    return this.transportEntries.map((entry) => {
+      const { tile, sprite } = entry;
+      const collisionEnabled = this.transitionCollisionEnabled(tile.id);
+      return ({
       id: tile.id,
       profileKey: tile.profileKey,
       anchor: { x: tile.worldX, y: tile.worldY },
@@ -111,10 +123,79 @@ export class WorldPresentationRuntime {
       visualBasePosition: { x: tile.worldX, y: tile.worldY },
       targets: [sprite],
       special: true,
+      fixedWorld: true,
+      placementPosition: { x: tile.worldX, y: tile.worldY },
+      snapAnchorOffset: { ...(this.transitionProfile(tile.profileKey).snapAnchorOffset ?? { x: 0, y: 0 }) },
+      collisionEnabled,
+      getCollisionEnabled: () => this.transitionCollisionEnabled(tile.id),
+      setCollisionEnabled: (enabled) => this.setTransitionCollisionEnabled(tile.id, enabled),
+      move: (point) => this.moveTransitionAuthoringInstance(tile.id, point),
       ...(isGroundOverlayTransition(tile.profileKey)
         ? { depthMode: "fixed", fixedDepth: WORLD_GROUND_OVERLAY_DEPTH }
         : {}),
-    }));
+      });
+    });
+  }
+
+  transitionCollisionEnabled(id) {
+    const entry = this.activeLayout?.getWorldObjectColliders?.().find((candidate) => candidate.id === id);
+    return entry?.collisionEnabled !== false;
+  }
+
+  syncTransitionCollider(entry, collisionEnabled = this.transitionCollisionEnabled(entry.tile.id)) {
+    const transition = this.activeLayout?.transitions?.find(({ id }) => id === entry.tile.id);
+    if (!transition) return null;
+    const base = {
+      left: entry.tile.worldX + transition.collider.left,
+      right: entry.tile.worldX + transition.collider.right,
+      top: entry.tile.worldY + transition.collider.top,
+      bottom: entry.tile.worldY + transition.collider.bottom,
+    };
+    this.activeLayout.setWorldObjectCollider?.(entry.tile.id, base, entry.tile.profileKey, {
+      kind: transition.kind ?? "world-transition",
+      profileKey: entry.tile.profileKey,
+      collisionEnabled: Boolean(collisionEnabled),
+    });
+    return base;
+  }
+
+  moveTransitionAuthoringInstance(id, point) {
+    const entry = this.transportEntries.find((candidate) => candidate.tile.id === id);
+    if (!entry) return null;
+    const previous = { x: entry.tile.worldX, y: entry.tile.worldY };
+    const current = { x: Math.round(Number(point?.x) || 0), y: Math.round(Number(point?.y) || 0) };
+    const collisionEnabled = this.transitionCollisionEnabled(id);
+    entry.tile = Object.freeze({ ...entry.tile, worldX: current.x, worldY: current.y });
+    this.activeLayout.transportTiles = Object.freeze(this.transportEntries.map((candidate) => candidate.tile));
+    this.activeLayout.transitions = Object.freeze(this.activeLayout.transitions.map((transition) => (
+      transition.id === id
+        ? Object.freeze({
+            ...transition,
+            footprintBounds: Object.freeze({
+              left: current.x,
+              top: current.y,
+              right: current.x + entry.tile.width,
+              bottom: current.y + entry.tile.height,
+            }),
+          })
+        : transition
+    )));
+    updateFixedWorldInstance(id, { ...current, collisionEnabled }, previous, this.authoringStorage);
+    this.syncTransitionCollider(entry, collisionEnabled);
+    this.syncTransportEntry(entry);
+    this.renderingHost?.interactionRuntime?.refresh?.();
+    return { previous, current };
+  }
+
+  setTransitionCollisionEnabled(id, enabled) {
+    const entry = this.transportEntries.find((candidate) => candidate.tile.id === id);
+    if (!entry) return null;
+    const collisionEnabled = Boolean(enabled);
+    const point = { x: entry.tile.worldX, y: entry.tile.worldY };
+    updateFixedWorldInstance(id, { ...point, collisionEnabled }, point, this.authoringStorage);
+    this.syncTransitionCollider(entry, collisionEnabled);
+    this.renderingHost?.interactionRuntime?.refresh?.();
+    return collisionEnabled;
   }
 
   applyTransitionAuthoringProfile(profileKey = null) {
@@ -134,14 +215,31 @@ export class WorldPresentationRuntime {
   }
 
   createCanonicalWallEntry(tile) {
-    const depth = worldDepthFromAnchorY((tile.worldY ?? tile.y * TILE_SIZE) + TILE_SIZE, tile.id);
+    const edgeAnchorY = Number(tile.y);
+    const profileKey = tile.orientation === "vertical"
+      ? WALL_COLLIDER_GROUPS.vertical
+      : WALL_COLLIDER_GROUPS.horizontal;
+    const profile = this.renderingHost?.assetProfiles?.[profileKey] ?? {};
+    const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = profile.snapAnchorOffset ?? { x: 0, y: 0 };
+    const visualOffsetY = getBuildWallEdgeVisualOffset(tile.orientation) + Number(visualOffset.y || 0);
+    const baseDepthOffset = getBuildWallEdgeDepthOffset(tile.orientation);
+    const spriteDepthOffset = isBuildWallCapFrame(tile.frame)
+      ? getBuildWallCapDepthOffset()
+      : baseDepthOffset;
+    const depth = worldDepthFromAnchorY(edgeAnchorY + spriteDepthOffset + Number(pivotOffset.y || 0), tile.id);
+    const supplementDepth = worldDepthFromAnchorY(edgeAnchorY + baseDepthOffset + Number(pivotOffset.y || 0), `${tile.id}:supplement`);
     const extraSprites = (tile.supplements ?? []).map((supplement) => this.renderingHost.add
-      .image(supplement.worldX, supplement.worldY, HOUSE_TEXTURE_KEY, supplement.frame)
+      .image(supplement.worldX + Number(visualOffset.x || 0), supplement.worldY + visualOffsetY, HOUSE_TEXTURE_KEY, supplement.frame)
       .setOrigin(0, 0)
       .setCrop(supplement.cropX, 0, supplement.cropWidth, TILE_SIZE)
-      .setDepth(depth));
+      .setDepth(supplementDepth));
     this.worldRenderSprites.push(...extraSprites);
     const sprite = this.addCanonicalTile(tile, HOUSE_TEXTURE_KEY, depth);
+    sprite.setPosition?.(
+      (tile.worldX ?? tile.x * TILE_SIZE) + Number(visualOffset.x || 0),
+      (tile.worldY ?? tile.y * TILE_SIZE) + visualOffsetY,
+    );
     return { sprite, extraSprites, tile };
   }
 

@@ -21,3 +21,17 @@ export function normalizeInteractionDirections(value, fallback = INTERACTION_APP
 export function isInteractionDirection(direction) {
   return DIRECTION_SET.has(direction);
 }
+
+export function interactionDirectionAtPoint(bounds, point) {
+  const horizontal = point.x < bounds.left ? "left" : point.x > bounds.right ? "right" : null;
+  const vertical = point.y < bounds.top ? "top" : point.y > bounds.bottom ? "bottom" : null;
+  if (vertical && horizontal) return `${vertical}-${horizontal}`;
+  if (vertical || horizontal) return vertical ?? horizontal;
+  const distances = [
+    { direction: "left", distance: Math.abs(point.x - bounds.left) },
+    { direction: "right", distance: Math.abs(bounds.right - point.x) },
+    { direction: "top", distance: Math.abs(point.y - bounds.top) },
+    { direction: "bottom", distance: Math.abs(bounds.bottom - point.y) },
+  ];
+  return distances.sort((left, right) => left.distance - right.distance)[0].direction;
+}
