@@ -39,8 +39,10 @@ async function activateStair(page, worldId, transportId) {
     await bridge(page, "placePlayerAt", route.retreat);
     await expect.poll(async () => (await bridge(page, "getLocationState"))?.transitionLocked).toBe(false);
   }
-  await bridge(page, "placePlayerAt", route.interaction);
-  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId).toBe(transportId);
+  await expect.poll(async () => {
+    await bridge(page, "placePlayerNear", transportId);
+    return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
+  }).toBe(transportId);
   await bridge(page, "interact");
 }
 
@@ -127,7 +129,7 @@ test("village and Nest transition atomically and preserve location resource stat
   const nest = await bridge(page, "getLocationState");
   expect(nest.layout.bounds).toEqual({ left: 0, top: 0, right: 352, bottom: 256 });
   expect(nest.layout.transitions[0].footprintBounds).toMatchObject({ left: 144, top: 208, right: 208, bottom: 256 });
-  expect(nest.home).toEqual({ npcCount: 0, facilityCount: 0, tavernPresent: false, farmingPresent: false, buildModePresent: false, bedPresent: false });
+  expect(nest.home).toEqual({ npcCount: 0, facilityCount: 0, tavernPresent: false, farmingPresent: false, buildModePresent: true, bedPresent: false });
   expect(await bridge(page, "getMeleeState")).toMatchObject({ dummy: null });
   const camera = await bridge(page, "getCameraState");
   const player = await bridge(page, "getCharacterSnapshot", "player");
@@ -162,7 +164,7 @@ test("village and Nest transition atomically and preserve location resource stat
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
   await waitForWorld(page, "nest");
   const reloaded = await bridge(page, "getLocationState");
-  expect(reloaded.home).toEqual({ npcCount: 0, facilityCount: 0, tavernPresent: false, farmingPresent: false, buildModePresent: false, bedPresent: false });
+  expect(reloaded.home).toEqual({ npcCount: 0, facilityCount: 0, tavernPresent: false, farmingPresent: false, buildModePresent: true, bedPresent: false });
   expect((await bridge(page, "getResourceNodeState", "nest-tree-01")).cleared).toBe(true);
   expect(await bridge(page, "getResourceVisualState", "nest-tree-01")).toBeNull();
 

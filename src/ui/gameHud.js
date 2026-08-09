@@ -700,12 +700,16 @@ export function createGameHud(scene, options) {
   return {
     render,
     setSuppressed(value) {
-      suppressed = Boolean(value);
+      const nextSuppressed = Boolean(value);
+      if (suppressed === nextSuppressed) return;
+      suppressed = nextSuppressed;
       if (suppressed) {
-        if (confirmingNewGame) onConfirmationChange(false);
+        const wasConfirmingNewGame = confirmingNewGame;
+        const wasOptionsOpen = optionsOpen;
         confirmingNewGame = false;
-        if (optionsOpen) onOptionsChange(false);
         optionsOpen = false;
+        if (wasConfirmingNewGame) onConfirmationChange(false);
+        if (wasOptionsOpen) onOptionsChange(false);
       }
       render();
     },
