@@ -600,32 +600,11 @@ export class BuildModeRuntime {
       this.onPreview(item, this.drag.points);
       return;
     }
-    if (item.placement === "wall" && !this.drag.wallAxis) {
-      const raw = {
-        x: Number(pointer.worldX ?? pointer.x),
-        y: Number(pointer.worldY ?? pointer.y),
-      };
-      const deltaX = raw.x - this.drag.startRaw.x;
-      const deltaY = raw.y - this.drag.startRaw.y;
-      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < TILE_SIZE / 4) return;
-      this.drag.wallAxis = getBuildWallDragAxis(this.drag.startRaw, raw);
-      const startPoint = {
-        ...snapBuildWallDragPoint(this.drag.startRaw, this.drag.wallAxis),
-        rawX: this.drag.startRaw.x,
-        rawY: this.drag.startRaw.y,
-      };
-      this.drag.lastPoint = startPoint;
-      this.drag.points = [startPoint];
-    }
-    const point = this.getActionPoint(pointer, item, this.drag.demolitionType, this.drag.wallAxis);
     if (item.placement === "wall") {
-      this.drag.points = [
-        this.drag.lastPoint,
-        ...getBuildDragPoints(this.drag.lastPoint, point),
-      ];
-      this.onPreview(item, this.drag.points);
+      this.updateWallPlacementDrag(pointer);
       return;
     }
+    const point = this.getActionPoint(pointer, item, this.drag.demolitionType, this.drag.wallAxis);
     const sameWallAxis = point.orientation && point.orientation === this.drag.lastPoint.orientation;
     const points = point.orientation && !sameWallAxis
       ? [point]
@@ -639,10 +618,46 @@ export class BuildModeRuntime {
     this.onPreview(item, this.drag.points);
   }
 
-  endPointerDrag() {
+  updateWallPlacementDrag(pointer, { requirePointerDown = true } = {}) {
+    if (this.drag?.mode !== "place" || this.drag.item?.placement !== "wall") return false;
+    if (requirePointerDown && !pointer?.isDown) return false;
+    const raw = {
+      x: Number(pointer?.worldX ?? pointer?.x),
+      y: Number(pointer?.worldY ?? pointer?.y),
+    };
+    if (!Number.isFinite(raw.x) || !Number.isFinite(raw.y)) return false;
+    const firstPoint = this.drag.points?.[0] ?? this.drag.pendingPoint;
+    const startRaw = this.drag.startRaw ?? {
+      x: Number(firstPoint?.rawX ?? firstPoint?.x),
+      y: Number(firstPoint?.rawY ?? firstPoint?.y),
+    };
+    if (!Number.isFinite(startRaw.x) || !Number.isFinite(startRaw.y)) return false;
+    this.drag.startRaw = startRaw;
+    if (!this.drag.wallAxis) {
+      const deltaX = raw.x - startRaw.x;
+      const deltaY = raw.y - startRaw.y;
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < TILE_SIZE / 4) return false;
+      this.drag.wallAxis = getBuildWallDragAxis(startRaw, raw);
+      this.drag.lastPoint = {
+        ...snapBuildWallDragPoint(startRaw, this.drag.wallAxis),
+        rawX: startRaw.x,
+        rawY: startRaw.y,
+      };
+    }
+    const point = this.getActionPoint({ worldX: raw.x, worldY: raw.y }, this.drag.item, null, this.drag.wallAxis);
+    this.drag.points = [
+      this.drag.lastPoint,
+      ...getBuildDragPoints(this.drag.lastPoint, point),
+    ];
+    this.onPreview(this.drag.item, this.drag.points);
+    return this.drag.points.length > 1;
+  }
+
+  endPointerDrag(pointer) {
     if (this.drag?.mode === "move") this.onMove(this.drag.target, this.drag.lastPoint);
     if (this.drag?.mode === "place") {
       if (this.drag.item.placement === "wall") {
+        this.updateWallPlacementDrag(pointer, { requirePointerDown: false });
         if (this.drag.wallAxis && this.drag.points.length > 1) {
           for (let index = 1; index < this.drag.points.length; index += 1) {
             this.onPlace(this.drag.item, this.drag.points[index], {

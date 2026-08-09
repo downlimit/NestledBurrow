@@ -85,6 +85,7 @@ export class CharacterVisual {
       originY: pose.originY ?? 0.5,
       depth: pose.depth,
       showSleepMarker: Boolean(pose.showSleepMarker),
+      walking: Boolean(pose.walking),
     } : null;
     if (this.presentationPose) this.applyPresentationPose();
     else {
@@ -110,9 +111,14 @@ export class CharacterVisual {
   }
 
   applyPresentationPose() {
-    const idleFrame = this.frames[this.presentationPose.facing][this.idleFrameIndex];
-    this.sprite.anims.stop();
-    applyFrameReference(this.sprite, idleFrame);
+    if (this.presentationPose.walking) {
+      const key = `${this.animationPrefix}-walk-${this.presentationPose.facing}`;
+      if (!this.sprite.anims.isPlaying || this.sprite.anims.currentAnim?.key !== key) this.sprite.anims.play(key);
+    } else {
+      const idleFrame = this.frames[this.presentationPose.facing][this.idleFrameIndex];
+      this.sprite.anims.stop();
+      applyFrameReference(this.sprite, idleFrame);
+    }
     this.sprite.setOrigin?.(this.presentationPose.originX, this.presentationPose.originY);
     this.sprite.setAngle?.(this.presentationPose.angle);
     this.sprite.setPosition(this.presentationPose.x, this.presentationPose.y);

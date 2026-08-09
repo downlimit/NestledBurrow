@@ -4,6 +4,7 @@ import { createFreshGameSessionState } from "../src/session/gameSessionState.js"
 import { createWorldLocationRuntime, validateLocationCapabilities } from "../src/world/worldLocationRuntime.js";
 import { createWorldPresentationRuntime } from "../src/world/worldPresentationRuntime.js";
 import { WORLD_LOCATION_DEFINITIONS } from "../src/world/worldLocationConfig.js";
+import { getCurrentWorldScene } from "../src/build/worldSceneRegistry.js";
 
 const read = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
 const main = read("src/main.js");
@@ -104,6 +105,7 @@ const village = definition("village-fixture", {
   buildMode: true,
 });
 const firstVillageOwners = lifecycle.runtime.mount({ definition: village, layout: layout("village-fixture") });
+assert.equal(getCurrentWorldScene(), lifecycle.renderingHost, "the location owner registers the world scene independently of facilities");
 assert.deepEqual(
   creationEvents(lifecycle.events),
   ["presentation", "puddle", "npc", "merchant", "debris", "melee", "facility", "needs", "tavern-sign", "tavern-service", "farming", "cooking", "kitchen", "movement-debug", "build", "interaction-bind", "candidate-reset", "hud-sync"],
@@ -141,6 +143,7 @@ for (const guard of ["sleeping", "options", "confirmation", "build", "facility",
 
 lifecycle.events.length = 0;
 lifecycle.runtime.unmount();
+assert.equal(getCurrentWorldScene(), null, "unmount clears the registered world scene");
 const firstDestroyEvents = [...lifecycle.events];
 assert(firstDestroyEvents.indexOf("candidate-reset") < firstDestroyEvents.indexOf("interaction-unbind"));
 assert(firstDestroyEvents.indexOf("interaction-unbind") < firstDestroyEvents.indexOf("destroy:build"));
@@ -167,6 +170,7 @@ const nestOwners = lifecycle.runtime.mount({
   definition: definition("nest-fixture", { meleeWeapons: true }),
   layout: layout("nest-fixture"),
 });
+assert.equal(getCurrentWorldScene(), lifecycle.renderingHost, "a facility-free world still registers the authoring scene");
 assert(nestOwners.debrisRuntime && nestOwners.meleeRuntime);
 assert.equal(nestOwners.merchantRuntime, null);
 assert.equal(nestOwners.facilityRuntime, null);
@@ -287,8 +291,9 @@ function createLifecycleHarness() {
       return owner("build", { getBuildModeRuntime: () => ({ isActive: () => guards.build }) });
     },
   };
+  const renderingHost = {};
   const runtime = createWorldLocationRuntime({
-    renderingHost: {},
+    renderingHost,
     sessionState: createFreshGameSessionState(),
     localization: { getLanguage: () => "en" },
     presentationRuntime,
@@ -328,7 +333,7 @@ function createLifecycleHarness() {
     },
     factories,
   });
-  return { runtime, events, guards };
+  return { runtime, events, guards, renderingHost };
 }
 
 function checkPresentationLifecycle() {
@@ -343,7 +348,7 @@ function checkPresentationLifecycle() {
   const fixture = {
     groundTiles: [{ x: 0, y: 0, frame: 0 }],
     houseFloorTiles: [{ x: 1, y: 0, frame: 0 }],
-    houseWallTiles: [{ id: "wall", x: 2, y: 0, frame: 0, supplements: [] }],
+    houseWallTiles: [{ id: "wall", x: 2, y: 0, frame: 0, orientation: "horizontal", supplements: [] }],
     decorationTiles: [{ x: 3, y: 0, frame: 0, depth: 1 }],
     transportTiles: [{ worldX: 0, worldY: 16, textureKey: "transport", frame: 0, depth: 2 }],
   };

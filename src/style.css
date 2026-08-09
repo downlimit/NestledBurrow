@@ -81,6 +81,7 @@ canvas {
 }
 
 .movement-debug-panel input,
+.movement-debug-panel select,
 .movement-debug-panel button {
   min-width: 0;
   font: inherit;
@@ -155,10 +156,16 @@ canvas {
   display: none;
 }
 
+.collider-debug-wide-control[hidden] {
+  display: none;
+}
+
 .collider-debug-editor output,
-.collider-debug-editor button:last-child,
+.collider-debug-editor > button:last-child,
 .collider-debug-editor .collider-debug-wide-action,
-.collider-debug-editor .interaction-direction-grid {
+.collider-debug-editor .interaction-direction-grid,
+.collider-debug-editor .collider-debug-wide-control,
+.collider-debug-editor .authoring-profile-controls {
   grid-column: 1 / -1;
 }
 
@@ -171,6 +178,8 @@ canvas {
 .interaction-direction-grid {
   display: grid;
   grid-template-columns: repeat(3, 32px);
+  width: max-content;
+  justify-self: center;
   justify-content: center;
   gap: 3px;
 }
@@ -183,6 +192,8 @@ canvas {
   width: 32px;
   height: 26px;
   padding: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .interaction-direction-grid button[data-enabled="true"] {
@@ -192,4 +203,26 @@ canvas {
 .interaction-direction-grid button[data-enabled="false"] {
   opacity: 0.55;
   border-color: #ff5f6d;
+}
+
+.authoring-profile-controls {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid rgb(242 234 220 / 18%);
+}
+
+.authoring-profile-controls[hidden] {
+  display: none;
+}
+
+.authoring-profile-controls label {
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 1fr);
+}
+
+.authoring-profile-controls input,
+.authoring-profile-controls select {
+  width: 100%;
+  min-width: 0;
 }

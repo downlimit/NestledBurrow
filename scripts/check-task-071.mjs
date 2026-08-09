@@ -194,7 +194,7 @@ assert.deepEqual(bathInteraction.position, { x: 112, y: 96 });
 assert.deepEqual(bathInteraction.aimPosition, { x: 112, y: 96 });
 assert.equal(bathInteraction.targetingMode, "facing-first");
 assert.equal(bathInteraction.targetingGroup, PLACEABLE_TARGETING_GROUP);
-assert.equal(bathInteraction.requiresFacing, false);
+assert.equal(bathInteraction.requiresFacing, true, "physical placeables participate in the player attention cone");
 
 const sourceSnapshot = { id: "player", position: { x: 0, y: 0 }, facingDirection: { x: 1, y: 0 } };
 const bedTarget = createInteractionTarget({

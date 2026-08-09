@@ -12,6 +12,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - explicit safe-spawn transitions connect the Nest entrance and transport-free Atoll arenas;
 - tools have strict actions; mismatched tools cannot mutate targets;
 - logs, stones and berries use the same resource targeting/reward pipeline in every location;
+- physical interactions use one forward attention cone: collider-centre alignment, then nearest collider point, then domain priority; a small hysteresis prevents prompt flicker;
 - resource removal clears presentation/collision before atomic reward delivery;
 - ten inventory slots hold tools and stackable loot; world drops remain pickable;
 - the canonical well refills the eight-use bucket;
@@ -32,6 +33,7 @@ Owns world geometry, collision, location switching, resources, farming and inven
 - runtime transition/teleport PNGs must be structurally complete, fully IDAT-decodable and match canonical dimensions;
 - stairs expose normal collider/pivot/visual/interaction profiles without becoming build-library objects;
 - stair collision is registered in the active layout and uses common `world-placeable` targeting;
+- the candidate is resolved again in the exact `Space` frame, so stale prompts cannot activate a previous object;
 - Burrow→Nest renders as fixed ground-overlay; Nest→Burrow keeps pivot-based world depth;
 - explicit `transitionTo` runs the normal location lifecycle without hidden transports;
 - canonical resources have one `worldId`; only active-location resources mount;

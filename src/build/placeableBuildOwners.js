@@ -16,6 +16,7 @@ import {
   isBlocked,
   midpointAnchor,
   registeredCollider,
+  resourcePlacementPoint,
   resourceColliderAt,
   resourceVisualBoundsAt,
   shiftRect,
@@ -206,10 +207,7 @@ function createResourceAdapter(scene, runtime) {
   let nextId = maximumEditorResourceId([...runtime.getResourceDefinitions(), ...persistedIds]);
 
   function pointFor(definition) {
-    return {
-      x: definition.cell.x * PLACEMENT_CELL_SIZE,
-      y: definition.cell.y * PLACEMENT_CELL_SIZE,
-    };
+    return resourcePlacementPoint(definition);
   }
 
   function targetFor(definition) {
@@ -245,8 +243,8 @@ function createResourceAdapter(scene, runtime) {
       id: forcedId ?? `editor-resource-${++nextId}`,
       profileId,
       cell: {
-        x: Math.round(point.x / PLACEMENT_CELL_SIZE),
-        y: Math.round(point.y / PLACEMENT_CELL_SIZE),
+        x: Number(point.x) / PLACEMENT_CELL_SIZE,
+        y: Number(point.y) / PLACEMENT_CELL_SIZE,
       },
       worldId,
       roomId,

@@ -5,8 +5,7 @@ import {
 } from "./facilityConfig.js";
 import { TILE_SIZE } from "../world/worldConfig.js";
 import { getKitchenFacilityPrompt, getServingTableStock } from "../tavern/cookingDomain.js";
-import { clearCurrentWorldScene, setCurrentWorldScene } from "../build/worldSceneRegistry.js";
-import { assetDepthFromPivot, pixelAlignedWorldPoint } from "../build/buildWorldGeometry.js";
+import { assetDepthFromRenderMode, pixelAlignedWorldPoint } from "../build/buildWorldGeometry.js";
 import { drawFacility } from "./facilityPreviewVisuals.js";
 import {
   BROKEN_STOVE_TEXTURE_KEY,
@@ -21,7 +20,6 @@ export function createFacilityRuntime(scene, {
   getSelectedItem = () => null,
   isFacilityReserved = () => false,
 }) {
-  setCurrentWorldScene(scene);
   const definitions = new Map(FACILITIES.map((facility) => [facility.id, facility]));
   const visuals = new Map();
   let activeFacilityId = null;
@@ -32,6 +30,17 @@ export function createFacilityRuntime(scene, {
   function trackEditorId(id) {
     const match = /^editor-.+-(\d+)$/.exec(id);
     if (match) editorId = Math.max(editorId, Number(match[1]));
+  }
+
+  function authoredDepth(facility, profileKey, baseDepth, stableId) {
+    const profile = scene.assetProfiles?.[profileKey] ?? {};
+    return assetDepthFromRenderMode({
+      placementPosition: facility.visual,
+      pivotOffset: profile.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height },
+      renderMode: profile.renderMode,
+      baseDepth,
+      stableId,
+    });
   }
 
   function createVisual(facility, { validateFootprint = true } = {}) {
@@ -45,13 +54,14 @@ export function createFacilityRuntime(scene, {
         top: facility.usePosition.y - 2,
         bottom: facility.usePosition.y + 2,
       }))) return false;
-    worldLayout.setWorldObjectCollider(facility.id, baseCollider, profileKey);
+    worldLayout.setWorldObjectCollider(facility.id, baseCollider, profileKey, {
+      collisionEnabled: scene.assetProfiles?.[profileKey]?.collisionEnabled !== false,
+    });
     const offset = scene.assetProfiles?.[profileKey]?.visualOffset ?? { x: 0, y: 0 };
-    const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
     const renderPosition = pixelAlignedWorldPoint({ x: facility.visual.x + offset.x, y: facility.visual.y + offset.y });
     const graphics = scene.add.graphics()
       .setPosition(renderPosition.x, renderPosition.y)
-      .setDepth(assetDepthFromPivot(facility.visual, pivotOffset, 500, facility.id));
+      .setDepth(authoredDepth(facility, profileKey, 500, facility.id));
     drawFacility(graphics, facility.facilityType);
     visuals.set(facility.id, graphics);
     return true;
@@ -60,8 +70,6 @@ export function createFacilityRuntime(scene, {
   function createServingTableVisual(facility) {
     if (facility.facilityType !== "serving-table" || platedDishVisuals.has(facility.id)) return;
     const offset = scene.assetProfiles?.["facility:serving-table"]?.visualOffset ?? { x: 0, y: 0 };
-    const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
-      ?? { x: facility.visual.width / 2, y: facility.visual.height };
     const dishPosition = pixelAlignedWorldPoint({
       x: facility.footprint.x + facility.footprint.width / 2 + offset.x,
       y: facility.footprint.y + 5 + offset.y,
@@ -71,7 +79,7 @@ export function createFacilityRuntime(scene, {
       dishPosition.y,
       PLATED_DISH_ASSET.key,
     ).setOrigin(0.5, 0.5)
-      .setDepth(assetDepthFromPivot(facility.visual, pivotOffset, 501, `${facility.id}:dish`))
+      .setDepth(authoredDepth(facility, "facility:serving-table", 501, `${facility.id}:dish`))
       .setVisible(false);
     platedDishVisuals.set(facility.id, dish);
   }
@@ -220,14 +228,12 @@ export function createFacilityRuntime(scene, {
     for (const servingTable of servingTables) {
       createServingTableVisual(servingTable);
       const dish = platedDishVisuals.get(servingTable.id);
-      const pivotOffset = scene.assetProfiles?.["facility:serving-table"]?.snapAnchorOffset
-        ?? { x: servingTable.visual.width / 2, y: servingTable.visual.height };
       const dishPosition = pixelAlignedWorldPoint({
         x: servingTable.footprint.x + servingTable.footprint.width / 2 + offset.x,
         y: servingTable.footprint.y + 5 + offset.y,
       });
       dish?.setPosition?.(dishPosition.x, dishPosition.y)
-        ?.setDepth?.(assetDepthFromPivot(servingTable.visual, pivotOffset, 501, `${servingTable.id}:dish`));
+        ?.setDepth?.(authoredDepth(servingTable, "facility:serving-table", 501, `${servingTable.id}:dish`));
       const stock = getServingTableStock(kitchen, servingTable.id);
       if (stock.itemId === "lemonade") dish?.setTexture?.(LEMONADE_TEXTURE_KEY, LEMONADE_FRAMES.lemonade);
       else dish?.setTexture?.(PLATED_DISH_ASSET.key, 0);
@@ -355,8 +361,7 @@ export function createFacilityRuntime(scene, {
       const facility = definitions.get(facilityId);
       if (!facility?.presentationPose) return null;
       const profileKey = `facility:${facility.facilityType}`;
-      const pivotOffset = scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: facility.visual.width / 2, y: facility.visual.height };
-      return { ...facility.presentationPose, depth: assetDepthFromPivot(facility.visual, pivotOffset, 501, `${facility.id}:pose`) };
+      return { ...facility.presentationPose, depth: authoredDepth(facility, profileKey, 501, `${facility.id}:pose`) };
     },
     isUsing() {
       return activeFacilityId !== null;
@@ -364,7 +369,6 @@ export function createFacilityRuntime(scene, {
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      clearCurrentWorldScene(scene);
       activeFacilityId = null;
       for (const [id, image] of visuals) {
         image.destroy();

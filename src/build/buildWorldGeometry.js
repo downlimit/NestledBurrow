@@ -5,6 +5,8 @@ export const WALL_COLLIDER_GROUPS = Object.freeze({
   legacy: "build:wall",
 });
 export const WORLD_DEPTH_BASE = 500;
+export const WORLD_DEPTH_BELOW_CHARACTER = WORLD_DEPTH_BASE - 1;
+export const WORLD_DEPTH_ABOVE_CHARACTER = WORLD_DEPTH_BASE + 4096;
 const WORLD_DEPTH_TIE_SCALE = 0.000001;
 
 const ZERO_OFFSETS = Object.freeze({ left: 0, right: 0, top: 0, bottom: 0 });
@@ -129,6 +131,19 @@ export function worldDepthFromAnchorY(anchorY, stableId = "", baseDepth = WORLD_
 
 export function assetDepthFromPivot(placementPosition, pivotOffset = { x: 0, y: 0 }, baseDepth = WORLD_DEPTH_BASE, stableId = "") {
   return worldDepthFromAnchorY(assetPivotWorldPosition(placementPosition, pivotOffset).y, stableId, baseDepth);
+}
+
+export function assetDepthFromRenderMode({
+  placementPosition,
+  pivotOffset = { x: 0, y: 0 },
+  renderMode = "pivot-depth",
+  fixedBelowDepth = WORLD_DEPTH_BELOW_CHARACTER,
+  stableId = "",
+  baseDepth = WORLD_DEPTH_BASE,
+} = {}) {
+  if (renderMode === "below-character") return Number(fixedBelowDepth);
+  if (renderMode === "above-character") return WORLD_DEPTH_ABOVE_CHARACTER;
+  return assetDepthFromPivot(placementPosition, pivotOffset, baseDepth, stableId);
 }
 
 export function placementMidpointOffset({ placementPosition, pivotOffset, effectiveCollider }) {

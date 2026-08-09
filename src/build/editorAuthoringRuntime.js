@@ -15,6 +15,7 @@ import { hitResourceDefinition } from "../session/gameSessionState.js";
 import { assetDepthFromPivot } from "./buildWorldGeometry.js";
 import { DEFAULT_ASSET_PROFILES, saveAssetProfiles } from "./assetProfiles.js";
 import { canonicalVisualOffsetAtCurrentPivot } from "./assetProfileRelations.js";
+import { collectAssetAuthoringInstances } from "./assetAuthoringRegistry.js";
 
 export const PLANTED_TREE_PROFILE_ID = "tree-planted";
 
@@ -179,10 +180,7 @@ export function attachEditorAuthoringRuntime(scene, {
   }
 
   function getAuthoringInstances() {
-    return [
-      ...(getLocationOwners().debrisRuntime?.getAuthoringInstances?.() ?? []),
-      ...(getLocationOwners().facilityRuntime?.getAuthoringInstances?.() ?? []),
-    ].filter((instance) => scene.assetProfiles?.[instance.profileKey]);
+    return collectAssetAuthoringInstances(scene);
   }
 
   function findAuthoringInstanceAt(point) {
@@ -212,6 +210,7 @@ export function attachEditorAuthoringRuntime(scene, {
     });
     getLocationOwners().debrisRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
     getLocationOwners().facilityRuntime?.applyAuthoringVisualOffset?.(profileKey, offset);
+    getLocationOwners().worldBuildCoordinator?.applyWallAuthoringProfile?.(profileKey);
     return offset;
   }
 
@@ -228,6 +227,7 @@ export function attachEditorAuthoringRuntime(scene, {
       const depth = assetDepthFromPivot(instance.anchor, offset, 500, instance.id);
       for (const target of instance.targets) target.setDepth?.(depth);
     }
+    getLocationOwners().worldBuildCoordinator?.applyWallAuthoringProfile?.(profileKey);
     getLocationOwners().facilityRuntime?.syncKitchenVisuals?.();
     return offset;
   }

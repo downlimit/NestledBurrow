@@ -95,6 +95,19 @@ test("fresh Task 049 world has four tools, editable kitchen/well and two trees",
   expect(facilities.visuals["home-gas-stove-01"].textureKey).toBe("facility.gas-stove-broken");
 });
 
+test("facility prompts require collider range and an unobstructed wall segment", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves deterministic world-space targeting once");
+  await bootFresh(page);
+
+  await bridge(page, "placePlayerAt", { x: 504, y: 456, facing: { x: 0, y: -1 } });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId ?? null)
+    .not.toBe("home-juicer-01");
+
+  await bridge(page, "placePlayerAt", { x: 540, y: 452, facing: { x: 0, y: -1 } });
+  await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.entityId ?? null)
+    .not.toBe("home-serving-table-01");
+});
+
 test("well refills only the bucket and resource targeting follows the strict tool matrix", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves keyboard hotbar targeting once");
   await bootFresh(page);

@@ -15,7 +15,12 @@ function usesPlaceablePerimeter(definition, collider) {
   return Boolean(collider && definition?.targetingGroup === PLACEABLE_TARGETING_GROUP);
 }
 
-export function createInteractionApproachResolver({ worldLayout, getWorldLayout = null, getPlayer }) {
+export function createInteractionApproachResolver({
+  worldLayout,
+  getWorldLayout = null,
+  getPlayer,
+  getAssetProfile = () => null,
+}) {
   const probeWallsBySource = new WeakMap();
   const currentWorldLayout = (definition = null) => definition?.interactionWorldLayout ?? getWorldLayout?.() ?? worldLayout;
 
@@ -38,17 +43,24 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
     const targetId = definition.entityId ?? definition.id;
     const walls = probeWalls(sourceSnapshot, activeLayout);
     const collider = interactionCollider(activeLayout, definition);
+    const maximumDistance = interactionPaddingFor(definition);
+    const attention = interactionAttentionMetrics(collider, aimPosition, sourceSnapshot.position);
+    if (!isInteractionAvailable({
+      definition,
+      sourcePosition: sourceSnapshot.position,
+      collider,
+      attention,
+      walls,
+      targetId,
+      maximumDistance,
+    })) return null;
     if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
-      const distance = Math.hypot(
-        definition.position.x - sourceSnapshot.position.x,
-        definition.position.y - sourceSnapshot.position.y,
-      );
-      if (distance > definition.radius
-        || !hasDirectInteractionReachAgainst(walls, sourceSnapshot.position, definition.position, targetId)) return null;
       return {
         position: definition.position,
         aimPosition,
-        availabilityDistance: distance,
+        ...attention,
+        radius: maximumDistance,
+        availabilityDistance: attention.selectionDistance,
         payload: { ...definition.payload },
       };
     }
@@ -60,7 +72,7 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
           point.x - sourceSnapshot.position.x,
           point.y - sourceSnapshot.position.y,
         );
-        return distance <= definition.radius
+        return distance <= maximumDistance
           && hasDirectInteractionReachAgainst(walls, point, aimPosition, targetId)
           ? [{ point, distance }]
           : [];
@@ -70,11 +82,9 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
     return {
       position: nearest.point,
       aimPosition,
+      ...attention,
+      radius: maximumDistance,
       availabilityDistance: nearest.distance,
-      selectionDistance: Math.hypot(
-        aimPosition.x - sourceSnapshot.position.x,
-        aimPosition.y - sourceSnapshot.position.y,
-      ),
       payload: { ...definition.payload },
     };
   }
@@ -84,18 +94,31 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
     const activeLayout = currentWorldLayout(definition);
     if (!activeLayout) return null;
     const collider = interactionCollider(activeLayout, definition);
-    if (definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
+    const maximumDistance = interactionPaddingFor(definition);
+    if (definition.requiresApproach === false
+      || definition.targetingMode === "facing-first" && !usesPlaceablePerimeter(definition, collider)) {
       return probe(definition, sourceSnapshot);
     }
     const player = getPlayer();
     const points = interactionPoints(definition, collider);
     const aimPosition = definition.aimPosition ?? definition.position;
+    const attention = interactionAttentionMetrics(collider, aimPosition, sourceSnapshot.position);
     const targetId = definition.entityId ?? definition.id;
+    const walls = probeWalls(sourceSnapshot, activeLayout);
+    if (!isInteractionAvailable({
+      definition,
+      sourcePosition: sourceSnapshot.position,
+      collider,
+      attention,
+      walls,
+      targetId,
+      maximumDistance,
+    })) return null;
     const nearbyPoints = points.filter((point) => (
       Math.hypot(
         point.x - sourceSnapshot.position.x,
         point.y - sourceSnapshot.position.y,
-      ) <= definition.radius
+      ) <= maximumDistance
       && hasDirectInteractionReach(activeLayout, point, aimPosition, targetId)
     ));
     if (nearbyPoints.length === 0) return null;
@@ -118,7 +141,7 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
       const route = connectExactApproachPoint(sourceSnapshot.position, path, point, navigation);
       if (!route) return [];
       const distance = pathDistance(sourceSnapshot.position, route);
-      return distance <= definition.radius
+      return distance <= maximumDistance
         && hasDirectInteractionReach(activeLayout, point, aimPosition, targetId)
         ? [{ point, path: route, distance }]
         : [];
@@ -128,13 +151,18 @@ export function createInteractionApproachResolver({ worldLayout, getWorldLayout 
     return {
       position: nearest.point,
       aimPosition,
+      ...attention,
+      radius: maximumDistance,
       availabilityDistance: nearest.distance,
-      selectionDistance: Math.hypot(
-        aimPosition.x - sourceSnapshot.position.x,
-        aimPosition.y - sourceSnapshot.position.y,
-      ),
       payload: { ...definition.payload, approachPoint: nearest.point, approachPath: nearest.path },
     };
+  }
+
+  function interactionPaddingFor(definition) {
+    const profile = getAssetProfile(interactionProfileKey(definition));
+    const authored = Number(profile?.interactionPadding);
+    if (Number.isFinite(authored)) return Math.max(1, authored);
+    return Math.max(1, Number(definition?.radius) || 1);
   }
 
   return Object.freeze({ probe, resolve });
@@ -156,6 +184,7 @@ function interactionDirectionsFor(definition) {
 }
 
 function interactionProfileKey(definition) {
+  if (definition?.profileKey) return definition.profileKey;
   if (definition?.facilityType) return `facility:${definition.facilityType}`;
   if (definition?.profileId) return `resource:${definition.profileId}`;
   if (definition?.payload?.bedId || String(definition?.id ?? "").includes("bed")) return "furniture:bed";
@@ -190,6 +219,45 @@ function interactionCollider(worldLayout, definition) {
     entry.id === definition.id || entry.id === definition.entityId
   ));
   return worldCollider?.rect ?? null;
+}
+
+export function interactionAttentionMetrics(collider, fallbackPosition, sourcePosition) {
+  if (!collider) {
+    return Object.freeze({
+      attentionPosition: Object.freeze({ ...fallbackPosition }),
+      selectionDistance: Math.hypot(
+        fallbackPosition.x - sourcePosition.x,
+        fallbackPosition.y - sourcePosition.y,
+      ),
+    });
+  }
+  const attentionPosition = {
+    x: (collider.left + collider.right) / 2,
+    y: (collider.top + collider.bottom) / 2,
+  };
+  const closestPoint = closestPointOnCollider(collider, sourcePosition);
+  return Object.freeze({
+    attentionPosition: Object.freeze(attentionPosition),
+    selectionDistance: Math.hypot(
+      closestPoint.x - sourcePosition.x,
+      closestPoint.y - sourcePosition.y,
+    ),
+  });
+}
+
+function isInteractionAvailable({ definition, sourcePosition, collider, attention, walls, targetId, maximumDistance }) {
+  if (attention.selectionDistance > maximumDistance) return false;
+  const reachPoint = collider
+    ? closestPointOnCollider(collider, sourcePosition)
+    : definition.position;
+  return hasDirectInteractionReachAgainst(walls, sourcePosition, reachPoint, targetId);
+}
+
+function closestPointOnCollider(collider, sourcePosition) {
+  return {
+    x: Math.min(collider.right, Math.max(collider.left, sourcePosition.x)),
+    y: Math.min(collider.bottom, Math.max(collider.top, sourcePosition.y)),
+  };
 }
 
 export function hasDirectInteractionReach(worldLayout, start, goal, targetId = null) {

@@ -1,6 +1,10 @@
 import { TILE_SIZE } from "../world/worldConfig.js";
 import { getResourceProfile } from "./resourceDomain.js";
 import { TOILET_ACCIDENT_TIMELINE_TUNING } from "../needs/toiletAccidentTimelineRuntime.js";
+import {
+  WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
+  WORLD_OBJECT_ATTENTION_GROUP,
+} from "../interaction/interactionConfig.js";
 
 export const RESOURCE_INTERACTION_KIND = "work-resource";
 export const EXTRACTABLE_TARGETING_GROUP = "extractable";
@@ -66,10 +70,11 @@ export function createResourceDefinition({
   roomId = worldId,
   radius = null,
   priority = null,
-  requiresFacing = false,
-  facingDotThreshold = -1,
+  requiresFacing = true,
+  facingDotThreshold = WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
   targetingMode = "facing-first",
   targetingGroup = EXTRACTABLE_TARGETING_GROUP,
+  attentionGroup = WORLD_OBJECT_ATTENTION_GROUP,
 } = {}) {
   if (typeof id !== "string" || id.trim() === "") throw new Error("Resource definition requires a stable ID");
   if (!cell || !Number.isFinite(cell.x) || !Number.isFinite(cell.y)) throw new Error(`Resource ${id} requires a finite cell`);
@@ -101,6 +106,7 @@ export function createResourceDefinition({
     facingDotThreshold: Number(facingDotThreshold),
     targetingMode,
     targetingGroup,
+    attentionGroup,
     prompt: profile.prompt,
     payload: Object.freeze({ resourceId: id }),
   });

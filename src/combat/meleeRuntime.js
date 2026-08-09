@@ -672,7 +672,11 @@ function createTrainingDummy(scene, worldLayout) {
       bottom: position.y + asset.collision.bottom,
     },
     "melee:training-dummy",
-    { kind: "training-dummy", fixed: true },
+    {
+      kind: "training-dummy",
+      fixed: true,
+      collisionEnabled: scene.assetProfiles?.["melee:training-dummy"]?.collisionEnabled !== false,
+    },
   );
   return { sprite, flashSprite, position, home: { ...position }, lastHitAtMs: -Infinity, returnMotion: null, hitLiftPx: 0 };
 }
@@ -715,7 +719,11 @@ function syncTrainingDummy(trainingDummy, worldLayout) {
   const depth = worldDepthFromAnchorY(position.y + TRAINING_DUMMY.asset.depthAnchor.y, TRAINING_DUMMY.id);
   sprite.setPosition(position.x, position.y - trainingDummy.hitLiftPx).setDepth(depth);
   flashSprite.setPosition(sprite.x, sprite.y).setDepth(depth + 0.01);
-  worldLayout?.setWorldObjectCollider?.(TRAINING_DUMMY.id, dummyColliderAt(position), "melee:training-dummy", { kind: "training-dummy", fixed: true });
+  worldLayout?.setWorldObjectCollider?.(TRAINING_DUMMY.id, dummyColliderAt(position), "melee:training-dummy", {
+    kind: "training-dummy",
+    fixed: true,
+    collisionEnabled: sprite.scene?.assetProfiles?.["melee:training-dummy"]?.collisionEnabled !== false,
+  });
 }
 
 function drawMeleeSnapshot(graphics, snapshot, color, alpha) {

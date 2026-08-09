@@ -1,5 +1,10 @@
 import { TAVERN_SIGN, TAVERN_SIGN_ASSET, TAVERN_SIGN_BUILD_KIND, TAVERN_SIGN_KIND } from "./guestConfig.js";
-import { assetDepthFromPivot, pixelAlignedWorldPoint } from "../build/buildWorldGeometry.js";
+import { assetDepthFromRenderMode, pixelAlignedWorldPoint } from "../build/buildWorldGeometry.js";
+import {
+  WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
+  WORLD_OBJECT_ATTENTION_GROUP,
+  WORLD_PLACEABLE_TARGETING_GROUP,
+} from "../interaction/interactionConfig.js";
 
 const PROFILE_KEY = "facility:tavern-sign";
 
@@ -13,6 +18,13 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     const value = scene.assetProfiles?.[PROFILE_KEY]?.[field];
     return { x: Math.round(Number(value?.x) || 0), y: Math.round(Number(value?.y) || 0) };
   };
+  const authoredDepthAt = (point, baseDepth = 500, stableId = TAVERN_SIGN.id) => assetDepthFromRenderMode({
+    placementPosition: point,
+    pivotOffset: profilePoint("snapAnchorOffset"),
+    renderMode: scene.assetProfiles?.[PROFILE_KEY]?.renderMode,
+    baseDepth,
+    stableId,
+  });
   const visualPositionAt = (point) => {
     const offset = profilePoint("visualOffset");
     return pixelAlignedWorldPoint({ x: point.x + offset.x, y: point.y + offset.y });
@@ -66,11 +78,12 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
       return;
     }
     const visual = visualPositionAt(position);
-    const pivot = profilePoint("snapAnchorOffset");
     sprite
       .setPosition(visual.x, visual.y)
-      .setDepth(assetDepthFromPivot(position, pivot, 500, TAVERN_SIGN.id));
-    worldLayout?.setWorldObjectCollider?.(TAVERN_SIGN.id, colliderAt(position), PROFILE_KEY);
+      .setDepth(authoredDepthAt(position));
+    worldLayout?.setWorldObjectCollider?.(TAVERN_SIGN.id, colliderAt(position), PROFILE_KEY, {
+      collisionEnabled: scene.assetProfiles?.[PROFILE_KEY]?.collisionEnabled !== false,
+    });
   }
 
   function draw() {
@@ -100,11 +113,15 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
         entityId: TAVERN_SIGN.entityId,
         roomId: "world",
         kind: TAVERN_SIGN_KIND,
+        profileKey: PROFILE_KEY,
         position: offsetPoint(TAVERN_SIGN.interactionOffset),
         radius: 34,
         priority: 30,
-        requiresFacing: false,
-        facingDotThreshold: -1,
+        requiresFacing: true,
+        facingDotThreshold: WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
+        targetingMode: "facing-first",
+        targetingGroup: WORLD_PLACEABLE_TARGETING_GROUP,
+        attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
         prompt: getTavernOpen() ? "hud:interaction.closeTavern" : "hud:interaction.openTavern",
         payload: {},
       }];
@@ -166,10 +183,9 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
     restoreBuildTarget,
     renderBuildPreview(point) {
       const visual = visualPositionAt(point);
-      const pivot = profilePoint("snapAnchorOffset");
       return scene.add.sprite(visual.x, visual.y, TAVERN_SIGN_ASSET.key, getTavernOpen() ? 0 : 1)
         .setOrigin(0.5, 1)
-        .setDepth(assetDepthFromPivot(point, pivot, 8988, `${TAVERN_SIGN.id}:preview`))
+        .setDepth(authoredDepthAt(point, 8988, `${TAVERN_SIGN.id}:preview`))
         .setTint(isPlacementBlocked(point) ? 0xff5364 : 0x7dff9a)
         .setAlpha(0.58);
     },

@@ -9,7 +9,7 @@ import {
   pixelAlignedWorldPoint,
   placementMidpointOffset,
 } from "./buildWorldGeometry.js";
-import { effectiveCollider, resourceColliderAt } from "./placeableBuildGeometry.js";
+import { effectiveCollider, registeredCollider, resourceColliderAt } from "./placeableBuildGeometry.js";
 import { PLACEABLE_BUILD_OWNER_IDS } from "./placeableBuildProtocol.js";
 
 function profilePoint(value = {}) {
@@ -101,10 +101,14 @@ export function resolvePlaceablePlacementAnchor(scene, adapterId, value = {}, pl
   const baseCollider = basePlacementCollider(adapterId, value, placement);
   if (!baseCollider) return null;
   const pivotOffset = profilePoint(scene.assetProfiles?.[profileKey]?.snapAnchorOffset);
+  const instanceId = value?.id ?? value?.definition?.id;
+  const collider = instanceId
+    ? registeredCollider(scene, instanceId, baseCollider, profileKey)
+    : effectiveCollider(scene, baseCollider, profileKey);
   return placementMidpointOffset({
     placementPosition: placement,
     pivotOffset,
-    effectiveCollider: effectiveCollider(scene, baseCollider, profileKey),
+    effectiveCollider: collider,
   });
 }
 

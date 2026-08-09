@@ -37,7 +37,10 @@ import { dayNightMultiplyColor, formatClock } from "./session/gameClock.js";
 import { getDialogueDefinition } from "./interaction/dialogueConfig.js";
 import { INTERACTION_DEFINITIONS } from "./interaction/interactionConfig.js";
 import { createInteractionRuntime } from "./interaction/interactionRuntime.js";
-import { createWorldInteractionCoordinator } from "./interaction/worldInteractionCoordinator.js";
+import {
+  createWorldInteractionCoordinator,
+  isInteractionBlockedByInventoryMode,
+} from "./interaction/worldInteractionCoordinator.js";
 import { createInteractionApproachResolver } from "./interaction/interactionApproach.js";
 import { createInteractionHud } from "./ui/interactionHud.js";
 import { createGameHud } from "./ui/gameHud.js";
@@ -52,7 +55,7 @@ import { loadMovementDebugConfig } from "./devtools/movementDebugPanel.js";
 import { loadColliderDebugOverrides, saveColliderDebugOverrides } from "./build/colliderDebugOverrides.js";
 import { loadAssetProfiles, saveAssetProfiles } from "./build/assetProfiles.js";
 import { migrateDirectionalWallOverrides } from "./build/buildWorldGeometry.js";
-import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./build/colliderResize.js";
+import { getColliderResizeEdges, getColliderResizeHandles, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "./build/colliderResize.js";
 import { BED_OBJECT, BED_WAKE_TILE } from "./resources/debrisConfig.js";
 import { DEFAULT_RESOURCE_ID, PLACEMENT_CELL_SIZE, RESOURCE_INTERACTION_KIND, RESOURCE_OBJECTS } from "./resources/resourceConfig.js";
 import { FACILITIES, preloadFacilityAssets } from "./facilities/facilityConfig.js";
@@ -163,6 +166,7 @@ class WorldScene extends Phaser.Scene {
       sessionState: this.sessionState,
       createLayout: (worldId) => createWorldLayout(worldId),
       applyColliderOverrides: (layout) => this.applyColliderOverridesToLayout(layout),
+      getAssetProfiles: () => this.assetProfiles,
       getPlayerCharacter: () => this.playerCharacter,
       canTransition: () => this.worldLocationRuntime?.canTransition?.() ?? false,
       beforeLocationChange: () => this.worldLocationRuntime?.unmount?.(),
@@ -302,7 +306,11 @@ class WorldScene extends Phaser.Scene {
       ),
     });
     this.needsFlowRuntime = createNeedsFlowRuntime({ initialValues: needMeterValues(this.sessionState.gameplay) });
-    this.interactionApproachResolver = createInteractionApproachResolver({ worldLayout: this.worldLayout, getPlayer: () => this.playerCharacter });
+    this.interactionApproachResolver = createInteractionApproachResolver({
+      getWorldLayout: () => this.worldLayout,
+      getPlayer: () => this.playerCharacter,
+      getAssetProfile: (profileKey) => this.assetProfiles?.[profileKey] ?? null,
+    });
     this.syncPlayerEnergyTarget();
     this.worldInteractionCoordinator = createWorldInteractionCoordinator({
       sessionState: this.sessionState,
@@ -451,6 +459,10 @@ class WorldScene extends Phaser.Scene {
         stopSleep: (options) => this.wakeUp(options),
         setCookingOverlayActive: (active) => { this.cookingOverlayActive = Boolean(active); },
         syncGameplayHudVisibility: () => this.syncGameplayHudVisibility(),
+        setDebugPanelOpen: (active) => {
+          this.debugPanelOpen = Boolean(active);
+          this.syncGameplayHudVisibility();
+        },
         syncPlayerEnergyTarget: () => this.syncPlayerEnergyTarget(),
         updateGameplayTime: (deltaMs) => this.updateGameplayTime(deltaMs),
         saveSession: () => this.saveSession(),
@@ -532,6 +544,11 @@ class WorldScene extends Phaser.Scene {
       .sort((a, b) => ((a.rect.right - a.rect.left) * (a.rect.bottom - a.rect.top))
         - ((b.rect.right - b.rect.left) * (b.rect.bottom - b.rect.top)))[0];
     if (!entry) return;
+    if (selection?.id === entry.id) {
+      this.syncColliderEditorPanel();
+      this.renderColliderDebug();
+      return;
+    }
     this.colliderEditSelection = { id: entry.id, groupKey: entry.groupKey, base: { ...entry.base }, draft: { ...entry.rect } };
     selection = this.colliderEditSelection;
     edges = getColliderResizeEdges(point, selection.draft);
@@ -638,8 +655,6 @@ class WorldScene extends Phaser.Scene {
     const draft = this.colliderEditSelection?.draft;
     if (draft) {
       const pixelBounds = getPixelColliderBounds(draft);
-      const centerX = Math.round((pixelBounds.left + pixelBounds.right) / 2);
-      const centerY = Math.round((pixelBounds.top + pixelBounds.bottom) / 2);
       graphics.lineStyle(1, 0x62ff91, 0.55);
       graphics.strokeRect(
         pixelBounds.left + 0.5,
@@ -648,11 +663,7 @@ class WorldScene extends Phaser.Scene {
         pixelBounds.bottom - pixelBounds.top,
       );
       graphics.fillStyle(0xffffff, 1);
-      for (const [x, y] of [
-        [pixelBounds.left, pixelBounds.top], [centerX, pixelBounds.top], [pixelBounds.right, pixelBounds.top],
-        [pixelBounds.left, centerY], [pixelBounds.right, centerY],
-        [pixelBounds.left, pixelBounds.bottom], [centerX, pixelBounds.bottom], [pixelBounds.right, pixelBounds.bottom],
-      ]) {
+      for (const { x, y } of getColliderResizeHandles(draft)) {
         graphics.fillRect(x, y, 1, 1);
       }
     }
@@ -695,13 +706,13 @@ class WorldScene extends Phaser.Scene {
 
   syncGameplayHudVisibility() {
     const buildActive = this.buildMode?.isActive?.() ?? false;
-    const gameplayOverlay = this.gameHudHidden || buildActive || this.cookingOverlayActive || this.gameHudConfirmationActive;
-    this.gameHud?.setSuppressed?.(this.gameHudHidden || buildActive);
+    const gameplayOverlay = this.gameHudHidden || buildActive || this.cookingOverlayActive || this.gameHudConfirmationActive || this.debugPanelOpen;
+    this.gameHud?.setSuppressed?.(this.gameHudHidden || buildActive || this.debugPanelOpen);
     this.uiVisibilityCoordinator?.setClassHidden("gameplay-overlay", gameplayOverlay);
     this.uiVisibilityCoordinator?.setClassHidden("option-sensitive", this.optionsOpen);
     this.uiVisibilityCoordinator?.setClassHidden("merchant-active", this.merchantRuntime?.isActive?.());
     this.uiVisibilityCoordinator?.setClassHidden("inventory-action-blocked", this.gameHud?.isInventoryInteractionBlocked?.() ?? false);
-    if (this.gameHudHidden) this.mobileJoystick?.reset?.();
+    if (this.gameHudHidden || this.debugPanelOpen) this.mobileJoystick?.reset?.();
   }
 
   setPivotEditMode(active) {
@@ -1010,7 +1021,7 @@ class WorldScene extends Phaser.Scene {
       this.worldLocationRuntime?.runWorldStep?.(substepMs, (stepMs) => this.characterSystem?.update(stepMs));
       worldDeltaMs -= substepMs;
     }
-    this.worldLocationCoordinator?.update?.();
+    this.worldLocationCoordinator?.update?.(realDeltaMs);
     this.cameraRuntime?.update({
       presentationPosition: this.getPlayerCameraPosition(),
       speed: this.playerCharacter?.speed ?? 0,
@@ -1039,12 +1050,16 @@ class WorldScene extends Phaser.Scene {
     const mobilePressed = this.interactionHud?.consumeInteractPressed() ?? false;
     const mobileHeldResourceInteract = this.interactionHud?.isInteractHeld?.()
       && this.interactionRuntime?.getCurrentCandidate?.()?.kind === RESOURCE_INTERACTION_KIND;
-    const interactionBlocked = this.gameHud?.isInventoryInteractionBlocked?.() ?? false;
+    const interactionBlocked = isInteractionBlockedByInventoryMode({
+      inventoryBlocked: this.gameHud?.isInventoryInteractionBlocked?.() ?? false,
+      candidateKind: this.interactionRuntime?.getCurrentCandidate?.()?.kind ?? null,
+    });
     const actionIds = [keyboardPressed || mobilePressed ? "space" : null, pointerActionId, shiftPressed ? "shift" : null].filter(Boolean);
     this.frameMeleeItem = resolveMeleeActionItem(actionIds, (actionId) => this.gameHud?.getCombatActionItem?.(actionId));
     const shiftMeleeEquipped = isMeleeWeaponId(this.gameHud?.getCombatActionItem?.("shift")?.id);
     const runningAllowed = this.needsRuntime?.movementState?.().runningAllowed ?? true;
-    const nextRunning = Boolean((this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()) && !this.sleeping && !this.needsInteractionCoordinator?.isLocked?.() && runningAllowed; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
+    const transitionLocked = this.worldLocationCoordinator?.isInteractionLocked?.() || this.wildAtollRuntime?.isInteractionLocked?.();
+    const nextRunning = Boolean((this.runKey?.isDown && !shiftMeleeEquipped) || this.mobileJoystick?.isSprinting?.()) && !this.sleeping && !this.needsInteractionCoordinator?.isLocked?.() && !transitionLocked && runningAllowed; if (nextRunning !== this.isRunning && Math.hypot(...Object.values(this.getMovementVector())) > 0.1) this.audioRuntime?.playEffect?.(nextRunning ? "sprint-on" : "sprint-off"); this.isRunning = nextRunning;
     this.syncPlayerEnergyTarget();
     this.syncLowEnergyMarker();
     this.frameActions = Object.freeze({
@@ -1140,6 +1155,7 @@ class WorldScene extends Phaser.Scene {
 
   getControllerMoveDirection() {
     if (this.pivotEditEnabled) return { x: 0, y: 0 };
+    if (this.worldLocationCoordinator?.isInteractionLocked?.() || this.wildAtollRuntime?.isInteractionLocked?.()) return { x: 0, y: 0 };
     const approachDirection = this.needsInteractionCoordinator?.getMovementDirection?.();
     if (approachDirection) return approachDirection;
     if (isPlayerMovementSuppressed({

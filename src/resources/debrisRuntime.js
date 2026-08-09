@@ -50,8 +50,10 @@ export function createDebrisRuntime(scene, {
   };
   const setBlocked = (definition, active) => {
     if (!active) return worldLayout.clearResourceCollider(definition.id);
+    const profileKey = `resource:${definition.profileId}`;
+    const metadata = { collisionEnabled: scene.assetProfiles?.[profileKey]?.collisionEnabled !== false };
     if (definition.colliderBounds) {
-      worldLayout.setResourceCollider(definition.id, definition.colliderBounds, `resource:${definition.profileId}`);
+      worldLayout.setResourceCollider(definition.id, definition.colliderBounds, profileKey, metadata);
       return;
     }
     const profile = getResourceProfile(definition.profileId);
@@ -69,7 +71,7 @@ export function createDebrisRuntime(scene, {
       right: definition.cell.x * PLACEMENT_CELL_SIZE + collision.right - rightInset,
       top: definition.cell.y * PLACEMENT_CELL_SIZE + collision.top + topInset,
       bottom: definition.cell.y * PLACEMENT_CELL_SIZE + collision.bottom,
-    }, `resource:${definition.profileId}`);
+    }, profileKey, metadata);
   };
 
   function createVisual(definition) {
@@ -204,7 +206,9 @@ export function createDebrisRuntime(scene, {
 
   function createBed(definition) {
     const bounds = bedBounds(definition);
-    worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed");
+    worldLayout.setWorldObjectCollider(definition.id, bounds, "furniture:bed", {
+      collisionEnabled: scene.assetProfiles?.["furniture:bed"]?.collisionEnabled !== false,
+    });
     const offset = scene.assetProfiles?.["furniture:bed"]?.visualOffset ?? { x: 0, y: 0 };
     const pivotOffset = scene.assetProfiles?.["furniture:bed"]?.snapAnchorOffset ?? { x: TILE_SIZE / 2, y: TILE_SIZE / 2 };
     const placementPosition = { x: bounds.left, y: bounds.top };

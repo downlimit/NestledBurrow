@@ -3,10 +3,19 @@ import {
   BUILD_CARPET_FRAME_BY_MASK,
   BUILD_SURFACE_CUSTOM_MASKS,
   BUILD_SURFACE_FRAME_BY_MASK,
+  BUILD_WALL_TOPOLOGY_FRAMES,
+  doesBuildWallTopologyOwnHorizontalHalf,
+  getBuildWallCapDepthOffset,
   getBuildWallColumnDepthOffset,
   getBuildWallColumnOffset,
+  getBuildWallEdgeDepthOffset,
+  getBuildWallHorizontalOverlayDepth,
+  getBuildWallJunctionFrameDepthOffset,
+  getBuildHorizontalWallVisualOffset,
+  getBuildHorizontalWallBodyCrop,
   getBuildVerticalWallFrame,
   getBuildVerticalWallOffset,
+  isBuildWallCapFrame,
   getBuildWallFrames,
 } from "./buildAssetCatalog.js";
 import {
@@ -91,6 +100,7 @@ function createWellOwner(scene, {
     wellVisuals.set(well.id, visual);
     worldLayout.setWorldObjectCollider(well.id, collisionAt(point), "farming:well", {
       depthAnchor: { x: point.x + WELL_PROFILE.depthAnchorOffset.x, y: point.y + WELL_PROFILE.depthAnchorOffset.y },
+      collisionEnabled: scene.assetProfiles?.["farming:well"]?.collisionEnabled !== false,
     });
     return visual;
   }
@@ -186,6 +196,7 @@ function createWellOwner(scene, {
         id: `refill-${well.id}`,
         entityId: well.id,
         kind: FARMING_INTERACTION_KINDS.refill,
+        profileKey: "farming:well",
         position: { x: well.x + TILE_SIZE / 2, y: well.y + TILE_SIZE / 2 },
         radius: 28,
         priority: 24,
@@ -343,7 +354,7 @@ class WorldBuildCoordinator {
       edgeId: edge.id,
     }));
     for (const point of canonicalWallPoints) this.buildWallEdges.set(this.buildWallEdgeKey(point), point.edgeId);
-    for (const point of canonicalWallPoints) this.refreshBuildWallJunctions(point);
+    this.refreshAllBuildWallJunctions();
     this.ensureBuildSurfaceTextures();
     this.nextBuildObjectId = 0;
   }
@@ -365,6 +376,75 @@ class WorldBuildCoordinator {
   hasConstructionCapability() { return this.constructionEnabled; }
   getPlacedObject(id) { return this.buildPlacedObjects.get(id) ?? null; }
   getPlacedObjects() { return [...this.buildPlacedObjects.values()]; }
+  getWallAuthoringInstances() {
+    const capabilities = {
+      approachDirections: false,
+      interactionPoint: false,
+      renderMode: false,
+      timeline: false,
+    };
+    const wallInstances = [...this.buildWallEdges.entries()].flatMap(([edgeKey, id]) => {
+      const [orientation, coordinates] = edgeKey.split(":");
+      const [x, y] = coordinates.split(",").map(Number);
+      const point = { x, y, orientation };
+      const placed = this.buildPlacedObjects.get(id);
+      const canonical = placed ? null : [...this.wallSprites.values()]
+        .find((entry) => entry.tile.edgeIds.includes(id));
+      const targets = placed?.sprites?.length
+        ? placed.sprites
+        : canonical ? [canonical.sprite, ...canonical.extraSprites] : [];
+      if (!targets.length) return [];
+      const { bounds } = this.getBuildWallEdgeGeometry(point);
+      return [{
+        id: `wall-edge:${edgeKey}`,
+        profileKey: wallColliderGroup(orientation),
+        anchor: { x, y },
+        bounds,
+        visualBasePosition: { x, y },
+        targets,
+        presentationManagedByOwner: true,
+        authoringCapabilities: capabilities,
+      }];
+    });
+    const columnInstances = [...this.buildWallJunctions.entries()].flatMap(([key, targets]) => {
+      if (!targets?.length) return [];
+      const [x, y] = key.split(",").map(Number);
+      return [{
+        id: `wall-column:${key}`,
+        profileKey: WALL_COLLIDER_GROUPS.node,
+        anchor: { x, y },
+        bounds: {
+          left: x - TILE_SIZE / 2,
+          right: x + TILE_SIZE / 2,
+          top: y - TILE_SIZE + getBuildHorizontalWallVisualOffset(),
+          bottom: y + getBuildHorizontalWallVisualOffset(),
+        },
+        visualBasePosition: { x, y },
+        targets,
+        presentationManagedByOwner: true,
+        authoringCapabilities: capabilities,
+      }];
+    });
+    return [...wallInstances, ...columnInstances];
+  }
+  applyWallAuthoringProfile(profileKey) {
+    if (profileKey === WALL_COLLIDER_GROUPS.node) {
+      this.refreshAllBuildWallJunctions();
+      return true;
+    }
+    const orientation = profileKey === WALL_COLLIDER_GROUPS.horizontal
+      ? "horizontal"
+      : profileKey === WALL_COLLIDER_GROUPS.vertical ? "vertical" : null;
+    if (!orientation) return false;
+    for (const edgeKey of this.buildWallEdges.keys()) {
+      if (!edgeKey.startsWith(`${orientation}:`)) continue;
+      const [, coordinates] = edgeKey.split(":");
+      const [x, y] = coordinates.split(",").map(Number);
+      this.refreshBuildWallEdgeVisual({ x, y, orientation });
+    }
+    this.refreshAllBuildWallJunctions();
+    return true;
+  }
   getNextBuildObjectId() { return this.nextBuildObjectId; }
   setNextBuildObjectId(value) { this.nextBuildObjectId = Math.max(this.nextBuildObjectId, Number(value) || 0); }
   getCellKey(point) { return this.buildCellKey(point); }
@@ -617,6 +697,16 @@ class WorldBuildCoordinator {
     return sprite;
   }
 
+  addBuildWallJunctionPreview(point, incidents, depth = 8989, explicit = false) {
+    return getBuildWallFrames({ ...incidents, explicit }).map((frame, index) => this.addBuildPreviewImage(
+      point.x - TILE_SIZE / 2,
+      point.y + getBuildWallColumnOffset({ explicit }),
+      HOUSE_TEXTURE_KEY,
+      frame,
+      depth + index * 0.01,
+    ));
+  }
+
   isBuildObjectPlacementBlocked(item, point) {
     const coordinated = this.wellOwner?.isPlacementBlocked?.(item, point);
     if (coordinated !== null && coordinated !== undefined) return coordinated;
@@ -711,21 +801,38 @@ class WorldBuildCoordinator {
 
   renderBuildWallPreview(points) {
     if (points.length === 1) {
-      this.addBuildPreviewImage(
-        points[0].x - TILE_SIZE / 2,
-        points[0].y - TILE_SIZE,
-        HOUSE_TEXTURE_KEY,
-        HOUSE_FRAMES.sideLeft,
-      );
+      this.addBuildWallJunctionPreview(points[0], {}, 8989, true);
       return;
     }
     const horizontal = points.every((point) => point.y === points[0].y);
     const ordered = [...points].sort((a, b) => horizontal ? a.x - b.x : a.y - b.y);
+    const previewIncidents = (point, index) => ({
+      ...this.getBuildWallIncidents(point),
+      ...(horizontal
+        ? {
+            west: index > 0 || this.getBuildWallIncidents(point).west,
+            east: index < ordered.length - 1 || this.getBuildWallIncidents(point).east,
+          }
+        : {
+            north: index > 0 || this.getBuildWallIncidents(point).north,
+            south: index < ordered.length - 1 || this.getBuildWallIncidents(point).south,
+          }),
+    });
     for (let index = 0; index < ordered.length - 1; index += 1) {
       const first = ordered[index];
       const second = ordered[index + 1];
       if (horizontal) {
-        this.addBuildPreviewImage(first.x, first.y - TILE_SIZE, HOUSE_TEXTURE_KEY, HOUSE_FRAMES.bottom);
+        const crop = getBuildHorizontalWallBodyCrop({
+          leftJunction: doesBuildWallTopologyOwnHorizontalHalf(previewIncidents(first, index), "east"),
+          rightJunction: doesBuildWallTopologyOwnHorizontalHalf(previewIncidents(second, index + 1), "west"),
+        });
+        const body = crop.visible ? this.addBuildPreviewImage(
+          first.x,
+          first.y - TILE_SIZE + getBuildHorizontalWallVisualOffset(),
+          HOUSE_TEXTURE_KEY,
+          BUILD_WALL_TOPOLOGY_FRAMES.horizontalBody,
+        ) : null;
+        if (body && crop.width < TILE_SIZE) body.setCrop?.(crop.x, crop.y, crop.width, crop.height);
       } else {
         this.addBuildPreviewImage(
           first.x - TILE_SIZE / 2,
@@ -735,38 +842,13 @@ class WorldBuildCoordinator {
         );
       }
     }
+    for (let index = 0; index < ordered.length; index += 1) {
+      this.addBuildWallJunctionPreview(ordered[index], previewIncidents(ordered[index], index), 8989);
+    }
     if (!horizontal) {
       const top = ordered[0];
       const bottom = ordered.at(-1);
-      const topIncidents = this.getBuildWallIncidents(top);
-      const bottomIncidents = this.getBuildWallIncidents(bottom);
-      if (!topIncidents.north && !topIncidents.east && !topIncidents.west) {
-        this.addBuildPreviewImage(
-          top.x - TILE_SIZE / 2,
-          top.y - TILE_SIZE,
-          HOUSE_TEXTURE_KEY,
-          HOUSE_FRAMES.sideLeft,
-          8987,
-        );
-      }
-      if (!bottomIncidents.south && !bottomIncidents.east && !bottomIncidents.west) {
-        this.addBuildPreviewImage(
-          bottom.x - TILE_SIZE / 2,
-          bottom.y - TILE_SIZE,
-          HOUSE_TEXTURE_KEY,
-          HOUSE_FRAMES.sideLeft,
-          8989,
-        );
-      }
       return;
-    }
-    const left = ordered[0];
-    const right = ordered.at(-1);
-    if (!this.hasBuildWallVertex(left)) {
-      this.addBuildPreviewImage(left.x - TILE_SIZE / 2, left.y - TILE_SIZE, HOUSE_TEXTURE_KEY, HOUSE_FRAMES.bottomLeft);
-    }
-    if (!this.hasBuildWallVertex(right)) {
-      this.addBuildPreviewImage(right.x - TILE_SIZE / 2, right.y - TILE_SIZE, HOUSE_TEXTURE_KEY, HOUSE_FRAMES.bottomRight);
     }
   }
 
@@ -1013,10 +1095,7 @@ class WorldBuildCoordinator {
       }
       const id = this.addBuildWallEdge(item, edge);
       if (!id) return { status: "exists" };
-      for (const vertex of this.getBuildWallVertices(edge)) {
-        this.refreshBuildWallJunction(vertex);
-        this.refreshBuildWallEdgesAtVertex(vertex);
-      }
+      this.refreshBuildWallTopologyAtVertices(this.getBuildWallVertices(edge));
       return { status: "placed", id };
     }
 
@@ -1053,8 +1132,7 @@ class WorldBuildCoordinator {
       textureKey: item.textureKey,
     });
     this.buildWallNodes.set(key, id);
-    this.refreshBuildWallJunction(point);
-    this.refreshBuildWallEdgesAtVertex(point);
+    this.refreshBuildWallTopologyAtVertices([point]);
     return { status: "placed", id };
   }
 
@@ -1099,35 +1177,59 @@ class WorldBuildCoordinator {
       const joinsWest = top.west || bottom.west;
       return [getBuildVerticalWallFrame({ joinsEast, joinsWest })];
     }
-    const left = this.getBuildWallIncidents({ x: point.x, y: point.y });
-    const right = this.getBuildWallIncidents({ x: point.x + TILE_SIZE, y: point.y });
-    const leftCap = !left.west;
-    const rightCap = !right.east;
-    const frames = [HOUSE_FRAMES.bottom];
-    if (leftCap) frames.push(HOUSE_FRAMES.bottomLeft);
-    if (rightCap) frames.push(HOUSE_FRAMES.bottomRight);
-    return frames;
+    return [BUILD_WALL_TOPOLOGY_FRAMES.horizontalBody];
   }
 
   createBuildWallEdgeSprites(point, textureKey, frames) {
     const vertical = point.orientation === "vertical";
-    return frames.map((frame) => this.renderingHost.add.image(
+    const profile = this.assetProfiles?.[wallColliderGroup(point.orientation)] ?? {};
+    const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = profile.snapAnchorOffset ?? { x: 0, y: 0 };
+    const horizontalCrop = vertical ? null : getBuildHorizontalWallBodyCrop({
+      leftJunction: doesBuildWallTopologyOwnHorizontalHalf(
+        this.getBuildWallIncidents({ x: point.x, y: point.y }),
+        "east",
+      ),
+      rightJunction: doesBuildWallTopologyOwnHorizontalHalf(
+        this.getBuildWallIncidents({ x: point.x + TILE_SIZE, y: point.y }),
+        "west",
+      ),
+    });
+    return frames.map((frame) => {
+      const sprite = this.renderingHost.add.image(
       vertical
-        ? point.x - TILE_SIZE / 2
+        ? point.x - TILE_SIZE / 2 + Number(visualOffset.x || 0)
         : frame === HOUSE_FRAMES.bottomLeft
-          ? point.x - TILE_SIZE / 2
+          ? point.x - TILE_SIZE / 2 + Number(visualOffset.x || 0)
           : frame === HOUSE_FRAMES.bottomRight
-            ? point.x + TILE_SIZE / 2
-            : point.x,
-      vertical ? point.y + getBuildVerticalWallOffset() : point.y - TILE_SIZE,
+            ? point.x + TILE_SIZE / 2 + Number(visualOffset.x || 0)
+            : point.x + Number(visualOffset.x || 0),
+      vertical
+        ? point.y + getBuildVerticalWallOffset() + Number(visualOffset.y || 0)
+        : point.y - TILE_SIZE + getBuildHorizontalWallVisualOffset() + Number(visualOffset.y || 0),
       textureKey,
       frame,
     )
       .setOrigin(0)
       .setDepth(worldDepthFromAnchorY(
-        point.y + (vertical ? TILE_SIZE : 0),
+        point.y + this.getBuildWallFrameDepthOffset(point, frame) + Number(pivotOffset.y || 0),
         `${this.buildWallEdgeKey(point)}:${frame}`,
-      )));
+      ));
+      if (horizontalCrop && horizontalCrop.width < TILE_SIZE) {
+        sprite.setCrop?.(
+          horizontalCrop.x,
+          horizontalCrop.y,
+          horizontalCrop.width,
+          horizontalCrop.height,
+        );
+      }
+      return sprite;
+    });
+  }
+
+  getBuildWallFrameDepthOffset(point, frame) {
+    if (isBuildWallCapFrame(frame)) return getBuildWallCapDepthOffset();
+    return getBuildWallEdgeDepthOffset(point.orientation);
   }
 
   refreshBuildWallEdgeVisual(point) {
@@ -1150,13 +1252,51 @@ class WorldBuildCoordinator {
     canonical.extraSprites = sprites.slice(1);
   }
 
+  getBuildWallEdgeSpriteTargets(point) {
+    const id = this.buildWallEdges.get(this.buildWallEdgeKey(point));
+    if (!id) return [];
+    const placed = this.buildPlacedObjects.get(id);
+    if (placed) return placed.sprites ?? [];
+    const canonical = [...this.wallSprites.values()]
+      .find((entry) => entry.tile.edgeIds.includes(id));
+    return canonical ? [canonical.sprite, ...canonical.extraSprites] : [];
+  }
+
   refreshBuildWallEdgesAtVertex(vertex) {
     for (const edge of [
+      { x: vertex.x, y: vertex.y - TILE_SIZE, orientation: "vertical" },
+      { x: vertex.x, y: vertex.y, orientation: "vertical" },
       { x: vertex.x - TILE_SIZE, y: vertex.y, orientation: "horizontal" },
       { x: vertex.x, y: vertex.y, orientation: "horizontal" },
     ]) {
       this.refreshBuildWallEdgeVisual(edge);
     }
+  }
+
+  getAllBuildWallVertices() {
+    const vertices = new Map();
+    const addVertex = (vertex) => vertices.set(this.buildCellKey(vertex), vertex);
+    for (const edgeKey of this.buildWallEdges.keys()) {
+      const [orientation, coordinates] = edgeKey.split(":");
+      const [x, y] = coordinates.split(",").map(Number);
+      for (const vertex of this.getBuildWallVertices({ x, y, orientation })) addVertex(vertex);
+    }
+    for (const key of this.buildWallNodes.keys()) {
+      const [x, y] = key.split(",").map(Number);
+      addVertex({ x, y });
+    }
+    return [...vertices.values()];
+  }
+
+  refreshAllBuildWallJunctions() {
+    for (const vertex of this.getAllBuildWallVertices()) this.refreshBuildWallJunction(vertex);
+  }
+
+  refreshBuildWallTopologyAtVertices(vertices) {
+    const uniqueVertices = new Map();
+    for (const vertex of vertices) uniqueVertices.set(this.buildCellKey(vertex), vertex);
+    for (const vertex of uniqueVertices.values()) this.refreshBuildWallEdgesAtVertex(vertex);
+    for (const vertex of uniqueVertices.values()) this.refreshBuildWallJunction(vertex);
   }
 
   getBuildWallEdgeGeometry(point) {
@@ -1207,10 +1347,6 @@ class WorldBuildCoordinator {
       && foot.bottom > box.top;
   }
 
-  refreshBuildWallJunctions(edge) {
-    for (const vertex of this.getBuildWallVertices(edge)) this.refreshBuildWallJunction(vertex);
-  }
-
   refreshBuildWallJunction(vertex) {
     const key = this.buildCellKey(vertex);
     const previous = this.buildWallJunctions.get(key);
@@ -1223,18 +1359,39 @@ class WorldBuildCoordinator {
     const frames = getBuildWallFrames({ ...incidents, explicit });
     if (!frames.length) return;
     const verticalTerminus = incidents.north !== incidents.south && !incidents.east && !incidents.west;
-    const anchorY = vertex.y + getBuildWallColumnDepthOffset({
-      verticalTerminus,
-      explicit,
-      isBottom: incidents.north,
-    });
-    const spriteY = vertex.y + getBuildWallColumnOffset({ verticalTerminus, explicit });
-    const sprites = frames.map((frame) => this.renderingHost.add.image(
-      vertex.x - TILE_SIZE / 2,
+    const profile = this.assetProfiles?.[WALL_COLLIDER_GROUPS.node] ?? {};
+    const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = profile.snapAnchorOffset ?? { x: 0, y: 0 };
+    const horizontalPivotOffset = this.assetProfiles?.[WALL_COLLIDER_GROUPS.horizontal]?.snapAnchorOffset?.y ?? 0;
+    const spriteY = vertex.y + getBuildWallColumnOffset({ verticalTerminus, explicit }) + Number(visualOffset.y || 0);
+    const horizontalDepths = [
+      ...this.getBuildWallEdgeSpriteTargets({ x: vertex.x - TILE_SIZE, y: vertex.y, orientation: "horizontal" }),
+      ...this.getBuildWallEdgeSpriteTargets({ x: vertex.x, y: vertex.y, orientation: "horizontal" }),
+    ].map((sprite) => sprite.depth);
+    const sprites = frames.map((frame, index) => this.renderingHost.add.image(
+      vertex.x - TILE_SIZE / 2 + Number(visualOffset.x || 0),
       spriteY,
       HOUSE_TEXTURE_KEY,
       frame,
-    ).setOrigin(0).setDepth(worldDepthFromAnchorY(anchorY, `${key}:${frame}`)));
+    )
+      .setOrigin(0)
+      .setDepth(getBuildWallHorizontalOverlayDepth({
+        incidents,
+        frame,
+        junctionDepth: worldDepthFromAnchorY(
+          vertex.y + getBuildWallJunctionFrameDepthOffset({
+            incidents,
+            frame,
+            nodePivotOffset: pivotOffset.y,
+            horizontalPivotOffset,
+            verticalTerminus,
+            explicit,
+            isBottom: incidents.north,
+          }) + index * 0.01,
+          `${key}:${frame}:${index}`,
+        ),
+        horizontalDepths,
+      })));
     this.buildWallJunctions.set(key, sprites);
   }
 
@@ -1420,14 +1577,11 @@ class WorldBuildCoordinator {
     this.buildPlacedObjects.delete(placed.id);
     if (placed.kind === "wall") {
       this.buildWallEdges.delete(this.buildWallEdgeKey(placed.point));
-      this.refreshBuildWallJunctions(placed.point);
-      for (const vertex of this.getBuildWallVertices(placed.point)) {
-        this.refreshBuildWallEdgesAtVertex(vertex);
-      }
+      this.refreshBuildWallTopologyAtVertices(this.getBuildWallVertices(placed.point));
     }
     if (placed.kind === "wall-node") {
       this.buildWallNodes.delete(this.buildCellKey(placed.point));
-      this.refreshBuildWallJunction(placed.point);
+      this.refreshBuildWallTopologyAtVertices([placed.point]);
     }
     if (placed.kind === "ground") {
       this.buildGroundCells.delete(this.buildCellKey(placed.point));
@@ -1455,17 +1609,12 @@ class WorldBuildCoordinator {
     }
     if (restored.kind === "wall") {
       this.buildWallEdges.set(this.buildWallEdgeKey(restored.point), restored.id);
-      this.refreshBuildWallEdgeVisual(restored.point);
-      this.refreshBuildWallJunctions(restored.point);
-      for (const vertex of this.getBuildWallVertices(restored.point)) {
-        this.refreshBuildWallEdgesAtVertex(vertex);
-      }
+      this.refreshBuildWallTopologyAtVertices(this.getBuildWallVertices(restored.point));
       return true;
     }
     if (restored.kind === "wall-node") {
       this.buildWallNodes.set(this.buildCellKey(restored.point), restored.id);
-      this.refreshBuildWallJunction(restored.point);
-      this.refreshBuildWallEdgesAtVertex(restored.point);
+      this.refreshBuildWallTopologyAtVertices([restored.point]);
       return true;
     }
     if (restored.kind === "ground") {
@@ -1603,12 +1752,8 @@ class WorldBuildCoordinator {
       this.buildWallEdges.delete(this.buildWallEdgeKey(removedPoint));
     }
     this.worldLayout.removeWallEdges([...edgeIds]);
-    for (const removedPoint of removedPoints) {
-      this.refreshBuildWallJunctions(removedPoint);
-      for (const vertex of this.getBuildWallVertices(removedPoint)) {
-        this.refreshBuildWallEdgesAtVertex(vertex);
-      }
-    }
+    const removedVertices = removedPoints.flatMap((point) => this.getBuildWallVertices(point));
+    this.refreshBuildWallTopologyAtVertices(removedVertices);
     return {
       status: "removed",
       type: "wall",
@@ -1619,8 +1764,8 @@ class WorldBuildCoordinator {
         }
         for (const removedPoint of removedPoints) {
           this.buildWallEdges.set(this.buildWallEdgeKey(removedPoint), removedPoint.edgeId);
-          this.refreshBuildWallJunctions(removedPoint);
         }
+        this.refreshBuildWallTopologyAtVertices(removedVertices);
       },
     };
   }

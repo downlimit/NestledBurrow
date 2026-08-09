@@ -33,11 +33,6 @@ export function createInteractionRuntime({
       return;
     }
 
-    if (interact && currentCandidate && currentCandidateDefinitions.length > 0) {
-      startSelectedInteraction();
-      return;
-    }
-
     applySelection(findCandidate());
     if (currentCandidate) {
       if (!presenter?.isMessageVisible?.()) presenter?.showPrompt?.({ promptKey: currentCandidate.prompt });
@@ -64,7 +59,9 @@ export function createInteractionRuntime({
       addTarget({ ...definition, position: snapshot.position });
     }
     for (const definition of worldInteractionCoordinator?.getStaticInteractionDefinitions?.() ?? []) addTarget(definition);
-    const candidate = findBestInteractionTarget(player, targets);
+    const candidate = findBestInteractionTarget(player, targets, {
+      preferredTargetId: currentCandidate?.targetId ?? null,
+    });
     const selectedDefinition = candidate ? definitionsByTargetId.get(candidate.targetId) : null;
     if (!candidate || !selectedDefinition) return null;
     const fallbacks = [...definitionsByTargetId.entries()]

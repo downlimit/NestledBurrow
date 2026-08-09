@@ -43,6 +43,16 @@ test("Wild Atoll mounts common melee runtime for sword and battle axe", async ({
   await page.keyboard.press("Space");
   await expect.poll(async () => (await bridge(page, "getLocationState")).worldId, { timeout: 2000 }).toBe("atoll");
   await expect.poll(() => bridge(page, "getMeleeState")).not.toBeNull();
+  await expect.poll(() => page.locator(".authoring-mode-list label").allTextContents()).toEqual([
+    "Коллайдер",
+    "Пивот",
+    "Оффсет визуала",
+    "Обрезка визуала",
+    "Точки подхода",
+    "Точка взаимодействия",
+    "Режим рендера",
+    "Таймлайн взаимодействия",
+  ]);
 
   await bridge(page, "addCombatInventoryItem", { itemId: "sword" });
   await bridge(page, "addCombatInventoryItem", { itemId: "battle-axe" });

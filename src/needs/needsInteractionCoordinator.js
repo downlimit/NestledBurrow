@@ -1,4 +1,9 @@
-import { createInteractionTimelineRuntime, INTERACTION_PHASE } from "./interactionTimelineRuntime.js";
+import { resolveInteractionTimelinePresentation } from "../build/assetProfiles.js";
+import {
+  createInteractionTimelineRuntime,
+  INTERACTION_PHASE,
+  presentationPoseAtBodyCenter,
+} from "./interactionTimelineRuntime.js";
 import { createToiletAccidentTimelineRuntime } from "./toiletAccidentTimelineRuntime.js";
 
 const APPROACH_PHASE = "approach";
@@ -21,8 +26,22 @@ export function createNeedsInteractionCoordinator({
   let approach = null;
   let pendingCollapse = false;
   let pendingToiletAccident = null;
+  const currentPresentationPose = () => ({
+    x: getPlayer().sprite.x,
+    y: getPlayer().sprite.y,
+    facing: getPlayer().visual.presentationPose?.facing ?? getPlayer().visual.lastFacing ?? "down",
+    angle: Number(getPlayer().sprite.angle) || 0,
+    originX: getPlayer().sprite.originX,
+    originY: getPlayer().sprite.originY,
+  });
+  const withAuthoredPresentation = (pose, authoredTimeline) => authoredTimeline
+    ? presentationPoseAtBodyCenter({
+        ...pose,
+        ...resolveInteractionTimelinePresentation(authoredTimeline, currentPresentationPose()),
+      }, getPlayer().sprite)
+    : pose;
   const timeline = createInteractionTimelineRuntime({
-    getPresentationPosition: () => ({ x: getPlayer().sprite.x, y: getPlayer().sprite.y, originX: getPlayer().sprite.originX, originY: getPlayer().sprite.originY }),
+    getPresentationPosition: currentPresentationPose,
     getMotorPosition: () => getPlayer().motor.position,
     setPresentationPose: (pose) => getPlayer().visual.setPresentationPose(pose),
   });
@@ -48,12 +67,17 @@ export function createNeedsInteractionCoordinator({
     if (current.metadata?.kind === "facility" && current.metadata.id === facilityId) return exit("normal");
     const facility = facilityRuntime.getDefinition(facilityId);
     if (!facility || !["shower", "toilet", "table"].includes(facility.facilityType)) return { status: "ignored", mutated: false };
+    const authoredTimeline = facility.interactionTimeline?.enabled ? facility.interactionTimeline : null;
     return beginApproach(interaction, {
       profileId: facility.facilityType,
+      profileOverride: authoredTimeline,
       metadata: { kind: "facility", id: facilityId },
-      targetPose: () => facility.facilityType === "table"
-        ? facePoint(getPlayer().motor.position, facility.position)
-        : facilityRuntime.getPresentationPose(facilityId),
+      targetPose: () => withAuthoredPresentation(
+        facility.facilityType === "table"
+          ? facePoint(authoredTimeline ? facility.timelineTarget : getPlayer().motor.position, facility.position)
+          : facilityRuntime.getPresentationPose(facilityId),
+        authoredTimeline,
+      ),
       onActivate: () => {
         const activation = facilityRuntime.toggle(facilityId, getPlayer().motor);
         if (activation.status !== "started") timeline.requestExit("emergency");
@@ -67,10 +91,16 @@ export function createNeedsInteractionCoordinator({
     if (current.metadata?.kind === "bed") return exit("normal");
     const bed = debrisRuntime.getBedDefinition(bedId);
     if (!bed) return { status: "unknown-bed", mutated: false };
+    const authoredTimeline = bed.interactionTimeline?.enabled ? bed.interactionTimeline : null;
     return beginApproach(interaction, {
       profileId: "bed",
+      profileOverride: authoredTimeline,
       metadata: { kind: "bed", id: bed.id },
-      targetPose: () => ({ x: bed.position.x, y: bed.position.y - 1, facing: "right", angle: -90, showSleepMarker: true }),
+      targetPose: () => withAuthoredPresentation({
+        x: authoredTimeline ? bed.timelineTarget.x : bed.position.x,
+        y: authoredTimeline ? bed.timelineTarget.y : bed.position.y - 1,
+        showSleepMarker: true,
+      }, authoredTimeline),
       onActivate: () => startSleep({ bedId: bed.id, presentationHandled: true }),
       onDeactivate: () => stopSleep({ presentationHandled: true }),
     });

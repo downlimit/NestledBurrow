@@ -8,7 +8,7 @@ import {
 import { DEFAULT_MOVEMENT_CONFIG, MOVEMENT_TUNING_FIELDS } from "../src/character/movementConfig.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
 import { COLLIDER_DEBUG_STORAGE_KEY, loadColliderDebugOverrides, saveColliderDebugOverrides } from "../src/build/colliderDebugOverrides.js";
-import { getColliderResizeEdges, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "../src/build/colliderResize.js";
+import { getColliderResizeEdges, getColliderResizeHandles, getPixelColliderBounds, resizeColliderDraft, roundColliderDraftToGrid } from "../src/build/colliderResize.js";
 
 class EventTargetStub {
   constructor() {
@@ -311,9 +311,7 @@ let documentStub = new DocumentStub();
 let storage = createStorage();
 let gameplayTuning = { maximumEnergy: 100, axeDamage: 1, smallLogChopHp: 7, energyPerHit: 1, awakeDrainAmount: 0.5, awakeWalkDrainAmount: 1.5, awakeRunDrainAmount: 3, universalHitCooldownSeconds: 0.66, minimumFatigueSpeedMultiplier: 0.25, sleepTimeScale: 32, sleepEnergyPerGameHour: 12.5, realSecondsPerGameDay: 1440 };
 let changeCalls = 0;
-let resetCalls = 0;
 let addCookedDishCalls = 0;
-const needsDebugPresets = [];
 let colliderVisibility = null;
 let buildGridVisibility = null;
 let colliderEditMode = null;
@@ -323,6 +321,7 @@ let colliderConfirmCalls = 0;
 let colliderRoundCalls = 0;
 const pivotAlignAxes = [];
 let visualOffsetResetCalls = 0;
+const panelOpenStates = [];
 let panel = new MovementDebugPanel({ enabled: false, gameplayTuning, documentRef: documentStub, storage });
 assert.equal(documentStub.body.children.length, 0, "disabled debug controls are absent");
 assert.deepEqual(loadMovementDebugConfig({ enabled: true, storage }), {}, "legacy movement overrides are no longer exposed");
@@ -331,9 +330,8 @@ documentStub = new DocumentStub();
 panel = new MovementDebugPanel({
   enabled: true, gameplayTuning, documentRef: documentStub, storage,
   onGameplayTuningChange: () => changeCalls++,
-  onResetBalanceRun: () => resetCalls++,
-  onSetNeedsDebugPreset: (preset) => needsDebugPresets.push(preset),
   onAddCookedDish: () => addCookedDishCalls++,
+  onOpenChange: (active) => panelOpenStates.push(active),
   onColliderVisibilityChange: (visible) => { colliderVisibility = visible; },
   onBuildGridVisibilityChange: (visible) => { buildGridVisibility = visible; },
   onColliderEditModeChange: (active) => { colliderEditMode = active; },
@@ -357,6 +355,7 @@ panel.toggleButton.emit("click");
 assert.equal(panel.panel.hidden, false, "toggle opens the panel");
 panel.toggleButton.emit("click");
 assert.equal(panel.panel.hidden, true, "toggle closes the panel");
+assert.deepEqual(panelOpenStates, [true, false], "debug panel visibility is exposed so gameplay HUD can follow it");
 assert.deepEqual([...panel.inputs.keys()], ["axeDamage", "smallLogChopHp", "universalHitCooldownSeconds", "minimumFatigueSpeedMultiplier", "sleepTimeScale", "sleepEnergyPerGameHour", "backPointFollowRate", "cameraLeadTransitionSeconds"], "panel exposes balance and camera fields");
 const hpInput = panel.inputs.get("smallLogChopHp");
 hpInput.value = "9";
@@ -364,15 +363,11 @@ hpInput.input();
 assert.equal(gameplayTuning.smallLogChopHp, 9, "input applies live normalized tuning");
 assert.equal(changeCalls, 1, "live tuning callback fires");
 assert(storage.getItem("nestledBurrow.gameplayDebug").includes('"smallLogChopHp":9'), "balance tuning persists separately");
-assert(panel.derived.textContent.includes("14"), "derived large log HP updates and remains read-only");
 panel.updateStatus();
-assert(panel.status.textContent.includes("время 06:00") && panel.status.textContent.includes("дерево 2 камень 1 рубины 0"), "compact Russian live status reports balance state");
-const resetButton = panel.panel.children.at(-1).children[0];
-resetButton.emit("click");
-assert.equal(resetCalls, 1, "balance reset action is wired");
-for (const index of [2, 3, 4, 5]) panel.panel.children.at(-1).children[index].emit("click");
-assert.deepEqual(needsDebugPresets, ["hungry", "exhausted", "urgent-toilet", "clear"], "needs debug presets are wired outside gameplay tuning");
-const addCookedDishButton = panel.panel.children.at(-1).children[6];
+assert.equal(panel.status.textContent, "время 06:00", "debug status omits gameplay resources and needs telemetry");
+const actionLabels = panel.panel.children.at(-1).children.map(({ textContent }) => textContent);
+assert(!actionLabels.some((label) => label.includes("Потребности") || label.includes("баланс-забег") || label.includes("энергию")), "debug actions omit needs and partial-run reset controls");
+const addCookedDishButton = panel.panel.children.at(-1).children[0];
 addCookedDishButton.emit("click");
 assert.equal(addCookedDishCalls, 1, "debug cooked-dish action is wired");
 panel.colliderCheckbox.checked = true;
@@ -414,6 +409,14 @@ assert.equal(visualOffsetEditMode, false, "pivot mode and visual-offset mode sta
 assert.equal(panel.visualOffsetEditCheckbox.checked, false);
 
 assert.deepEqual(getColliderResizeEdges({ x: 10, y: 20 }, { left: 10, right: 30, top: 20, bottom: 40 }), { left: true, right: false, top: true, bottom: false }, "collider corner exposes both window resize edges");
+assert.equal(getColliderResizeEdges({ x: 26, y: 30 }, { left: 10, right: 30, top: 20, bottom: 40 })?.right, true, "the right resize handle includes three pixels inward from the rendered border");
+assert.equal(getColliderResizeEdges({ x: 25, y: 30 }, { left: 10, right: 30, top: 20, bottom: 40 }), null, "the right resize handle keeps an exact three-pixel inward tolerance");
+assert.deepEqual(
+  getColliderResizeHandles({ left: 10, right: 30, top: 20, bottom: 40 }).map(({ x, y }) => [x, y]),
+  [[10, 20], [20, 20], [29, 20], [10, 30], [29, 30], [10, 39], [20, 39], [29, 39]],
+  "rendering and hit testing share the same eight collider handle centers",
+);
+assert.equal(getColliderResizeEdges({ x: 29, y: 25 }, { left: 10, right: 30, top: 20, bottom: 40 }), null, "unrendered border spans are not hidden resize handles");
 assert.deepEqual(resizeColliderDraft({ left: 10, right: 30, top: 20, bottom: 40 }, { left: false, right: true, top: false, bottom: true }, { x: -3, y: 2 }), { left: 10, right: 27, top: 20, bottom: 42 }, "dragging a corner resizes at one-pixel precision");
 assert.deepEqual(
   roundColliderDraftToGrid({ left: 9, right: 31, top: 17, bottom: 42 }, 8, 2),

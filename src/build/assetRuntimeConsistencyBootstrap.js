@@ -1,5 +1,9 @@
 import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { WorldLocationRuntime } from "../world/worldLocationRuntime.js";
+import {
+  WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
+  WORLD_OBJECT_ATTENTION_GROUP,
+} from "../interaction/interactionConfig.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
 import { installPlaceableBuildContract } from "./placeableBuildContract.js";
@@ -277,10 +281,11 @@ function patchFarmingRuntime(runtime, scene) {
       ...definition,
       position: centre,
       aimPosition: centre,
-      requiresFacing: false,
-      facingDotThreshold: -1,
+      requiresFacing: true,
+      facingDotThreshold: WORLD_OBJECT_ATTENTION_DOT_THRESHOLD,
       targetingMode: "facing-first",
       targetingGroup: PLACEABLE_TARGETING_GROUP,
+      attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
     });
   });
 

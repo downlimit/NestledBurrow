@@ -1,5 +1,12 @@
 import {
-  assetDepthFromPivot,
+  getBuildWallCapDepthOffset,
+  getBuildWallEdgeDepthOffset,
+  getBuildWallEdgeVisualOffset,
+  isBuildWallCapFrame,
+} from "../build/buildAssetCatalog.js";
+import {
+  assetDepthFromRenderMode,
+  WALL_COLLIDER_GROUPS,
   worldDepthFromAnchorY,
   WORLD_DEPTH_BASE,
 } from "../build/buildWorldGeometry.js";
@@ -67,14 +74,14 @@ export class WorldPresentationRuntime {
       Math.round(tile.worldX + Number(visualOffset.x || 0)),
       Math.round(tile.worldY + Number(visualOffset.y || 0)),
     );
-    sprite.setDepth?.(isGroundOverlayTransition(tile.profileKey)
-      ? WORLD_GROUND_OVERLAY_DEPTH
-      : assetDepthFromPivot(
-          { x: tile.worldX, y: tile.worldY },
-          pivot,
-          WORLD_DEPTH_BASE,
-          tile.id,
-        ));
+    sprite.setDepth?.(assetDepthFromRenderMode({
+      placementPosition: { x: tile.worldX, y: tile.worldY },
+      pivotOffset: pivot,
+      renderMode: profile.renderMode ?? (isGroundOverlayTransition(tile.profileKey) ? "below-character" : "pivot-depth"),
+      fixedBelowDepth: WORLD_GROUND_OVERLAY_DEPTH,
+      baseDepth: WORLD_DEPTH_BASE,
+      stableId: tile.id,
+    }));
     const crop = profile.visualCropInsets;
     if (crop) {
       const left = Math.max(0, Number(crop.left) || 0);
@@ -208,14 +215,31 @@ export class WorldPresentationRuntime {
   }
 
   createCanonicalWallEntry(tile) {
-    const depth = worldDepthFromAnchorY((tile.worldY ?? tile.y * TILE_SIZE) + TILE_SIZE, tile.id);
+    const edgeAnchorY = Number(tile.y);
+    const profileKey = tile.orientation === "vertical"
+      ? WALL_COLLIDER_GROUPS.vertical
+      : WALL_COLLIDER_GROUPS.horizontal;
+    const profile = this.renderingHost?.assetProfiles?.[profileKey] ?? {};
+    const visualOffset = profile.visualOffset ?? { x: 0, y: 0 };
+    const pivotOffset = profile.snapAnchorOffset ?? { x: 0, y: 0 };
+    const visualOffsetY = getBuildWallEdgeVisualOffset(tile.orientation) + Number(visualOffset.y || 0);
+    const baseDepthOffset = getBuildWallEdgeDepthOffset(tile.orientation);
+    const spriteDepthOffset = isBuildWallCapFrame(tile.frame)
+      ? getBuildWallCapDepthOffset()
+      : baseDepthOffset;
+    const depth = worldDepthFromAnchorY(edgeAnchorY + spriteDepthOffset + Number(pivotOffset.y || 0), tile.id);
+    const supplementDepth = worldDepthFromAnchorY(edgeAnchorY + baseDepthOffset + Number(pivotOffset.y || 0), `${tile.id}:supplement`);
     const extraSprites = (tile.supplements ?? []).map((supplement) => this.renderingHost.add
-      .image(supplement.worldX, supplement.worldY, HOUSE_TEXTURE_KEY, supplement.frame)
+      .image(supplement.worldX + Number(visualOffset.x || 0), supplement.worldY + visualOffsetY, HOUSE_TEXTURE_KEY, supplement.frame)
       .setOrigin(0, 0)
       .setCrop(supplement.cropX, 0, supplement.cropWidth, TILE_SIZE)
-      .setDepth(depth));
+      .setDepth(supplementDepth));
     this.worldRenderSprites.push(...extraSprites);
     const sprite = this.addCanonicalTile(tile, HOUSE_TEXTURE_KEY, depth);
+    sprite.setPosition?.(
+      (tile.worldX ?? tile.x * TILE_SIZE) + Number(visualOffset.x || 0),
+      (tile.worldY ?? tile.y * TILE_SIZE) + visualOffsetY,
+    );
     return { sprite, extraSprites, tile };
   }
 
