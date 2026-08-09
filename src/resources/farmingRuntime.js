@@ -116,6 +116,7 @@ export function createFarmingRuntime(scene, {
       position: { x: point.x + TILE_SIZE / 2, y: point.y + TILE_SIZE / 2 },
       radius: 30,
       priority,
+      requiresApproach: false,
       requiresFacing: false,
       facingDotThreshold: -1,
       targetingMode: extractable ? "facing-first" : "priority-distance",

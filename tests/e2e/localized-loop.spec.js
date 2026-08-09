@@ -152,6 +152,7 @@ test("desktop clears a persistent resource and New Game restores gameplay only",
   await expect.poll(async () => (await bridge(page, "getResourceVisualState", "fallen-log-01"))?.highlighted).toBe(false);
   await bridge(page, "interact");
   expect((await bridge(page, "getSession")).gameplay.resourceNodes["fallen-log-01"].progress).toBe(0);
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(1);
   const [soilCell] = (await bridge(page, "getFarmingState")).farm.soilCells;
   await bridge(page, "selectInventorySlot", 0);
   await bridge(page, "placePlayerAt", { x: soilCell.x - 8, y: soilCell.y + 12, facing: { x: 1, y: 0 } });
