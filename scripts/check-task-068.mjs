@@ -82,8 +82,8 @@ function gameplayFixture() {
       .map((exit) => exit.direction);
     assert.deepEqual(
       entryDirections,
-      segment.routeComposition === "left" ? ["north-west", "north"] : ["north", "north-east"],
-      `${segmentId} entry paths follow its composition`,
+      ["north-west", "north-east"],
+      `${segmentId} entry paths derive from center-to-left/right lane geometry`,
     );
     assert.deepEqual(
       getWildAtollArenaDefinition(segment.levels[1][0]).exits.map((exit) => exit.direction),
@@ -105,15 +105,16 @@ function gameplayFixture() {
       ["north-west", "north"],
       `${segmentId} second right arena keeps the composition`,
     );
-    for (const arenaId of segment.arenaIds) {
-      const pathDirections = getWildAtollArenaDefinition(arenaId).exits
-        .filter((exit) => exit.kind === "path")
-        .map((exit) => exit.direction);
-      if (pathDirections.length === 2) {
-        assert(pathDirections.includes("north"), `${arenaId} presents one straight path`);
-        assert.notDeepEqual(pathDirections, ["north-west", "north-east"], `${arenaId} does not use two mirrored diagonals`);
-      }
-    }
+    assert.deepEqual(
+      getWildAtollArenaDefinition(segment.levels[3][0]).exits.map((exit) => exit.direction),
+      ["north-east"],
+      `${segmentId} final left lane converges diagonally to the threshold`,
+    );
+    assert.deepEqual(
+      getWildAtollArenaDefinition(segment.levels[3][1]).exits.map((exit) => exit.direction),
+      ["north-west"],
+      `${segmentId} final right lane converges diagonally to the threshold`,
+    );
 
     const terminal = getWildAtollArenaDefinition(segment.terminalArenaId);
     assert.equal(terminal.terminal, true);
@@ -123,8 +124,8 @@ function gameplayFixture() {
     if (transitions.length === 2) {
       assert.deepEqual(
         transitions.map((exit) => exit.direction),
-        entryDirections,
-        `${segmentId} threshold transitions follow the segment composition`,
+        ["north-west", "north-east"],
+        `${segmentId} threshold transitions derive from center-to-left/right lane geometry`,
       );
     }
     for (const arenaId of segment.arenaIds.filter((id) => id !== segment.terminalArenaId)) {

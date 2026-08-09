@@ -155,6 +155,7 @@ export class BuildModeRuntime {
     onUndo = () => {},
     getPlacementAnchorOffset = () => ({ x: 0, y: 0 }),
     isActivationAllowed = () => true,
+    assetGroups = BUILD_ASSET_GROUPS,
   } = {}) {
     this.scene = scene;
     this.localization = localization;
@@ -174,6 +175,7 @@ export class BuildModeRuntime {
     this.onUndo = onUndo;
     this.getPlacementAnchorOffset = getPlacementAnchorOffset;
     this.isActivationAllowed = isActivationAllowed;
+    this.assetGroups = assetGroups;
     this.active = false;
     this.selectedId = null;
     this.objects = [];
@@ -291,7 +293,7 @@ export class BuildModeRuntime {
     this.selection = this.scene.add.graphics().setDepth(PANEL_DEPTH + 2).setScrollFactor(0).setVisible(false);
     this.title = this.addText(8, 8, "", 7, false);
     let contentY = PANEL.contentTop;
-    for (const group of BUILD_ASSET_GROUPS) {
+    for (const group of this.assetGroups) {
       const groupLabel = this.addText(8, contentY, "", 7, true);
       groupLabel.buildLabelKey = group.labelKey;
       contentY += 10;
@@ -494,7 +496,7 @@ export class BuildModeRuntime {
   }
 
   getSelectedItem() {
-    return BUILD_ASSET_GROUPS
+    return this.assetGroups
       .flatMap((group) => group.items)
       .find((candidate) => candidate.id === this.selectedId);
   }

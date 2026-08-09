@@ -17,27 +17,26 @@ Owns construction, placeable lifecycle and asset/layout editing.
 
 ## Universal placeable lifecycle
 
-Every object-like catalog entry declares `objectLike: true`, one `placeableOwner`, and `place → move → remove → restore`.
+Every object-like catalog entry declares one `placeableOwner` and `place → move → remove → restore`. The same descriptor drives hover, commit and grouped undo from visible geometry plus effective collider.
 
-One owner descriptor drives move/demolition hover and commit. Bounds combine current visible geometry and effective collider. Grouped undo uses the same restore operation. `FACILITY_BUILD_ORDER` covers all `FACILITY_ASSETS`; `RESOURCE_PROFILES` supplies trees, `berry-bush`, logs, stones and ruby nodes. Wells, tavern signs and training dummies use the same contract.
+Catalog owners cover facilities, `berry-bush`, other resources, wells, signs and training dummies.
 
 ## Developer-authoring contract
 
-One versioned profile owns collider, pivot, visual offset, crop, interaction offset and approach directions. Mouse and `1 px` keyboard edits are supported; active point editing suppresses player movement.
+One versioned profile owns collider, pivot, visual/crop and interaction offsets plus approach directions. Mouse and `1 px` keyboard edits are supported; active editing suppresses movement. These profile-space values never rewrite placement; the interaction marker uses effective collider centre plus offset.
 
-Pivot, visual offset and interaction offset are profile-space vectors and never rewrite world placement. The interaction marker is the current effective collider centre plus interaction offset. Visual reset preserves the current pivot and restores the canonical visual-to-pivot relation.
+Editing pivot or collider immediately changes the build cursor anchor; no cached anchor may override the live midpoint. Authoring selection covers every live placeable profile and fixed-world transition instance. Fixed-world stairs and gliders use the ordinary move workflow in every location while their runtime owner keeps lifecycle, interaction and presentation synchronized. They never enter the construction catalog and cannot be created or demolished.
 
-Editing pivot or collider immediately changes the build cursor anchor; no cached anchor may override the live midpoint. Authoring selection covers every live placeable profile and fixed world-transition profiles. A fixed transition may expose the same authoring panel in a location with gameplay build mode disabled, but it does not become constructible, movable or demolishable.
+Fixed-world placement and `collisionEnabled` are per-instance authoring data. Collision OFF preserves selection/profile editing and interaction while removing physical blocking. Move synchronizes sprite, collider, interaction and depth without changing destination safe-spawn. Grid and fixed-world move are capability/instance-driven without full home construction.
 
-`Сохранить и выгрузить канон объектов` commits the current collider draft and downloads `nestledburrow-authoring-canon.json` with live layout, collider overrides and complete asset profiles. Collider rounding uses the live draft; crop keeps one visible pixel. Browser storage may hold drafts/backups. `NEW GAME` restores the authored baseline.
+`Сохранить и выгрузить канон объектов` commits the current collider draft and downloads `nestledburrow-authoring-canon.json` with live layout, collider overrides, complete asset profiles and fixed-world instance state. Collider rounding uses the live draft; crop keeps one visible pixel. Browser storage may hold drafts/backups. `NEW GAME` restores the authored baseline.
 
 ## Owners
 
 - orchestration: `src/build/worldBuildCoordinator.js`;
-- lifecycle: `src/build/placeableBuildProtocol.js`, `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`;
-- placement: `src/build/placeablePlacementPose.js`, `src/build/buildWorldGeometry.js`;
-- profiles/input: `src/build/assetProfiles.js`, `src/build/assetProfileRelations.js`, `src/build/assetAuthoringInput.js`;
-- authoring/export: `src/build/universalPlaceableAuthoring.js`, `src/build/authoringCanonExport.js`, `src/build/authoringBackup.js`, `src/build/assetRuntimeConsistencyBootstrap.js`;
+- lifecycle/placement: `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeablePlacementPose.js`;
+- profiles/input: `src/build/assetProfiles.js`, `src/build/assetAuthoringInput.js`;
+- authoring/export: `src/build/universalPlaceableAuthoring.js`, `src/build/fixedWorldAuthoringState.js`, `src/build/authoringBackup.js`;
 - transition bridge: `src/build/worldTransitionAuthoringBridge.js`.
 
 `WorldBuildCoordinator` owns build actions. Runtime owners own entities. `WorldScene` remains composition only.
@@ -50,6 +49,9 @@ Editing pivot or collider immediately changes the build cursor anchor; no cached
 - pivot, visual offset and interaction offset never become world coordinates;
 - authoring selection covers live placeables and fixed transitions;
 - fixed transitions stay outside the build-library lifecycle;
+- fixed-world placement and collision toggles are per instance and survive canonical export/load;
+- collision OFF preserves selection, interaction and edited collider shape while removing physical blocking;
+- fixed-world/grid availability never depends on a literal location ID;
 - every object-like catalog entry has one full lifecycle owner;
 - move and demolition resolve the same target;
 - resource movement preserves state and demolition undo restores it;
@@ -59,7 +61,7 @@ Editing pivot or collider immediately changes the build cursor anchor; no cached
 
 ## Current baseline
 
-Furniture, facilities, resources, special objects and the Burrow/Nest stairs share collider/pivot/visual/interaction authoring profiles. Construction placement/movement/demolition remains limited to build-library objects.
+Furniture, facilities, resources and special objects use the full village construction lifecycle. Burrow/Nest stairs, the Nest Atoll entrance and Atoll exits share fixed-world move/collider/collision-toggle authoring across locations; only the village exposes the construction catalog.
 
 ## Not yet
 
@@ -67,4 +69,4 @@ Rotation, gameplay construction persistence, history, general map editing and mu
 
 ## Evidence
 
-`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `check:task-074`, `authoring-persistence.spec.js`.
+`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `check:task-074`, `check:task-085`, `authoring-persistence.spec.js`.

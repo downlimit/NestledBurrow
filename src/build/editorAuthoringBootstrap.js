@@ -45,12 +45,18 @@ function delay(milliseconds) {
 }
 
 function isAuthoringSceneReady(scene) {
+  const owners = scene?.worldLocationRuntime?.getOwners?.() ?? {};
+  const hasAuthorableInstances = Boolean(
+    scene?.worldPresentationRuntime?.getTransitionAuthoringInstances?.().length
+      || owners.wildAtollRuntime?.getAuthoringInstances?.().length
+      || owners.debrisRuntime?.getAuthoringInstances?.().length
+      || owners.facilityRuntime?.getAuthoringInstances?.().length,
+  );
   return Boolean(
     scene?.buildMode
       && scene?.worldBuildCoordinator?.getPlacedObjects
-      && scene?.facilityRuntime
-      && scene?.debrisRuntime
-      && scene?.worldLayout,
+      && scene?.worldLayout
+      && hasAuthorableInstances,
   );
 }
 

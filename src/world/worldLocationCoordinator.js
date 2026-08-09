@@ -1,4 +1,5 @@
 import { PLACEABLE_TARGETING_GROUP } from "../build/liveAssetGeometry.js";
+import { resolveFixedWorldInstance } from "../build/fixedWorldAuthoringState.js";
 import { createMovementState } from "../character/characterMovement.js";
 import { getResourceObjectsForWorld } from "../resources/resourceConfig.js";
 import {
@@ -248,8 +249,10 @@ export function applyTransportProfile(layout, definition) {
   const transportTiles = [];
   const transitions = [];
   for (const placement of definition.transports) {
-    const left = placement.tile.x * TILE_SIZE;
-    const top = placement.tile.y * TILE_SIZE;
+    const canonical = { x: placement.tile.x * TILE_SIZE, y: placement.tile.y * TILE_SIZE };
+    const authored = resolveFixedWorldInstance(placement.id, canonical);
+    const left = authored.x;
+    const top = authored.y;
     const footprintBounds = Object.freeze({
       left,
       top,
@@ -265,6 +268,7 @@ export function applyTransportProfile(layout, definition) {
     layout.setWorldObjectCollider?.(placement.id, baseCollider, placement.profileKey, {
       kind: WORLD_TRANSITION_INTERACTION_KIND,
       profileKey: placement.profileKey,
+      collisionEnabled: authored.collisionEnabled,
     });
     transportTiles.push(Object.freeze({
       id: placement.id,

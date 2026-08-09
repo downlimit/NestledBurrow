@@ -53,72 +53,61 @@ const SEGMENT_SPECS = Object.freeze([
     id: WILD_ATOLL_SEGMENTS.starter,
     segmentKey: "atoll:segments.starter",
     resourcePattern: STARTER_RESOURCE_PATTERN,
-    routeComposition: "right",
     nextSegments: [WILD_ATOLL_SEGMENTS.sereneSkerries, WILD_ATOLL_SEGMENTS.sereneGrotto],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.sereneSkerries,
     segmentKey: "atoll:segments.sereneSkerries",
     resourcePattern: FOREST_RESOURCE_PATTERN,
-    routeComposition: "left",
     nextSegments: [WILD_ATOLL_SEGMENTS.forestedIsthmus, WILD_ATOLL_SEGMENTS.deepSkerries],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.forestedIsthmus,
     segmentKey: "atoll:segments.forestedIsthmus",
     resourcePattern: STARTER_RESOURCE_PATTERN,
-    routeComposition: "right",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.deepSkerries,
     segmentKey: "atoll:segments.deepSkerries",
     resourcePattern: FOREST_RESOURCE_PATTERN,
-    routeComposition: "left",
     nextSegments: [WILD_ATOLL_SEGMENTS.motu, WILD_ATOLL_SEGMENTS.fearsomeSkerries],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.motu,
     segmentKey: "atoll:segments.motu",
     resourcePattern: STARTER_RESOURCE_PATTERN,
-    routeComposition: "right",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.fearsomeSkerries,
     segmentKey: "atoll:segments.fearsomeSkerries",
     resourcePattern: FOREST_RESOURCE_PATTERN,
-    routeComposition: "left",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.sereneGrotto,
     segmentKey: "atoll:segments.sereneGrotto",
     resourcePattern: MINE_RESOURCE_PATTERN,
-    routeComposition: "right",
     nextSegments: [WILD_ATOLL_SEGMENTS.shadowIsthmus, WILD_ATOLL_SEGMENTS.deepGrotto],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.shadowIsthmus,
     segmentKey: "atoll:segments.shadowIsthmus",
     resourcePattern: STARTER_RESOURCE_PATTERN,
-    routeComposition: "left",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.deepGrotto,
     segmentKey: "atoll:segments.deepGrotto",
     resourcePattern: MINE_RESOURCE_PATTERN,
-    routeComposition: "right",
     nextSegments: [WILD_ATOLL_SEGMENTS.blueHole, WILD_ATOLL_SEGMENTS.relictGrotto],
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.blueHole,
     segmentKey: "atoll:segments.blueHole",
     resourcePattern: MINE_RESOURCE_PATTERN,
-    routeComposition: "left",
   }),
   segmentSpec({
     id: WILD_ATOLL_SEGMENTS.relictGrotto,
     segmentKey: "atoll:segments.relictGrotto",
     resourcePattern: MINE_RESOURCE_PATTERN,
-    routeComposition: "right",
   }),
 ]);
 
@@ -204,7 +193,7 @@ export function getWildAtollExitPoint(direction, tileSize = 16) {
     north: { x: 11 * tileSize, y: 4 * tileSize },
     "north-west": { x: 7 * tileSize, y: 5 * tileSize },
     "north-east": { x: 15 * tileSize, y: 5 * tileSize },
-    center: { x: 11 * tileSize, y: 10 * tileSize },
+    center: { x: 2 * tileSize, y: 10 * tileSize },
   };
   const point = points[direction];
   if (!point) throw new Error(`Unknown Wild Atoll exit direction: ${String(direction)}`);
@@ -218,15 +207,11 @@ export function hashUnit(text) {
   return (hash >>> 0) / 0x100000000;
 }
 
-function segmentSpec({ id, segmentKey, resourcePattern, routeComposition, nextSegments = [] }) {
-  if (routeComposition !== "left" && routeComposition !== "right") {
-    throw new Error(`Unknown Wild Atoll route composition: ${String(routeComposition)}`);
-  }
+function segmentSpec({ id, segmentKey, resourcePattern, nextSegments = [] }) {
   return Object.freeze({
     id,
     segmentKey,
     resourcePattern,
-    routeComposition,
     nextSegments: Object.freeze([...nextSegments]),
   });
 }
@@ -260,20 +245,19 @@ function buildSegment(spec) {
     exits: Object.freeze(exits),
     terminal,
   });
-  const pathTo = (targetArenaId, direction) => Object.freeze({
+  const pathTo = (sourceArenaId, targetArenaId) => Object.freeze({
     id: targetArenaId,
     kind: "path",
     targetArenaId,
-    direction,
+    direction: deriveWildAtollDirection(arenaLane(sourceArenaId), arenaLane(targetArenaId)),
     promptKey: `atoll:paths.${spec.id}.${arenaNodeName(targetArenaId)}`,
   });
-  const [entryLeftDirection, entryRightDirection] = branchDirections(spec.routeComposition);
   const terminalExits = [
     ...spec.nextSegments.map((targetSegmentId, index) => Object.freeze({
       id: targetSegmentId,
       kind: "segment",
       targetSegmentId,
-      direction: branchDirections(spec.routeComposition)[index],
+      direction: deriveWildAtollDirection("center", index === 0 ? "left" : "right"),
       promptKey: `atoll:segmentPaths.${targetSegmentId}`,
     })),
     Object.freeze({
@@ -285,19 +269,18 @@ function buildSegment(spec) {
     }),
   ];
   const arenas = Object.freeze([
-    arena(ids.root, [pathTo(ids.left1, entryLeftDirection), pathTo(ids.right1, entryRightDirection)]),
-    arena(ids.left1, [pathTo(ids.left2, "north"), pathTo(ids.right2, "north-east")]),
-    arena(ids.right1, [pathTo(ids.left2, "north-west"), pathTo(ids.right2, "north")]),
-    arena(ids.left2, [pathTo(ids.left3, "north"), pathTo(ids.right3, "north-east")]),
-    arena(ids.right2, [pathTo(ids.left3, "north-west"), pathTo(ids.right3, "north")]),
-    arena(ids.left3, [pathTo(ids.edge, "north")]),
-    arena(ids.right3, [pathTo(ids.edge, "north")]),
+    arena(ids.root, [pathTo(ids.root, ids.left1), pathTo(ids.root, ids.right1)]),
+    arena(ids.left1, [pathTo(ids.left1, ids.left2), pathTo(ids.left1, ids.right2)]),
+    arena(ids.right1, [pathTo(ids.right1, ids.left2), pathTo(ids.right1, ids.right2)]),
+    arena(ids.left2, [pathTo(ids.left2, ids.left3), pathTo(ids.left2, ids.right3)]),
+    arena(ids.right2, [pathTo(ids.right2, ids.left3), pathTo(ids.right2, ids.right3)]),
+    arena(ids.left3, [pathTo(ids.left3, ids.edge)]),
+    arena(ids.right3, [pathTo(ids.right3, ids.edge)]),
     arena(ids.edge, terminalExits, true),
   ]);
   return Object.freeze({
     id: spec.id,
     segmentKey: spec.segmentKey,
-    routeComposition: spec.routeComposition,
     entryArenaId: ids.root,
     terminalArenaId: ids.edge,
     levels,
@@ -307,10 +290,19 @@ function buildSegment(spec) {
   });
 }
 
-function branchDirections(routeComposition) {
-  return routeComposition === "left"
-    ? Object.freeze(["north-west", "north"])
-    : Object.freeze(["north", "north-east"]);
+export function deriveWildAtollDirection(sourceLane, targetLane) {
+  const rank = { left: -1, center: 0, right: 1 };
+  if (!(sourceLane in rank) || !(targetLane in rank)) {
+    throw new Error(`Unknown Wild Atoll lane transition: ${String(sourceLane)} -> ${String(targetLane)}`);
+  }
+  const delta = rank[targetLane] - rank[sourceLane];
+  return delta < 0 ? "north-west" : delta > 0 ? "north-east" : "north";
+}
+
+function arenaLane(arenaId) {
+  const node = arenaNodeName(arenaId);
+  if (node === "root" || node === "edge") return "center";
+  return node.startsWith("left") ? "left" : "right";
 }
 
 function arenaNodeName(arenaId) {

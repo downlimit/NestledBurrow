@@ -3,6 +3,7 @@ import {
   worldDepthFromAnchorY,
   WORLD_DEPTH_BASE,
 } from "../build/buildWorldGeometry.js";
+import { updateFixedWorldInstance } from "../build/fixedWorldAuthoringState.js";
 import {
   HOUSE_TEXTURE_KEY,
   OUTDOOR_TEXTURE_KEY,
@@ -17,9 +18,10 @@ export function createWorldPresentationRuntime(options) {
 }
 
 export class WorldPresentationRuntime {
-  constructor({ renderingHost } = {}) {
+  constructor({ renderingHost, authoringStorage = globalThis.localStorage } = {}) {
     if (!renderingHost?.add) throw new Error("WorldPresentationRuntime requires a Phaser rendering host");
     this.renderingHost = renderingHost;
+    this.authoringStorage = authoringStorage;
     this.destroyed = false;
     this.activeLayout = null;
     this.worldRenderSprites = [];
@@ -98,7 +100,10 @@ export class WorldPresentationRuntime {
   }
 
   getTransitionAuthoringInstances() {
-    return this.transportEntries.map(({ tile, sprite }) => ({
+    return this.transportEntries.map((entry) => {
+      const { tile, sprite } = entry;
+      const collisionEnabled = this.transitionCollisionEnabled(tile.id);
+      return ({
       id: tile.id,
       profileKey: tile.profileKey,
       anchor: { x: tile.worldX, y: tile.worldY },
@@ -111,10 +116,79 @@ export class WorldPresentationRuntime {
       visualBasePosition: { x: tile.worldX, y: tile.worldY },
       targets: [sprite],
       special: true,
+      fixedWorld: true,
+      placementPosition: { x: tile.worldX, y: tile.worldY },
+      snapAnchorOffset: { ...(this.transitionProfile(tile.profileKey).snapAnchorOffset ?? { x: 0, y: 0 }) },
+      collisionEnabled,
+      getCollisionEnabled: () => this.transitionCollisionEnabled(tile.id),
+      setCollisionEnabled: (enabled) => this.setTransitionCollisionEnabled(tile.id, enabled),
+      move: (point) => this.moveTransitionAuthoringInstance(tile.id, point),
       ...(isGroundOverlayTransition(tile.profileKey)
         ? { depthMode: "fixed", fixedDepth: WORLD_GROUND_OVERLAY_DEPTH }
         : {}),
-    }));
+      });
+    });
+  }
+
+  transitionCollisionEnabled(id) {
+    const entry = this.activeLayout?.getWorldObjectColliders?.().find((candidate) => candidate.id === id);
+    return entry?.collisionEnabled !== false;
+  }
+
+  syncTransitionCollider(entry, collisionEnabled = this.transitionCollisionEnabled(entry.tile.id)) {
+    const transition = this.activeLayout?.transitions?.find(({ id }) => id === entry.tile.id);
+    if (!transition) return null;
+    const base = {
+      left: entry.tile.worldX + transition.collider.left,
+      right: entry.tile.worldX + transition.collider.right,
+      top: entry.tile.worldY + transition.collider.top,
+      bottom: entry.tile.worldY + transition.collider.bottom,
+    };
+    this.activeLayout.setWorldObjectCollider?.(entry.tile.id, base, entry.tile.profileKey, {
+      kind: transition.kind ?? "world-transition",
+      profileKey: entry.tile.profileKey,
+      collisionEnabled: Boolean(collisionEnabled),
+    });
+    return base;
+  }
+
+  moveTransitionAuthoringInstance(id, point) {
+    const entry = this.transportEntries.find((candidate) => candidate.tile.id === id);
+    if (!entry) return null;
+    const previous = { x: entry.tile.worldX, y: entry.tile.worldY };
+    const current = { x: Math.round(Number(point?.x) || 0), y: Math.round(Number(point?.y) || 0) };
+    const collisionEnabled = this.transitionCollisionEnabled(id);
+    entry.tile = Object.freeze({ ...entry.tile, worldX: current.x, worldY: current.y });
+    this.activeLayout.transportTiles = Object.freeze(this.transportEntries.map((candidate) => candidate.tile));
+    this.activeLayout.transitions = Object.freeze(this.activeLayout.transitions.map((transition) => (
+      transition.id === id
+        ? Object.freeze({
+            ...transition,
+            footprintBounds: Object.freeze({
+              left: current.x,
+              top: current.y,
+              right: current.x + entry.tile.width,
+              bottom: current.y + entry.tile.height,
+            }),
+          })
+        : transition
+    )));
+    updateFixedWorldInstance(id, { ...current, collisionEnabled }, previous, this.authoringStorage);
+    this.syncTransitionCollider(entry, collisionEnabled);
+    this.syncTransportEntry(entry);
+    this.renderingHost?.interactionRuntime?.refresh?.();
+    return { previous, current };
+  }
+
+  setTransitionCollisionEnabled(id, enabled) {
+    const entry = this.transportEntries.find((candidate) => candidate.tile.id === id);
+    if (!entry) return null;
+    const collisionEnabled = Boolean(enabled);
+    const point = { x: entry.tile.worldX, y: entry.tile.worldY };
+    updateFixedWorldInstance(id, { ...point, collisionEnabled }, point, this.authoringStorage);
+    this.syncTransitionCollider(entry, collisionEnabled);
+    this.renderingHost?.interactionRuntime?.refresh?.();
+    return collisionEnabled;
   }
 
   applyTransitionAuthoringProfile(profileKey = null) {

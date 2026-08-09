@@ -200,7 +200,9 @@ export function createWorldLayout(worldId = WORLD_IDS.village) {
     isBlockedCell: (x, y) => blocked.has(cellKey(x, y)),
     isBlockedBox: (box) => (
       [...wallColliders.values()].some(({ rect }) => overlaps(box, rect))
-      || [...resourceColliders.values()].some((rect) => overlaps(box, rect))
+      || [...resourceColliders].some(([id, rect]) => (
+        resourceColliderMetadata.get(id)?.collisionEnabled !== false && overlaps(box, rect)
+      ))
     ),
   });
 
@@ -214,7 +216,11 @@ export function createWorldLayout(worldId = WORLD_IDS.village) {
     houseFootprint: houseGeometry.footprint,
     wallEdges: houseGeometry.wallEdges,
     get wallColliders() { return [...wallColliders.values()].map(({ rect }) => rect); },
-    get objectColliders() { return [...resourceColliders.values()]; },
+    get objectColliders() {
+      return [...resourceColliders]
+        .filter(([id]) => resourceColliderMetadata.get(id)?.collisionEnabled !== false)
+        .map(([, rect]) => rect);
+    },
     getWorldObjectColliders() {
       return [
         ...[...wallColliders].map(([id, entry]) => ({ id, ...entry })),
@@ -236,7 +242,7 @@ export function createWorldLayout(worldId = WORLD_IDS.village) {
           rect,
           ...(resourceColliderMetadata.get(id) ?? {}),
         })),
-      ].filter((entry) => overlaps(box, entry.rect));
+      ].filter((entry) => entry.collisionEnabled !== false && overlaps(box, entry.rect));
     },
     doorway: houseGeometry.doorway,
     getSurfaceAt(point) {

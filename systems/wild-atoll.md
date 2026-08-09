@@ -52,15 +52,11 @@ Every implemented segment contains eight arenas in a forward-only `1 -> 2 -> 2 -
 
 ## Path composition
 
-A two-path arena presents one straight northern path plus one diagonal path:
-
-- a left-side arena uses north and north-east;
-- a right-side arena uses north-west and north;
-- the entry arena and threshold transitions use north plus the diagonal selected by that segment's composition.
+Direction derives from source and target lanes in the graph. Center-to-left/right is north-west/north-east; same-lane movement is north; left-to-right is north-east; right-to-left is north-west. Therefore every segment root and every threshold with two onward segments presents north-west plus north-east, left-side two-path arenas present north plus north-east, right-side arenas present north-west plus north, and the final left/right lanes converge through north-east/north-west.
 
 Native path presentation follows the direction exactly: north uses `NestledBurrow_GliderPlatform_N.png`; north-west uses `NestledBurrow_GliderPlatform_NE.png` as authored; north-east reuses that same NE sprite with horizontal mirroring. Both ordinary paths and onward segment transitions use this mapping.
 
-This keeps the route readable and varies the composition between arenas.
+Terminal thresholds have no synthetic onward gliders.
 
 ## Arena naming and mood
 
@@ -91,6 +87,8 @@ Path tips display only `SPACE - <next arena>`. Transition tips display the canon
 - paths and transitions never subtract an estimated cost or reveal resource counts in text;
 - travel is forward-only: a chosen path or transition cannot be reversed;
 - every threshold exposes the crystal return teleport;
+- the Island Nest entrance is the native north glider and uses the same fixed-world instance contract;
+- every threshold teleport is centered at `2 * TILE_SIZE, 10 * TILE_SIZE`, keeping its 64 px platform against the left edge;
 - path platforms and the teleport's stone platform render above terrain but below the character;
 - the blue crystal construct uses a base pivot and the common world-depth rule, so the player can render in front of or behind it;
 - glider platforms, teleport platform and crystal construct expose normal editable collider, pivot and visual profiles without becoming build-library objects.
@@ -114,7 +112,9 @@ Collapsing on the Atoll starts sleep immediately so movement stops, but visible 
 - eleven segments and eighty-eight unique arenas are generated;
 - every segment topology is `1/2/2/2/1`;
 - all internal paths advance exactly one arena level;
-- every two-path arena contains one north exit and exactly one diagonal exit;
+- every root and two-way threshold uses north-west plus north-east;
+- every left/right two-path arena uses north plus its inward diagonal;
+- final left/right arenas converge through north-east/north-west respectively;
 - no non-threshold arena has a home teleport;
 - First Trails transitions to Безмятежные Шхеры and Безмятежный Грот;
 - Безмятежные Шхеры transitions to Лесистая Перейма and Дремучие Шхеры;
@@ -125,6 +125,7 @@ Collapsing on the Atoll starts sleep immediately so movement stops, but visible 
 - represented resources use the common resource owner and never overlap spawn corridors;
 - all transient exit colliders are removed before the next arena presentation is mounted;
 - north-east reuses the north-west diagonal platform through horizontal mirroring; no third diagonal binary is required;
+- glider/teleport placement and collision toggles are per-instance authoring data; interaction follows the authored placement;
 - paths and transitions do not mutate needs directly;
 - transient run state is not serialized;
 - expedition capacity remains slot-based.
@@ -135,7 +136,7 @@ The production slice contains the complete canonical route tree, ordinary common
 
 ## Evidence
 
-`check:task-068`, `check:inventory`, `check:interaction`, `check:hud`, `check:i18n`, Browser E2E and managed game preview.
+`check:task-068`, `check:task-085`, `check:inventory`, `check:interaction`, `check:hud`, `check:i18n`, Browser E2E and managed game preview.
 
 ## Not fixed
 

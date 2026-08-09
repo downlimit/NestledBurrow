@@ -1,8 +1,6 @@
 import { MovementDebugPanel } from "../devtools/movementDebugPanel.js";
 import { WorldLocationRuntime } from "../world/worldLocationRuntime.js";
-import { WORLD_IDS } from "../world/worldLocationConfig.js";
 import { BuildModeRuntime } from "./buildModeRuntime.js";
-import { attachEditorAuthoringRuntime } from "./editorAuthoringRuntime.js";
 import { normalizeBedDefinitionToGrid } from "./assetGridPlacement.js";
 import { installPlaceableBuildContract } from "./placeableBuildContract.js";
 import { installUniversalPlaceableAuthoring } from "./universalPlaceableAuthoring.js";
@@ -48,15 +46,9 @@ if (!BuildModeRuntime.prototype[BUILD_GRID_PATCH]) {
 if (!WorldLocationRuntime.prototype[LOCATION_RUNTIME_PATCH]) {
   const originalMount = WorldLocationRuntime.prototype.mount;
   WorldLocationRuntime.prototype.mount = function mountWithCurrentAssetGeometry(...args) {
-    originalMount.apply(this, args);
-    if (!this.owners.movementDebugPanel
-      && this.movementDebugEnabled
-      && ((this.activeDefinition?.transports?.length ?? 0) > 0 || this.owners.wildAtollRuntime)) {
-      this.mountMovementDebugPanel();
-      this.updateOwnerSnapshot();
-    }
+    const result = originalMount.apply(this, args);
     installCurrentAssetRuntime(this.renderingHost);
-    return this.getOwners();
+    return result;
   };
   Object.defineProperty(WorldLocationRuntime.prototype, LOCATION_RUNTIME_PATCH, { value: true });
 }
@@ -66,23 +58,7 @@ if (!MovementDebugPanel.prototype[PANEL_PATCH]) {
 
   MovementDebugPanel.prototype.attachSceneRuntime = async function attachCurrentAssetRuntime() {
     const scene = await this.resolveWorldScene?.();
-    const profileOnly = Boolean(
-      scene
-        && !scene.buildMode
-        && ((scene.worldLocationRuntime?.activeDefinition?.transports?.length ?? 0) > 0
-          || scene.worldLocationRuntime?.activeDefinition?.id === WORLD_IDS.atoll),
-    );
-    let result = null;
-    if (profileOnly) {
-      this.scene = scene;
-      this.authoringRuntime ??= attachEditorAuthoringRuntime(scene, {
-        storage: this.storage,
-        confirmColliderDraft: this.onColliderDraftConfirm,
-      });
-      result = this.authoringRuntime;
-    } else {
-      result = await originalAttachSceneRuntime.call(this);
-    }
+    const result = await originalAttachSceneRuntime.call(this);
     installCurrentAssetRuntime(this.scene ?? scene);
     return result;
   };

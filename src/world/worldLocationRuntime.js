@@ -116,9 +116,9 @@ export class WorldLocationRuntime {
       if (capabilities.tavernService) this.mountTavern();
       if (capabilities.farming) this.mountFarming();
       if (capabilities.cooking) this.mountCooking();
-      if (capabilities.buildMode) {
+      if (capabilities.buildMode || capabilities.fixedWorldAuthoring) {
         this.mountMovementDebugPanel();
-        this.mountBuildCoordinator();
+        this.mountBuildCoordinator({ constructionEnabled: capabilities.buildMode });
       }
       this.updateOwnerSnapshot();
       this.globalOwners.worldInteractionCoordinator?.rebindLocationOwners?.(this.interactionOwners());
@@ -528,7 +528,7 @@ export class WorldLocationRuntime {
     this.mountAuthoringInput();
   }
 
-  mountBuildCoordinator() {
+  mountBuildCoordinator({ constructionEnabled = true } = {}) {
     const registries = this.presentationRuntime.getBuildSurfaceRegistries();
     this.owners.worldBuildCoordinator = this.factories.worldBuildCoordinator({
       renderingHost: this.renderingHost,
@@ -560,6 +560,11 @@ export class WorldLocationRuntime {
         this.callbacks.getMobileJoystick?.()?.reset?.();
         if (!active) this.globalOwners.interactionRuntime?.refresh?.();
       },
+      constructionEnabled,
+      getFixedWorldAuthoringInstances: () => [
+        ...(this.presentationRuntime.getTransitionAuthoringInstances?.() ?? []),
+        ...(this.owners.wildAtollRuntime?.getAuthoringInstances?.() ?? []),
+      ],
     });
     this.owners.buildModeRuntime = this.owners.worldBuildCoordinator.getBuildModeRuntime();
     this.owners.farmingRuntime?.attachWorldBuildCoordinator?.(this.owners.worldBuildCoordinator);
@@ -653,6 +658,7 @@ export function validateLocationCapabilities(capabilities = {}) {
     farming: Boolean(capabilities.farming),
     cooking: Boolean(capabilities.cooking),
     buildMode: Boolean(capabilities.buildMode),
+    fixedWorldAuthoring: Boolean(capabilities.fixedWorldAuthoring),
   });
   if (normalized.tavernService && !normalized.facilities) {
     throw new Error("Invalid location capabilities: tavernService requires facilities");

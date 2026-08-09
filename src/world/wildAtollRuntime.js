@@ -1,4 +1,8 @@
 import { assetDepthFromPivot, WORLD_DEPTH_BASE } from "../build/buildWorldGeometry.js";
+import {
+  resolveFixedWorldInstance,
+  updateFixedWorldInstance,
+} from "../build/fixedWorldAuthoringState.js";
 import { HUD_COLORS, HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import {
@@ -11,10 +15,6 @@ import {
 } from "./wildAtollDomain.js";
 import { ATOLL_WORLD_MODEL, WORLD_IDS } from "./worldLocationConfig.js";
 import {
-  HOUSE_FRAMES,
-  HOUSE_TEXTURE_KEY,
-  OUTDOOR_FRAMES,
-  OUTDOOR_TEXTURE_KEY,
   TILE_SIZE,
   WORLD_GROUND_OVERLAY_DEPTH,
   WORLD_TRANSITION_ASSETS,
@@ -46,6 +46,7 @@ export function createWildAtollRuntime(scene, {
   transitionWorld = (worldId, spawn) => scene.worldLocationCoordinator?.transitionTo?.(worldId, spawn)
     ?? { status: "unavailable", transitioned: false },
   showMessage = (keyOrText, options) => scene.gameHud?.showTransientMessage?.(keyOrText, options),
+  authoringStorage = globalThis.localStorage,
 } = {}) {
   const promptBackground = scene.add.graphics().setDepth(HUD_DEPTH + 34).setScrollFactor(0).setVisible(false);
   const promptText = createManagedText(scene, 0, 0, "", {
@@ -97,7 +98,15 @@ export function createWildAtollRuntime(scene, {
     arenaId = null;
     candidate = null;
     clearArenaPresentation({ removeResourceState: true });
-    arenaVisuals.push(...createCave(scene, NEST_ATOLL_ENTRANCE.x, NEST_ATOLL_ENTRANCE.y));
+    createAuthoredAssetVisual({
+      id: "nest-atoll-entrance",
+      profileKey: WORLD_TRANSITION_PROFILE_KEYS.atollPathNorth,
+      asset: WORLD_TRANSITION_ASSETS.atollPathNorth,
+      center: NEST_ATOLL_ENTRANCE,
+      baseCollider: GLIDER_BASE_COLLIDER,
+      depthMode: "fixed",
+      fixedDepth: WORLD_GROUND_OVERLAY_DEPTH,
+    });
     setTitlesVisible(false);
   }
 
@@ -218,7 +227,7 @@ export function createWildAtollRuntime(scene, {
       ? WORLD_TRANSITION_ASSETS.atollPathDiagonal
       : WORLD_TRANSITION_ASSETS.atollPathNorth;
     createAuthoredAssetVisual({
-      id: `atoll:${arenaId}:${exit.id}:glider`,
+      id: exitVisualId(exit),
       profileKey,
       asset,
       center: point,
@@ -230,8 +239,12 @@ export function createWildAtollRuntime(scene, {
   }
 
   function createTeleportVisual(exit, point) {
+    const groupId = `atoll:${arenaId}:${exit.id}:teleport`;
+    const platformId = `atoll:${arenaId}:${exit.id}:platform`;
     createAuthoredAssetVisual({
-      id: `atoll:${arenaId}:${exit.id}:platform`,
+      id: platformId,
+      placementSourceId: platformId,
+      moveGroupId: groupId,
       profileKey: WORLD_TRANSITION_PROFILE_KEYS.atollTeleportPlatform,
       asset: WORLD_TRANSITION_ASSETS.atollTeleportPlatform,
       center: point,
@@ -241,6 +254,8 @@ export function createWildAtollRuntime(scene, {
     });
     createAuthoredAssetVisual({
       id: `atoll:${arenaId}:${exit.id}:construct`,
+      placementSourceId: platformId,
+      moveGroupId: groupId,
       profileKey: WORLD_TRANSITION_PROFILE_KEYS.atollTeleportConstruct,
       asset: WORLD_TRANSITION_ASSETS.atollTeleportConstruct,
       center: point,
@@ -252,6 +267,8 @@ export function createWildAtollRuntime(scene, {
 
   function createAuthoredAssetVisual({
     id,
+    placementSourceId = id,
+    moveGroupId = id,
     profileKey,
     asset,
     center,
@@ -261,15 +278,23 @@ export function createWildAtollRuntime(scene, {
     fixedDepth = null,
     flipX = false,
   }) {
-    const anchor = {
+    const canonicalAnchor = {
       x: Math.round(center.x - asset.width / 2),
       y: Math.round(center.y - asset.height / 2),
     };
+    const authoredPlacement = resolveFixedWorldInstance(placementSourceId, canonicalAnchor, authoringStorage);
+    const authoredInstance = resolveFixedWorldInstance(id, authoredPlacement, authoringStorage);
+    const anchor = { x: authoredPlacement.x, y: authoredPlacement.y };
     const sprite = scene.add.image(anchor.x, anchor.y, asset.textureKey).setOrigin(0, 0);
     sprite.setFlipX?.(Boolean(flipX));
     const instance = {
       id,
+      placementSourceId,
+      moveGroupId,
       profileKey,
+      asset,
+      baseCollider,
+      authoringBounds,
       anchor,
       bounds: authoringBounds
         ? {
@@ -287,23 +312,97 @@ export function createWildAtollRuntime(scene, {
       visualBasePosition: { ...anchor },
       targets: [sprite],
       special: true,
+      fixedWorld: true,
+      placementPosition: { ...anchor },
+      snapAnchorOffset: { ...(scene.assetProfiles?.[profileKey]?.snapAnchorOffset ?? { x: 0, y: 0 }) },
+      collisionEnabled: authoredInstance.collisionEnabled,
       depthMode,
       ...(fixedDepth === null ? {} : { fixedDepth }),
     };
     syncAuthoredAssetVisual(instance, asset);
-    const collider = {
-      left: anchor.x + baseCollider.left,
-      right: anchor.x + baseCollider.right,
-      top: anchor.y + baseCollider.top,
-      bottom: anchor.y + baseCollider.bottom,
-    };
-    scene.worldLayout?.setWorldObjectCollider?.(id, collider, profileKey, {
-      kind: "wild-atoll-transition",
-      profileKey,
-    });
+    instance.getCollisionEnabled = () => instance.collisionEnabled;
+    instance.setCollisionEnabled = (enabled) => setAuthoredCollisionEnabled(instance, enabled);
+    instance.move = (point) => moveAuthoredInstance(instance, point);
+    registerAuthoredCollider(instance);
     arenaAuthoringInstances.push(instance);
     arenaVisuals.push(sprite);
     return instance;
+  }
+
+  function registerAuthoredCollider(instance) {
+    const collider = {
+      left: instance.anchor.x + instance.baseCollider.left,
+      right: instance.anchor.x + instance.baseCollider.right,
+      top: instance.anchor.y + instance.baseCollider.top,
+      bottom: instance.anchor.y + instance.baseCollider.bottom,
+    };
+    scene.worldLayout?.setWorldObjectCollider?.(instance.id, collider, instance.profileKey, {
+      kind: "wild-atoll-transition",
+      profileKey: instance.profileKey,
+      collisionEnabled: instance.collisionEnabled,
+    });
+    return collider;
+  }
+
+  function updateAuthoredInstancePlacement(instance, point) {
+    instance.anchor = { x: Math.round(Number(point.x) || 0), y: Math.round(Number(point.y) || 0) };
+    instance.placementPosition = { ...instance.anchor };
+    instance.visualBasePosition = { ...instance.anchor };
+    const local = instance.authoringBounds ?? {
+      left: 0,
+      right: instance.asset.width,
+      top: 0,
+      bottom: instance.asset.height,
+    };
+    instance.bounds = {
+      left: instance.anchor.x + local.left,
+      right: instance.anchor.x + local.right,
+      top: instance.anchor.y + local.top,
+      bottom: instance.anchor.y + local.bottom,
+    };
+    syncAuthoredAssetVisual(instance, instance.asset);
+    registerAuthoredCollider(instance);
+  }
+
+  function moveAuthoredInstance(instance, point) {
+    const previous = { ...instance.anchor };
+    const current = { x: Math.round(Number(point?.x) || 0), y: Math.round(Number(point?.y) || 0) };
+    const group = arenaAuthoringInstances.filter((candidate) => candidate.moveGroupId === instance.moveGroupId);
+    const delta = { x: current.x - instance.anchor.x, y: current.y - instance.anchor.y };
+    for (const candidate of group) {
+      const next = { x: candidate.anchor.x + delta.x, y: candidate.anchor.y + delta.y };
+      updateFixedWorldInstance(candidate.id, {
+        ...next,
+        collisionEnabled: candidate.collisionEnabled,
+      }, candidate.anchor, authoringStorage);
+      updateAuthoredInstancePlacement(candidate, next);
+    }
+    scene.interactionRuntime?.refresh?.();
+    return { previous, current };
+  }
+
+  function setAuthoredCollisionEnabled(instance, enabled) {
+    instance.collisionEnabled = Boolean(enabled);
+    updateFixedWorldInstance(instance.id, {
+      ...instance.anchor,
+      collisionEnabled: instance.collisionEnabled,
+    }, instance.anchor, authoringStorage);
+    registerAuthoredCollider(instance);
+    scene.interactionRuntime?.refresh?.();
+    return instance.collisionEnabled;
+  }
+
+  function exitVisualId(exit) {
+    return exit.kind === "teleport"
+      ? `atoll:${arenaId}:${exit.id}:platform`
+      : `atoll:${arenaId}:${exit.id}:glider`;
+  }
+
+  function interactionCenter(instance) {
+    return instance ? {
+      x: instance.anchor.x + instance.asset.width / 2,
+      y: instance.anchor.y + instance.asset.height / 2,
+    } : null;
   }
 
   function syncAuthoredAssetVisual(instance, asset) {
@@ -399,7 +498,8 @@ export function createWildAtollRuntime(scene, {
     const position = getPlayerCharacter()?.motor?.position;
     if (!position) return null;
     if (mountedWorldId === WORLD_IDS.nest) {
-      const distance = Math.hypot(NEST_ATOLL_ENTRANCE.x - position.x, NEST_ATOLL_ENTRANCE.y - position.y);
+      const entrance = interactionCenter(arenaAuthoringInstances.find(({ id }) => id === "nest-atoll-entrance"));
+      const distance = entrance ? Math.hypot(entrance.x - position.x, entrance.y - position.y) : Infinity;
       return distance <= INTERACTION_RADIUS
         ? { kind: "enter", id: "enter", labelKey: "atoll:promptEnter", distance }
         : null;
@@ -408,13 +508,13 @@ export function createWildAtollRuntime(scene, {
     const definition = getWildAtollArenaDefinition(arenaId);
     return definition.exits
       .map((exit) => {
-        const point = getWildAtollExitPoint(exit.direction, TILE_SIZE);
+        const point = interactionCenter(arenaAuthoringInstances.find(({ id }) => id === exitVisualId(exit)));
         return {
           kind: "exit",
           id: `exit:${exit.id}`,
           exit,
           labelKey: exit.promptKey,
-          distance: Math.hypot(point.x - position.x, point.y - position.y),
+          distance: point ? Math.hypot(point.x - position.x, point.y - position.y) : Infinity,
         };
       })
       .filter((entry) => entry.distance <= INTERACTION_RADIUS)
@@ -640,22 +740,6 @@ export function createWildAtollRuntime(scene, {
       blackout.destroy();
     },
   };
-}
-
-function createCave(scene, centerX, topY) {
-  const left = centerX - TILE_SIZE;
-  const parts = [
-    [0, 0, HOUSE_TEXTURE_KEY, HOUSE_FRAMES.transport.topLeft],
-    [1, 0, HOUSE_TEXTURE_KEY, HOUSE_FRAMES.transport.topRight],
-    [0, 1, OUTDOOR_TEXTURE_KEY, OUTDOOR_FRAMES.transport.entranceLeft],
-    [1, 1, OUTDOOR_TEXTURE_KEY, OUTDOOR_FRAMES.transport.entranceRight],
-  ];
-  return parts.map(([x, y, textureKey, frame]) => scene.add.image(
-    left + x * TILE_SIZE,
-    topY + y * TILE_SIZE,
-    textureKey,
-    frame,
-  ).setOrigin(0).setDepth(560 + topY + 2 * TILE_SIZE));
 }
 
 function isEditableTarget(target) {

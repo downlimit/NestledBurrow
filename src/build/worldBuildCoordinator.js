@@ -242,6 +242,8 @@ class WorldBuildCoordinator {
     isActivationAllowed = () => true,
     getBuildGridEnabled = () => false,
     onModeChange = () => {},
+    constructionEnabled = true,
+    getFixedWorldAuthoringInstances = () => [],
   }) {
     if (!renderingHost || !worldLayout) throw new Error("WorldBuildCoordinator requires renderingHost and worldLayout");
     this.renderingHost = renderingHost;
@@ -266,6 +268,8 @@ class WorldBuildCoordinator {
     this.isActivationAllowed = isActivationAllowed;
     this.getBuildGridEnabled = getBuildGridEnabled;
     this.onModeChange = onModeChange;
+    this.constructionEnabled = Boolean(constructionEnabled);
+    this.getFixedWorldAuthoringInstances = getFixedWorldAuthoringInstances;
     this.buildMode = null;
     this.wellOwner = null;
     this.destroyed = false;
@@ -277,11 +281,13 @@ class WorldBuildCoordinator {
 
   mount() {
     this.reset();
-    this.wellOwner = createWellOwner(this.renderingHost, {
-      farmState: this.farmState,
-      worldLayout: this.worldLayout,
-      hasFarmCell: this.hasFarmCell,
-    });
+    this.wellOwner = this.constructionEnabled
+      ? createWellOwner(this.renderingHost, {
+          farmState: this.farmState,
+          worldLayout: this.worldLayout,
+          hasFarmCell: this.hasFarmCell,
+        })
+      : null;
     this.buildMode = createBuildModeRuntime(this.renderingHost, {
       localization: this.localization,
       worldBounds: this.worldLayout.bounds,
@@ -303,6 +309,7 @@ class WorldBuildCoordinator {
       getPlacementAnchorOffset: (item) => this.getBuildPlacementAnchorOffset(item),
       isActivationAllowed: this.isActivationAllowed,
       onModeChange: this.onModeChange,
+      ...(this.constructionEnabled ? {} : { assetGroups: [] }),
     });
     const syncBuildGridVisibility = () => this.buildMode?.setGridEnabled?.(this.getBuildGridEnabled());
     syncBuildGridVisibility();
@@ -355,6 +362,7 @@ class WorldBuildCoordinator {
   }
 
   getBuildModeRuntime() { return this.buildMode; }
+  hasConstructionCapability() { return this.constructionEnabled; }
   getPlacedObject(id) { return this.buildPlacedObjects.get(id) ?? null; }
   getPlacedObjects() { return [...this.buildPlacedObjects.values()]; }
   getNextBuildObjectId() { return this.nextBuildObjectId; }
@@ -417,6 +425,8 @@ class WorldBuildCoordinator {
 
   getBuildMoveTarget(point) {
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
+    const fixedWorld = this.getFixedWorldMoveTargetAt(hitPoint);
+    if (fixedWorld) return fixedWorld;
     const coordinated = this.wellOwner?.getMoveTargetAt?.(hitPoint);
     if (coordinated) return coordinated;
     const sign = this.tavernSignRuntime?.getBuildMoveTargetAt?.(hitPoint);
@@ -445,6 +455,32 @@ class WorldBuildCoordinator {
     } : null;
   }
 
+  getFixedWorldMoveTargetAt(point) {
+    const instances = [...(this.getFixedWorldAuthoringInstances?.() ?? [])].reverse();
+    for (const instance of instances) {
+      if (!instance?.fixedWorld || typeof instance.move !== "function") continue;
+      const visualOffset = this.assetProfiles?.[instance.profileKey]?.visualOffset ?? { x: 0, y: 0 };
+      const bounds = {
+        left: instance.bounds.left + Number(visualOffset.x || 0),
+        right: instance.bounds.right + Number(visualOffset.x || 0),
+        top: instance.bounds.top + Number(visualOffset.y || 0),
+        bottom: instance.bounds.bottom + Number(visualOffset.y || 0),
+      };
+      if (!contains(bounds, point)) continue;
+      return {
+        kind: "fixed-world",
+        definition: { id: instance.id },
+        instance,
+        profileKey: instance.profileKey,
+        targets: [...(instance.targets ?? [])],
+        bounds,
+        placementPosition: { ...instance.placementPosition },
+        snapAnchorOffset: { ...(instance.snapAnchorOffset ?? { x: 0, y: 0 }) },
+      };
+    }
+    return null;
+  }
+
   getBuildPlacementAnchorOffset(item) {
     if (item?.placement === "well") return { ...WELL_PROFILE.depthAnchorOffset };
     const profileKey = item?.placement === "facility"
@@ -469,7 +505,9 @@ class WorldBuildCoordinator {
 
   applyBuildMove(target, point) {
     if (!target?.definition) return { status: "ignored" };
-    const result = target.kind === "well"
+    const result = target.kind === "fixed-world"
+      ? target.instance?.move?.(point)
+      : target.kind === "well"
       ? this.wellOwner?.move?.(target, point)
       : target.kind === TAVERN_SIGN_BUILD_KIND
       ? this.tavernSignRuntime?.moveBuildTarget?.(point)
@@ -479,7 +517,8 @@ class WorldBuildCoordinator {
       : target.kind === "training-dummy" ? this.meleeRuntime?.moveBuildTarget?.(point) : null;
     if (!result) return { status: "blocked" };
     this.recordBuildUndo(() => {
-      if (target.kind === "well") {
+      if (target.kind === "fixed-world") target.instance?.move?.(result.previous);
+      else if (target.kind === "well") {
         this.wellOwner?.removeAt?.(result.current);
         this.wellOwner?.restore?.(result.previous);
         this.persistGameplay?.();
@@ -499,6 +538,18 @@ class WorldBuildCoordinator {
   renderBuildMovePreview(target, point) {
     this.clearBuildPreview();
     if (!target?.definition) return;
+    if (target.kind === "fixed-world") {
+      const width = Math.max(1, target.bounds.right - target.bounds.left);
+      const height = Math.max(1, target.bounds.bottom - target.bounds.top);
+      const visualOffset = this.assetProfiles?.[target.profileKey]?.visualOffset ?? { x: 0, y: 0 };
+      const graphics = this.renderingHost.add.graphics()
+        .setPosition(point.x + Number(visualOffset.x || 0), point.y + Number(visualOffset.y || 0))
+        .setDepth(8988)
+        .setAlpha(0.75);
+      graphics.lineStyle(1, 0x7dff9a, 1).strokeRect(0.5, 0.5, width - 1, height - 1);
+      this.buildPreviewObjects.push(graphics);
+      return;
+    }
     if (target.kind === TAVERN_SIGN_BUILD_KIND) { this.buildPreviewObjects.push(this.tavernSignRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "training-dummy") { this.buildPreviewObjects.push(this.meleeRuntime.renderBuildPreview(point)); return; }
     if (target.kind === "well") {
@@ -520,6 +571,7 @@ class WorldBuildCoordinator {
     this.clearBuildPreview();
     const hitPoint = { x: Number(point.rawX ?? point.x), y: Number(point.rawY ?? point.y) };
     const target = this.wellOwner?.getMoveTargetAt?.(hitPoint)
+      ?? this.getFixedWorldMoveTargetAt(hitPoint)
       ?? this.tavernSignRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.meleeRuntime?.getBuildMoveTargetAt?.(hitPoint)
       ?? this.facilityRuntime?.getMoveTargetAt?.(hitPoint)

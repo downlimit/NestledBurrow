@@ -147,7 +147,9 @@ for (const required of [
   assert(universalAuthoringSource.includes(required), `universal authoring retains ${required}`);
 }
 const bootstrapSource = readFileSync("src/build/assetRuntimeConsistencyBootstrap.js", "utf8");
-assert(bootstrapSource.includes("this.activeDefinition?.transports?.length"), "transition locations mount the same authoring panel even without build mode");
+const locationRuntimeSource = readFileSync("src/world/worldLocationRuntime.js", "utf8");
+assert(locationRuntimeSource.includes("capabilities.buildMode || capabilities.fixedWorldAuthoring"), "transition locations mount the shared authoring runtime through capability routing");
+assert(!bootstrapSource.includes("this.activeDefinition?.transports?.length"), "transition authoring has no transport-count special case");
 assert(bootstrapSource.includes("installWorldTransitionAuthoringBridge"), "transition authoring gets live scene/profile wiring");
 const editorSource = readFileSync("src/build/editorAuthoringRuntime.js", "utf8");
 assert(editorSource.includes("hasBuildCoordinator"), "profile authoring remains available without a build coordinator");

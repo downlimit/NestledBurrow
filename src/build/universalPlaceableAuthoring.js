@@ -146,6 +146,8 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
   let interactionSelection = null;
   let interactionDrag = null;
   let interactionEditEnabled = false;
+  let collisionSelection = null;
+  let collisionCheckbox = null;
   const getOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
 
   function getInstances() {
@@ -404,6 +406,8 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
     patchedBeginColliderEditPointer = (pointer) => {
       const worldPoint = point({ x: pointer.worldX ?? pointer.x, y: pointer.worldY ?? pointer.y });
       const instance = findAt(worldPoint);
+      collisionSelection = instance?.fixedWorld ? instance : null;
+      syncCollisionToggle();
       if (!instance) return originalBeginColliderEditPointer(pointer);
       const selectionPoint = colliderSelectionPoint(instance);
       return selectionPoint
@@ -415,6 +419,30 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
 
   const interactionGraphics = scene.add.graphics().setDepth(8975).setVisible(false);
   const documentRef = panel.documentRef ?? globalThis.document;
+  const collisionLabel = documentRef.createElement("label");
+  const collisionName = documentRef.createElement("span");
+  collisionName.textContent = "Коллизия включена";
+  collisionCheckbox = documentRef.createElement("input");
+  collisionCheckbox.type = "checkbox";
+  collisionLabel.append(collisionName, collisionCheckbox);
+  panel.colliderEditor?.insertBefore?.(collisionLabel, panel.colliderConfirmButton ?? null);
+  if (!collisionLabel.parentNode) panel.colliderEditor?.append?.(collisionLabel);
+  panel.fixedWorldCollisionCheckbox = collisionCheckbox;
+
+  function syncCollisionToggle() {
+    if (!collisionCheckbox) return;
+    collisionLabel.hidden = !collisionSelection;
+    collisionCheckbox.disabled = !collisionSelection;
+    collisionCheckbox.checked = Boolean(collisionSelection?.getCollisionEnabled?.());
+  }
+
+  collisionCheckbox.addEventListener("change", () => {
+    if (!collisionSelection) return;
+    const enabled = collisionSelection.setCollisionEnabled?.(collisionCheckbox.checked);
+    collisionCheckbox.checked = enabled !== false;
+    scene.interactionRuntime?.refresh?.();
+  });
+  syncCollisionToggle();
   const interactionLabel = documentRef.createElement("label");
   const interactionName = documentRef.createElement("span");
   interactionName.textContent = "Редактировать точку взаимодействия";
@@ -549,6 +577,7 @@ export function installUniversalPlaceableAuthoring(panel, scene) {
       scene.beginColliderEditPointer = originalBeginColliderEditPointer;
     }
     interactionLabel.remove?.();
+    collisionLabel.remove?.();
     interactionGraphics.destroy?.();
     scene.interactionPointEditEnabled = false;
     originalDestroy?.();

@@ -123,7 +123,11 @@ export function attachEditorAuthoringRuntime(scene, {
   if (!scene?.worldLayout) throw new Error("World scene is unavailable");
   const getLocationOwners = () => scene.worldLocationRuntime?.getOwners?.() ?? {};
   const buildCoordinator = getLocationOwners().worldBuildCoordinator ?? null;
-  const hasBuildCoordinator = Boolean(buildCoordinator?.getPlacedObjects && buildCoordinator?.placeBuildAsset);
+  const hasBuildCoordinator = Boolean(
+    buildCoordinator?.hasConstructionCapability?.()
+      && buildCoordinator?.getPlacedObjects
+      && buildCoordinator?.placeBuildAsset,
+  );
   const plants = new Map();
   const selectionBoundsById = new Map();
   let destroyed = false;
