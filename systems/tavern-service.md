@@ -100,11 +100,15 @@ The first implemented format remains food service. Additional entertainment such
 - A person may enter or inspect the offer and buy nothing. This is a normal mismatch, not automatically a reputation penalty.
 - Better crop quality and better cooking execution may raise food quality later and therefore satisfaction, while leaving the nominal price rule simple unless a future explicit product decision changes it.
 
-## Opening hours and audience
+## Opening hours and menu activation
 
-Early play uses direct `OPEN/CLOSED` control. A later automated venue may support a schedule.
+Early play uses direct active/inactive control. A later automated venue may support a schedule.
 
-Opening time affects audience composition through real people rather than a special night multiplier. Repeatedly operating at night naturally gives more opportunities to people whose schedules, needs or preferences make night visits plausible. A closed venue creates no penalty because no service obligation was accepted.
+The tavern sign has one interaction scenario regardless of whether service is currently active: interacting with it opens the same compact menu panel. The panel contains one ordinary switch-style control whose state is labeled **`Меню активно` / `Меню неактивно`** (`Menu active / Menu inactive`). Toggling this control directly changes whether the venue is serving; there is no separate `OPEN` button and no direct-close shortcut outside the panel.
+
+While the menu is active, the currently advertised food selection remains locked for Stage 2. To change advertised dishes, the player first switches the menu inactive, edits the offer, then can switch it active again from the same panel. Closing the panel does not itself change active/inactive state.
+
+Opening time affects audience composition through real people rather than a special night multiplier. Repeatedly operating at night naturally gives more opportunities to people whose schedules, needs or preferences make night visits plausible. An inactive venue creates no penalty because no service obligation was accepted.
 
 ## Experience and negative feedback
 
@@ -137,7 +141,7 @@ The first demand implementation does not require full Sims-like social simulatio
 This is the validation order for the system, not a promise to implement every later stage consecutively. Each next stage starts only after the previous one produces an observable, understandable result; later stages can be revised or dropped if playtesting changes the product direction.
 
 1. **Persistent population foundation.** A small test population has stable identities, the full canonical need set, persisted last-evaluation time and coarse offscreen reconstruction. Save/reload returns the same people. No tavern demand behavior changes yet.
-2. **Venue offer.** The venue explicitly exposes what it currently offers. The first version is a small food menu; inventory outside the offer is irrelevant to demand.
+2. **Venue offer.** The venue explicitly exposes what it currently offers. The first version is a small food menu; inventory outside the offer is irrelevant to demand. One unified sign panel both edits the inactive offer and controls active/inactive service state with a switch.
 3. **Individual visit decision.** A simple popularity rate creates visit opportunities; a concrete persistent person is evaluated and may choose the venue from hunger, offer fit, budget and recent personal history.
 4. **Order and fulfillment.** The arriving person selects an offered product, creates an order or equivalent commitment, receives service and pays; anonymous stock-triggered spawning is removed.
 5. **Live needs during visits.** All canonical needs become active while the guest is present, so toilets, social contact, rest, cleanliness and other facilities can produce unscripted situations.
@@ -188,6 +192,7 @@ The success criterion is:
 - recipes consume inputs and publish outputs atomically through inventory operations;
 - facility positions are read live by reserved table ID, so moved furniture changes only its assigned guest path;
 - the build-mode movable tavern sign owns one live position shared by its visual, collider, interaction and guest check point;
+- sign interaction always opens the same menu panel; active/inactive service state is controlled only by the panel switch in Stage 2;
 - sign, stock reservation and service lifecycle cannot contradict each other;
 - the current technical baseline uses persisted guest IDs, waves of one or two every three to eight seconds, at most six active visits and stock-triggered spawning; this rule is intentionally superseded by the target demand model when that model is implemented;
 - dine-in guests reserve distinct dining-table IDs before consuming a dish; a table currently used by the player is excluded from new seat assignments, and the player cannot start using a guest-reserved table;
