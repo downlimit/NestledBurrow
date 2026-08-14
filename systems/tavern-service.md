@@ -11,6 +11,20 @@ potato → preparation → frying → serving table → dine-in guest → 4 coin
 lemon + bucket water → juicer → serving table → takeout guest → 2 coins
 ```
 
+## Target demand model
+
+The current stock-triggered guest waves are a technical baseline, not the intended demand model.
+
+- A save owns a finite persistent population of potential visitors. The initial scale is expected to be roughly one hundred distinct people, but the exact count is a balance parameter rather than a system invariant.
+- Every person keeps a stable identity and profile: preferences, spending capacity, social influence, visit history and last known needs. Repeat visits therefore belong to the same person rather than to a newly generated anonymous customer.
+- Visitors have real needs. A food visit requires meaningful hunger, while secondary needs such as toilet, social contact, energy or novelty can be in different states and create additional behavior during the visit.
+- Offscreen life is not simulated frame by frame. When a person becomes a candidate for a visit, current needs are reconstructed from the last persistent state, elapsed world time and bounded variation; while present in the world, the person uses actual live state and behavior.
+- Opening the tavern creates opportunities for potential visitors to consider it. Popularity controls how many such opportunities occur over time; it does not directly manufacture customers or change their wealth.
+- A concrete person chooses whether to visit from their current needs, menu and price fit, personal preferences and remembered experience. Venue identity and accumulated audience affinity change which kinds of people are more likely to choose the tavern.
+- Spending capacity belongs to the person. Higher popularity primarily increases reach and visit volume; more valuable demand emerges from matching the venue to people who already have the relevant budget and preferences.
+- A completed visit updates personal memory. Satisfaction can change future popularity and audience affinity, weighted by the visitor's influence. A closed tavern creates no penalty; negative service consequences begin only after the tavern has accepted an obligation it fails to fulfill.
+- The system must preserve recognizable people and repeat history. Anonymous scripted customers are allowed only as temporary implementation scaffolding.
+
 ## Owners
 
 - kitchen state/rules: `src/tavern/cookingDomain.js`;
@@ -41,7 +55,7 @@ Potato preparation/frying and lemon juicing feed real inventory items into indep
 
 ## Not yet
 
-Recipe book, broader ingredient variety, storage, guest preferences, configurable prices, staff and venue style/audience.
+Recipe book, broader ingredient variety, storage, persistent visitor population, need-driven demand, visitor preferences/budgets/influence, popularity and audience affinity, configurable prices, staff and venue style/audience.
 
 ## Evidence
 
