@@ -48,6 +48,7 @@ export function createWorldInteractionCoordinator({
       merchantRuntime: next.merchantRuntime ?? null,
       farmingRuntime: next.farmingRuntime ?? null,
       tavernSignRuntime: next.tavernSignRuntime ?? null,
+      venueMenuRuntime: next.venueMenuRuntime ?? null,
       facilityRuntime: next.facilityRuntime ?? null,
       kitchenInteractionRuntime: next.kitchenInteractionRuntime ?? null,
       needsInteractionCoordinator: next.needsInteractionCoordinator ?? null,
@@ -81,7 +82,7 @@ export function createWorldInteractionCoordinator({
   }
 
   function isInteractionAllowed(definition) {
-    if (destroyed || locationOwners.cookingRuntime?.isActive?.()) return false;
+    if (destroyed || locationOwners.cookingRuntime?.isActive?.() || locationOwners.venueMenuRuntime?.isActive?.()) return false;
     if (!(locationOwners.needsInteractionCoordinator?.allowsInteraction?.(definition) ?? true)) return false;
     return !locationOwners.facilityRuntime?.isUsing?.()
       || definition.kind === FACILITY_INTERACTION_KIND
@@ -136,14 +137,10 @@ export function createWorldInteractionCoordinator({
 
   function handleTavernSign(candidate) {
     if (candidate.kind !== TAVERN_SIGN_KIND) return IGNORED;
-    sessionState.gameplay.tavernOpen = !sessionState.gameplay.tavernOpen;
-    playEffect(sessionState.gameplay.tavernOpen ? "tavern-open" : "tavern-close");
-    locationOwners.tavernSignRuntime?.sync?.();
-    refreshInteractions();
+    const result = locationOwners.venueMenuRuntime?.handleSignInteraction?.() ?? IGNORED;
+    if (!isHandled(result)) return result;
     suppressNextInteract();
-    renderHud();
-    saveSession();
-    return { status: sessionState.gameplay.tavernOpen ? "opened" : "closed", mutated: true };
+    return result;
   }
 
   function handleFacility(candidate) {
@@ -324,6 +321,7 @@ function emptyLocationOwners() {
     merchantRuntime: null,
     farmingRuntime: null,
     tavernSignRuntime: null,
+    venueMenuRuntime: null,
     facilityRuntime: null,
     kitchenInteractionRuntime: null,
     needsInteractionCoordinator: null,

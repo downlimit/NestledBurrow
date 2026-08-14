@@ -16,7 +16,7 @@ export const COOKING_STEP_TYPES = Object.freeze({
   frying: "frying",
 });
 
-export const SELLABLE_ITEM_IDS = Object.freeze(["lemonade", "fried-potato-dish"]);
+export const SELLABLE_ITEM_IDS = Object.freeze(["fried-potato-dish", "lemonade"]);
 export const SERVING_TABLE_CAPACITY = 1;
 export const DEFAULT_SERVING_TABLE_ID = "home-serving-table-01";
 export const STOVE_REPAIR_COST = Object.freeze({ wood: 10, stone: 8, coins: 10 });

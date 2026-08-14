@@ -208,6 +208,7 @@ export class WorldLocationRuntime {
       || this.owners.buildModeRuntime?.isActive?.()
       || this.owners.facilityRuntime?.isUsing?.()
       || this.owners.cookingRuntime?.isActive?.()
+      || this.owners.tavernServiceRuntime?.venueMenuRuntime?.isActive?.()
       || this.globalOwners.interactionRuntime?.isDialogueActive?.()
       || this.owners.merchantRuntime?.isActive?.()
     );
@@ -349,6 +350,7 @@ export class WorldLocationRuntime {
         || this.callbacks.isConfirmationActive?.()
         || this.owners.buildModeRuntime?.isActive?.()
         || this.owners.cookingRuntime?.isActive?.()
+        || this.owners.tavernServiceRuntime?.venueMenuRuntime?.isActive?.()
         || this.owners.facilityRuntime?.isUsing?.()
         || this.owners.needsInteractionCoordinator?.isLocked?.()
         || this.globalOwners.interactionRuntime?.isDialogueActive?.()
@@ -393,6 +395,26 @@ export class WorldLocationRuntime {
       createNpcMovementConfig: (profile) => this.createNpcMovementConfig(profile),
       getPlayerPosition: () => this.callbacks.getPlayerCharacter?.()?.motor?.position,
       getSignPoint: () => this.owners.tavernSignRuntime?.getGuestCheckPoint?.() ?? GUEST_CONFIG.points.sign,
+      localization: this.localization,
+      playEffect: (type) => this.globalOwners.audioRuntime?.playEffect?.(type),
+      syncSign: () => {
+        this.owners.tavernSignRuntime?.sync?.();
+        this.globalOwners.interactionRuntime?.refresh?.();
+      },
+      onVenueMenuActiveChange: (active) => {
+        this.globalOwners.gameHud?.setGameplayOverlayActive?.(active);
+        this.callbacks.syncGameplayHudVisibility?.();
+        this.callbacks.getMobileJoystick?.()?.reset?.();
+        this.globalOwners.interactionRuntime?.refresh?.();
+        if (!active) this.callbacks.suppressNextInteract?.();
+        if (active) {
+          const player = this.characterSystem?.require?.(this.sessionState.playerId);
+          if (player?.motor?.movement?.velocity) {
+            player.motor.movement.velocity.x = 0;
+            player.motor.movement.velocity.y = 0;
+          }
+        }
+      },
       onPersistentMutation: (result) => {
         if (result?.status === "coin-collected") this.globalOwners.gameHud?.notifyCoinDelta?.(result.value);
         this.owners.facilityRuntime?.syncKitchenVisuals?.();
@@ -414,6 +436,7 @@ export class WorldLocationRuntime {
       isModalActive: () => Boolean(
         this.owners.merchantRuntime?.isActive?.()
         || this.owners.cookingRuntime?.isActive?.()
+        || this.owners.tavernServiceRuntime?.venueMenuRuntime?.isActive?.()
         || this.owners.buildModeRuntime?.isActive?.()
         || this.callbacks.isConfirmationActive?.()
       ),
@@ -613,6 +636,7 @@ export class WorldLocationRuntime {
       merchantRuntime: this.owners.merchantRuntime,
       farmingRuntime: this.owners.farmingRuntime,
       tavernSignRuntime: this.owners.tavernSignRuntime,
+      venueMenuRuntime: this.owners.tavernServiceRuntime?.venueMenuRuntime ?? null,
       facilityRuntime: this.owners.facilityRuntime,
       kitchenInteractionRuntime: this.owners.kitchenInteractionRuntime,
       needsInteractionCoordinator: this.owners.needsInteractionCoordinator,

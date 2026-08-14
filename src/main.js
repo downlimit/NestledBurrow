@@ -499,6 +499,7 @@ class WorldScene extends Phaser.Scene {
   get needsInteractionCoordinator() { return this.locationOwners.needsInteractionCoordinator ?? null; }
   get tavernSignRuntime() { return this.locationOwners.tavernSignRuntime ?? null; }
   get tavernServiceRuntime() { return this.locationOwners.tavernServiceRuntime ?? null; }
+  get venueMenuRuntime() { return this.tavernServiceRuntime?.venueMenuRuntime ?? null; }
   get guestRuntime() { return this.locationOwners.guestRuntime ?? null; }
   get coinRuntime() { return this.locationOwners.coinRuntime ?? null; }
   get farmingRuntime() { return this.locationOwners.farmingRuntime ?? null; }
@@ -856,7 +857,8 @@ class WorldScene extends Phaser.Scene {
     return Boolean(this.gameHud?.isPointInHud(x, y))
       || Boolean(this.interactionHud?.isPointInHud(x, y))
       || Boolean(this.merchantRuntime?.isPointInHud?.(x, y))
-      || Boolean(this.cookingRuntime?.isPointInHud?.(x, y));
+      || Boolean(this.cookingRuntime?.isPointInHud?.(x, y))
+      || Boolean(this.venueMenuRuntime?.isPointInHud?.(x, y));
   }
 
   startNewGame() {
@@ -1037,7 +1039,7 @@ class WorldScene extends Phaser.Scene {
 
   sampleFrameActions() {
     const pointerActionId = this.meleeRuntime?.consumePointerAction?.() ?? null;
-    if (this.buildMode?.isActive?.() || this.cookingRuntime?.isActive?.()) {
+    if (this.buildMode?.isActive?.() || this.cookingRuntime?.isActive?.() || this.venueMenuRuntime?.isActive?.()) {
       this.isRunning = false;
       this.frameMeleeItem = null;
       this.frameActions = Object.freeze({ interact: false, primary: false, secondary: false });
@@ -1162,7 +1164,7 @@ class WorldScene extends Phaser.Scene {
       sleeping: this.sleeping,
       facilityActive: this.facilityRuntime?.isUsing() || this.needsInteractionCoordinator?.isLocked?.(),
       dialogueActive: this.interactionRuntime?.isDialogueActive() || this.merchantRuntime?.isActive?.(),
-      cookingActive: this.cookingRuntime?.isActive?.(),
+      cookingActive: this.cookingRuntime?.isActive?.() || this.venueMenuRuntime?.isActive?.(),
     })) return { x: 0, y: 0 };
     const left = this.cursors.left.isDown || this.wasd.A.isDown;
     const right = this.cursors.right.isDown || this.wasd.D.isDown;

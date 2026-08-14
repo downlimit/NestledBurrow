@@ -102,13 +102,9 @@ The first implemented format remains food service. Additional entertainment such
 
 ## Opening hours and menu activation
 
-Early play uses direct active/inactive control. A later automated venue may support a schedule.
+Early play uses direct active/inactive control; a later automated venue may support a schedule. The sign always opens one compact panel whose pill switch is labeled **`Меню активно` / `Меню неактивно`** (`Menu active / Menu inactive`) and directly controls service. Closing the panel, including with `Space` or `Escape`, preserves that state. Dish editing is locked while active. Its bounded two-row list scrolls by wheel or touch swipe when more products are added.
 
-The tavern sign has one interaction scenario regardless of whether service is currently active: interacting with it opens the same compact menu panel. The panel contains one ordinary switch-style control whose state is labeled **`Меню активно` / `Меню неактивно`** (`Menu active / Menu inactive`). Toggling this control directly changes whether the venue is serving; there is no separate `OPEN` button and no direct-close shortcut outside the panel.
-
-While the menu is active, the currently advertised food selection remains locked for Stage 2. To change advertised dishes, the player first switches the menu inactive, edits the offer, then can switch it active again from the same panel. Closing the panel does not itself change active/inactive state.
-
-Opening time affects audience composition through real people rather than a special night multiplier. Repeatedly operating at night naturally gives more opportunities to people whose schedules, needs or preferences make night visits plausible. An inactive venue creates no penalty because no service obligation was accepted.
+The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and current anonymous guests can reserve only stocked items active in the offer. Opening time later affects audience composition through real people; an inactive venue creates no penalty.
 
 ## Experience and negative feedback
 
@@ -138,39 +134,23 @@ The first demand implementation does not require full Sims-like social simulatio
 
 ## Development sequence
 
-This is the validation order for the system, not a promise to implement every later stage consecutively. Each next stage starts only after the previous one produces an observable, understandable result; later stages can be revised or dropped if playtesting changes the product direction.
+Validation proceeds through observable slices that may be revised after playtesting:
 
-1. **Persistent population foundation.** A small test population has stable identities, the full canonical need set, persisted last-evaluation time and coarse offscreen reconstruction. Save/reload returns the same people. No tavern demand behavior changes yet.
-2. **Venue offer.** The venue explicitly exposes what it currently offers. The first version is a small food menu; inventory outside the offer is irrelevant to demand. One unified sign panel both edits the inactive offer and controls active/inactive service state with a switch.
-3. **Individual visit decision.** A simple popularity rate creates visit opportunities; a concrete persistent person is evaluated and may choose the venue from hunger, offer fit, budget and recent personal history.
-4. **Order and fulfillment.** The arriving person selects an offered product, creates an order or equivalent commitment, receives service and pays; anonymous stock-triggered spawning is removed.
-5. **Live needs during visits.** All canonical needs become active while the guest is present, so toilets, social contact, rest, cleanliness and other facilities can produce unscripted situations.
-6. **Popularity, reputation and personal opinion.** Reach, descriptive venue reputation and one person's own attitude become separate feedback systems. Reputation is allowed to attract one audience while repelling another.
-7. **Groups and time patterns.** Persistent people can arrive together; actual opening hours and later schedules alter which people plausibly consider the venue.
-8. **Emergent venue formats.** Takeaway, restaurant/bar, buffet/event and canteen behavior grow from infrastructure and offer rather than from a required mode selector.
-9. **Social graph and population lifecycle.** People can form deeper relationships, communicate opinions, become friends or partners, form families, age, reproduce and die; population replenishment prevents long-term collapse.
+1. **Persistent population:** stable people, canonical needs and coarse offscreen reconstruction.
+2. **Venue offer:** a saved food menu and unified active/inactive panel.
+3. **Visit decision:** one persistent person evaluates needs, offer, budget and history.
+4. **Order and fulfillment:** the chosen product becomes a service commitment and payment.
+5. **Live guest needs:** every canonical need can affect an onsite visit.
+6. **Feedback:** popularity, venue reputation and personal opinion stay distinct.
+7. **Groups and time:** relationships and schedules shape plausible visitors.
+8. **Venue formats:** infrastructure and offer produce takeaway, restaurant, event or self-service behavior.
+9. **Social lifecycle:** relationships, families, ageing, death and replenishment deepen the population.
 
-The early player-facing priority remains **optimization and development**. Learning individual people is the second layer. Reacting to need-driven and social chaos is the third.
+Early play prioritizes optimization, then recognizable people, then need-driven social situations.
 
 ## First implementation stage
 
-Stage 1 deliberately stops before menu, popularity and demand. Its purpose is to prove that persistent people exist independently of the tavern and can later be consumed by any profession or social system.
-
-Use a small test population rather than the final target scale. Each person needs only:
-
-- stable ID and recognizable display name;
-- the complete canonical need state: novelty, energy, satiety, toilet, lustre and dialogue/social contact;
-- the world time at which that state was last evaluated.
-
-Offscreen reconstruction must be coarse rather than pretending to simulate a hidden life frame by frame. Elapsed world time affects the result and bounded variation prevents identical trajectories, but repeated evaluation at the same world time must not reroll the person into a different state. Long absence must not simply apply the player's waking drain until every need becomes zero.
-
-The population and every person's state survive save/reload. `NEW GAME` creates a fresh small population. A developer-visible inspection path must make it possible to identify a person, inspect all six needs, advance world time, evaluate that same person again and see an explainable state change.
-
-Stage 1 does **not** add food preferences, budgets, venue opinion, visit memory, popularity, menu, visit selection, groups, social relationships, ageing, reproduction or new guest spawning. Those belong to later validation stages.
-
-The success criterion is:
-
-> The game owns a small set of persistent recognizable people whose complete need state can be reconstructed after offscreen time and survives save/reload, without those people yet being coupled to tavern guest generation.
+Stage 1 proves that 16 persistent people exist independently of tavern demand. Each has a stable ID/name, all six canonical needs and a saved evaluation time. Coarse deterministic reconstruction reacts to elapsed world time without replaying hidden life or collapsing everyone to zero; save/reload and the developer inspection path preserve the result. Food preferences, budgets, venue opinion, visits, relationships, ageing and replenishment remain later stages.
 
 ## Owners
 
@@ -181,6 +161,7 @@ The success criterion is:
 - sign: `src/tavern/tavernSignRuntime.js`, `src/tavern/guestConfig.js`;
 - guest flow/pathing: `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`;
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
+- active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
 - guest reaction/carried-item presentation: `src/tavern/guestFeedback.js`;
 - payment: `src/tavern/coinRuntime.js`;
 - persistent people and offscreen needs: `src/character/populationDomain.js` (external owner; tavern consumption begins in a later stage);
@@ -195,16 +176,17 @@ The success criterion is:
 - sign interaction always opens the same menu panel; active/inactive service state is controlled only by the panel switch in Stage 2;
 - sign, stock reservation and service lifecycle cannot contradict each other;
 - the current technical baseline uses persisted guest IDs, waves of one or two every three to eight seconds, at most six active visits and stock-triggered spawning; this rule is intentionally superseded by the target demand model when that model is implemented;
+- `venueOffer` is the venue's explicit promise and remains independent from physical kitchen stock; current anonymous guests may reserve only stocked portions whose item is active in the offer;
 - dine-in guests reserve distinct dining-table IDs before consuming a dish; a table currently used by the player is excluded from new seat assignments, and the player cannot start using a guest-reserved table;
 - lemonade is takeout worth two coins; a fried potato dish is dine-in worth four.
 
 ## Current baseline
 
-Potato preparation/frying and lemon juicing feed real inventory items into independently stocked single-portion serving tables. A finite six-lemon starter sack, persistent stove repair, table-routed multi-guest service, lemonade takeout, conflict-free potato dine-in and value-bearing coin rewards work end-to-end. A separate persisted 16-person population now exists with coarse need reconstruction; current guest spawning and service do not consume it yet.
+Potato preparation/frying and lemon juicing feed real inventory items into independently stocked single-portion serving tables. A finite six-lemon starter sack, persistent stove repair, table-routed multi-guest service, lemonade takeout, conflict-free potato dine-in and value-bearing coin rewards work end-to-end. The tavern sign always opens the same active-food panel; fried potato and lemonade can be selected independently while its activity switch is off. Current anonymous stock-triggered guests ignore portions outside that offer. A separate persisted 16-person population exists with coarse need reconstruction; current guest spawning and service do not consume it yet.
 
 ## Not yet
 
-Recipe book, broader ingredient variety, storage, population-backed need-driven demand, visitor preferences/budgets/influence, popularity/reputation, venue offer/menu, group visits, social propagation, configurable schedules, staff and broader venue formats.
+Recipe book, broader ingredient variety, storage, population-backed need-driven demand, visitor preferences/budgets/influence, popularity/reputation, group visits, social propagation, configurable schedules, staff and broader venue formats.
 
 ## Evidence
 

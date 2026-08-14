@@ -5,6 +5,7 @@ import { createCoinRuntime } from "./coinRuntime.js";
 import {
   consumeServingReservation,
   getAvailableServingPortions,
+  getServingTableStock,
   releaseServingReservation,
   reserveServingItem,
 } from "./cookingDomain.js";
@@ -13,6 +14,8 @@ import { createGuestController } from "./guestController.js";
 import { createGuestFeedback } from "./guestFeedback.js";
 import { throwDirectionTowardPoint, throwOriginFromPlayer } from "../inventory/worldThrowDirection.js";
 import { createGuestRuntime } from "./guestRuntime.js";
+import { isVenueOfferItemActive } from "./venueOfferDomain.js";
+import { createVenueMenuRuntime } from "./venueMenuRuntime.js";
 
 export function createTavernServiceRuntime(scene, {
   sessionState,
@@ -22,7 +25,11 @@ export function createTavernServiceRuntime(scene, {
   createNpcMovementConfig,
   getPlayerPosition = () => null,
   getSignPoint = () => GUEST_CONFIG.points.sign,
+  localization,
   onPersistentMutation = () => {},
+  onVenueMenuActiveChange = () => {},
+  playEffect = () => {},
+  syncSign = () => {},
   randomSource = Math.random,
 } = {}) {
   const actorProfile = getActorProfile(GUEST_CONFIG.profileId);
@@ -33,6 +40,10 @@ export function createTavernServiceRuntime(scene, {
   const definitionsByType = (facilityType) => facilityRuntime?.getDefinitions?.()
     ?.filter((facility) => facility.facilityType === facilityType) ?? [];
   const servingTableIds = () => definitionsByType("serving-table").map(({ id }) => id);
+  const offeredServingTableIds = () => servingTableIds().filter((servingTableId) => {
+    const itemId = getServingTableStock(sessionState.gameplay.kitchen, servingTableId).itemId;
+    return isVenueOfferItemActive(sessionState.gameplay.venueOffer, itemId);
+  });
   const getServicePoint = (servingTableId) => facilityRuntime?.getDefinition?.(servingTableId)?.usePosition
     ?? definitionsByType("serving-table")[0]?.usePosition
     ?? GUEST_CONFIG.points.insideDoor;
@@ -70,6 +81,14 @@ export function createTavernServiceRuntime(scene, {
       onPersistentMutation({ status: "coin-collected", mutated: true, value });
     },
   });
+  const venueMenuRuntime = createVenueMenuRuntime(scene, {
+    sessionState,
+    localization,
+    onActiveChange: onVenueMenuActiveChange,
+    onPersistentMutation,
+    playEffect,
+    syncSign,
+  });
 
   const guestRuntime = createGuestRuntime({
     config: { ...GUEST_CONFIG, createController: createGuestController },
@@ -94,11 +113,11 @@ export function createTavernServiceRuntime(scene, {
     getSeatPoint,
     reserveSeat,
     releaseSeat,
-    getAvailablePortions: () => getAvailableServingPortions(sessionState.gameplay.kitchen, servingTableIds()),
+    getAvailablePortions: () => getAvailableServingPortions(sessionState.gameplay.kitchen, offeredServingTableIds()),
     reserveItem: (guestId, { excludedServingTableIds = [] } = {}) => reserveServingItem(
       sessionState.gameplay.kitchen,
       guestId,
-      servingTableIds().filter((tableId) => !excludedServingTableIds.includes(tableId)),
+      offeredServingTableIds().filter((tableId) => !excludedServingTableIds.includes(tableId)),
     ),
     releaseReservation: (guestId, servingTableId) => releaseServingReservation(
       sessionState.gameplay.kitchen,
@@ -128,6 +147,7 @@ export function createTavernServiceRuntime(scene, {
   return {
     guestRuntime,
     coinRuntime,
+    venueMenuRuntime,
     dropWalletCoin({ position, playerSprite, facing, pointerWorld } = {}) {
       if (!position || sessionState.gameplay.coins < 1) {
         return { status: "wallet-empty", mutated: false };
@@ -157,6 +177,7 @@ export function createTavernServiceRuntime(scene, {
       diningReservations: Object.fromEntries(diningTableByGuest),
     }),
     destroy() {
+      venueMenuRuntime.destroy();
       guestRuntime.destroy();
       coinRuntime.destroy();
     },

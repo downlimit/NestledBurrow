@@ -122,7 +122,7 @@ export function createTavernSignRuntime(scene, { getTavernOpen, worldLayout }) {
         targetingMode: "facing-first",
         targetingGroup: WORLD_PLACEABLE_TARGETING_GROUP,
         attentionGroup: WORLD_OBJECT_ATTENTION_GROUP,
-        prompt: getTavernOpen() ? "hud:interaction.closeTavern" : "hud:interaction.openTavern",
+        prompt: "hud:interaction.manageTavern",
         payload: {},
       }];
     },
