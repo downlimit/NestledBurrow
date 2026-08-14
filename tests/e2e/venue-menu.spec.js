@@ -9,6 +9,17 @@ async function bridge(page, method, argument) {
   );
 }
 
+async function advanceUntil(page, read, predicate, { maxMs = 30_000, stepMs = 250 } = {}) {
+  for (let elapsedMs = 0; elapsedMs <= maxMs; elapsedMs += stepMs) {
+    const value = await read();
+    if (predicate(value)) return value;
+    await bridge(page, "advanceWorldSimulation", stepMs);
+  }
+  const value = await read();
+  expect(predicate(value)).toBe(true);
+  return value;
+}
+
 async function bootFresh(page) {
   await page.setViewportSize({ width: 320, height: 180 });
   await page.goto("./?movementDebug=1");
@@ -102,14 +113,18 @@ test("one sign panel edits the offer and switches menu activity without closing"
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
 });
 
-test("anonymous scheduler ignores stocked food outside the offer", async ({ page }) => {
+test("live service never reserves stocked food outside the accepted offer", async ({ page }) => {
   await bootFresh(page);
   await bridge(page, "setServingStock", { itemId: "fried-potato-dish", quantity: 1 });
   await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: false });
-  await bridge(page, "setGuestRandomValue", 0);
   await openTavern(page);
-  await bridge(page, "advanceWorldSimulation", 3_100);
-  expect((await bridge(page, "getTavernState")).guest.active).toBe(false);
+  await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
+  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getTavernState")).guest.active,
+    (active) => active === false,
+  );
   expect((await bridge(page, "getSession")).gameplay.kitchen.servingTables["home-serving-table-01"].reservations).toEqual([]);
 
   await openMenu(page);
@@ -121,8 +136,11 @@ test("anonymous scheduler ignores stocked food outside the offer", async ({ page
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   await clickLogical(page, { x: 12, y: 90 });
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
-  await bridge(page, "advanceWorldSimulation", 3_100);
-  const guest = (await bridge(page, "getTavernState")).guest;
-  expect(guest.active).toBe(true);
-  expect(guest.guests[0]).toMatchObject({ itemId: "fried-potato-dish", reservedDish: true });
+  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-2");
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getTavernState")).guest.guests[0]?.reservedDish,
+    Boolean,
+  );
+  expect((await bridge(page, "getTavernState")).guest.guests[0]).toMatchObject({ itemId: "fried-potato-dish" });
 });

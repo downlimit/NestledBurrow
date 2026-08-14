@@ -100,9 +100,16 @@ test("two dine-in guests reserve distinct serving and dining tables", async ({ p
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   await clickLogical(page, { x: 12, y: 90 });
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
+  await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-2");
 
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getTavernState")).guest.guests
+      .filter(({ servingTableId, diningTableId }) => servingTableId && diningTableId).length,
+    (count) => count === 2,
+  );
   const guests = (await bridge(page, "getTavernState")).guest.guests;
   expect({
     count: guests.length,

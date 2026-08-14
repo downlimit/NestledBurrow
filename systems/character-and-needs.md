@@ -9,6 +9,7 @@ The same need dimensions and meanings apply to persistent people in the populati
 ## Shared person need contract
 
 - A persistent person uses the same canonical need dimensions as the player: novelty, energy, satiety, toilet, lustre and dialogue/social contact.
+- Each Stage-3 person also keeps a stable `spendingCapacity` and layered `foodPreferences` (`cuisine`, `dishClass`, `ingredient`). These are deterministic from the stable person ID, JSON-safe and normalized by the population owner; venue history remains outside the person profile.
 - Offscreen people are not simulated frame by frame. Their last stored need state and evaluation time are persisted, then reconstructed when the person becomes relevant again: visit consideration, scene appearance, phone contact, invitation or another explicit interaction.
 - Reconstruction uses elapsed world time plus bounded variation and may later use individual traits, age or lifestyle. It must preserve the same `0..100` meanings as live needs.
 - While physically present, a person's needs are live and may drive behavior. Different people can therefore arrive with several simultaneous pressures rather than a single scripted reason.
@@ -96,8 +97,8 @@ The target need is protected through exit; recovery is active-only. Normal cance
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns canonical need IDs and player formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. `src/character/populationDomain.js` owns the 16-person Stage-1 baseline, population normalization and deterministic coarse offscreen reconstruction for all six needs. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
+`src/needs/needsDomain.js` owns canonical need IDs and player formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. `src/character/populationDomain.js` owns the 16-person baseline, stable demand profiles, population normalization and deterministic coarse offscreen reconstruction for all six needs. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:interaction`; focused browser E2E.

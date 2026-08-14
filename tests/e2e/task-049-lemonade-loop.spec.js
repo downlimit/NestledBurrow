@@ -82,7 +82,7 @@ test("fresh Task 049 world has four tools, editable kitchen/well and two trees",
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
-  expect(session.version).toBe(14);
+  expect(session.version).toBe(15);
   expect(session.gameplay.inventory.slots.slice(0, 5).map((item) => item?.id)).toEqual([
     "axe", "pickaxe", "hoe", "water-bucket", "potato-seed",
   ]);
@@ -253,7 +253,11 @@ test("lemonade guests take out and pay two coins", async ({ page }, testInfo) =>
   await openTavern(page);
   expect((await bridge(page, "getTavernState")).open).toBe(true);
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
-  expect((await bridge(page, "getTavernState")).guest.guests[0]?.itemId).toBe("lemonade");
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getTavernState")).guest.guests[0]?.itemId,
+    (itemId) => itemId === "lemonade",
+  );
   await advanceUntil(
     page,
     async () => {

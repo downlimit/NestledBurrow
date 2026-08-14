@@ -8,7 +8,7 @@ This system separates player session progress from developer-authored project de
 
 `src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, the persistent population with per-person evaluation timestamps, peaceful inventory, combat loadout, dropped items, resources, farm/water state, kitchen serving stock and repair, the active `venueOffer`, tavern sign, guest service snapshots and coins. Selected slot, open menu modal and other in-flight presentation state are transient.
+Session data includes player/world progress, needs, the persistent population with evaluation timestamps and stable demand profiles, peaceful inventory, combat loadout, dropped items, resources, farm/water state, kitchen serving stock and repair, the active `venueOffer`, tavern sign, opportunity timer, visitor history, person-backed guest snapshots and coins. Selected slot, last decision diagnostics, open menu modal and other in-flight presentation state are transient.
 
 ## Authoring data
 
@@ -29,6 +29,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 - schema v11 migrates once to v12 by moving one legacy serving portion under the canonical table ID and returning overflow portions to inventory or the world; guest snapshots persist serving and dining table assignments;
 - schema v12 migrates once to v13 by creating the valid 16-person Stage-1 population at the saved world time;
 - schema v13 migrates once to v14 by adding the default two-item `venueOffer` while preserving population, needs, kitchen, tavern service and coins;
+- schema v14 migrates once to v15 by adding deterministic spending/preferences, the opportunity timer, per-person visitor history and unique `personId`/acceptable items to active guest snapshots while preserving their technical IDs and service state;
 - the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
 - dropped items persist only stable ID, item payload and logical position;
 - selected slot, in-flight drag state, throw arc, gain feedback and fade timers are not persisted;
@@ -36,7 +37,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v14 save/reload and migrations work. The normalized active food offer survives alongside stable population IDs, names, all six canonical needs and evaluation timestamps, peaceful inventory, combat loadout, dropped items, farm water/crops, per-table kitchen stock/repair and active table-routed service snapshots. Authoring backups survive page reload and `NEW GAME`.
+Schema v15 save/reload and migrations work. The normalized food offer survives alongside stable population IDs, names, needs, budgets/preferences and evaluation timestamps. Opportunity state, visitor history and active guest→person mappings persist with inventory, farm, kitchen stock/repair, table-routed service and coins. Authoring backups survive page reload and `NEW GAME`.
 
 ## Not yet
 
@@ -44,4 +45,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, domain-specific checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, domain-specific checks, `check:authoring`, persistence Browser E2E.

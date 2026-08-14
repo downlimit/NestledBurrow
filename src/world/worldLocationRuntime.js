@@ -394,6 +394,7 @@ export class WorldLocationRuntime {
       characterSystem: this.characterSystem,
       createNpcMovementConfig: (profile) => this.createNpcMovementConfig(profile),
       getPlayerPosition: () => this.callbacks.getPlayerCharacter?.()?.motor?.position,
+      getWorldTimeSeconds: () => this.sessionState.gameplay.worldTimeSeconds,
       getSignPoint: () => this.owners.tavernSignRuntime?.getGuestCheckPoint?.() ?? GUEST_CONFIG.points.sign,
       localization: this.localization,
       playEffect: (type) => this.globalOwners.audioRuntime?.playEffect?.(type),

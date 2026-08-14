@@ -52,7 +52,7 @@
 
 ### Persistent population
 
-`src/character/populationDomain.js` владеет созданием устойчивых person identities, полным canonical need state и детерминированной coarse-реконструкцией по прошедшему world time. `src/session/gameSessionState.js` и `src/session/sessionPersistence.js` вызывают публичные функции owner для JSON-safe state и schema migration, не размещая у себя population formulas.
+`src/character/populationDomain.js` владеет созданием устойчивых person identities, полным canonical need state, стабильными budget/preference profiles и детерминированной coarse-реконструкцией по прошедшему world time. `src/session/gameSessionState.js` и `src/session/sessionPersistence.js` вызывают публичные функции owner для JSON-safe state и schema migration, не размещая у себя population formulas.
 
 Tavern, social и profession systems могут позже потреблять один и тот же persisted person state через этот owner. Они не создают собственную population, need vocabulary или offscreen evaluation.
 
@@ -71,7 +71,7 @@ Tavern, social и profession systems могут позже потреблять 
 
 ### Tavern service
 
-`TavernServiceRuntime` координирует persisted multi-guest service, value-bearing coin runtime и дочерний runtime активного меню. `KitchenInteractionRuntime` делегирует fixed-facility mutations соответствующим domain/runtime owners. Расписание волн принадлежит `src/tavern/tavernServiceDomain.js`, маршруты и состояние визита — `src/tavern/guestRuntime.js`, рецепты/stock/reservations — `src/tavern/cookingDomain.js`, состояние и правила `venueOffer` — `src/tavern/venueOfferDomain.js`, а presentation/input единой панели выбора и переключения активности — `src/tavern/venueMenuRuntime.js`. `WorldScene` только связывает owners и callbacks; world interaction всегда маршрутизирует взаимодействие с вывеской через публичный menu runtime.
+`TavernServiceRuntime` координирует persisted person-backed service, opportunity timer, visitor history, value-bearing coin runtime и дочерний runtime активного меню. Он вызывает публичную offscreen evaluation population owner ровно для выбранного кандидата. `src/tavern/visitDemandDomain.js` владеет food motive, budget/taste/recency формулой и decision breakdown; `src/tavern/saleProfileDomain.js` — canonical price/tag profiles. Таймер/history/snapshot normalization принадлежат `src/tavern/tavernServiceDomain.js`, маршруты live visit — `src/tavern/guestRuntime.js`, recipes/stock/reservations — `src/tavern/cookingDomain.js`, `venueOffer` — `src/tavern/venueOfferDomain.js`, panel presentation/input — `src/tavern/venueMenuRuntime.js`. `WorldScene` только связывает owners и callbacks.
 
 Следующее расширение очереди, staff или нескольких service stations развивает эти owners и не возвращает orchestration в `WorldScene`.
 

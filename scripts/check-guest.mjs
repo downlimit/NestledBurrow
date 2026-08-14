@@ -5,7 +5,6 @@ import { CharacterSystem } from "../src/character/characterSystem.js";
 import { createCoinRuntime } from "../src/tavern/coinRuntime.js";
 import {
   consumeServingReservation,
-  getAvailableServingPortions,
   normalizeKitchenState,
   releaseServingReservation,
   reserveServingItem,
@@ -17,8 +16,12 @@ import { createActorNavigation, createActorWalkability, findGridPath } from "../
 import { createFreshGameSessionState } from "../src/session/gameSessionState.js";
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION } from "../src/session/sessionPersistence.js";
 import { createTavernSignRuntime } from "../src/tavern/tavernSignRuntime.js";
+import { getSalePrice } from "../src/tavern/saleProfileDomain.js";
 
 const bounds = { left: 0, top: 0, right: 160, bottom: 160 };
+const spawnVisit = (runtime, index = 1, acceptableItemIds = ["fried-potato-dish", "lemonade"]) => (
+  runtime.spawnVisit(`person-test-${index}`, acceptableItemIds)
+);
 const clearPath = findGridPath({ start: { x: 8, y: 14 }, goal: { x: 72, y: 78 }, bounds, isWalkable: () => true });
 assert(clearPath.length > 0);
 assert(clearPath.some((point) => point.x > 8 && point.y > 14), "A* uses eight-direction movement");
@@ -77,7 +80,7 @@ const legacy = createFreshGameSessionState();
 legacy.version = 4;
 delete legacy.gameplay.tavernOpen;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 4, state: legacy }));
-assert.equal(SAVE_SCHEMA_VERSION, 14);
+assert.equal(SAVE_SCHEMA_VERSION, 15);
 assert.equal(migrated.status, "loaded");
 assert.equal(migrated.state.gameplay.tavernOpen, false);
 assert.equal(migrated.state.gameplay.coins, 0);
@@ -180,7 +183,7 @@ function scenario({
   const kitchen = normalizeKitchenState({
     servingTables: tableStocks,
   });
-  const serviceState = { spawnRemainingMs: 8_000, nextGuestId: 0, guests: [] };
+  const serviceState = { opportunityRemainingMs: 8_000, nextGuestId: 0, visitorHistoryByPersonId: {}, guests: [] };
   const actors = new Map();
   const controllers = new Map();
   const payments = [];
@@ -227,16 +230,18 @@ function scenario({
       seatsByGuest.delete(guestId);
       return tableId ? guestsBySeat.delete(tableId) : false;
     },
-    getAvailablePortions: () => getAvailableServingPortions(kitchen, Object.keys(resolvedServicePoints)),
-    reserveItem: (guestId, { excludedServingTableIds = [] } = {}) => reserveServingItem(
+    reserveItem: (guestId, { excludedServingTableIds = [], acceptableItemIds = [] } = {}) => reserveServingItem(
       kitchen,
       guestId,
-      Object.keys(resolvedServicePoints).filter((tableId) => !excludedServingTableIds.includes(tableId)),
+      Object.keys(resolvedServicePoints).filter((tableId) => (
+        !excludedServingTableIds.includes(tableId)
+        && acceptableItemIds.includes(kitchen.servingTables[tableId]?.itemId)
+      )),
     ),
     releaseReservation: (guestId, tableId) => releaseServingReservation(kitchen, guestId, tableId),
     consumeReservation: (guestId, tableId) => consumeServingReservation(kitchen, guestId, tableId),
     onPurchaseComplete: (purchase) => payments.push(purchase),
-    randomSource: () => 0,
+    getSalePrice,
     createFeedback: () => ({ set: (state) => feedback.push(state), update() {}, destroy() {} }),
   });
   function tick(ms = 10) {
@@ -258,8 +263,13 @@ function scenario({
   return { kitchen, serviceState, runtime, payments, paymentStates, feedback, states, seatsByGuest, tick, finish };
 }
 
+function advanceScenarioUntil(activeScenario, predicate, limit = 600) {
+  for (let index = 0; index < limit && !predicate(); index += 1) activeScenario.tick();
+  assert(predicate(), "guest scenario reached its expected live-service state");
+}
+
 const closed = scenario({ open: false, itemId: "lemonade" });
-assert.equal(closed.runtime.forceSpawn(), "tavern-guest-1");
+assert.equal(spawnVisit(closed.runtime), "tavern-guest-1");
 closed.finish();
 assert(closed.states.includes(GUEST_STATES.checkingSign));
 assert.equal(closed.states.includes(GUEST_STATES.entering), false);
@@ -267,7 +277,7 @@ assert.equal(closed.kitchen.servingTables["serving-1"].quantity, 1);
 assert.deepEqual(closed.kitchen.servingTables["serving-1"].reservations, []);
 
 const takeout = scenario({ open: true, itemId: "lemonade" });
-assert.equal(takeout.runtime.forceSpawn(), "tavern-guest-1");
+assert.equal(spawnVisit(takeout.runtime), "tavern-guest-1");
 takeout.finish();
 assert(takeout.feedback.includes("carrying-lemonade"));
 assert.equal(takeout.states.includes(GUEST_STATES.eating), false);
@@ -275,7 +285,7 @@ assert.deepEqual(takeout.payments.map(({ itemId, value }) => ({ itemId, value })
 assert.deepEqual(takeout.paymentStates, [GUEST_STATES.leaving], "takeout payment exists as soon as the guest starts leaving");
 
 const dineIn = scenario({ open: true, itemId: "fried-potato-dish" });
-assert.equal(dineIn.runtime.forceSpawn(), "tavern-guest-1");
+assert.equal(spawnVisit(dineIn.runtime), "tavern-guest-1");
 dineIn.finish();
 assert(dineIn.states.includes(GUEST_STATES.carryingToSeat));
 assert(dineIn.states.includes(GUEST_STATES.eating));
@@ -287,7 +297,7 @@ const blockedDoorTarget = scenario({
   servicePoint: { x: 72, y: 110 },
   isBlockedBox: (box) => box.right > 16 && box.left < 32 && box.bottom > 88 && box.top < 104,
 });
-assert.equal(blockedDoorTarget.runtime.forceSpawn(), "tavern-guest-1");
+assert.equal(spawnVisit(blockedDoorTarget.runtime), "tavern-guest-1");
 blockedDoorTarget.finish();
 assert.equal(blockedDoorTarget.states.includes(GUEST_STATES.entering), false, "guest does not enter the house before visiting an outdoor service point");
 assert(blockedDoorTarget.states.includes(GUEST_STATES.approachingService), "guest walks directly from the sign to the outdoor service point");
@@ -304,8 +314,10 @@ const multi = scenario({
     "serving-2": { x: 88, y: 46 },
   },
 });
-assert.equal(multi.runtime.forceSpawn(), "tavern-guest-1");
-assert.equal(multi.runtime.forceSpawn(), "tavern-guest-2");
+assert.equal(spawnVisit(multi.runtime), "tavern-guest-1");
+assert.equal(spawnVisit(multi.runtime, 2), "tavern-guest-2");
+advanceScenarioUntil(multi, () => Object.values(multi.kitchen.servingTables)
+  .reduce((total, stock) => total + stock.reservations.length, 0) === 2);
 assert.equal(multi.runtime.getState().activeCount, 2);
 assert.deepEqual(multi.runtime.getState().guests.map(({ id }) => id), ["tavern-guest-1", "tavern-guest-2"]);
 assert.equal(multi.kitchen.servingTables["serving-1"].reservations.length, 1);
@@ -326,8 +338,9 @@ const multiTable = scenario({
     "dining-right": { x: 136, y: 78 },
   },
 });
-assert.equal(multiTable.runtime.forceSpawn(), "tavern-guest-1");
-assert.equal(multiTable.runtime.forceSpawn(), "tavern-guest-2");
+assert.equal(spawnVisit(multiTable.runtime), "tavern-guest-1");
+assert.equal(spawnVisit(multiTable.runtime, 2), "tavern-guest-2");
+advanceScenarioUntil(multiTable, () => multiTable.runtime.getState().guests.every(({ servingTableId }) => servingTableId));
 const assigned = multiTable.runtime.getState().guests;
 assert.deepEqual(assigned.map(({ servingTableId }) => servingTableId), ["serving-left", "serving-right"]);
 assert.deepEqual(assigned.map(({ diningTableId }) => diningTableId), ["dining-left", "dining-right"]);
@@ -346,7 +359,8 @@ const takeoutWithBusyDining = scenario({
   },
   seatPoints: {},
 });
-assert.equal(takeoutWithBusyDining.runtime.forceSpawn(), "tavern-guest-1");
+assert.equal(spawnVisit(takeoutWithBusyDining.runtime), "tavern-guest-1");
+advanceScenarioUntil(takeoutWithBusyDining, () => takeoutWithBusyDining.runtime.getState().guests[0]?.itemId === "lemonade");
 const busyDiningGuest = takeoutWithBusyDining.runtime.getState().guests[0];
 assert.equal(busyDiningGuest.itemId, "lemonade");
 assert.equal(busyDiningGuest.servingTableId, "serving-takeout");
