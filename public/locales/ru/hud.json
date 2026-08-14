@@ -70,6 +70,7 @@
     "noCookedDish": "Нет готового блюда",
     "servingTableOccupied": "Сервировочный стол занят",
     "openTavern": "Открыть таверну",
+    "manageTavern": "Меню заведения",
     "closeTavern": "Закрыть таверну",
     "openSeedShop": "Магазин семян",
     "tillSoil": "Вскопать землю",
@@ -213,6 +214,14 @@
     "combo": "КОМБО",
     "success": "Успех!",
     "miss": "Промах"
+  },
+  "venueMenu": {
+    "title": "МЕНЮ",
+    "friedPotatoDish": "Жареный картофель",
+    "lemonade": "Лимонад",
+    "active": "Меню активно",
+    "inactive": "Меню неактивно",
+    "closeHint": "Пробел: закрыть"
   },
   "needs": {
     "toiletAccidentPrivate": "Не удалось дотерпеть. Лучше привести себя в порядок.",

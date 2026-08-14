@@ -40,6 +40,17 @@ async function interactWith(page, entityId) {
   return bridge(page, "interact");
 }
 
+async function openTavern(page) {
+  await interactWith(page, "tavern-open-sign");
+  await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(true);
+  const point = await canvasPoint(page, { x: 108, y: 130 });
+  await page.mouse.click(point.x, point.y);
+  await expect.poll(async () => (await bridge(page, "getTavernState")).open).toBe(true);
+  const closePoint = await canvasPoint(page, { x: 12, y: 90 });
+  await page.mouse.click(closePoint.x, closePoint.y);
+  await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
+}
+
 async function canvasPoint(page, point) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
@@ -71,7 +82,7 @@ test("fresh Task 049 world has four tools, editable kitchen/well and two trees",
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
-  expect(session.version).toBe(13);
+  expect(session.version).toBe(14);
   expect(session.gameplay.inventory.slots.slice(0, 5).map((item) => item?.id)).toEqual([
     "axe", "pickaxe", "hoe", "water-bucket", "potato-seed",
   ]);
@@ -239,7 +250,7 @@ test("lemonade guests take out and pay two coins", async ({ page }, testInfo) =>
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves the takeout route once");
   await bootFresh(page);
   await bridge(page, "setServingStock", { itemId: "lemonade", quantity: 1 });
-  await interactWith(page, "tavern-open-sign");
+  await openTavern(page);
   expect((await bridge(page, "getTavernState")).open).toBe(true);
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
   expect((await bridge(page, "getTavernState")).guest.guests[0]?.itemId).toBe("lemonade");
@@ -302,7 +313,7 @@ test("fried potato guests dine in and pay four coins", async ({ page }, testInfo
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves the dine-in route once");
   await bootFresh(page);
   await bridge(page, "setServingStock", { itemId: "fried-potato-dish", quantity: 1 });
-  await interactWith(page, "tavern-open-sign");
+  await openTavern(page);
   expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
   await advanceUntil(
     page,

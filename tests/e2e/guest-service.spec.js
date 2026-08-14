@@ -37,7 +37,13 @@ async function openTavern(page) {
     return (await bridge(page, "getInteractionState"))?.candidate?.entityId;
   }).toBe("tavern-open-sign");
   await bridge(page, "interact");
+  await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(true);
+  const canvas = await page.locator("canvas").boundingBox();
+  if (!canvas) throw new Error("Game canvas is unavailable");
+  await page.mouse.click(canvas.x + 108 * canvas.width / 320, canvas.y + 130 * canvas.height / 180);
   await expect.poll(async () => (await bridge(page, "getTavernState")).open).toBe(true);
+  await page.mouse.click(canvas.x + 12 * canvas.width / 320, canvas.y + 90 * canvas.height / 180);
+  await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
 }
 
 test("closed guest checks the sign, pauses and leaves outside", async ({ page }) => {

@@ -6,6 +6,7 @@ import { normalizePopulation } from "../character/populationDomain.js";
 import { normalizeKitchenState } from "../tavern/cookingDomain.js";
 import { createFreshFarmState, normalizeFarmState } from "../resources/farmingDomain.js";
 import { normalizeTavernServiceState } from "../tavern/tavernServiceDomain.js";
+import { normalizeVenueOffer } from "../tavern/venueOfferDomain.js";
 import {
   addInventoryItem,
   canAddInventoryItem,
@@ -20,7 +21,7 @@ import {
   resetInventory,
 } from "../inventory/inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 13;
+export const SESSION_STATE_VERSION = 14;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -181,6 +182,7 @@ function normalizeGameplayState(value = {}) {
     population: normalizePopulation(value.population, { worldTimeSeconds }),
     kitchen,
     tavernService,
+    venueOffer: normalizeVenueOffer(value.venueOffer),
     tavernOpen: normalizeBoolean(value.tavernOpen, false, "Tavern open"),
     coins: normalizeNonNegativeInteger(value.coins, 3, "Coins"),
   });

@@ -71,9 +71,9 @@ Tavern, social и profession systems могут позже потреблять 
 
 ### Tavern service
 
-`TavernServiceRuntime` координирует persisted multi-guest service и value-bearing coin runtime. `KitchenInteractionRuntime` делегирует fixed-facility mutations соответствующим domain/runtime owners. Расписание волн принадлежит `src/tavern/tavernServiceDomain.js`, маршруты и состояние визита — `src/tavern/guestRuntime.js`, рецепты/stock/reservations — `src/tavern/cookingDomain.js`, а `WorldScene` только связывает owners и callbacks.
+`TavernServiceRuntime` координирует persisted multi-guest service, value-bearing coin runtime и дочерний runtime активного меню. `KitchenInteractionRuntime` делегирует fixed-facility mutations соответствующим domain/runtime owners. Расписание волн принадлежит `src/tavern/tavernServiceDomain.js`, маршруты и состояние визита — `src/tavern/guestRuntime.js`, рецепты/stock/reservations — `src/tavern/cookingDomain.js`, состояние и правила `venueOffer` — `src/tavern/venueOfferDomain.js`, а presentation/input единой панели выбора и переключения активности — `src/tavern/venueMenuRuntime.js`. `WorldScene` только связывает owners и callbacks; world interaction всегда маршрутизирует взаимодействие с вывеской через публичный menu runtime.
 
-Следующее расширение очереди, меню, staff или нескольких service stations развивает эти owners и не возвращает orchestration в `WorldScene`.
+Следующее расширение очереди, staff или нескольких service stations развивает эти owners и не возвращает orchestration в `WorldScene`.
 
 ### Facilities и presentation
 

@@ -109,7 +109,7 @@ const audioRuntimeSource = readFileSync("src/audio/audioRuntime.js", "utf8");
 assert(!audioRuntimeSource.includes("visibilitychange")); assert(!audioRuntimeSource.includes("blur"));
 const eventWiringSource = [
   "src/main.js", "src/build/worldBuildCoordinator.js", "src/interaction/worldInteractionCoordinator.js", "src/inventory/inventoryRuntime.js", "src/resources/farmingRuntime.js",
-  "src/tavern/cookingRuntime.js", "src/resources/merchantRuntime.js", "src/tavern/kitchenInteractionRuntime.js",
+  "src/tavern/cookingRuntime.js", "src/tavern/venueMenuRuntime.js", "src/resources/merchantRuntime.js", "src/tavern/kitchenInteractionRuntime.js",
   "src/tavern/guestFeedback.js", "src/tavern/tavernServiceRuntime.js", "src/combat/meleeRuntime.js",
 ].map((path) => readFileSync(path, "utf8")).join("\n");
 for (const effectId of task047Effects.filter((id) => !id.startsWith("wood-") && !id.startsWith("stone-") && !id.startsWith("ruby-"))) {

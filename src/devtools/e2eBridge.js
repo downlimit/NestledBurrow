@@ -180,11 +180,19 @@ export function installWorldE2EBridge(scene) {
     getCookingState: () => getLocationOwners().cookingRuntime?.getState?.() ?? null,
     getTavernState: () => ({
       open: scene.sessionState.gameplay.tavernOpen,
+      offer: clone(scene.sessionState.gameplay.venueOffer),
+      menu: getLocationOwners().tavernServiceRuntime?.venueMenuRuntime?.getState?.() ?? null,
       sign: getLocationOwners().tavernSignRuntime?.getState?.(),
       guest: getLocationOwners().guestRuntime?.getState?.(),
       service: getLocationOwners().tavernServiceRuntime?.getState?.(),
     }),
     getCoinState: () => getLocationOwners().coinRuntime?.getState?.() ?? [],
+    getVenueOffer: () => clone(scene.sessionState.gameplay.venueOffer),
+    setVenueOfferItemActive: ({ itemId, active }) => getLocationOwners()
+      .tavernServiceRuntime?.venueMenuRuntime?.setItemActive?.(itemId, active),
+    toggleVenueOfferItem: (itemId) => getLocationOwners()
+      .tavernServiceRuntime?.venueMenuRuntime?.toggleItem?.(itemId),
+    getTavernOpen: () => Boolean(scene.sessionState.gameplay.tavernOpen),
     addFacility: ({ facilityType, x, y } = {}) => {
       const facility = getLocationOwners().facilityRuntime?.add?.(facilityType, { x: Number(x), y: Number(y) }) ?? null;
       scene.interactionRuntime?.refresh?.();

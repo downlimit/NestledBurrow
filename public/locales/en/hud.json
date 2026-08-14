@@ -70,6 +70,7 @@
     "noCookedDish": "No cooked dish",
     "servingTableOccupied": "Serving table occupied",
     "openTavern": "Open tavern",
+    "manageTavern": "Venue menu",
     "closeTavern": "Close tavern",
     "openSeedShop": "Seed shop",
     "tillSoil": "Till soil",
@@ -213,6 +214,14 @@
     "combo": "COMBO",
     "success": "Success!",
     "miss": "Miss"
+  },
+  "venueMenu": {
+    "title": "MENU",
+    "friedPotatoDish": "Fried potato",
+    "lemonade": "Lemonade",
+    "active": "Menu active",
+    "inactive": "Menu inactive",
+    "closeHint": "Space: close"
   },
   "needs": {
     "toiletAccidentPrivate": "Could not hold it. Time to clean up.",
