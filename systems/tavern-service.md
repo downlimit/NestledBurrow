@@ -179,6 +179,7 @@ The success criterion is:
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
 - guest reaction/carried-item presentation: `src/tavern/guestFeedback.js`;
 - payment: `src/tavern/coinRuntime.js`;
+- persistent people and offscreen needs: `src/character/populationDomain.js` (external owner; tavern consumption begins in a later stage);
 - `WorldScene` composes owners and delegates updates and callbacks.
 
 ## Invariants
@@ -194,12 +195,12 @@ The success criterion is:
 
 ## Current baseline
 
-Potato preparation/frying and lemon juicing feed real inventory items into independently stocked single-portion serving tables. A finite six-lemon starter sack, persistent stove repair, table-routed multi-guest service, lemonade takeout, conflict-free potato dine-in and value-bearing coin rewards work end-to-end.
+Potato preparation/frying and lemon juicing feed real inventory items into independently stocked single-portion serving tables. A finite six-lemon starter sack, persistent stove repair, table-routed multi-guest service, lemonade takeout, conflict-free potato dine-in and value-bearing coin rewards work end-to-end. A separate persisted 16-person population now exists with coarse need reconstruction; current guest spawning and service do not consume it yet.
 
 ## Not yet
 
-Recipe book, broader ingredient variety, storage, persistent population, need-driven demand, visitor preferences/budgets/influence, popularity/reputation, venue offer/menu, group visits, social propagation, configurable schedules, staff and broader venue formats.
+Recipe book, broader ingredient variety, storage, population-backed need-driven demand, visitor preferences/budgets/influence, popularity/reputation, venue offer/menu, group visits, social propagation, configurable schedules, staff and broader venue formats.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`; focused Task #058 Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`; focused service and population Browser E2E.

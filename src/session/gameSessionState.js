@@ -2,6 +2,7 @@ import { RESOURCE_OBJECTS } from "../resources/resourceConfig.js";
 import { applyResourceWork, getResourceProfile } from "../resources/resourceDomain.js";
 import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
 import { DEFAULT_NEEDS, normalizeNeeds } from "../needs/needsDomain.js";
+import { normalizePopulation } from "../character/populationDomain.js";
 import { normalizeKitchenState } from "../tavern/cookingDomain.js";
 import { createFreshFarmState, normalizeFarmState } from "../resources/farmingDomain.js";
 import { normalizeTavernServiceState } from "../tavern/tavernServiceDomain.js";
@@ -19,7 +20,7 @@ import {
   resetInventory,
 } from "../inventory/inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 12;
+export const SESSION_STATE_VERSION = 13;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -177,6 +178,7 @@ function normalizeGameplayState(value = {}) {
     worldTimeSeconds,
     farm: normalizeFarmState(value.farm ?? createFreshFarmState(worldTimeSeconds), worldTimeSeconds),
     needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
+    population: normalizePopulation(value.population, { worldTimeSeconds }),
     kitchen,
     tavernService,
     tavernOpen: normalizeBoolean(value.tavernOpen, false, "Tavern open"),

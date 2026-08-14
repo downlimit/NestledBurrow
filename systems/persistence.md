@@ -8,7 +8,7 @@ This system separates player session progress from developer-authored project de
 
 `src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, peaceful inventory, combat loadout, dropped items, resources, farm/water state, kitchen serving stock and repair, tavern sign, guest service snapshots and coins. Selected slot and in-flight presentation state are transient.
+Session data includes player/world progress, needs, the persistent population with per-person evaluation timestamps, peaceful inventory, combat loadout, dropped items, resources, farm/water state, kitchen serving stock and repair, tavern sign, guest service snapshots and coins. Selected slot and in-flight presentation state are transient.
 
 ## Authoring data
 
@@ -27,6 +27,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 - schema v10 preserves active guest IDs and matching reservations; orphan reservations are discarded;
 - schema v10 migrates once to v11 by adding an empty ten-slot combat loadout; later drag swaps persist the single physical item owner across peaceful and combat slots;
 - schema v11 migrates once to v12 by moving one legacy serving portion under the canonical table ID and returning overflow portions to inventory or the world; guest snapshots persist serving and dining table assignments;
+- schema v12 migrates once to v13 by creating the valid 16-person Stage-1 population at the saved world time;
 - the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
 - dropped items persist only stable ID, item payload and logical position;
 - selected slot, in-flight drag state, throw arc, gain feedback and fade timers are not persisted;
@@ -34,7 +35,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v12 save/reload and migrations work. Peaceful inventory, combat loadout, dropped items, farm water/crops, per-table kitchen stock/repair and active table-routed service snapshots survive reload. Authoring backups survive page reload and `NEW GAME`.
+Schema v13 save/reload and migrations work. Stable population IDs, names, all six canonical needs and evaluation timestamps survive reload alongside peaceful inventory, combat loadout, dropped items, farm water/crops, per-table kitchen stock/repair and active table-routed service snapshots. Authoring backups survive page reload and `NEW GAME`.
 
 ## Not yet
 
@@ -42,4 +43,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, domain-specific checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, domain-specific checks, `check:authoring`, persistence Browser E2E.

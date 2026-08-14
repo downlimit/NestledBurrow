@@ -77,7 +77,7 @@ const legacy = createFreshGameSessionState();
 legacy.version = 4;
 delete legacy.gameplay.tavernOpen;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 4, state: legacy }));
-assert.equal(SAVE_SCHEMA_VERSION, 12);
+assert.equal(SAVE_SCHEMA_VERSION, 13);
 assert.equal(migrated.status, "loaded");
 assert.equal(migrated.state.gameplay.tavernOpen, false);
 assert.equal(migrated.state.gameplay.coins, 0);

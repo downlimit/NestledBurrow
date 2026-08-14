@@ -4,7 +4,7 @@
 
 Owns movement, time, sleep, energy and the canonical `0..100` need set. HUD order for the player: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure; no passive bonus stack.
 
-The same need dimensions and meanings are the target contract for persistent people in the population. The current runtime applies the full implementation to the player; visitor/NPC adoption is future work and may use person-specific rates without inventing a separate need vocabulary.
+The same need dimensions and meanings apply to persistent people in the population. The player keeps the full live runtime; offscreen people use bounded coarse reconstruction and future visible NPC behavior may use person-specific rates without inventing a separate need vocabulary.
 
 ## Shared person need contract
 
@@ -96,8 +96,8 @@ The target need is protected through exit; recovery is active-only. Normal cance
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes. Persistent-person use of the same need vocabulary is a target contract and is not yet implemented.
+`src/needs/needsDomain.js` owns canonical need IDs and player formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. `src/character/populationDomain.js` owns the 16-person Stage-1 baseline, population normalization and deterministic coarse offscreen reconstruction for all six needs. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:interaction`; focused browser E2E.

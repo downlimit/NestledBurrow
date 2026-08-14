@@ -13,6 +13,7 @@
 |---|---|---|---|
 | локации, переход Нора ↔ Гнездо, world bounds, location lifecycle и explicit transport-free transitions | `systems/world-and-resources.md` + `systems/character-and-needs.md` | `src/world/worldLocationConfig.js`, `src/world/worldLocationCoordinator.js`, `src/world/worldLocationRuntime.js`, `src/world/worldPresentationRuntime.js`, `src/world/puddleRuntime.js`, `src/world/puddleDomain.js`, `src/world/nestWorldLayout.js`, `src/world/atollWorldLayout.js` | `check:task-059`, `check:task-065`, `check:task-069`, focused location Browser E2E |
 | движение, joystick, камера, сон, потребности | `systems/character-and-needs.md` | `src/character/characterMotor.js`, `src/controls/input.js`, `src/controls/mobileJoystick.js`, `src/character/cameraFollowRuntime.js`, `src/interaction/interactionApproach.js`, `src/needs/needsDomain.js`, `src/needs/needsRuntime.js`, `src/needs/needsFlowRuntime.js`, `src/needs/interactionTimelineRuntime.js`, `src/needs/toiletAccidentTimelineRuntime.js`, `src/needs/needsInteractionCoordinator.js` | `check:input`, `check:interaction`, `check:movement`, `check:needs`, `check:task-061` |
+| persistent population, person state, offscreen needs reconstruction | `systems/character-and-needs.md` + `systems/persistence.md` | `src/character/populationDomain.js`, `src/session/gameSessionState.js`, `src/session/sessionPersistence.js`, `src/devtools/e2eBridge.js` | `check:task-086`, focused population Browser E2E |
 | Дикий Атолл, полная схема Шхер/Гротов, NPC-переймы, Моту, Голубая дыра и сегменты T1-T3 | `systems/wild-atoll.md` | `src/world/atollWorldLayout.js`, `src/world/wildAtollDomain.js`, `src/world/wildAtollRuntime.js`; `WildAtollPrototype/` остаётся standalone design aid | `check:task-059`, `check:task-068`, `check:docs` |
 | ресурсы, добыча, world interactions, инвентарь, выброшенные предметы, огород, вода, растения | `systems/world-and-resources.md` | `src/interaction/interaction.js`, `src/interaction/interactionRuntime.js`, `src/interaction/worldInteractionCoordinator.js`, `src/resources/resourceDomain.js`, `src/resources/debrisRuntime.js`, `src/inventory/inventoryDomain.js`, `src/inventory/inventoryRuntime.js`, `src/resources/farmingDomain.js`, `src/resources/farmingRuntime.js` | `check:inventory`, `check:world`, `check:interaction`, `check:task-047`, `check:task-049`, `check:task-056`, `check:task-064` |
 | готовка, кухня, вывеска, гости, монеты | `systems/tavern-service.md` | `src/tavern/cookingDomain.js`, `src/tavern/kitchenInteractionRuntime.js`, `src/facilities/facilityRuntime.js`, `src/tavern/guestRuntime.js`, `src/tavern/tavernServiceRuntime.js`, `src/tavern/coinRuntime.js` | `check:cooking`, `check:guest`, `check:facilities`, `check:task-049` |
@@ -26,7 +27,7 @@ Production-модули сгруппированы по игровому или 
 
 | Owner | Канонический каталог |
 |---|---|
-| персонажи, motor, controllers и character presentation | `src/character/` |
+| персонажи, persistent population, motor, controllers и character presentation | `src/character/` |
 | потребности и их timelines | `src/needs/` |
 | interaction selection, dialogue и world dispatch | `src/interaction/` |
 | layouts, locations, Дикий Атолл и world presentation | `src/world/` |

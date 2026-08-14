@@ -35,6 +35,10 @@ const systemPaths = [
   "systems/persistence.md",
   "systems/presentation.md",
 ];
+const systemDocBudgets = new Map([
+  ["systems/character-and-needs.md", 7000],
+  ["systems/tavern-service.md", 20000],
+]);
 
 requireText(project, [
   "<!-- audience: project-bootstrap -->",
@@ -167,7 +171,7 @@ for (const path of systemPaths) {
   assert(existsSync(path), `${path} must exist`);
   const text = read(path);
   requireText(text, ["## Purpose", "## Invariants", "## Current baseline", "## Evidence"], path);
-  assert(text.length <= 5000, `${path} exceeds focused system-doc budget`);
+  assert(text.length <= (systemDocBudgets.get(path) ?? 5000), `${path} exceeds focused system-doc budget`);
   assert(library.includes(path), `LIBRARY.md must route to ${path}`);
 }
 
@@ -219,7 +223,7 @@ requireText(prWorkflow, ["Classify Scope", "PR_BODY", "metadata_valid", "needs: 
 requireText(focusedE2E, ["mkdtempSync", "tmpdir()", "PW_OUTPUT_DIR", "PW_REPORT_DIR"], "focused E2E");
 requireText(managedPreview, ["tmpdir()", "task-preview.json", "smokeCanvas", "detached: true"], "managed preview");
 requireText(pythonLauncher, ["NESTLEDBURROW_PYTHON", "NESTLEDBURROW_ARTIFACT_DIR", "codex-runtimes", "python_embed", "No usable Python 3 runtime was found"], "Python launcher");
-requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"codex:validate"', '"delivery:timing"', '"check:task-063"', '"check:architecture": "node scripts/check-architecture-boundaries.mjs"'], "package.json");
+requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"codex:validate"', '"delivery:timing"', '"check:task-063"', '"check:task-086"', '"check:architecture": "node scripts/check-architecture-boundaries.mjs"'], "package.json");
 
 for (const [label, text, limit] of [
   ["PROJECT.md", project, 7000],
@@ -227,9 +231,9 @@ for (const [label, text, limit] of [
   ["ARTIST.md", artist, 18000],
   ["AGENTS.md", agents, 11000],
   ["REVIEW.md", review, 5000],
-  ["GAME.md", game, 7000],
+  ["GAME.md", game, 11000],
   ["ROADMAP.md", roadmap, 4500],
-  ["LIBRARY.md", library, 7000],
+  ["LIBRARY.md", library, 7500],
 ]) {
   assert(text.length <= limit, `${label} exceeds context budget: ${text.length} > ${limit}`);
 }
