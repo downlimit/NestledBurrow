@@ -2,7 +2,17 @@
 
 ## Purpose
 
-Owns movement, time, sleep, energy and `0..100` needs. HUD order: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure; no passive bonus stack.
+Owns movement, time, sleep, energy and the canonical `0..100` need set. HUD order for the player: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure; no passive bonus stack.
+
+The same need dimensions and meanings are the target contract for persistent people in the population. The current runtime applies the full implementation to the player; visitor/NPC adoption is future work and may use person-specific rates without inventing a separate need vocabulary.
+
+## Shared person need contract
+
+- A persistent person uses the same canonical need dimensions as the player: novelty, energy, satiety, toilet, lustre and dialogue/social contact.
+- Offscreen people are not simulated frame by frame. Their last stored need state and evaluation time are persisted, then reconstructed when the person becomes relevant again: visit consideration, scene appearance, phone contact, invitation or another explicit interaction.
+- Reconstruction uses elapsed world time plus bounded variation and may later use individual traits, age or lifestyle. It must preserve the same `0..100` meanings as live needs.
+- While physically present, a person's needs are live and may drive behavior. Different people can therefore arrive with several simultaneous pressures rather than a single scripted reason.
+- Sharing the need vocabulary does not require every NPC to use the player's exact drain rates, motor penalties or accident presentation. Those remain role-specific behavior layered on the same state semantics.
 
 ## Time, energy and satiety
 
@@ -86,7 +96,7 @@ The target need is protected through exit; recovery is active-only. Normal cance
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
+`src/needs/needsDomain.js` owns formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes. Persistent-person use of the same need vocabulary is a target contract and is not yet implemented.
 
 ## Evidence
 

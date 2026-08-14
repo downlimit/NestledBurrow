@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This system owns kitchen transformation, service facilities, tavern opening, visitor demand, guest behavior and payment feedback.
+This system owns kitchen transformation, service facilities, tavern opening, venue offer, visitor demand, guest behavior and payment feedback.
 
 ## Player-visible contract
 
@@ -11,98 +11,147 @@ potato → preparation → frying → serving table → dine-in guest → 4 coin
 lemon + bucket water → juicer → serving table → takeout guest → 2 coins
 ```
 
-The current stock-triggered guest flow is a technical baseline. The intended model reverses that causality: a persistent person first decides to visit, then creates demand that the tavern may or may not satisfy.
+The current stock-triggered guest flow is a technical baseline. The intended model reverses that causality: a persistent person first has a reason to go out, considers the venue, then creates demand that the venue may or may not satisfy.
 
 ## Demand terminology
 
-These terms are canonical. They describe different stages of the same person and must not be used interchangeably.
+These terms are canonical. They describe different layers of the same system and must not be used interchangeably.
 
-- **Visitor population (`visitorPopulation`)** — the finite persistent set of people who can visit the player's tavern. These are recurring people, not disposable customer instances. The initial target scale is roughly one hundred people, but the exact count remains a balance parameter.
-- **Visitor (`visitor`)** — one persistent person from that population, whether currently visible or not. A visitor keeps stable identity, preferences, spending capacity, social influence, visit history and the last stored state of their needs.
-- **Candidate (`candidate`)** — a visitor currently being considered for a possible visit. Becoming a candidate does not guarantee arrival.
-- **Guest (`guest`)** — a visitor who has actually committed to a visit and entered the live tavern flow. A guest keeps the same persistent identity as the visitor they came from.
-- **Needs (`needs`)** — changing personal pressures such as hunger, toilet, social contact, energy and novelty. Hunger is the primary reason to consider a food visit; other needs can alter the decision or create additional behavior after arrival.
-- **Visit opportunity (`visitOpportunity`)** — one chance for somebody in the population to consider the tavern. This is the unit produced by popularity over time. It is not a spawned customer.
-- **Popularity (`popularity`)** — how widely known and considered the tavern is. It controls the frequency of visit opportunities. It does not directly make a specific person like the tavern, increase their budget or guarantee a visit.
-- **Menu fit (`menuFit`)** — how well the currently offered dishes fit one person's food preferences and spending capacity. A large inventory outside the active menu does not improve menu fit.
-- **Visit memory (`visitMemory`)** — that person's remembered experience of prior visits: whether service was completed, how satisfied they were and how recently they visited. It affects later decisions by the same person.
-- **Recent-visit suppression (`recentVisitSuppression`)** — a soft temporary reduction in the chance that the same person returns immediately. It fades with world time rather than acting as a hard cooldown.
-- **Audience profile (`audienceProfile`)** — the accumulated tendency of the tavern to attract particular kinds of people. Repeatedly satisfying visitors with similar tastes can increase future representation of similar tastes among candidates. This changes the composition of demand, whereas popularity changes its volume.
-- **Spending capacity (`spendingCapacity`)** — the amount or price range a person is willing and able to spend. It belongs to the visitor, not to tavern popularity.
-- **Influence (`influence`)** — how strongly one person's completed experience can affect popularity and the audience profile. It does not change the value of the meal they personally bought.
-- **Potential demand (`potentialDemand`)** — people who currently want and are willing to visit before physical tavern constraints are applied.
-- **Service capacity (`serviceCapacity`)** — how many of those willing visitors the tavern can actually accept and process, given seats, kitchen throughput, staff and other physical limits. Popularity may exceed service capacity without creating impossible simultaneous crowds.
+- **Population (`population`)** — the finite persistent set of people in the save. People are recurring identities rather than disposable customer instances. The initial target scale is roughly one hundred people, while the exact count remains a balance parameter. Population lifecycle belongs to the broader product contract; this system consumes people as potential visitors.
+- **Person (`person`)** — one persistent individual from the population whether currently visible or not. A person keeps stable identity, needs, preferences, spending capacity, relationships and personal history.
+- **Candidate (`candidate`)** — a person currently considering this venue. Becoming a candidate does not guarantee arrival.
+- **Guest (`guest`)** — a person who has committed to a visit and entered the live venue flow. A guest keeps the same persistent identity and state as the person they came from.
+- **Needs (`needs`)** — the canonical person needs defined by `systems/character-and-needs.md`. Food uses satiety/hunger as its main motive, but social contact, novelty, energy, toilet and lustre can also affect a visit or create behavior after arrival.
+- **Visit motive (`visitMotive`)** — the concrete reason a person is considering the venue now. Hunger can create a food motive; future attractions such as karaoke, sauna, jacuzzi, exhibitions or other profession-specific services can satisfy different motives.
+- **Visit opportunity (`visitOpportunity`)** — one chance for someone in the population to consider the venue. Popularity controls how often opportunities occur; an opportunity is not a spawned customer.
+- **Popularity (`popularity`)** — how widely known and considered the venue is. It controls reach and therefore the volume of visit opportunities. It does not directly make a person like the venue, alter their wealth or guarantee arrival.
+- **Reputation profile (`reputationProfile`)** — what the venue is known for. Reputation is descriptive rather than a single good/bad score: a rowdy place can repel one person while attracting another. Food style, calmness, social intensity, cleanliness, art focus or frequent conflict can all become relevant reputation dimensions later.
+- **Personal venue opinion (`venueOpinion`)** — one person's own current attitude toward the venue, derived from remembered visits and direct interactions. Positive and negative opinions both drift gradually toward neutral when no reinforcing experience occurs.
+- **Venue offer (`venueOffer`)** — what the venue currently promises or makes available: active menu items, displayed takeout goods, self-service food, entertainment, facilities, exhibitions or other supported services. Inventory that is not actually offered does not attract demand.
+- **Food preference (`foodPreference`)** — a layered taste profile. Current target order is cuisine/origin as the strongest level, dish class such as hot food/cold food/drinks/desserts as the next level, and individual ingredients as the finer level. Exact weights are balance parameters.
+- **Offer fit (`offerFit`)** — how well the current venue offer fits one person's motive, tastes and spending capacity. Prices are fixed by the game; affordability affects selection but is not itself a service failure.
+- **Visit memory (`visitMemory`)** — the person's remembered history with the venue: completed service, satisfaction, conflicts, purchases and recency.
+- **Recent-visit suppression (`recentVisitSuppression`)** — a soft temporary reduction in immediate repeat visits. It fades with world time rather than acting as a hard cooldown.
+- **Spending capacity (`spendingCapacity`)** — the price range a person is willing and able to pay. It belongs to the person, not to popularity.
+- **Influence (`influence`)** — how strongly a person's experience can spread through future social/reputation systems. It does not change the nominal value of their purchase.
+- **Potential demand (`potentialDemand`)** — people who currently want and are willing to visit before physical venue constraints are applied.
+- **Service capacity (`serviceCapacity`)** — how much willing demand the venue can actually process given seats, counters, kitchen throughput, staff, queues and other physical limits.
+- **Group (`group`)** — two or more persistent people who choose to visit together. Group visits are a target behavior; group composition can create additional seating, social and service constraints.
+- **Audience composition (`audienceComposition`)** — a derived description of the kinds of real people who currently tend to visit. It is not a separate spendable stat or a magic attraction score. It emerges from popularity, reputation, individual needs/preferences/opinions, time of operation and eventually social communication between people.
 
 ## How demand is formed
 
 The causal order is fixed even though the eventual balance formulas are not yet fixed.
 
 ```text
-tavern is open
+venue is open or scheduled open
 → popularity produces a visit opportunity
-→ one persistent visitor becomes a candidate
-→ offscreen needs are reconstructed for that person
-→ current hunger and other needs are evaluated
-→ active menu is compared with that person's tastes and budget
-→ their own visit memory and recent-visit suppression are applied
-→ the person decides whether to visit
+→ one persistent person becomes a candidate
+→ that person's offscreen needs are reconstructed
+→ current needs create one or more possible visit motives
+→ venue offer is compared with motive, tastes and spending capacity
+→ reputation fit, personal venue opinion and recent-visit suppression are applied
+→ the person decides whether to visit, alone or eventually with a group
 → service capacity determines whether the visit can currently be accepted
 → the same persistent person enters the world as a guest
-→ live needs and service behavior run during the visit
-→ the completed experience updates that person's memory
-→ satisfaction may change popularity and audience profile, weighted by influence
+→ all of that person's needs become live while present
+→ service, facilities and other people produce an actual experience
+→ the visit updates personal memory and opinion
+→ the experience may affect popularity and reputation and later spread socially
 ```
 
-The system therefore separates **volume** from **composition**:
+The system separates four different questions:
 
-- popularity answers **how often the tavern gets a chance to attract somebody**;
-- the visitor's current state answers **whether this concrete person wants to go out now**;
-- menu, prices, preferences and memory answer **whether this concrete tavern is suitable for them**;
-- audience profile answers **which kinds of people become more represented among future candidates**;
-- service capacity answers **how much of existing demand can actually be converted into served guests and money**.
+- **Reach:** popularity answers how often the venue gets considered.
+- **Motive:** the person's reconstructed needs answer why they want to go somewhere now.
+- **Choice:** offer, tastes, budget, reputation and personal opinion answer why they choose this venue or reject it.
+- **Conversion:** service capacity and actual service answer how much potential demand becomes completed visits and money.
 
-Higher popularity must not silently create wealthier people. Expensive demand grows when the tavern becomes attractive to existing visitors with higher spending capacity and suitable preferences.
+Higher popularity must not silently create wealthier people. Expensive demand grows when the venue becomes suitable for existing people with higher spending capacity and matching motives.
+
+A failed match also matters without requiring a punitive score. A person who arrives or considers the venue and finds nothing suitable simply creates missed revenue; repeated mismatches can later reduce similar future demand through personal memory, reputation and social propagation. Audience composition is the visible result of those individual mechanisms rather than an independently manipulated number.
 
 ## Persistent people without full offscreen simulation
 
-Visitors remain real persistent people even while offscreen, but their complete life is not simulated frame by frame.
+People remain persistent while offscreen, but their complete life is not simulated frame by frame.
 
-For each visitor the save keeps the last relevant state and time of evaluation. When that person next becomes a candidate, their current needs are reconstructed from:
+For each person the save keeps the last relevant state and evaluation time. When that person becomes relevant again — visit consideration, scene appearance, phone contact, invitation or another explicit interaction — their current state is reconstructed from the stored state, elapsed world time, person-specific traits when available and bounded variation.
 
-1. the stored need values;
-2. elapsed world time;
-3. that person's own need rates or traits when such traits exist;
-4. bounded variation so different visits do not become mechanically identical.
+Population members may later form relationships and families, age, reproduce and die through coarse offscreen progression. If the living population drops below the target range, new people may be generated to restore the population. Those lifecycle rules are broader than tavern service but the resulting people remain the same persistent identities consumed by demand.
 
-While the person is physically present, their needs and behavior are live. A guest may therefore arrive hungry while also needing the toilet, social contact or rest, creating situations that are not authored as one-off scripts.
+While a person is physically present, all canonical needs are live. A guest may therefore arrive hungry while also urgently needing the toilet, wanting social contact or lacking energy. These combinations should create systemic situations rather than authored customer scripts.
 
-This reconstruction is an optimization boundary, not a fiction boundary: the game treats the visitor as the same person before, during and after every visit.
+## Venue formats
 
-## Responsibility and negative feedback
+The target system supports several ways to turn an allod into a functioning venue. These are behavioral patterns produced by offer and infrastructure, not necessarily explicit mode switches.
 
-- A closed tavern creates no penalty because it has accepted no obligation.
-- An unavailable dish before an order is accepted creates no service failure.
-- Once the tavern accepts an order or equivalent commitment, failure to fulfill it may reduce satisfaction and affect future memory, popularity or audience profile.
-- Missed revenue is already a consequence of demand that the tavern cannot serve; extra reputation punishment is added only for an actual failed commitment.
+- **Takeaway / unattended retail:** displayed food, refrigerator, counter or vending-style device; people inspect available goods, buy and leave with little or no table service.
+- **Cafe / restaurant / bar:** the player chooses an active menu, prepares stock, opens the venue, accepts orders and serves them; some food can be prepared on demand.
+- **Buffet / event:** people pay a fixed admission price, serve themselves from prepared food, socialize and use the venue's activities. A future exhibition can use satisfaction and interest to affect the chance of buying player-made art.
+- **Canteen / self-service:** food is produced in larger batches; people choose portions, pay, sit, eat and leave with low per-person service overhead.
+
+The first implemented format remains food service. Additional entertainment such as karaoke, sauna or jacuzzi can later become part of `venueOffer`, allowing people to consider the place for motives other than hunger. The same broader structure should eventually support non-food professions such as a gallery or repair business without forcing those professions to copy restaurant service.
+
+## Food offer and pricing
+
+- Prices are fixed by the game. The player does not manually set dish prices in the target design.
+- The player controls what is actually offered, its quality, quantity and the venue's capacity to fulfill demand.
+- Food preference has several layers: cuisine/origin first, broad dish class second, ingredients third. Exact scoring remains a balance decision.
+- A person may enter or inspect the offer and buy nothing. This is a normal mismatch, not automatically a reputation penalty.
+- Better crop quality and better cooking execution may raise food quality later and therefore satisfaction, while leaving the nominal price rule simple unless a future explicit product decision changes it.
+
+## Opening hours and audience
+
+Early play uses direct `OPEN/CLOSED` control. A later automated venue may support a schedule.
+
+Opening time affects audience composition through real people rather than a special night multiplier. Repeatedly operating at night naturally gives more opportunities to people whose schedules, needs or preferences make night visits plausible. A closed venue creates no penalty because no service obligation was accepted.
+
+## Experience and negative feedback
+
+A completed or attempted visit can be affected by:
+
+- waiting too long after an accepted order;
+- receiving the wrong order;
+- unavailable or inadequate toilet access when the person needs it;
+- dirt or poor cleanliness;
+- lack of seating or usable space;
+- low-quality ingredients or poor cooking quality;
+- direct conflict with the player;
+- conflict with other guests.
+
+These effects are not universally negative for every person. Reputation can make some traits attractive to a matching audience; for example, a venue known for loud drinking and frequent fights can be popular with people who actively prefer that environment while remaining unattractive to others.
+
+An unavailable dish before an order is accepted is not a service failure. Once the venue accepts an order or equivalent commitment, failure to fulfill it can reduce satisfaction and personal opinion and may later affect popularity or reputation.
+
+## Social depth
+
+The first demand implementation does not require full Sims-like social simulation, but the persistent-person model must leave room for it.
+
+- Individual people can become recognizable repeat visitors and later friends or romantic partners of the player.
+- The player may eventually phone people, ask how they are and invite them over; any such direct contact reconstructs that person's offscreen state before interaction.
+- Guests can later talk to one another, form relationships, argue, fight and change each other's opinions.
+- Word of mouth should ultimately be grounded in these people and their connections. It is a narrative realization of the same demand feedback, not a separate currency.
 
 ## First implementation slice
 
 The first playable replacement for anonymous stock-triggered spawning should prove identity and demand causality before implementing the whole simulation.
 
-It should use a small persistent test population and only these visitor properties:
+Use a small persistent test population rather than the final target scale. Store the full canonical need state from the start, but initially let only satiety/hunger participate in the visit decision. Add only the minimum other properties required to make the choice meaningful:
 
 - stable identity;
-- hunger;
-- food preferences;
+- canonical need state and last evaluation time;
+- layered food preferences;
 - spending capacity;
 - last visit time / recent-visit suppression;
-- simple visit memory.
+- simple personal venue opinion and visit memory.
 
-Popularity may initially use one simple tunable opportunity rate. Secondary needs, influence, audience-profile learning and richer popularity curves are deliberately deferred until persistent visitors can already decide to visit from hunger + menu fit + budget + memory and then complete the existing service flow.
+Popularity may initially use one simple tunable opportunity rate. Rich reputation propagation, groups, multiple visit motives, social influence, population lifecycle and complex popularity curves are deliberately deferred until a known persistent person can already decide to visit from hunger + active food offer + budget + memory and then complete the existing service flow.
 
-The first success criterion is therefore:
+The first success criterion is:
 
-> Opening the tavern no longer creates a compatible anonymous customer because food exists. It gives known persistent people opportunities to consider the tavern; a concrete person chooses to visit for understandable reasons and returns later as the same person.
+> Opening the tavern no longer creates a compatible anonymous customer because food exists. It gives known persistent people opportunities to consider the venue; a concrete person chooses to visit for understandable reasons and returns later as the same person.
+
+The early player-facing priority is optimization and development: improve production, offer and capacity. Discovering individual people becomes the second layer; emergent need/social chaos becomes the third.
 
 ## Owners
 
@@ -134,7 +183,7 @@ Potato preparation/frying and lemon juicing feed real inventory items into indep
 
 ## Not yet
 
-Recipe book, broader ingredient variety, storage, persistent visitor population, need-driven demand, visitor preferences/budgets/influence, popularity and audience profile, configurable prices, staff and venue style/audience.
+Recipe book, broader ingredient variety, storage, persistent population, need-driven demand, visitor preferences/budgets/influence, popularity/reputation, venue offer/menu, group visits, social propagation, configurable schedules, staff and broader venue formats.
 
 ## Evidence
 
