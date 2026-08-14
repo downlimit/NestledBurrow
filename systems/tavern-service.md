@@ -11,7 +11,7 @@ potato → preparation → frying → serving table → dine-in guest → 4 coin
 lemon + bucket water → juicer → serving table → takeout guest → 2 coins
 ```
 
-The current stock-triggered guest flow is a technical baseline. The intended model reverses that causality: a persistent person first has a reason to go out, considers the venue, then creates demand that the venue may or may not satisfy.
+Stage 3 uses the target causality: a persistent person first has a reason to go out, considers the menu, then creates demand that available stock may or may not satisfy.
 
 ## Demand terminology
 
@@ -104,7 +104,7 @@ The first implemented format remains food service. Additional entertainment such
 
 Early play uses direct active/inactive control; a later automated venue may support a schedule. The sign always opens one compact panel whose pill switch is labeled **`Меню активно` / `Меню неактивно`** (`Menu active / Menu inactive`) and directly controls service. Closing the panel, including with `Space` or `Escape`, preserves that state. Dish editing is locked while active. Its bounded two-row list scrolls by wheel or touch swipe when more products are added.
 
-The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and current anonymous guests can reserve only stocked items active in the offer. Opening time later affects audience composition through real people; an inactive venue creates no penalty.
+The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. An inactive venue produces no opportunities or penalty.
 
 ## Experience and negative feedback
 
@@ -148,9 +148,9 @@ Validation proceeds through observable slices that may be revised after playtest
 
 Early play prioritizes optimization, then recognizable people, then need-driven social situations.
 
-## First implementation stage
+## Implemented stages
 
-Stage 1 proves that 16 persistent people exist independently of tavern demand. Each has a stable ID/name, all six canonical needs and a saved evaluation time. Coarse deterministic reconstruction reacts to elapsed world time without replaying hidden life or collapsing everyone to zero; save/reload and the developer inspection path preserve the result. Food preferences, budgets, venue opinion, visits, relationships, ageing and replenishment remain later stages.
+Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 persists the active food offer and unifies sign interaction in one menu panel. Stage 3 gives every person a stable budget/taste profile and replaces stock-driven waves with one-person visit opportunities: the selected person's state is reconstructed, satiety creates food motive, menu prices/tastes produce offer fit, recent completed service softens repeat chance, and one roll yields `VISIT` or `NO_VISIT`. The resulting diagnostic breakdown is developer-only.
 
 ## Owners
 
@@ -161,10 +161,11 @@ Stage 1 proves that 16 persistent people exist independently of tavern demand. E
 - sign: `src/tavern/tavernSignRuntime.js`, `src/tavern/guestConfig.js`;
 - guest flow/pathing: `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`;
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
+- visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags: `src/tavern/saleProfileDomain.js`;
 - active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
 - guest reaction/carried-item presentation: `src/tavern/guestFeedback.js`;
 - payment: `src/tavern/coinRuntime.js`;
-- persistent people and offscreen needs: `src/character/populationDomain.js` (external owner; tavern consumption begins in a later stage);
+- persistent people, budgets/preferences and offscreen needs: `src/character/populationDomain.js` (external owner consumed through its public evaluation API);
 - `WorldScene` composes owners and delegates updates and callbacks.
 
 ## Invariants
@@ -175,19 +176,21 @@ Stage 1 proves that 16 persistent people exist independently of tavern demand. E
 - the build-mode movable tavern sign owns one live position shared by its visual, collider, interaction and guest check point;
 - sign interaction always opens the same menu panel; active/inactive service state is controlled only by the panel switch in Stage 2;
 - sign, stock reservation and service lifecycle cannot contradict each other;
-- the current technical baseline uses persisted guest IDs, waves of one or two every three to eight seconds, at most six active visits and stock-triggered spawning; this rule is intentionally superseded by the target demand model when that model is implemented;
-- `venueOffer` is the venue's explicit promise and remains independent from physical kitchen stock; current anonymous guests may reserve only stocked portions whose item is active in the offer;
+- an active menu produces one opportunity every three to eight real seconds; it evaluates exactly one non-visiting persistent person and a refusal does not select a replacement;
+- `venueOffer` remains independent from physical stock: stock cannot create or block demand, and a person who visits with zero acceptable stock arrives then leaves without purchase or negative opinion;
+- a live visit keeps separate technical `guestId` and stable `personId`; one person cannot have two active visits, and fulfillment may reserve only the decision's `acceptableItemIds`;
+- successful purchase records one completed visit and world-time timestamp under tavern-owned `visitorHistoryByPersonId`; an unfulfilled visit does not change history;
 - dine-in guests reserve distinct dining-table IDs before consuming a dish; a table currently used by the player is excluded from new seat assignments, and the player cannot start using a guest-reserved table;
 - lemonade is takeout worth two coins; a fried potato dish is dine-in worth four.
 
 ## Current baseline
 
-Potato preparation/frying and lemon juicing feed real inventory items into independently stocked single-portion serving tables. A finite six-lemon starter sack, persistent stove repair, table-routed multi-guest service, lemonade takeout, conflict-free potato dine-in and value-bearing coin rewards work end-to-end. The tavern sign always opens the same active-food panel; fried potato and lemonade can be selected independently while its activity switch is off. Current anonymous stock-triggered guests ignore portions outside that offer. A separate persisted 16-person population exists with coarse need reconstruction; current guest spawning and service do not consume it yet.
+Potato and lemonade feed independently stocked serving tables with existing dine-in/takeout, reservations, pathing and coin rewards. The sign panel owns offer/activity. New guests now originate only from active-menu opportunities and carry a persistent person identity; decisions use reconstructed satiety, the canonical 4/2 prices, layered preferences and recent completed visits. Physical stock is consulted only after arrival, so missing or unsuitable stock produces a visible visit without purchase.
 
 ## Not yet
 
-Recipe book, broader ingredient variety, storage, population-backed need-driven demand, visitor preferences/budgets/influence, popularity/reputation, group visits, social propagation, configurable schedules, staff and broader venue formats.
+Real orders/fulfillment commitments, recipe book, broader ingredients/storage, influence, popularity/reputation/opinion, group visits, social propagation, configurable schedules, staff and broader venue formats.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`; focused service and population Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`; focused service and population Browser E2E.

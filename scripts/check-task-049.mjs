@@ -57,15 +57,13 @@ import { STARTER_TREE_OBJECTS } from "../src/build/startingLayout.js";
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
 import {
   GUEST_ACTIVE_CAP,
-  allowedGuestWaveSize,
-  sampleGuestSpawnDelay,
-  sampleGuestWaveSize,
+  sampleVisitOpportunityDelay,
 } from "../src/tavern/tavernServiceDomain.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-assert.equal(SESSION_STATE_VERSION, 14);
-assert.equal(SAVE_SCHEMA_VERSION, 14);
+assert.equal(SESSION_STATE_VERSION, 15);
+assert.equal(SAVE_SCHEMA_VERSION, 15);
 assert.deepEqual(INVENTORY_TOOL_IDS, ["axe", "pickaxe", "hoe", "water-bucket", "sword", "battle-axe"]);
 for (const id of ["pickaxe", "water-bucket", "lemon-seed", "lemon", "sliced-potato", "lemonade", "fried-potato-dish"]) {
   assert(INVENTORY_ITEM_IDS.includes(id), `inventory contains ${id}`);
@@ -206,12 +204,9 @@ for (const value of [0, 0.999999]) {
 
 assert.equal(POTATO_SEED_PRICE, 1);
 assert.equal(LEMON_SEED_PRICE, 2);
-assert.equal(sampleGuestSpawnDelay(() => 0), 3_000);
-assert(sampleGuestSpawnDelay(() => 0.999999) < 8_001);
-assert.equal(sampleGuestWaveSize(() => 0), 1);
-assert.equal(sampleGuestWaveSize(() => 0.999999), 2);
-assert.equal(allowedGuestWaveSize({ requested: 2, activeGuests: 5, unreservedPortions: 4 }), 1);
-assert.equal(allowedGuestWaveSize({ requested: 2, activeGuests: GUEST_ACTIVE_CAP, unreservedPortions: 4 }), 0);
+assert.equal(sampleVisitOpportunityDelay(() => 0), 3_000);
+assert(sampleVisitOpportunityDelay(() => 0.999999) < 8_001);
+assert.equal(GUEST_ACTIVE_CAP, 6);
 assert.equal(normalizeCoinValue(undefined), 1);
 assert.equal(normalizeCoinValue(2), 2);
 assert.equal(normalizeCoinValue(4), 4);

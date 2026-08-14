@@ -21,7 +21,7 @@ import {
   resetInventory,
 } from "../inventory/inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 14;
+export const SESSION_STATE_VERSION = 15;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -160,7 +160,8 @@ function normalizeGameplayState(value = {}) {
     reservedToolIds: inventory.slots.filter((item) => item?.kind === "tool").map((item) => item.id),
   });
   const kitchen = normalizeKitchenState(value.kitchen ?? {});
-  const tavernService = normalizeTavernServiceState(value.tavernService ?? {});
+  const population = normalizePopulation(value.population, { worldTimeSeconds });
+  const tavernService = normalizeTavernServiceState(value.tavernService ?? {}, { population });
   const resumableReservations = new Map(tavernService.guests
     .filter((guest) => guest.reservationActive)
     .map((guest) => [guest.id, guest.servingTableId]));
@@ -179,7 +180,7 @@ function normalizeGameplayState(value = {}) {
     worldTimeSeconds,
     farm: normalizeFarmState(value.farm ?? createFreshFarmState(worldTimeSeconds), worldTimeSeconds),
     needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
-    population: normalizePopulation(value.population, { worldTimeSeconds }),
+    population,
     kitchen,
     tavernService,
     venueOffer: normalizeVenueOffer(value.venueOffer),

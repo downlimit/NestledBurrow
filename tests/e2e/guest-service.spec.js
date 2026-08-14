@@ -70,7 +70,11 @@ test("open guest reserves, eats and consumes the served dish", async ({ page }) 
   await bridge(page, "setServingDish", true);
   await openTavern(page);
   const guestId = await bridge(page, "forceGuestSpawn");
-  expect((await bridge(page, "getTavernState")).guest.reservedDish).toBe(true);
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getTavernState")).guest.reservedDish,
+    Boolean,
+  );
   await advanceUntil(
     page,
     async () => (await bridge(page, "getTavernState")).guest.state,

@@ -36,13 +36,15 @@ function assertPopulation(population) {
       assert(Number.isFinite(person.needs[needId]));
       assert(person.needs[needId] >= 0 && person.needs[needId] <= 100);
     }
+    assert([2, 4, 6].includes(person.spendingCapacity));
+    assert.equal(typeof person.foodPreferences, "object");
     assert(Number.isFinite(person.lastEvaluatedWorldTimeSeconds));
     assert(person.lastEvaluatedWorldTimeSeconds >= 0);
   }
 }
 
-assert.equal(SESSION_STATE_VERSION, 14);
-assert.equal(SAVE_SCHEMA_VERSION, 14);
+assert.equal(SESSION_STATE_VERSION, 15);
+assert.equal(SAVE_SCHEMA_VERSION, 15);
 assert.deepEqual(NEED_IDS, ["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
 
 const fresh = createFreshGameSessionState();
@@ -91,8 +93,8 @@ v12State.version = 12;
 delete v12State.gameplay.population;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 12, state: v12State }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 14);
-assert.equal(migrated.state.version, 14);
+assert.equal(migrated.schemaVersion, 15);
+assert.equal(migrated.state.version, 15);
 assertPopulation(migrated.state.gameplay.population);
 assert(migrated.state.gameplay.population.every((person) => (
   person.lastEvaluatedWorldTimeSeconds === migrated.state.gameplay.worldTimeSeconds
@@ -139,11 +141,4 @@ const bridgeSource = readFileSync("src/devtools/e2eBridge.js", "utf8");
 for (const method of ["getPopulation", "getPopulationPerson", "evaluatePopulationPerson"]) {
   assert(bridgeSource.includes(`${method}:`), `E2E bridge exposes ${method}`);
 }
-const tavernSources = [
-  "src/tavern/tavernServiceDomain.js",
-  "src/tavern/tavernServiceRuntime.js",
-  "src/tavern/guestRuntime.js",
-].map((path) => readFileSync(path, "utf8")).join("\n");
-assert(!tavernSources.includes("populationDomain"), "Stage 1 does not couple population ownership to tavern owners");
-
 console.log("Task #086 contracts OK");

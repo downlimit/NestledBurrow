@@ -14,7 +14,7 @@ import { DEFAULT_SERVING_TABLE_ID } from "../tavern/cookingDomain.js";
 import { createStage1Population, normalizePopulation } from "../character/populationDomain.js";
 import { createDefaultVenueOffer, normalizeVenueOffer } from "../tavern/venueOfferDomain.js";
 
-export const SAVE_SCHEMA_VERSION = 14;
+export const SAVE_SCHEMA_VERSION = 15;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -62,6 +62,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 11) envelope = migrateV11Envelope(envelope);
   if (envelope.schemaVersion === 12) envelope = migrateV12Envelope(envelope);
   if (envelope.schemaVersion === 13) envelope = migrateV13Envelope(envelope);
+  if (envelope.schemaVersion === 14) envelope = migrateV14Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -88,6 +89,7 @@ const migrationRegistry = new Map([
   [11, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [12, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [13, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [14, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -341,6 +343,50 @@ function migrateV13Envelope(envelope) {
   gameplay.venueOffer = gameplay.venueOffer === undefined
     ? createDefaultVenueOffer()
     : normalizeVenueOffer(gameplay.venueOffer);
+  state.gameplay = gameplay;
+  state.version = 14;
+  return { schemaVersion: 14, state };
+}
+
+function migrateV14Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const worldTimeSeconds = Number.isFinite(Number(gameplay.worldTimeSeconds))
+    ? Math.max(0, Number(gameplay.worldTimeSeconds))
+    : 0;
+  gameplay.population = normalizePopulation(gameplay.population, { worldTimeSeconds });
+  gameplay.venueOffer = normalizeVenueOffer(gameplay.venueOffer);
+  const service = isPlainObject(gameplay.tavernService) ? gameplay.tavernService : {};
+  const usedPersonIds = new Set();
+  const guests = Array.isArray(service.guests) ? service.guests.map((guest) => {
+    const requestedPersonId = typeof guest?.personId === "string" ? guest.personId : null;
+    const personId = gameplay.population.some((person) => person.id === requestedPersonId)
+      && !usedPersonIds.has(requestedPersonId)
+      ? requestedPersonId
+      : gameplay.population.find((person) => !usedPersonIds.has(person.id))?.id ?? null;
+    if (personId) usedPersonIds.add(personId);
+    const acceptableItemIds = gameplay.venueOffer.foodItemIds.filter((itemId) => (
+      !guest?.itemId || guest.itemId === itemId
+    ));
+    return {
+      ...guest,
+      personId,
+      acceptableItemIds: acceptableItemIds.length > 0
+        ? acceptableItemIds
+        : [...gameplay.venueOffer.foodItemIds],
+    };
+  }) : [];
+  gameplay.tavernService = {
+    ...service,
+    opportunityRemainingMs: Number.isFinite(service.opportunityRemainingMs)
+      ? Math.max(0, service.opportunityRemainingMs)
+      : Number.isFinite(service.spawnRemainingMs) ? Math.max(0, service.spawnRemainingMs) : 3_000,
+    visitorHistoryByPersonId: isPlainObject(service.visitorHistoryByPersonId)
+      ? service.visitorHistoryByPersonId
+      : {},
+    guests,
+  };
+  delete gameplay.tavernService.spawnRemainingMs;
   state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };

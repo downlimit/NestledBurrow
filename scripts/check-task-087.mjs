@@ -27,8 +27,8 @@ import {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-assert.equal(SESSION_STATE_VERSION, 14);
-assert.equal(SAVE_SCHEMA_VERSION, 14);
+assert.equal(SESSION_STATE_VERSION, 15);
+assert.equal(SAVE_SCHEMA_VERSION, 15);
 assert.deepEqual(SELLABLE_ITEM_IDS, ["fried-potato-dish", "lemonade"]);
 assert.deepEqual(createDefaultVenueOffer(), { foodItemIds: [...SELLABLE_ITEM_IDS] });
 assert.deepEqual(
@@ -76,8 +76,8 @@ delete v13State.gameplay.venueOffer;
 const v13Gameplay = clone(v13State.gameplay);
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 13, state: v13State }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 14);
-assert.equal(migrated.state.version, 14);
+assert.equal(migrated.schemaVersion, 15);
+assert.equal(migrated.state.version, 15);
 assert.deepEqual(migrated.state.gameplay.venueOffer, createDefaultVenueOffer());
 const migratedGameplay = clone(migrated.state.gameplay);
 delete migratedGameplay.venueOffer;
@@ -94,9 +94,9 @@ assert.deepEqual(recovered.gameplay.venueOffer, { foodItemIds: [...SELLABLE_ITEM
 assert.deepEqual(recovered.gameplay.population, corrupted.gameplay.population);
 
 const serviceSource = readFileSync("src/tavern/tavernServiceRuntime.js", "utf8");
-assert(serviceSource.includes("offeredServingTableIds()"));
-assert(serviceSource.includes("getAvailableServingPortions(sessionState.gameplay.kitchen, offeredServingTableIds())"));
-assert(serviceSource.includes("offeredServingTableIds().filter"));
+assert(serviceSource.includes("offeredServingTableIds(acceptableItemIds)"));
+assert(serviceSource.includes("isVenueOfferItemActive(sessionState.gameplay.venueOffer, itemId)"));
+assert(serviceSource.includes("acceptableItemIds.includes(itemId)"));
 const coordinatorSource = readFileSync("src/interaction/worldInteractionCoordinator.js", "utf8");
 assert(coordinatorSource.includes("venueMenuRuntime?.handleSignInteraction"));
 assert(!coordinatorSource.includes("gameplay.venueOffer") && !coordinatorSource.includes("foodItemIds"));

@@ -198,8 +198,41 @@ export function installWorldE2EBridge(scene) {
       scene.interactionRuntime?.refresh?.();
       return facility;
     },
-    forceGuestSpawn: () => getLocationOwners().guestRuntime?.forceSpawn?.(),
-    setGuestRandomValue: (value) => getLocationOwners().guestRuntime?.setRandomSource?.(() => Number(value)),
+    forceGuestSpawn: (personId) => getLocationOwners().tavernServiceRuntime?.forceGuestVisit?.(personId),
+    setGuestRandomValue: (value) => getLocationOwners()
+      .tavernServiceRuntime?.setDemandRandomSource?.(() => Number(value)),
+    getDemandProfilePerson: (personId) => {
+      const person = scene.sessionState.gameplay.population.find((candidate) => candidate.id === personId);
+      return person ? clone({
+        personId: person.id,
+        displayName: person.displayName,
+        spendingCapacity: person.spendingCapacity,
+        foodPreferences: person.foodPreferences,
+      }) : null;
+    },
+    setVisitCandidatePersonId: (personId) => getLocationOwners()
+      .tavernServiceRuntime?.setForcedCandidatePersonId?.(personId),
+    setVisitDecisionRoll: (value) => getLocationOwners()
+      .tavernServiceRuntime?.setDecisionRandomSource?.(() => Number(value)),
+    forceVisitOpportunity: (options) => clone(getLocationOwners()
+      .tavernServiceRuntime?.forceVisitOpportunity?.(options) ?? null),
+    getLastVisitDecision: () => clone(getLocationOwners().tavernServiceRuntime?.getLastDecision?.() ?? null),
+    getGuestPersonMapping: () => Object.fromEntries(
+      (getLocationOwners().guestRuntime?.getState?.().guests ?? []).map(({ id, personId }) => [id, personId]),
+    ),
+    getVisitorHistory: () => clone(getLocationOwners().tavernServiceRuntime?.getVisitorHistory?.() ?? {}),
+    setVisitOpportunityRemainingMs: (value) => {
+      scene.sessionState.gameplay.tavernService.opportunityRemainingMs = Math.max(0, Number(value) || 0);
+      return scene.sessionState.gameplay.tavernService.opportunityRemainingMs;
+    },
+    setPopulationPersonDemand: ({ personId, satiety, spendingCapacity, foodPreferences } = {}) => {
+      const person = scene.sessionState.gameplay.population.find((candidate) => candidate.id === personId);
+      if (!person) return false;
+      if (Number.isFinite(Number(satiety))) person.needs.satiety = Math.min(100, Math.max(0, Number(satiety)));
+      if (Number.isFinite(Number(spendingCapacity))) person.spendingCapacity = Number(spendingCapacity);
+      if (foodPreferences && typeof foodPreferences === "object") person.foodPreferences = clone(foodPreferences);
+      return true;
+    },
     setServingDish: (present) => {
       scene.sessionState.gameplay.kitchen.servingTables[DEFAULT_SERVING_TABLE_ID] = {
         itemId: present ? "fried-potato-dish" : null,
