@@ -8,6 +8,7 @@ import { addInventoryItem, createInventoryItem, routePickedInventoryItem } from 
 import { DEFAULT_SERVING_TABLE_ID } from "../tavern/cookingDomain.js";
 import { collides } from "../character/movement.js";
 import { needMeterValues } from "../needs/needsFlowRuntime.js";
+import { evaluatePopulationPerson } from "../character/populationDomain.js";
 
 export function installWorldE2EBridge(scene) {
   if (!import.meta.env.VITE_E2E) return null;
@@ -224,6 +225,15 @@ export function installWorldE2EBridge(scene) {
       activity: scene.getNeedsActivityContext(),
       runtime: clone(scene.needsRuntime?.getState?.() ?? {}),
     }),
+    getPopulation: () => clone(scene.sessionState.gameplay.population),
+    getPopulationPerson: (personId) => clone(
+      scene.sessionState.gameplay.population.find((person) => person.id === personId) ?? null,
+    ),
+    evaluatePopulationPerson: (personId) => clone(evaluatePopulationPerson(
+      scene.sessionState.gameplay.population,
+      personId,
+      scene.sessionState.gameplay.worldTimeSeconds,
+    )),
     setNeeds: (values) => {
       for (const [id, value] of Object.entries(values ?? {})) {
         if (!(id in scene.sessionState.gameplay.needs)) continue;

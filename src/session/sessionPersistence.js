@@ -11,8 +11,9 @@ import {
 import { DOOR_LEFT, DOOR_Y, TILE_SIZE } from "../world/worldConfig.js";
 import { STARTER_WELL, WATER_BUCKET_CAPACITY } from "../resources/farmingConfig.js";
 import { DEFAULT_SERVING_TABLE_ID } from "../tavern/cookingDomain.js";
+import { createStage1Population, normalizePopulation } from "../character/populationDomain.js";
 
-export const SAVE_SCHEMA_VERSION = 12;
+export const SAVE_SCHEMA_VERSION = 13;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -58,6 +59,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 9) envelope = migrateV9Envelope(envelope);
   if (envelope.schemaVersion === 10) envelope = migrateV10Envelope(envelope);
   if (envelope.schemaVersion === 11) envelope = migrateV11Envelope(envelope);
+  if (envelope.schemaVersion === 12) envelope = migrateV12Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -82,6 +84,7 @@ const migrationRegistry = new Map([
   [9, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [10, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [11, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [12, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -310,6 +313,20 @@ function migrateV11Envelope(envelope) {
     guest.servingTableId = guest.reservationActive ? DEFAULT_SERVING_TABLE_ID : null;
     guest.diningTableId = null;
   }
+  state.gameplay = gameplay;
+  state.version = 12;
+  return { schemaVersion: 12, state };
+}
+
+function migrateV12Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const worldTimeSeconds = Number.isFinite(Number(gameplay.worldTimeSeconds))
+    ? Math.max(0, Number(gameplay.worldTimeSeconds))
+    : 0;
+  gameplay.population = Array.isArray(gameplay.population)
+    ? normalizePopulation(gameplay.population, { worldTimeSeconds })
+    : createStage1Population(worldTimeSeconds);
   state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };

@@ -12,6 +12,7 @@
 - character motor, visual и controller разделены;
 - input и mobile joystick возвращают команды, а не владеют gameplay state;
 - needs, resources, cooking и guest flow имеют domain/runtime owners;
+- persistent population state, его нормализация и coarse offscreen-реконструкция принадлежат `src/character/populationDomain.js`; session только сохраняет и загружает результат;
 - session save JSON-safe и versioned;
 - developer authoring отделён от gameplay save;
 - HUD, camera, audio и build UI имеют lifecycle owners;
@@ -48,6 +49,12 @@
 В корне `src/` разрешены `src/main.js` и `src/style.css`. Публичные контракты `src/assets/` и `src/localization/` сохраняются. Generic-каталоги `common`, `shared`, `misc`, `utils`, `core`, `runtime`, `domain` и `config`, а также новые barrel `index.js`, запрещены проверкой `check:source-layout`. Architecture scanner рекурсивно индексирует production JS по полному repository-relative path.
 
 ## Следующие подтверждённые выделения
+
+### Persistent population
+
+`src/character/populationDomain.js` владеет созданием устойчивых person identities, полным canonical need state и детерминированной coarse-реконструкцией по прошедшему world time. `src/session/gameSessionState.js` и `src/session/sessionPersistence.js` вызывают публичные функции owner для JSON-safe state и schema migration, не размещая у себя population formulas.
+
+Tavern, social и profession systems могут позже потреблять один и тот же persisted person state через этот owner. Они не создают собственную population, need vocabulary или offscreen evaluation.
 
 ### Build и authoring
 
