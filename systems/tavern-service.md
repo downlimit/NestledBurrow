@@ -132,26 +132,41 @@ The first demand implementation does not require full Sims-like social simulatio
 - Guests can later talk to one another, form relationships, argue, fight and change each other's opinions.
 - Word of mouth should ultimately be grounded in these people and their connections. It is a narrative realization of the same demand feedback, not a separate currency.
 
-## First implementation slice
+## Development sequence
 
-The first playable replacement for anonymous stock-triggered spawning should prove identity and demand causality before implementing the whole simulation.
+This is the validation order for the system, not a promise to implement every later stage consecutively. Each next stage starts only after the previous one produces an observable, understandable result; later stages can be revised or dropped if playtesting changes the product direction.
 
-Use a small persistent test population rather than the final target scale. Store the full canonical need state from the start, but initially let only satiety/hunger participate in the visit decision. Add only the minimum other properties required to make the choice meaningful:
+1. **Persistent population foundation.** A small test population has stable identities, the full canonical need set, persisted last-evaluation time and coarse offscreen reconstruction. Save/reload returns the same people. No tavern demand behavior changes yet.
+2. **Venue offer.** The venue explicitly exposes what it currently offers. The first version is a small food menu; inventory outside the offer is irrelevant to demand.
+3. **Individual visit decision.** A simple popularity rate creates visit opportunities; a concrete persistent person is evaluated and may choose the venue from hunger, offer fit, budget and recent personal history.
+4. **Order and fulfillment.** The arriving person selects an offered product, creates an order or equivalent commitment, receives service and pays; anonymous stock-triggered spawning is removed.
+5. **Live needs during visits.** All canonical needs become active while the guest is present, so toilets, social contact, rest, cleanliness and other facilities can produce unscripted situations.
+6. **Popularity, reputation and personal opinion.** Reach, descriptive venue reputation and one person's own attitude become separate feedback systems. Reputation is allowed to attract one audience while repelling another.
+7. **Groups and time patterns.** Persistent people can arrive together; actual opening hours and later schedules alter which people plausibly consider the venue.
+8. **Emergent venue formats.** Takeaway, restaurant/bar, buffet/event and canteen behavior grow from infrastructure and offer rather than from a required mode selector.
+9. **Social graph and population lifecycle.** People can form deeper relationships, communicate opinions, become friends or partners, form families, age, reproduce and die; population replenishment prevents long-term collapse.
 
-- stable identity;
-- canonical need state and last evaluation time;
-- layered food preferences;
-- spending capacity;
-- last visit time / recent-visit suppression;
-- simple personal venue opinion and visit memory.
+The early player-facing priority remains **optimization and development**. Learning individual people is the second layer. Reacting to need-driven and social chaos is the third.
 
-Popularity may initially use one simple tunable opportunity rate. Rich reputation propagation, groups, multiple visit motives, social influence, population lifecycle and complex popularity curves are deliberately deferred until a known persistent person can already decide to visit from hunger + active food offer + budget + memory and then complete the existing service flow.
+## First implementation stage
 
-The first success criterion is:
+Stage 1 deliberately stops before menu, popularity and demand. Its purpose is to prove that persistent people exist independently of the tavern and can later be consumed by any profession or social system.
 
-> Opening the tavern no longer creates a compatible anonymous customer because food exists. It gives known persistent people opportunities to consider the venue; a concrete person chooses to visit for understandable reasons and returns later as the same person.
+Use a small test population rather than the final target scale. Each person needs only:
 
-The early player-facing priority is optimization and development: improve production, offer and capacity. Discovering individual people becomes the second layer; emergent need/social chaos becomes the third.
+- stable ID and recognizable display name;
+- the complete canonical need state: novelty, energy, satiety, toilet, lustre and dialogue/social contact;
+- the world time at which that state was last evaluated.
+
+Offscreen reconstruction must be coarse rather than pretending to simulate a hidden life frame by frame. Elapsed world time affects the result and bounded variation prevents identical trajectories, but repeated evaluation at the same world time must not reroll the person into a different state. Long absence must not simply apply the player's waking drain until every need becomes zero.
+
+The population and every person's state survive save/reload. `NEW GAME` creates a fresh small population. A developer-visible inspection path must make it possible to identify a person, inspect all six needs, advance world time, evaluate that same person again and see an explainable state change.
+
+Stage 1 does **not** add food preferences, budgets, venue opinion, visit memory, popularity, menu, visit selection, groups, social relationships, ageing, reproduction or new guest spawning. Those belong to later validation stages.
+
+The success criterion is:
+
+> The game owns a small set of persistent recognizable people whose complete need state can be reconstructed after offscreen time and survives save/reload, without those people yet being coupled to tavern guest generation.
 
 ## Owners
 
