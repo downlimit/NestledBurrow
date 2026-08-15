@@ -12,9 +12,7 @@ async function boot(page) {
 }
 
 async function tapAlt(page) {
-  await page.keyboard.down("Alt");
-  await page.waitForTimeout(60);
-  await page.keyboard.up("Alt");
+  await page.keyboard.press("Alt");
 }
 
 async function enterNest(page) {
