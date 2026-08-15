@@ -206,6 +206,7 @@ test("four persistent guests arbitrate live needs, resume service, preserve tabl
     findGuest(await bridge(page, "getTavernState"), inspectedGuestId).overhead.orderLabelVisible
   )).toBe(false);
 
+  expect(await bridge(page, "forcePersonInspectionExpanded", inspectedPersonId)).toBe(true);
   for (const [needId] of NEED_INTENTS) {
     await bridge(page, "setInspectedPersonNeed", { needId, value: 100 });
   }
