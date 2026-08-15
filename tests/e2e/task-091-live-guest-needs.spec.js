@@ -219,16 +219,24 @@ test("four persistent guests arbitrate live needs, resume service, preserve tabl
     alternateThought: "bored",
     orderItemId: "fried-potato-dish",
   });
-  await bridge(page, "advanceWorldSimulation", 1_250);
-  alternatingOverhead = findGuest(await bridge(page, "getTavernState"), inspectedGuestId).overhead;
+  alternatingOverhead = await advanceUntil(
+    page,
+    async () => findGuest(await bridge(page, "getTavernState"), inspectedGuestId).overhead,
+    (overhead) => overhead?.displayedThought === "bored",
+    { maxMs: 2_500, stepMs: 100 },
+  );
   expect(alternatingOverhead).toMatchObject({
     thought: "order-item",
     displayedThought: "bored",
     alternateThought: "bored",
     orderItemId: "fried-potato-dish",
   });
-  await bridge(page, "advanceWorldSimulation", 1_200);
-  alternatingOverhead = findGuest(await bridge(page, "getTavernState"), inspectedGuestId).overhead;
+  alternatingOverhead = await advanceUntil(
+    page,
+    async () => findGuest(await bridge(page, "getTavernState"), inspectedGuestId).overhead,
+    (overhead) => overhead?.displayedThought === "order-item",
+    { maxMs: 2_500, stepMs: 100 },
+  );
   expect(alternatingOverhead).toMatchObject({
     thought: "order-item",
     displayedThought: "order-item",
@@ -290,8 +298,12 @@ test("four persistent guests arbitrate live needs, resume service, preserve tabl
   expect(guest.overhead.screenGeometry.action.x).toBe(guest.overhead.screenGeometry.anchor.x);
   expect(guest.overhead.screenGeometry.anchor.y - guest.overhead.screenGeometry.action.y).toBe(22);
   expect(guest.overhead.screenGeometry.actionWidth).toBeLessThanOrEqual(22);
-  await bridge(page, "advanceWorldSimulation", 250);
-  guest = findGuest(await bridge(page, "getTavernState"), inspectedGuestId);
+  guest = await advanceUntil(
+    page,
+    async () => findGuest(await bridge(page, "getTavernState"), inspectedGuestId),
+    (candidate) => candidate?.overhead?.screenGeometry?.actionWidth <= 20,
+    { maxMs: 1_000, stepMs: 50 },
+  );
   expect(guest.overhead.screenGeometry.actionWidth).toBeLessThanOrEqual(20);
   expect((await bridge(page, "getSession")).gameplay.kitchen.servingTables[tableId].quantity).toBe(0);
 

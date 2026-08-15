@@ -52,6 +52,12 @@ async function faceFarmCell(page) {
     await page.keyboard.down("KeyD");
     await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 1, y: 0 });
     await page.keyboard.up("KeyD");
+    await bridge(page, "placePlayerAt", {
+      x: FARM_CELL.x - 8,
+      y: FARM_CELL.y + 12,
+      facing: { x: 1, y: 0 },
+    });
+    await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
   } else {
     await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
   }
