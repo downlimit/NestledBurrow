@@ -174,6 +174,8 @@ test("running, exhaustion sleep and wake-up share the energy-flow contract", asy
   await bridge(page, "setEnergy", 25);
   await bridge(page, "setPlayerMotion", { moving: true, running: false });
   await page.keyboard.down("ArrowRight");
+  await bridge(page, "setPlayerMotion", { moving: true, running: false });
+  await bridge(page, "advanceGameplayTime", 100);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ resources: { energyFlow: { direction: "down", arrows: 2 } } });
   await page.keyboard.down("Shift");
   await expect.poll(() => bridge(page, "getPlayerMovementState")).toMatchObject({ runSpeedMultiplier: 1.66 });

@@ -158,8 +158,6 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   expect((await bridge(page, "getSession")).gameplay.coins).toBe(coinsBefore - 1);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("purchase");
 
-  const well = await bridge(page, "placeWell", WELL_CELL);
-  expect(well).toMatchObject({ status: "placed" });
   await selectInventoryItem(page, "hoe");
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-till");
@@ -221,6 +219,8 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.type).toBe("potato");
 
+  const well = await bridge(page, "placeWell", WELL_CELL);
+  expect(well).toMatchObject({ status: "placed" });
   await selectInventoryItem(page, "water-bucket");
   await placeNear(page, "farm-well-1");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-refill-water-bucket");
