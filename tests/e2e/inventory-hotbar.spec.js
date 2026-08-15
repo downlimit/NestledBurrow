@@ -12,8 +12,8 @@ async function boot(page) {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  await expect(page.locator("canvas")).toHaveJSProperty("width", 640);
-  await expect(page.locator("canvas")).toHaveJSProperty("height", 360);
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 1920);
+  await expect(page.locator("canvas")).toHaveJSProperty("height", 1080);
 }
 
 async function canvasPoint(page, point) {

@@ -33,6 +33,7 @@ export function bindSpriteVisual(graphics, asset, tint = null, profileKey = null
   }
 
   const image = scene.add.image(graphics.x ?? 0, graphics.y ?? 0, asset.key, asset.frame ?? 0).setOrigin(0, 0);
+  image.setDisplaySize?.(asset.width, asset.height);
   image.setDepth?.(graphics.depth ?? 0);
   image.setScrollFactor?.(graphics.scrollFactorX ?? 1, graphics.scrollFactorY ?? graphics.scrollFactorX ?? 1);
   image.setVisible?.(graphics.visible ?? true);

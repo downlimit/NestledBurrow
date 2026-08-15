@@ -128,10 +128,11 @@ export function createFacilityRuntime(scene, {
   }
 
   function restore(definition, { validateFootprint = true } = {}) {
-    if (!definition || definitions.has(definition.id) || !createVisual(definition, { validateFootprint })) return false;
-    definitions.set(definition.id, definition);
-    trackEditorId(definition.id);
-    createServingTableVisual(definition);
+    const normalized = withFacilityCapabilities(definition);
+    if (!normalized || definitions.has(normalized.id) || !createVisual(normalized, { validateFootprint })) return false;
+    definitions.set(normalized.id, normalized);
+    trackEditorId(normalized.id);
+    createServingTableVisual(normalized);
     return true;
   }
 
@@ -389,6 +390,16 @@ function boundsFor(facility) {
     top: facility.footprint.y,
     bottom: facility.footprint.y + facility.footprint.height,
   };
+}
+
+function withFacilityCapabilities(definition) {
+  if (!definition) return null;
+  const capabilities = new Set(Array.isArray(definition.capabilities) ? definition.capabilities : []);
+  if (definition.facilityType === "serving-table") capabilities.add("guest-service");
+  return Object.freeze({
+    ...definition,
+    capabilities: Object.freeze([...capabilities]),
+  });
 }
 
 function placeFacilityAt(facility, point) {

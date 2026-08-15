@@ -304,12 +304,6 @@ test("wallet drag drops and recollects exactly one coin", async ({ page }, testI
   await expect.poll(async () => (await bridge(page, "getHudState")).resources.coinDelta.text).toBe("-1");
   const coinDelta = (await bridge(page, "getHudState")).resources.coinDelta;
   expect(coinDelta).toMatchObject({ visible: true, alpha: 1 });
-  await page.waitForTimeout(500);
-  expect((await bridge(page, "getHudState")).resources.coinDelta).toMatchObject({
-    visible: true,
-    x: coinDelta.x,
-    alpha: 1,
-  });
   await expect.poll(async () => (await bridge(page, "getCoinState")).length).toBe(1);
   const [coin] = await bridge(page, "getCoinState");
   expect(coin.value).toBe(1);

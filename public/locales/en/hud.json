@@ -59,6 +59,7 @@
       "bed": "Bed",
       "shower": "Shower",
       "toilet": "Toilet",
+      "sink": "Sink",
       "table": "Table",
       "well": "Well",
       "tree": "Tree"
@@ -85,6 +86,8 @@
     "leaveShower": "Leave shower",
     "toilet": "Use toilet",
     "leaveToilet": "Get off toilet",
+    "washAtSink": "Wash at sink",
+    "leaveSink": "Finish washing",
     "eat": "Eat",
     "stopEating": "Stop eating",
     "startPreparation": "Start preparation",
@@ -129,6 +132,8 @@
     "servingTableEmpty": "The serving table is empty",
     "acceptOrderLemonade": "Accept order: Lemonade",
     "acceptOrderFriedPotato": "Accept order: Fried potato",
+    "acceptGuestOrder": "Take order",
+    "talkGuest": "Talk",
     "repairStove": "Repair: 10 wood, 8 stone, 10 coins",
     "repairMissing": "Missing: {categories}",
     "repairCategory": {

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { CameraFollowRuntime, cameraFollowStep, normalizeCameraTuning } from "../src/character/cameraFollowRuntime.js";
+import {
+  CAMERA_FOLLOW_PIXEL_STEP,
+  CameraFollowRuntime,
+  cameraFollowStep,
+  normalizeCameraTuning,
+} from "../src/character/cameraFollowRuntime.js";
 import { JOYSTICK, clampJoystickCenter } from "../src/controls/input.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../src/world/worldConfig.js";
 
@@ -54,10 +59,18 @@ const cameraRuntime = new CameraFollowRuntime({
   presentationPosition: { x: 10.4, y: 20.6 },
   movingSpeedThreshold: 2,
 });
-assert.equal(camera.roundPixels, true, "active camera always rounds scroll for pixel-art world visuals");
-assert.deepEqual({ x: cameraTarget.x, y: cameraTarget.y }, { x: 10, y: 21 }, "camera follow target is pixel-aligned at reset");
+assert.equal(camera.roundPixels, true, "active camera rounds scroll for crisp world visuals");
+assert.equal(CAMERA_FOLLOW_PIXEL_STEP, 1 / 6, "camera uses one backing pixel as its movement step");
+assert(Math.abs(cameraTarget.x - 10.4) <= CAMERA_FOLLOW_PIXEL_STEP / 2, "camera keeps the closest dense-pixel x at reset");
+assert(Math.abs(cameraTarget.y - 20.6) <= CAMERA_FOLLOW_PIXEL_STEP / 2, "camera keeps the closest dense-pixel y at reset");
 cameraRuntime.update({ presentationPosition: { x: 11.6, y: 21.6 }, speed: 0, deltaMs: 16 });
-assert(Number.isInteger(cameraTarget.x) && Number.isInteger(cameraTarget.y), "camera follow target remains pixel-aligned while moving");
+const targetXInPixels = cameraTarget.x / CAMERA_FOLLOW_PIXEL_STEP;
+const targetYInPixels = cameraTarget.y / CAMERA_FOLLOW_PIXEL_STEP;
+assert(
+  Math.abs(targetXInPixels - Math.round(targetXInPixels)) < 1e-9
+    && Math.abs(targetYInPixels - Math.round(targetYInPixels)) < 1e-9,
+  "camera follow target remains aligned to backing pixels while moving",
+);
 cameraRuntime.destroy();
 const interactionHud = readFileSync("src/ui/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");

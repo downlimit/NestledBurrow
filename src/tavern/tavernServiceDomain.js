@@ -65,10 +65,15 @@ export function normalizeTavernServiceState(value = {}, { population = [] } = {}
       order,
       acceptableItemIds: normalizeAcceptableItemIds(raw.acceptableItemIds, itemId),
       servingTableId: furnitureId(raw.servingTableId),
-      diningTableId: furnitureId(raw.diningTableId),
       reservationActive: Boolean(raw.reservationActive),
+      servedItemOnTable: Boolean(raw.servedItemOnTable),
       mealCompleted: Boolean(raw.mealCompleted),
       paid: Boolean(raw.paid),
+      menuStarted: Boolean(raw.menuStarted),
+      menuElapsedMs: nonNegativeNumber(raw.menuElapsedMs, 0, `Guest ${id} menu elapsed time`),
+      menuDurationMs: nonNegativeNumber(raw.menuDurationMs, 0, `Guest ${id} menu duration`),
+      menuComplete: Boolean(raw.menuComplete),
+      fulfillmentElapsedMs: nonNegativeNumber(raw.fulfillmentElapsedMs, order.statusElapsedMs, `Guest ${id} fulfillment elapsed time`),
     });
   }
   return { nextGuestId, opportunityRemainingMs, visitorHistoryByPersonId, guests };

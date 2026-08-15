@@ -6,6 +6,7 @@ export const FACILITY_INTERACTION_KIND = "use-facility";
 export const FACILITY_ASSETS = Object.freeze({
   shower: Object.freeze({ key: "facility.bathtub", path: "assets/project/facilities/NestledBurrow_Bathtub.png", width: 32, height: 32 }),
   toilet: Object.freeze({ key: "facility.toilet", path: "assets/project/facilities/NestledBurrow_Toilet.png", width: 16, height: 16 }),
+  sink: Object.freeze({ key: "facility.sink", path: "assets/project/facilities/NestledBurrow_Sink.png", width: 16, height: 16 }),
   table: Object.freeze({ key: "facility.dining-table-feast", path: "assets/project/facilities/NestledBurrow_DiningTableFeast.png", width: 48, height: 16 }),
   "cutting-table": Object.freeze({ key: "facility.cutting-table", path: "assets/project/facilities/NestledBurrow_CuttingTable.png", width: 32, height: 16 }),
   "gas-stove": Object.freeze({ key: "facility.gas-stove", path: "assets/project/facilities/NestledBurrow_GasStove.png", width: 16, height: 32 }),
@@ -17,6 +18,7 @@ export const FACILITY_ASSETS = Object.freeze({
 export const FACILITY_BUILD_ORDER = Object.freeze([
   "shower",
   "toilet",
+  "sink",
   "table",
   "cutting-table",
   "gas-stove",
@@ -28,6 +30,7 @@ export const FACILITY_BUILD_ORDER = Object.freeze([
 export const FACILITY_NAME_KEYS = Object.freeze({
   shower: "hud:buildMode.assets.shower",
   toilet: "hud:buildMode.assets.toilet",
+  sink: "hud:buildMode.assets.sink",
   table: "hud:buildMode.assets.table",
   "cutting-table": "build:assets.cuttingTable",
   "gas-stove": "build:assets.gasStove",
@@ -49,6 +52,7 @@ export function createFacilityDefinition({ id, type, tile, useTile, editable = t
   const labels = {
     shower: ["hud:interaction.shower", "hud:interaction.leaveShower"],
     toilet: ["hud:interaction.toilet", "hud:interaction.leaveToilet"],
+    sink: ["hud:interaction.washAtSink", "hud:interaction.leaveSink"],
     table: ["hud:interaction.eat", "hud:interaction.stopEating"],
     "cutting-table": ["hud:interaction.startPreparation", "hud:interaction.startPreparation"],
     "gas-stove": ["hud:interaction.startFrying", "hud:interaction.startFrying"],
@@ -69,6 +73,7 @@ export function createFacilityDefinition({ id, type, tile, useTile, editable = t
     roomId: "home",
     kind: FACILITY_INTERACTION_KIND,
     facilityType: type,
+    capabilities: Object.freeze(type === "serving-table" ? ["guest-service"] : []),
     editable,
     nameKey: FACILITY_NAME_KEYS[type],
     position: Object.freeze({ x: footprint.x + TILE_SIZE / 2, y: footprint.y + TILE_SIZE / 2 }),
@@ -91,6 +96,7 @@ export function createFacilityDefinition({ id, type, tile, useTile, editable = t
 export const FACILITIES = Object.freeze([
   createFacilityDefinition({ id: "home-shower-01", type: "shower", tile: { x: 27, y: 20 }, useTile: { x: 29, y: 21 } }),
   createFacilityDefinition({ id: "home-toilet-01", type: "toilet", tile: { x: 33, y: 20 }, useTile: { x: 35, y: 21 } }),
+  createFacilityDefinition({ id: "home-sink-01", type: "sink", tile: { x: 36, y: 20 }, useTile: { x: 36, y: 21 } }),
   createFacilityDefinition({ id: "home-table-01", type: "table", tile: { x: 36, y: 26 }, useTile: { x: 34, y: 27 } }),
   createFacilityDefinition({ id: "home-cutting-table-01", type: "cutting-table", tile: { x: 29, y: 21 }, useTile: { x: 30, y: 22 } }),
   createFacilityDefinition({ id: "home-gas-stove-01", type: "gas-stove", tile: { x: 31, y: 20 }, useTile: { x: 32, y: 21 } }),

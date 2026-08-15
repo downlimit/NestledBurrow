@@ -82,11 +82,10 @@ test("the approached serving table owns the placed food", async ({ page }, testI
   expect(visuals[second.id].visible).toBe(true);
 });
 
-test("two dine-in guests reserve distinct serving and dining tables", async ({ page }, testInfo) => {
+test("two dine-in guests reserve distinct service-capable tables without dining seats", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop proves multi-guest table routing once");
   await bootFresh(page);
   const serving = await addAtOpenPoint(page, "serving-table");
-  const dining = await addAtOpenPoint(page, "table", [serving.point]);
   await bridge(page, "setServingStock", { itemId: "fried-potato-dish", quantity: 1 });
   await bridge(page, "setServingStock", {
     itemId: "fried-potato-dish",
@@ -117,15 +116,15 @@ test("two dine-in guests reserve distinct serving and dining tables", async ({ p
   await advanceUntil(
     page,
     async () => (await bridge(page, "getTavernState")).guest.guests
-      .filter(({ servingTableId, diningTableId }) => servingTableId && diningTableId).length,
+      .filter(({ servingTableId, diningTableId }) => servingTableId && diningTableId === null).length,
     (count) => count === 2,
   );
   const guests = (await bridge(page, "getTavernState")).guest.guests;
   expect({
     count: guests.length,
     serving: new Set(guests.map(({ servingTableId }) => servingTableId)).size,
-    dining: new Set(guests.map(({ diningTableId }) => diningTableId)).size,
-  }).toEqual({ count: 2, serving: 2, dining: 2 });
+    dining: guests.map(({ diningTableId }) => diningTableId),
+  }).toEqual({ count: 2, serving: 2, dining: [null, null] });
 
   await advanceUntil(
     page,
@@ -134,5 +133,4 @@ test("two dine-in guests reserve distinct serving and dining tables", async ({ p
   );
   const coins = await bridge(page, "getCoinState");
   expect(coins.map(({ value }) => value)).toEqual([4, 4]);
-  expect(dining.facility.facilityType).toBe("table");
 });

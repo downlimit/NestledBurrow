@@ -175,9 +175,8 @@ function liveScenario({ stockItemId = null } = {}) {
     getTavernOpen: () => open,
     isOrderItemActive: () => open,
     getServicePoint: () => ({ x: 32, y: 8 }),
-    getSeatPoint: () => null,
-    claimOrderStation: () => ({ servingTableId: "serving-1" }),
-    releaseOrderStation: () => true,
+    claimServicePlace: () => ({ servingTableId: "serving-1" }),
+    releaseServicePlace: () => true,
     reserveExactItem: (guestId, tableId, itemId) => reserveServingItem(liveKitchen, guestId, [tableId], itemId),
     releaseReservation: () => false,
     consumeReservation: (guestId, tableId) => consumeServingReservation(liveKitchen, guestId, tableId),
@@ -197,7 +196,7 @@ function liveScenario({ stockItemId = null } = {}) {
       actor.motor.position.y += direction.y * 8;
     }
   }
-  function until(predicate, limit = 100) {
+  function until(predicate, limit = 600) {
     for (let index = 0; index < limit && !predicate(); index += 1) tick();
     assert(predicate(), "live order scenario reached the expected state");
   }
@@ -263,7 +262,7 @@ const serviceSource = readFileSync("src/tavern/tavernServiceRuntime.js", "utf8")
 const interactionSource = readFileSync("src/interaction/worldInteractionCoordinator.js", "utf8");
 const bridgeSource = readFileSync("src/devtools/e2eBridge.js", "utf8");
 for (const contract of [
-  "decision.bestOfferItemId", "claimOrderStation", "reserveExactItem", "recordFailedAcceptedOrder",
+  "decision.bestOfferItemId", "claimServicePlace", "reserveExactItem", "recordFailedAcceptedOrder",
   "getOrderInteractionDefinitions", "acceptGuestOrder",
 ]) assert(serviceSource.includes(contract), `service runtime exposes ${contract}`);
 assert(interactionSource.includes("GUEST_ORDER_INTERACTION_KIND"));

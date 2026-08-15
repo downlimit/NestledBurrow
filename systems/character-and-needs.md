@@ -9,7 +9,8 @@ The same need dimensions and meanings apply to persistent people in the populati
 ## Shared person need contract
 
 - Persistent people share the player's canonical `N E S T L D` dimensions. Stage-3 also persists deterministic, JSON-safe `spendingCapacity` and layered cuisine/dish/ingredient preferences; venue history remains external.
-- Offscreen reconstruction uses the stored needs/evaluation time, elapsed world time and bounded variation when a person becomes relevant. Physically present needs may later drive role-specific behavior without sharing every player rate or penalty.
+- Relevance reconstructs offscreen needs once from stored state, elapsed world time and bounded variation. A physical guest then advances the canonical population needs live and rebases evaluation time; there is no guest-local copy or repeated reconstruction.
+- One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume its commitment. Role policy stays outside `populationDomain`.
 - A live actor bound to `personId` shows its display name and expands the shared player-style `N E S T L D` panel after `667 ms`; coarse pointers use tap/long-press.
 - Bar editing maps the pointer to `0..100`, mutates that exact persistent person through the population owner and rebases `lastEvaluatedWorldTimeSeconds`; visits/orders remain unchanged.
 - Hover/pin/expansion are transient prototype tooling and may later move without changing person state or formulas.
@@ -97,8 +98,8 @@ The target need is protected through exit; recovery is active-only. Normal cance
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns canonical need IDs and player formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. `src/character/populationDomain.js` owns the 16-person baseline, stable demand profiles, population normalization, manual need mutation and deterministic coarse offscreen reconstruction for all six needs. `src/character/personInspectionRuntime.js` owns live actor hover/touch selection, screen clamping and need-bar input; desktop expansion starts after 667 ms and survives a 0.66 s cursor transfer to the card. `src/ui/needsPanelPresentation.js` draws the shared player/NPC NESTLD panel. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
+`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, persistent mutation and coarse reconstruction. Tavern-local `guestIntentDomain` owns live advancement/arbitration; `guestRuntime` retains `personId` and resolves the canonical person. `personInspectionRuntime` owns actor selection and need-bar input, so edits reach the next guest arbitration. `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:interaction`; focused browser E2E.

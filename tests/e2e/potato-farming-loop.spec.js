@@ -52,6 +52,12 @@ async function faceFarmCell(page) {
     await page.keyboard.down("KeyD");
     await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 1, y: 0 });
     await page.keyboard.up("KeyD");
+    await bridge(page, "placePlayerAt", {
+      x: FARM_CELL.x - 8,
+      y: FARM_CELL.y + 12,
+      facing: { x: 1, y: 0 },
+    });
+    await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
   } else {
     await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell).toEqual(FARM_CELL);
   }
@@ -61,6 +67,14 @@ function inventoryQuantity(session, itemId) {
   return session.gameplay.inventory.slots
     .filter((item) => item?.id === itemId)
     .reduce((sum, item) => sum + item.quantity, 0);
+}
+
+async function selectInventoryItem(page, itemId) {
+  const slot = (await bridge(page, "getSession")).gameplay.inventory.slots
+    .findIndex((item) => item?.id === itemId);
+  expect(slot, `${itemId} must exist in inventory`).toBeGreaterThanOrEqual(0);
+  await bridge(page, "selectInventorySlot", slot);
+  await expect.poll(async () => (await bridge(page, "getFarmingState")).selectedItem).toBe(itemId);
 }
 
 test("time controls pause and accelerate the farming clock", async ({ page }, testInfo) => {
@@ -101,8 +115,10 @@ test("time controls pause and accelerate the farming clock", async ({ page }, te
   });
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("time-speed-up");
   const acceleratedAt = (await bridge(page, "getSession")).gameplay.worldTimeSeconds;
-  await page.waitForTimeout(250);
-  expect((await bridge(page, "getSession")).gameplay.worldTimeSeconds - acceleratedAt).toBeGreaterThan(120);
+  await expect.poll(
+    async () => (await bridge(page, "getSession")).gameplay.worldTimeSeconds - acceleratedAt,
+    { timeout: 1_500 },
+  ).toBeGreaterThan(120);
 
   await clickControl(1);
   await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({
@@ -148,9 +164,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   expect((await bridge(page, "getSession")).gameplay.coins).toBe(coinsBefore - 1);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("purchase");
 
-  const well = await bridge(page, "placeWell", WELL_CELL);
-  expect(well).toMatchObject({ status: "placed" });
-  await bridge(page, "selectInventorySlot", 2);
+  await selectInventoryItem(page, "hoe");
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-till");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).highlightMode).toBe("hoe-valid");
@@ -204,16 +218,16 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(1);
 
-  const seedSlot = (await bridge(page, "getSession")).gameplay.inventory.slots
-    .findIndex((item) => item?.id === "potato-seed");
-  await bridge(page, "selectInventorySlot", seedSlot);
+  await selectInventoryItem(page, "potato-seed");
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-plant");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).highlightMode).toBe("potato-seed-valid");
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.type).toBe("potato");
 
-  await bridge(page, "selectInventorySlot", 3);
+  const well = await bridge(page, "placeWell", WELL_CELL);
+  expect(well).toMatchObject({ status: "placed" });
+  await selectInventoryItem(page, "water-bucket");
   await placeNear(page, "farm-well-1");
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-refill-water-bucket");
   await pressInteract(page);
@@ -249,7 +263,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   }
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells[0].crop?.mature).toBe(true);
   await expect.poll(async () => (await bridge(page, "getRuntimeState")).sleeping).toBe(false);
-  await bridge(page, "selectInventorySlot", seedSlot);
+  await selectInventoryItem(page, "potato-seed");
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-harvest");
   await page.waitForTimeout(100);
@@ -287,14 +301,12 @@ test("axe removes crop before soil and thrown wood or stone crushes crops", asyn
 
   const plant = async () => {
     if ((await bridge(page, "getFarmingState")).farm.soilCells.length === 0) {
-      await bridge(page, "selectInventorySlot", 2);
+      await selectInventoryItem(page, "hoe");
       await faceFarmCell(page);
       await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-till");
       await pressInteract(page);
     }
-    const seedSlot = (await bridge(page, "getSession")).gameplay.inventory.slots
-      .findIndex((item) => item?.id === "potato-seed");
-    await bridge(page, "selectInventorySlot", seedSlot);
+    await selectInventoryItem(page, "potato-seed");
     await faceFarmCell(page);
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-plant");
     await pressInteract(page);
@@ -302,7 +314,7 @@ test("axe removes crop before soil and thrown wood or stone crushes crops", asyn
   };
 
   await plant();
-  await bridge(page, "selectInventorySlot", 0);
+  await selectInventoryItem(page, "axe");
   await faceFarmCell(page);
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate).toMatchObject({
     kind: "farm-axe-cell",

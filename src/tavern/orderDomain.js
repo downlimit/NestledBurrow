@@ -17,7 +17,7 @@ const TRANSITIONS = Object.freeze({
   [ORDER_STATUS.planned]: Object.freeze([ORDER_STATUS.offered]),
   [ORDER_STATUS.offered]: Object.freeze([ORDER_STATUS.accepted]),
   [ORDER_STATUS.accepted]: Object.freeze([ORDER_STATUS.reserved, ORDER_STATUS.failed]),
-  [ORDER_STATUS.reserved]: Object.freeze([ORDER_STATUS.served]),
+  [ORDER_STATUS.reserved]: Object.freeze([ORDER_STATUS.served, ORDER_STATUS.failed]),
   [ORDER_STATUS.served]: Object.freeze([ORDER_STATUS.completed]),
   [ORDER_STATUS.completed]: Object.freeze([]),
   [ORDER_STATUS.failed]: Object.freeze([]),

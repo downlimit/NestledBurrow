@@ -372,7 +372,7 @@ export class WorldLocationRuntime {
       getKitchenState: () => this.sessionState.gameplay.kitchen,
       getInventoryState: () => this.sessionState.gameplay.inventory,
       getSelectedItem: () => this.globalOwners.gameHud?.getSelectedInventoryItem?.() ?? null,
-      isFacilityReserved: (facilityId) => this.owners.guestRuntime?.isDiningTableReserved?.(facilityId) ?? false,
+      isFacilityReserved: (facilityId) => this.owners.guestRuntime?.isServicePlaceReserved?.(facilityId) ?? false,
     });
     this.owners.needsInteractionCoordinator = this.factories.needsInteraction({
       facilityRuntime: this.owners.facilityRuntime,
@@ -401,6 +401,15 @@ export class WorldLocationRuntime {
       characterSystem: this.characterSystem,
       createNpcMovementConfig: (profile) => this.createNpcMovementConfig(profile),
       getPlayerPosition: () => this.callbacks.getPlayerCharacter?.()?.motor?.position,
+      getPlayerCharacter: () => this.callbacks.getPlayerCharacter?.(),
+      isPlayerAvailable: () => !this.callbacks.isSleeping?.()
+        && !this.callbacks.isOptionsOpen?.()
+        && !this.callbacks.isConfirmationActive?.()
+        && !this.owners.needsInteractionCoordinator?.isLocked?.()
+        && !this.globalOwners.interactionRuntime?.isDialogueActive?.()
+        && !this.owners.merchantRuntime?.isActive?.()
+        && !this.owners.cookingRuntime?.isActive?.()
+        && !this.owners.tavernServiceRuntime?.venueMenuRuntime?.isActive?.(),
       getWorldTimeSeconds: () => this.sessionState.gameplay.worldTimeSeconds,
       getSignPoint: () => this.owners.tavernSignRuntime?.getGuestCheckPoint?.() ?? GUEST_CONFIG.points.sign,
       localization: this.localization,

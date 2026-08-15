@@ -9,6 +9,7 @@ import {
 } from "./inventoryDomain.js";
 import { drawInventoryItem, inventoryItemAsset, renderInventoryItem } from "./inventoryVisuals.js";
 import { HUD_COLORS, HUD_DEPTH, drawBitmapTextInto, isPointInRect, measureBitmapText } from "../ui/hud.js";
+import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { FARMING_TEXTURE_KEY } from "../resources/farmingConfig.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 import { worldDepthFromAnchorY } from "../build/buildWorldGeometry.js";
@@ -224,7 +225,8 @@ export function createInventoryRuntime(scene, options = {}) {
         render();
         return;
       }
-      dragCandidate = { index, startX: pointer.x, startY: pointer.y };
+      const point = presentationPointer(pointer);
+      dragCandidate = { index, startX: point.x, startY: point.y };
       dragging = false;
     });
     return zone;
@@ -232,11 +234,12 @@ export function createInventoryRuntime(scene, options = {}) {
 
   function handlePointerMove(pointer) {
     if (!dragCandidate || !active()) return;
-    const distance = Math.hypot(pointer.x - dragCandidate.startX, pointer.y - dragCandidate.startY);
+    const point = presentationPointer(pointer);
+    const distance = Math.hypot(point.x - dragCandidate.startX, point.y - dragCandidate.startY);
     if (!dragging && distance >= 3) dragging = true;
     if (dragging) {
       stop(pointer);
-      renderDrag(pointer.x, pointer.y);
+      renderDrag(point.x, point.y);
       setThrowAimTarget(worldPointFromPointer(scene, pointer));
     }
   }
@@ -255,7 +258,8 @@ export function createInventoryRuntime(scene, options = {}) {
       toggleSelection(fromIndex);
       return;
     }
-    const targetIndex = inventorySlotIndexAt(pointer.x, pointer.y);
+    const point = presentationPointer(pointer);
+    const targetIndex = inventorySlotIndexAt(point.x, point.y);
     if (targetIndex >= 0) {
       const result = swapInventorySlots(inventory(), fromIndex, targetIndex);
       if (result.mutated) {
@@ -267,7 +271,7 @@ export function createInventoryRuntime(scene, options = {}) {
       render();
       return;
     }
-    if (!isPointInRect(pointer.x, pointer.y, INVENTORY_HUD_AREA)) {
+    if (!isPointInRect(point.x, point.y, INVENTORY_HUD_AREA)) {
       dropSlot(fromIndex, worldPointFromPointer(scene, pointer));
     }
   }
@@ -811,6 +815,13 @@ export function createInventoryRuntime(scene, options = {}) {
       heldGraphics.destroy();
       heldImage.destroy();
     },
+  };
+}
+
+function presentationPointer(pointer) {
+  return {
+    x: Number(pointer?.x) / PRESENTATION_DENSITY,
+    y: Number(pointer?.y) / PRESENTATION_DENSITY,
   };
 }
 

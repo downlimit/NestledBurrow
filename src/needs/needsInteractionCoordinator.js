@@ -66,14 +66,14 @@ export function createNeedsInteractionCoordinator({
     const current = getState();
     if (current.metadata?.kind === "facility" && current.metadata.id === facilityId) return exit("normal");
     const facility = facilityRuntime.getDefinition(facilityId);
-    if (!facility || !["shower", "toilet", "table"].includes(facility.facilityType)) return { status: "ignored", mutated: false };
+    if (!facility || !["shower", "toilet", "sink", "table"].includes(facility.facilityType)) return { status: "ignored", mutated: false };
     const authoredTimeline = facility.interactionTimeline?.enabled ? facility.interactionTimeline : null;
     return beginApproach(interaction, {
-      profileId: facility.facilityType,
+      profileId: facility.facilityType === "sink" ? "shower" : facility.facilityType,
       profileOverride: authoredTimeline,
       metadata: { kind: "facility", id: facilityId },
       targetPose: () => withAuthoredPresentation(
-        facility.facilityType === "table"
+        ["table", "sink"].includes(facility.facilityType)
           ? facePoint(authoredTimeline ? facility.timelineTarget : getPlayer().motor.position, facility.position)
           : facilityRuntime.getPresentationPose(facilityId),
         authoredTimeline,

@@ -32,6 +32,8 @@ export function createTavernServiceRuntime(scene, {
   characterSystem,
   createNpcMovementConfig,
   getPlayerPosition = () => null,
+  getPlayerCharacter = () => null,
+  isPlayerAvailable = () => false,
   getWorldTimeSeconds = () => sessionState?.gameplay?.worldTimeSeconds ?? 0,
   getSignPoint = () => GUEST_CONFIG.points.sign,
   localization,
@@ -43,10 +45,10 @@ export function createTavernServiceRuntime(scene, {
 } = {}) {
   const actorProfile = getActorProfile(GUEST_CONFIG.profileId);
   const visualProfile = getCharacterVisualProfile(GUEST_CONFIG.visualProfileId);
-  const diningTableByGuest = new Map();
-  const guestByDiningTable = new Map();
-  const serviceStationByGuest = new Map();
-  const guestByServiceStation = new Map();
+  const servicePlaceByGuest = new Map();
+  const guestByServicePlace = new Map();
+  const needFacilityByGuest = new Map();
+  const guestByNeedFacility = new Map();
   let candidateRandomSource = randomSource;
   let decisionRandomSource = randomSource;
   let forcedCandidatePersonId = null;
@@ -54,46 +56,21 @@ export function createTavernServiceRuntime(scene, {
 
   const definitionsByType = (facilityType) => facilityRuntime?.getDefinitions?.()
     ?.filter((facility) => facility.facilityType === facilityType) ?? [];
-  const servingTableIds = () => definitionsByType("serving-table").map(({ id }) => id);
+  const serviceCapableDefinitions = () => facilityRuntime?.getDefinitions?.()
+    ?.filter((facility) => facility.capabilities?.includes?.("guest-service")) ?? [];
+  const servingTableIds = () => serviceCapableDefinitions().map(({ id }) => id);
   const getServicePoint = (servingTableId) => facilityRuntime?.getDefinition?.(servingTableId)?.usePosition
     ?? definitionsByType("serving-table")[0]?.usePosition
     ?? GUEST_CONFIG.points.insideDoor;
-  const getSeatPoint = (diningTableId) => facilityRuntime?.getDefinition?.(diningTableId)?.usePosition ?? null;
-  const reserveSeat = (guestId, preferredDiningTableId = null) => {
-    const existing = diningTableByGuest.get(guestId);
-    if (existing && getSeatPoint(existing)) return { diningTableId: existing };
-    if (existing) {
-      diningTableByGuest.delete(guestId);
-      guestByDiningTable.delete(existing);
-    }
-    const activeId = facilityRuntime?.getActiveId?.() ?? null;
-    const candidates = definitionsByType("table");
-    const preferred = candidates.find(({ id }) => id === preferredDiningTableId);
-    const selected = [preferred, ...candidates].find((facility, index, values) => facility
-      && values.findIndex((candidate) => candidate?.id === facility.id) === index
-      && facility.id !== activeId
-      && !guestByDiningTable.has(facility.id));
-    if (!selected) return null;
-    diningTableByGuest.set(guestId, selected.id);
-    guestByDiningTable.set(selected.id, guestId);
-    return { diningTableId: selected.id };
-  };
-  const releaseSeat = (guestId, diningTableId = null) => {
-    const tableId = diningTableByGuest.get(guestId) ?? diningTableId;
-    if (!tableId || guestByDiningTable.get(tableId) !== guestId) return false;
-    diningTableByGuest.delete(guestId);
-    guestByDiningTable.delete(tableId);
-    return true;
-  };
-  const claimOrderStation = (guestId, itemId, preferredServingTableId = null) => {
-    const existing = serviceStationByGuest.get(guestId);
+  const claimServicePlace = (guestId, itemId, preferredServingTableId = null) => {
+    const existing = servicePlaceByGuest.get(guestId);
     if (existing && facilityRuntime?.getDefinition?.(existing)) return { servingTableId: existing };
     if (existing) {
-      serviceStationByGuest.delete(guestId);
-      guestByServiceStation.delete(existing);
+      servicePlaceByGuest.delete(guestId);
+      guestByServicePlace.delete(existing);
     }
     const candidates = servingTableIds()
-      .filter((tableId) => !guestByServiceStation.has(tableId) || guestByServiceStation.get(tableId) === guestId);
+      .filter((tableId) => !guestByServicePlace.has(tableId) || guestByServicePlace.get(tableId) === guestId);
     const preferred = candidates.includes(preferredServingTableId) ? preferredServingTableId : null;
     const exact = candidates.filter((tableId) => getServingTableStock(
       sessionState.gameplay.kitchen,
@@ -105,17 +82,41 @@ export function createTavernServiceRuntime(scene, {
     ).itemId);
     const selected = preferred ?? exact[0] ?? empty[0] ?? candidates[0] ?? null;
     if (!selected) return null;
-    serviceStationByGuest.set(guestId, selected);
-    guestByServiceStation.set(selected, guestId);
+    servicePlaceByGuest.set(guestId, selected);
+    guestByServicePlace.set(selected, guestId);
     return { servingTableId: selected };
   };
-  const releaseOrderStation = (guestId, servingTableId = null) => {
-    const tableId = serviceStationByGuest.get(guestId) ?? servingTableId;
-    if (!tableId || guestByServiceStation.get(tableId) !== guestId) return false;
-    serviceStationByGuest.delete(guestId);
-    guestByServiceStation.delete(tableId);
+  const releaseServicePlace = (guestId, servingTableId = null) => {
+    const tableId = servicePlaceByGuest.get(guestId) ?? servingTableId;
+    if (!tableId || guestByServicePlace.get(tableId) !== guestId) return false;
+    servicePlaceByGuest.delete(guestId);
+    guestByServicePlace.delete(tableId);
     return true;
   };
+  const claimNeedFacility = (guestId, intent, preferredFacilityId = null) => {
+    const existing = needFacilityByGuest.get(guestId);
+    if (existing && facilityRuntime?.getDefinition?.(existing)) return { facilityId: existing };
+    if (existing) {
+      needFacilityByGuest.delete(guestId);
+      guestByNeedFacility.delete(existing);
+    }
+    const types = intent === "toilet" ? ["toilet"] : intent === "wash" ? ["sink", "shower"] : [];
+    const candidates = types.flatMap((type) => definitionsByType(type))
+      .filter(({ id }) => !guestByNeedFacility.has(id));
+    const selected = candidates.find(({ id }) => id === preferredFacilityId) ?? candidates[0] ?? null;
+    if (!selected) return null;
+    needFacilityByGuest.set(guestId, selected.id);
+    guestByNeedFacility.set(selected.id, guestId);
+    return { facilityId: selected.id };
+  };
+  const releaseNeedFacility = (guestId, facilityId = null) => {
+    const id = needFacilityByGuest.get(guestId) ?? facilityId;
+    if (!id || guestByNeedFacility.get(id) !== guestId) return false;
+    needFacilityByGuest.delete(guestId);
+    guestByNeedFacility.delete(id);
+    return true;
+  };
+  const getNeedFacilityPoint = (facilityId) => facilityRuntime?.getDefinition?.(facilityId)?.usePosition ?? null;
   const coinRuntime = createCoinRuntime(scene, {
     getPlayerPosition,
     onCollect: ({ value }) => {
@@ -158,7 +159,7 @@ export function createTavernServiceRuntime(scene, {
       randomSource: Number.isFinite(Number(roll)) ? () => Number(roll) : decisionRandomSource,
     });
     const guestId = decision.decision === "VISIT"
-      ? guestRuntime.spawnVisit(candidate.id, decision.bestOfferItemId, decision.acceptableItemIds)
+      ? guestRuntime.spawnVisit(candidate.id, decision.bestOfferItemId, decision.acceptableItemIds, { offerFit: decision.bestOfferFit })
       : null;
     lastDecision = { ...decision, guestId: guestId || null };
     onPersistentMutation({
@@ -200,11 +201,11 @@ export function createTavernServiceRuntime(scene, {
     isOrderItemActive: (itemId) => isVenueOfferItemActive(sessionState.gameplay.venueOffer, itemId),
     getSignPoint,
     getServicePoint,
-    getSeatPoint,
-    claimOrderStation,
-    releaseOrderStation,
-    reserveSeat,
-    releaseSeat,
+    claimServicePlace,
+    releaseServicePlace,
+    claimNeedFacility,
+    releaseNeedFacility,
+    getNeedFacilityPoint,
     reserveExactItem: (guestId, servingTableId, itemId) => reserveServingItem(
       sessionState.gameplay.kitchen,
       guestId,
@@ -221,6 +222,15 @@ export function createTavernServiceRuntime(scene, {
       guestId,
       servingTableId,
     ),
+    getPerson: (personId) => sessionState.gameplay.population.find((person) => person.id === personId) ?? null,
+    getWorldTimeSeconds,
+    getPlayerPosition,
+    isPlayerAvailable,
+    createPlayerFeedback: () => {
+      const player = getPlayerCharacter();
+      return player ? createGuestFeedback(scene, player) : null;
+    },
+    onLiveNeedsChange: onPersistentMutation,
     onReservationChange: () => {
       facilityRuntime?.syncKitchenVisuals?.();
       scene.interactionRuntime?.refresh?.();
@@ -270,6 +280,8 @@ export function createTavernServiceRuntime(scene, {
     getItemLabel: (itemId) => localization.t(itemId === "lemonade"
       ? "hud:venueMenu.lemonade"
       : "hud:venueMenu.friedPotatoDish"),
+    getOrderPrompt: () => "hud:interaction.acceptGuestOrder",
+    getTalkPrompt: () => "hud:interaction.talkGuest",
     createFeedback: (character) => createGuestFeedback(scene, character),
   });
 
@@ -288,6 +300,7 @@ export function createTavernServiceRuntime(scene, {
         person.id,
         itemId,
         sessionState.gameplay.venueOffer.foodItemIds,
+        { offerFit: 0.75 },
       ) : false;
     },
     forceGuestOrder(personId = null, itemId = null) {
@@ -296,9 +309,11 @@ export function createTavernServiceRuntime(scene, {
         ? sessionState.gameplay.population.find((candidate) => candidate.id === personId && !active.includes(candidate.id))
         : sessionState.gameplay.population.find((candidate) => !active.includes(candidate.id));
       const exactItemId = itemId ?? sessionState.gameplay.venueOffer.foodItemIds[0] ?? null;
-      return person ? guestRuntime.spawnVisit(person.id, exactItemId, [exactItemId]) : false;
+      return person ? guestRuntime.spawnVisit(person.id, exactItemId, [exactItemId], { offerFit: 1 }) : false;
     },
     getOrderInteractionDefinitions: () => guestRuntime.getInteractionDefinitions(),
+    getGuestInteractionDefinitions: () => guestRuntime.getInteractionDefinitions(),
+    handleGuestInteraction: (candidate) => guestRuntime.handleGuestInteraction(candidate),
     acceptGuestOrder: (guestId) => guestRuntime.acceptGuestOrder(guestId),
     setGuestOrderElapsedMs: (guestId, value) => guestRuntime.setOrderElapsedMs(guestId, value),
     setForcedCandidatePersonId(personId) {
@@ -345,8 +360,8 @@ export function createTavernServiceRuntime(scene, {
     getState: () => ({
       guests: guestRuntime.getState(),
       coins: coinRuntime.getState(),
-      diningReservations: Object.fromEntries(diningTableByGuest),
-      orderStations: Object.fromEntries(serviceStationByGuest),
+      servicePlaces: Object.fromEntries(servicePlaceByGuest),
+      needFacilities: Object.fromEntries(needFacilityByGuest),
       demand: {
         opportunityRemainingMs: sessionState.gameplay.tavernService.opportunityRemainingMs,
         lastDecision: lastDecision ? { ...lastDecision } : null,

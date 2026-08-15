@@ -138,7 +138,11 @@ test.describe("Task #061 Sims-like needs", () => {
       return api.getRuntimeState().interactionTimeline;
     });
     expect(approach).toMatchObject({ phase: "approach", protectedNeed: null, metadata: { id: "editor-table-3" } });
-    await expect.poll(async () => (await page.evaluate(() => window.__NESTLED_BURROW_E2E__.getRuntimeState())).interactionTimeline.phase).toBe("active");
+    await expect.poll(async () => page.evaluate(() => {
+      const api = window.__NESTLED_BURROW_E2E__;
+      api.advanceWorldSimulation(100);
+      return api.getRuntimeState().interactionTimeline.phase;
+    })).toBe("active");
     const arrived = await page.evaluate(() => {
       const api = window.__NESTLED_BURROW_E2E__;
       return { motor: api.getCharacterSnapshot("player").position, visual: api.getPlayerVisualState() };

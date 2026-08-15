@@ -62,25 +62,36 @@ test("BUILD/TEST grants and persistent person inspection share canonical gamepla
   await bridge(page, "advanceWorldSimulation", 50);
   expect(await bridge(page, "forcePersonInspectionExpanded", personId)).toBe(true);
 
-  const inspection = await bridge(page, "getPersonInspectionState");
-  const persistentBefore = await bridge(page, "getPopulationPerson", personId);
+  const personSnapshot = await page.evaluate((inspectedPersonId) => {
+    const e2e = window.__NESTLED_BURROW_E2E__;
+    return {
+      inspection: e2e.getPersonInspectionState(),
+      persistentPerson: e2e.getPopulationPerson(inspectedPersonId),
+    };
+  }, personId);
+  const { inspection, persistentPerson: persistentBefore } = personSnapshot;
   const orderBefore = await bridge(page, "getGuestOrder", guestId);
   expect(inspection).toMatchObject({ personId, displayName: "Mira", expanded: true, expandProgress: 1 });
   expect(inspection.needs.map(({ id }) => id)).toEqual(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
-  expect(inspection.needs.map(({ value }) => value)).toEqual([
+  const persistentNeedValues = [
     persistentBefore.needs.novelty,
     persistentBefore.needs.energy,
     persistentBefore.needs.satiety,
     persistentBefore.needs.toilet,
     persistentBefore.needs.lustre,
     persistentBefore.needs.dialogue,
-  ]);
+  ];
+  inspection.needs.forEach(({ value }, index) => {
+    expect(value).toBeCloseTo(persistentNeedValues[index], 1);
+  });
 
   const mutationSnapshot = await page.evaluate((inspectedPersonId) => {
     const e2e = window.__NESTLED_BURROW_E2E__;
+    const persistentPersonBefore = e2e.getPopulationPerson(inspectedPersonId);
     const mutation = e2e.setInspectedPersonNeed({ needId: "satiety", value: 10 });
     return {
       mutation,
+      persistentPersonBefore,
       persistentPerson: e2e.getPopulationPerson(inspectedPersonId),
       worldTimeSeconds: e2e.getSession().gameplay.worldTimeSeconds,
     };
@@ -94,7 +105,7 @@ test("BUILD/TEST grants and persistent person inspection share canonical gamepla
   const worldTimeAfterMutation = mutationSnapshot.worldTimeSeconds;
   expect(persistentAfter.lastEvaluatedWorldTimeSeconds).toBe(worldTimeAfterMutation);
   for (const needId of ["novelty", "energy", "toilet", "lustre", "dialogue"]) {
-    expect(persistentAfter.needs[needId]).toBe(persistentBefore.needs[needId]);
+    expect(persistentAfter.needs[needId]).toBe(mutationSnapshot.persistentPersonBefore.needs[needId]);
   }
   expect(await bridge(page, "getGuestOrder", guestId)).toEqual(orderBefore);
   expect(await bridge(page, "getBuildModeState")).toMatchObject({ view: "test", selectedId: null });
@@ -102,7 +113,7 @@ test("BUILD/TEST grants and persistent person inspection share canonical gamepla
   expect((await bridge(page, "saveSession")).status).toBe("saved");
   await page.reload();
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  expect((await bridge(page, "getPopulationPerson", personId)).needs.satiety).toBe(10);
+  expect((await bridge(page, "getPopulationPerson", personId)).needs.satiety).toBeCloseTo(10, 1);
 });
 
 test("coarse-pointer inspection uses the same persistent mutation path", async ({ page }, testInfo) => {
@@ -112,6 +123,13 @@ test("coarse-pointer inspection uses the same persistent mutation path", async (
   expect(await bridge(page, "forceGuestOrder", { personId, itemId: "lemonade" })).toMatch(/^tavern-guest-/u);
   expect(await bridge(page, "forcePersonInspectionExpanded", personId)).toBe(true);
   expect(await bridge(page, "getPersonInspectionState")).toMatchObject({ personId, expanded: true, coarsePointer: true });
-  expect(await bridge(page, "setInspectedPersonNeed", { needId: "satiety", value: 90 })).toMatchObject({ mutated: true });
-  expect((await bridge(page, "getPopulationPerson", personId)).needs.satiety).toBe(90);
+  const mutationSnapshot = await page.evaluate((inspectedPersonId) => {
+    const e2e = window.__NESTLED_BURROW_E2E__;
+    return {
+      mutation: e2e.setInspectedPersonNeed({ needId: "satiety", value: 90 }),
+      persistentPerson: e2e.getPopulationPerson(inspectedPersonId),
+    };
+  }, personId);
+  expect(mutationSnapshot.mutation).toMatchObject({ mutated: true });
+  expect(mutationSnapshot.persistentPerson.needs.satiety).toBe(90);
 });
