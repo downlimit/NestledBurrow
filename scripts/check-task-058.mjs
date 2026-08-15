@@ -44,7 +44,7 @@ const current = createFreshGameSessionState();
 current.gameplay.kitchen.servingTables = kitchen.servingTables;
 const reloaded = deserializeSessionEnvelope(serializeSessionEnvelope(current));
 assert.equal(reloaded.status, "loaded");
-assert.equal(reloaded.state.version, 15);
+assert.equal(reloaded.state.version, 16);
 assert.deepEqual(reloaded.state.gameplay.kitchen.servingTables, kitchen.servingTables);
 
 const legacy = createFreshGameSessionState();
@@ -60,8 +60,8 @@ assert.deepEqual(migrated.state.gameplay.kitchen.servingTables["home-serving-tab
   itemId: "lemonade", quantity: 1, reservations: [],
 });
 assert.equal(getInventoryQuantity(migrated.state.gameplay.inventory, "lemonade"), 3);
-assert.equal(SESSION_STATE_VERSION, 15);
-assert.equal(SAVE_SCHEMA_VERSION, 15);
+assert.equal(SESSION_STATE_VERSION, 16);
+assert.equal(SAVE_SCHEMA_VERSION, 16);
 
 const guestSource = readFileSync("src/tavern/guestRuntime.js", "utf8");
 assert(guestSource.includes("servingTableId"));

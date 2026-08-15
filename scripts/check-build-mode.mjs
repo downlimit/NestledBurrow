@@ -329,28 +329,28 @@ runtime.setScrollOffset(0);
 
 const demolishEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "demolish");
 selectLibraryItem(demolishEntry);
-scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
+scene.input.emit("pointermove", { x: 300, worldX: 35, worldY: 50, isDown: false });
 assert.deepEqual(demolitionPreviews.at(-1), { x: 32, y: 48, rawX: 35, rawY: 50 }, "demolition hover identifies the precise target before click");
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+scene.input.emit("pointerdown", { x: 300, worldX: 35, worldY: 50 });
 assert.deepEqual(demolitions[0], { point: { x: 32, y: 48, rawX: 35, rawY: 50 }, onlyType: null }, "demolition keeps snapped and precise world coordinates");
-scene.input.emit("pointermove", { x: 220, worldX: 49, worldY: 50, isDown: true });
+scene.input.emit("pointermove", { x: 320, worldX: 49, worldY: 50, isDown: true });
 assert.equal(demolitions[1].onlyType, "wall", "demolition drag locks to the first removed object type");
 scene.input.emit("pointerup", {});
 const pathEntry = runtime.objects.find((entry) => entry.type === "item" && entry.item.id === "path");
 selectLibraryItem(pathEntry);
 movableHit = true;
 const moveHoverCountBeforeSurface = moveHovers.length;
-scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
+scene.input.emit("pointermove", { x: 300, worldX: 35, worldY: 50, isDown: false });
 assert.equal(moveHovers.length, moveHoverCountBeforeSurface, "ground brushes suppress existing-object move hover");
 const movesBeforeSurface = moves.length;
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
-scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+scene.input.emit("pointerdown", { x: 300, worldX: 35, worldY: 50 });
+scene.input.emit("pointermove", { x: 320, worldX: 67, worldY: 82, isDown: true });
 scene.input.emit("pointerup", {});
 assert.equal(moves.length, movesBeforeSurface, "ground brushes cannot pick up an existing object");
 movableHit = false;
 assert.equal(runtime.getState().selectedId, "path", "library selection is explicit");
 placements.length = 0;
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+scene.input.emit("pointerdown", { x: 300, worldX: 35, worldY: 50 });
 assert.equal(placements.length, 0, "pointerdown creates only a build preview");
 assert.deepEqual(previews.at(-1).points, [{ x: 32, y: 48, rawX: 35, rawY: 50 }], "the preview starts on the snapped world grid");
 scene.input.emit("pointermove", { x: 260, worldX: 83, worldY: 50, isDown: true });
@@ -374,9 +374,9 @@ selectLibraryItem(bedEntry);
 movableHit = true;
 const movesBeforeOccupiedPlacement = moves.length;
 const placementsBeforeOccupiedPlacement = placements.length;
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
+scene.input.emit("pointerdown", { x: 300, worldX: 35, worldY: 50 });
 assert.equal(runtime.drag?.mode, "place", "a selected catalog object stays in placement mode over an existing movable object");
-scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+scene.input.emit("pointermove", { x: 320, worldX: 67, worldY: 82, isDown: true });
 scene.input.emit("pointerup", {});
 assert.equal(moves.length, movesBeforeOccupiedPlacement, "occupied placement never picks up the object under the cursor");
 assert.equal(placements.length, placementsBeforeOccupiedPlacement + 1, "occupied placement still delegates final validity to the world placement contract");
@@ -384,10 +384,10 @@ assert.equal(placements.length, placementsBeforeOccupiedPlacement + 1, "occupied
 selectLibraryItem(bedEntry);
 assert.equal(runtime.getState().selectedId, null, "clicking the selected catalog object again enters dedicated movement mode");
 const hoverCountBeforeMoveMode = moveHovers.length;
-scene.input.emit("pointermove", { x: 200, worldX: 35, worldY: 50, isDown: false });
+scene.input.emit("pointermove", { x: 300, worldX: 35, worldY: 50, isDown: false });
 assert.equal(moveHovers.length, hoverCountBeforeMoveMode + 1, "dedicated movement mode highlights an existing object under the cursor");
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 50 });
-scene.input.emit("pointermove", { x: 220, worldX: 67, worldY: 82, isDown: true });
+scene.input.emit("pointerdown", { x: 300, worldX: 35, worldY: 50 });
+scene.input.emit("pointermove", { x: 320, worldX: 67, worldY: 82, isDown: true });
 assert.deepEqual(
   (({ x, y, rawX, rawY }) => ({ x, y, rawX, rawY }))(movePreviews.at(-1).point),
   { x: 64, y: 80, rawX: 67, rawY: 82 },
@@ -404,10 +404,10 @@ runtime.setScrollOffset(Math.max(0, bedEntry.baseY - 140));
 const bedPanelY = bedEntry.baseY - runtime.getState().scrollOffset + 1;
 const placementsBeforeDirectDrag = placements.length;
 scene.input.emit("pointerdown", { x: bedEntry.x + 1, y: bedPanelY, id: 77, event: { timeStamp: 100 } });
-scene.input.emit("pointermove", { x: 190, y: bedPanelY, worldX: 96, worldY: 112, id: 77, isDown: true, event: { timeStamp: 116 } });
+scene.input.emit("pointermove", { x: 290, y: bedPanelY, worldX: 96, worldY: 112, id: 77, isDown: true, event: { timeStamp: 116 } });
 assert.equal(runtime.panelDrag, null, "horizontal drag of a placeable asset leaves the catalog and starts world placement");
 assert.equal(runtime.drag?.mode, "place", "catalog drag always creates a new object even over an existing movable object");
-scene.input.emit("pointermove", { x: 220, y: bedPanelY, worldX: 128, worldY: 144, id: 77, isDown: true, event: { timeStamp: 132 } });
+scene.input.emit("pointermove", { x: 320, y: bedPanelY, worldX: 128, worldY: 144, id: 77, isDown: true, event: { timeStamp: 132 } });
 scene.input.emit("pointerup", { id: 77 });
 assert.equal(placements.length, placementsBeforeDirectDrag + 1, "releasing a catalog drag places one new object at its final preview");
 movableHit = false;
@@ -417,9 +417,9 @@ selectLibraryItem(wallEntry);
 movableHit = true;
 const movesBeforeWall = moves.length;
 const placementsBeforeWallDrag = placements.length;
-scene.input.emit("pointerdown", { x: 200, worldX: 35, worldY: 40 });
+scene.input.emit("pointerdown", { x: 300, worldX: 35, worldY: 40 });
 assert.equal(placements.length, placementsBeforeWallDrag, "wall placement waits for the gesture direction");
-scene.input.emit("pointermove", { x: 220, worldX: 43, worldY: 84, isDown: true });
+scene.input.emit("pointermove", { x: 320, worldX: 43, worldY: 84, isDown: true });
 assert.equal(placements.length, placementsBeforeWallDrag, "wall drag remains a preview until release");
 assert.deepEqual(previews.at(-1).points.map(({ x, y }) => ({ x, y })), [
   { x: 32, y: 48 },
@@ -445,7 +445,7 @@ assert.deepEqual(
   "wall drag passes adjacent vertex pairs instead of auto-connecting clicks",
 );
 const placementsBeforeWallClick = placements.length;
-scene.input.emit("pointerdown", { x: 200, worldX: 40, worldY: 47 });
+scene.input.emit("pointerdown", { x: 300, worldX: 40, worldY: 47 });
 scene.input.emit("pointerup", {});
 assert.equal(placements.length, placementsBeforeWallClick + 1, "a wall can still be placed with a single click");
 assert.deepEqual(placements.at(-1).point, { x: 48, y: 48, rawX: 40, rawY: 47 }, "a wall click creates a column at the nearest grid intersection");

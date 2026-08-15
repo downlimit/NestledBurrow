@@ -253,6 +253,9 @@ class WorldBuildCoordinator {
     isActivationAllowed = () => true,
     getBuildGridEnabled = () => false,
     onModeChange = () => {},
+    onTestGrant = () => ({ status: "ignored", mutated: false }),
+    onTestCoinGrant = () => ({ status: "ignored", mutated: false }),
+    isPointerBlocked = () => false,
     constructionEnabled = true,
     getFixedWorldAuthoringInstances = () => [],
   }) {
@@ -279,6 +282,9 @@ class WorldBuildCoordinator {
     this.isActivationAllowed = isActivationAllowed;
     this.getBuildGridEnabled = getBuildGridEnabled;
     this.onModeChange = onModeChange;
+    this.onTestGrant = onTestGrant;
+    this.onTestCoinGrant = onTestCoinGrant;
+    this.isPointerBlocked = isPointerBlocked;
     this.constructionEnabled = Boolean(constructionEnabled);
     this.getFixedWorldAuthoringInstances = getFixedWorldAuthoringInstances;
     this.buildMode = null;
@@ -320,6 +326,9 @@ class WorldBuildCoordinator {
       getPlacementAnchorOffset: (item) => this.getBuildPlacementAnchorOffset(item),
       isActivationAllowed: this.isActivationAllowed,
       onModeChange: this.onModeChange,
+      onTestGrant: this.onTestGrant,
+      onTestCoinGrant: this.onTestCoinGrant,
+      isPointerBlocked: this.isPointerBlocked,
       ...(this.constructionEnabled ? {} : { assetGroups: [] }),
     });
     const syncBuildGridVisibility = () => this.buildMode?.setGridEnabled?.(this.getBuildGridEnabled());

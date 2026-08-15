@@ -10,7 +10,7 @@ async function bridge(page, method, argument) {
 }
 
 async function bootFresh(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./?movementDebug=1");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
   await page.evaluate(() => localStorage.clear());
@@ -21,7 +21,7 @@ async function bootFresh(page) {
 async function clickLogical(page, point) {
   const canvas = await page.locator("canvas").boundingBox();
   if (!canvas) throw new Error("Game canvas is unavailable");
-  await page.mouse.click(canvas.x + point.x * canvas.width / 320, canvas.y + point.y * canvas.height / 180);
+  await page.mouse.click(canvas.x + point.x * canvas.width / 640, canvas.y + point.y * canvas.height / 360);
 }
 
 async function openTavern(page) {
@@ -31,7 +31,7 @@ async function openTavern(page) {
   }).toBe("tavern-open-sign");
   await bridge(page, "interact");
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(true);
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   await clickLogical(page, { x: 12, y: 90 });
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
@@ -147,7 +147,14 @@ test("acceptable stock completes once, persists personId and updates visitor his
   await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
   await bridge(page, "setVisitCandidatePersonId", person.id);
   await bridge(page, "setVisitDecisionRoll", 0);
-  expect((await bridge(page, "forceVisitOpportunity")).guestId).toBe("tavern-guest-1");
+  const visit = await bridge(page, "forceVisitOpportunity");
+  expect(visit.guestId).toBe("tavern-guest-1");
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getGuestOrder", visit.guestId))?.order?.status,
+    (status) => status === "offered",
+  );
+  expect(await bridge(page, "acceptGuestOrder", visit.guestId)).toMatchObject({ status: "order-accepted", mutated: true });
   await advanceUntil(page, async () => (await bridge(page, "getCoinState")).length, (count) => count === 1);
   const history = await bridge(page, "getVisitorHistory");
   expect(history[person.id].completedVisitCount).toBe(1);

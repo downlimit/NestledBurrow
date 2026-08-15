@@ -30,6 +30,7 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.js"), "utf8");
 const cameraFollowSource = fs.readFileSync(path.join(root, "src/character/cameraFollowRuntime.js"), "utf8");
+const presentationCameraSource = fs.readFileSync(path.join(root, "src/ui/presentationCameraRuntime.js"), "utf8");
 const visualConfigSource = fs.readFileSync(path.join(root, "src/character/visualConfig.js"), "utf8");
 const visualProfilesSource = fs.readFileSync(path.join(root, "src/character/characterVisualProfiles.js"), "utf8");
 const characterVisualSource = fs.readFileSync(path.join(root, "src/character/characterVisual.js"), "utf8");
@@ -118,8 +119,8 @@ for (const relativePath of [...removedSourcePaths, ...removedPublicAtlasPaths]) 
 }
 
 assert.equal(TILE_SIZE, 16);
-assert.equal(GAME_WIDTH, 320);
-assert.equal(GAME_HEIGHT, 180);
+assert.equal(GAME_WIDTH, 640);
+assert.equal(GAME_HEIGHT, 360);
 assert.equal(
   BASIC_VILLAGE_ASSET_PATH,
   "assets/third-party/basic-village",
@@ -129,9 +130,12 @@ assert(/BASIC_VILLAGE_ASSET_PATH/.test(mainSource), "scene uses the canonical as
 assert(/load\.spritesheet/.test(mainSource), "verified 16x16 sheets are loaded as spritesheets");
 assert(!/kenney-room|kenney-world-extension/.test(mainSource), "runtime does not reference removed legacy atlases");
 assert(!/ROOM_SCALE|PLAYER_SCALE|Phaser\.Scale\.FIT/.test(mainSource));
-assert(/Phaser\.Scale\.MAX_ZOOM/.test(mainSource), "display zoom remains integer");
+assert(/Phaser\.Scale\.MAX_ZOOM/.test(mainSource), "Phaser retains its pixel-art startup zoom policy");
 assert(/Phaser\.Scale\.Events\.RESIZE/.test(mainSource), "zoom is recalculated after resize");
-assert(/getMaxZoom\(\)/.test(mainSource), "integer zoom comes from Phaser max zoom");
+assert(/displayZoomForViewport\(window\.innerWidth, window\.innerHeight\)/.test(mainSource), "display zoom fits narrow viewports and keeps integer enlargement when space allows");
+assert(/WORLD_CAMERA_ZOOM\s*=\s*2/.test(presentationCameraSource), "world camera preserves the original 320x180 apparent world view");
+assert(/cameras\.add\(0, 0, GAME_WIDTH, GAME_HEIGHT/.test(presentationCameraSource), "HUD owns a separate 640x360 presentation camera");
+assert(/scrollFactorX/.test(presentationCameraSource) && /cameraFilter/.test(presentationCameraSource), "screen-space objects are isolated from world-camera zoom");
 assert(/new CameraFollowRuntime\(this,/.test(mainSource), "scene composes the camera follow runtime");
 assert(/startFollow\(this\.followTarget, true, 1, 1\)/.test(cameraFollowSource), "camera follow uses a rounded target");
 assert(/cameras\.main\.roundPixels\s*=\s*true/.test(cameraFollowSource), "active camera rounds its scroll for every world visual");

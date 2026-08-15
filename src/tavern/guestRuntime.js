@@ -1,13 +1,22 @@
 import { createActorNavigation, findGridPath } from "./gridPathfinder.js";
 import { GUEST_ACTIVE_CAP } from "./tavernServiceDomain.js";
+import {
+  advanceOrderTimer,
+  createPlannedOrder,
+  ORDER_STATUS,
+  transitionOrder,
+} from "./orderDomain.js";
 
 const NAVIGATION_CELL_SIZE = 16;
 const TARGET_SEARCH_RADIUS_CELLS = 2;
+export const GUEST_ORDER_INTERACTION_KIND = "accept-tavern-order";
 
 export const GUEST_STATES = Object.freeze({
   approachingSign: "approaching-sign",
   checkingSign: "checking-sign",
-  entering: "entering",
+  approachingOrder: "approaching-order",
+  offered: "offered-order",
+  accepted: "accepted-order",
   approachingService: "approaching-service",
   carryingToSeat: "carrying-to-seat",
   eating: "eating",
@@ -22,18 +31,29 @@ export function createGuestRuntime({
   createGuest,
   removeGuest,
   getTavernOpen,
+  isOrderItemActive = () => true,
   getSignPoint = () => config.points.sign,
   getServicePoint,
   getSeatPoint,
+  claimOrderStation = () => null,
+  releaseOrderStation = () => false,
   reserveSeat = () => null,
   releaseSeat = () => false,
-  reserveItem = () => null,
+  reserveExactItem = () => null,
   releaseReservation = () => false,
   consumeReservation = () => null,
   onReservationChange = () => {},
+  onOrderChange = () => {},
+  onOrderFailure = () => {},
+  onVisitFinished = () => {},
   onPurchaseComplete = () => {},
   getSalePrice = () => 0,
-  createFeedback = () => ({ set: () => {}, update: () => {}, destroy: () => {} }),
+  getPersonDisplayName = (personId) => personId,
+  getItemLabel = (itemId) => itemId,
+  getOrderPrompt = (itemId) => itemId === "lemonade"
+    ? "hud:interaction.acceptOrderLemonade"
+    : "hud:interaction.acceptOrderFriedPotato",
+  createFeedback = () => ({ set: () => {}, setOrder: () => {}, update: () => {}, destroy: () => {} }),
 }) {
   if (typeof getSignPoint !== "function" || typeof getServicePoint !== "function" || typeof getSeatPoint !== "function") {
     throw new Error("Guest runtime requires live sign, service and seat point resolvers");
@@ -50,6 +70,8 @@ export function createGuestRuntime({
     for (const visit of [...visits.values()]) {
       visit.feedback.update?.();
       visit.stateElapsedMs += delta;
+      const timer = advanceOrderTimer(visit.order, delta);
+      visit.orderTimedOut = timer.timedOut;
       syncMovingFacilityTarget(visit);
       if (visit.path) updateMovement(visit, delta);
       else updateStationary(visit);
@@ -57,14 +79,45 @@ export function createGuestRuntime({
     syncPersistedState();
   }
 
-  function spawnVisit(personId, acceptableItemIds = []) {
+  function spawnVisit(personId, orderItemId, acceptableItemIds = []) {
     if (destroyed || visits.size >= GUEST_ACTIVE_CAP || !personId) return false;
     if ([...visits.values()].some((visit) => visit.personId === personId)) return false;
+    if (Array.isArray(orderItemId)) {
+      acceptableItemIds = orderItemId;
+      [orderItemId] = acceptableItemIds;
+    }
+    let order;
+    try {
+      order = createPlannedOrder(orderItemId);
+    } catch {
+      return false;
+    }
     const id = `tavern-guest-${++serviceState.nextGuestId}`;
     const controller = config.createController();
     const character = createGuest(controller, id, config.points.spawn);
     const feedback = createFeedback(character);
-    const visit = {
+    const visit = baseVisit({
+      id,
+      personId,
+      character,
+      controller,
+      feedback,
+      order,
+      acceptableItemIds,
+      position: config.points.spawn,
+    });
+    visits.set(id, visit);
+    feedback.set("arriving");
+    if (!planTo(visit, getSignPoint())) {
+      cancelVisit(visit);
+      return false;
+    }
+    syncPersistedState();
+    return id;
+  }
+
+  function baseVisit({ id, personId, character, controller, feedback, order, acceptableItemIds }) {
+    return {
       id,
       personId,
       character,
@@ -79,57 +132,67 @@ export function createGuestRuntime({
       replans: 0,
       target: getSignPoint(),
       signDecision: null,
-      itemId: null,
+      order,
+      orderTimedOut: false,
+      itemId: order.itemId,
       acceptableItemIds: [...acceptableItemIds],
       servingTableId: null,
       diningTableId: null,
       reservationActive: false,
       mealCompleted: false,
       paid: false,
+      failureRecorded: false,
     };
-    visits.set(id, visit);
-    feedback.set("arriving");
-    if (!planTo(visit, getSignPoint())) {
-      cancelVisit(visit);
-      return false;
-    }
-    syncPersistedState();
-    return id;
   }
 
   function restoreVisit(snapshot) {
     const controller = config.createController();
     const character = createGuest(controller, snapshot.id, snapshot.position);
-    const visit = {
+    const visit = baseVisit({
       id: snapshot.id,
       personId: snapshot.personId,
       character,
       controller,
       feedback: createFeedback(character),
-      state: snapshot.state,
+      order: { ...snapshot.order },
+      acceptableItemIds: snapshot.acceptableItemIds,
+    });
+    Object.assign(visit, {
+      state: restoreState(snapshot),
       stateElapsedMs: snapshot.stateElapsedMs,
-      path: null,
-      waypointIndex: 0,
-      blockedMs: 0,
-      lastWaypointDistance: Number.POSITIVE_INFINITY,
-      replans: 0,
       target: null,
       signDecision: snapshot.state === GUEST_STATES.checkingSign ? null : true,
-      itemId: snapshot.itemId,
-      acceptableItemIds: [...snapshot.acceptableItemIds],
+      itemId: snapshot.itemId ?? snapshot.order.itemId,
       servingTableId: snapshot.servingTableId,
       diningTableId: snapshot.diningTableId,
       reservationActive: snapshot.reservationActive,
       mealCompleted: snapshot.mealCompleted,
       paid: snapshot.paid,
-    };
-    if (visit.itemId === "fried-potato-dish" && visit.state !== GUEST_STATES.leaving) {
+      failureRecorded: snapshot.order.status === ORDER_STATUS.failed,
+    });
+    if (visit.servingTableId) claimOrderStation(visit.id, visit.order.itemId, visit.servingTableId);
+    if (visit.order.itemId === "fried-potato-dish" && visit.diningTableId) {
       visit.diningTableId = reserveSeat(visit.id, visit.diningTableId)?.diningTableId ?? null;
     }
     visits.set(visit.id, visit);
-    visit.feedback.set(feedbackForState(visit));
+    setFeedbackForVisit(visit);
     const target = targetForState(visit);
-    if (target) planTo(visit, target);
+    if (target && !planTo(visit, target)) cancelVisit(visit);
+  }
+
+  function restoreState(snapshot) {
+    const status = snapshot.order.status;
+    if (status === ORDER_STATUS.offered) return GUEST_STATES.offered;
+    if (status === ORDER_STATUS.accepted) return GUEST_STATES.accepted;
+    if (status === ORDER_STATUS.reserved) return GUEST_STATES.approachingService;
+    if (status === ORDER_STATUS.failed) return GUEST_STATES.leaving;
+    if (status === ORDER_STATUS.completed) return GUEST_STATES.leaving;
+    if (status === ORDER_STATUS.served) {
+      return snapshot.order.itemId === "fried-potato-dish"
+        ? (snapshot.state === GUEST_STATES.eating ? GUEST_STATES.eating : GUEST_STATES.carryingToSeat)
+        : GUEST_STATES.leaving;
+    }
+    return Object.values(GUEST_STATES).includes(snapshot.state) ? snapshot.state : GUEST_STATES.approachingSign;
   }
 
   function updateMovement(visit, deltaMs) {
@@ -159,81 +222,104 @@ export function createGuestRuntime({
   }
 
   function updateStationary(visit) {
-    if (visit.state === GUEST_STATES.approachingService
-      && visit.itemId === "fried-potato-dish"
-      && visit.reservationActive
-      && !visit.diningTableId) {
-      visit.diningTableId = reserveSeat(visit.id)?.diningTableId ?? null;
-      if (visit.diningTableId) arrive(visit);
+    if (visit.state === GUEST_STATES.checkingSign) updateSignCheck(visit);
+    else if (visit.state === GUEST_STATES.offered) updateOfferedOrder(visit);
+    else if (visit.state === GUEST_STATES.accepted) updateAcceptedOrder(visit);
+    else if (visit.order.status === ORDER_STATUS.failed) updateFailedOrder(visit);
+    else if (visit.state === GUEST_STATES.eating) updateEating(visit);
+  }
+
+  function updateSignCheck(visit) {
+    if (visit.signDecision === null && visit.stateElapsedMs >= config.signCheckMs) {
+      visit.signDecision = getTavernOpen() && isOrderItemActive(visit.order.itemId);
+      visit.stateElapsedMs = 0;
+      visit.feedback.set(visit.signDecision ? "open-reaction" : "closed-reaction");
       return;
     }
-    if (visit.state === GUEST_STATES.checkingSign) {
-      if (visit.signDecision === null && visit.stateElapsedMs >= config.signCheckMs) {
-        visit.signDecision = getTavernOpen();
-        visit.stateElapsedMs = 0;
-        visit.feedback.set(visit.signDecision ? "open-reaction" : "closed-reaction");
-        return;
-      }
-      if (visit.signDecision === null || visit.stateElapsedMs < (config.signReactionMs ?? 0)) return;
-      if (!visit.signDecision) {
-        releaseVisitReservation(visit);
-        transition(visit, GUEST_STATES.leaving, config.points.exit);
-        return;
-      }
-      if (!visit.reservationActive) {
-        const claims = reserveServiceClaims(visit.id, visit.acceptableItemIds);
-        const reservation = claims?.reservation ?? null;
-        if (!reservation) {
-          transition(visit, GUEST_STATES.leaving, config.points.exit);
-          return;
-        }
-        visit.reservationActive = true;
-        visit.itemId = reservation.itemId;
-        visit.servingTableId = reservation.servingTableId;
-        visit.diningTableId = claims.diningTableId;
-        onReservationChange({
-          guestId: visit.id,
-          active: true,
-          itemId: reservation.itemId,
-          servingTableId: reservation.servingTableId,
-          diningTableId: visit.diningTableId,
-        });
-      }
-      transition(visit, GUEST_STATES.approachingService, getServicePoint(visit.servingTableId));
+    if (visit.signDecision === null || visit.stateElapsedMs < (config.signReactionMs ?? 0)) return;
+    if (!visit.signDecision || !getTavernOpen() || !isOrderItemActive(visit.order.itemId)) {
+      leaveWithoutFailure(visit);
       return;
     }
-    if (visit.state === GUEST_STATES.eating) {
-      const seatPoint = getSeatPoint(visit.diningTableId);
-      if (!seatPoint) {
-        cancelVisit(visit);
-        return;
+    const station = claimOrderStation(visit.id, visit.order.itemId, visit.servingTableId);
+    if (!station) {
+      if (visit.stateElapsedMs >= (config.signReactionMs ?? 0) + (config.orderStationWaitMs ?? 10_000)) {
+        leaveWithoutFailure(visit);
       }
-      if (!visit.mealCompleted && !isNearPoint(visit.character.motor.position, seatPoint, config.arrivalRadius)) {
-        transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
-        return;
-      }
-      if (!visit.mealCompleted && visit.stateElapsedMs >= config.eatingMs) {
-        visit.mealCompleted = true;
-        visit.stateElapsedMs = 0;
-        visit.feedback.set("meal-complete");
-        completePurchase(visit);
-      } else if (visit.mealCompleted && visit.stateElapsedMs >= (config.mealCompleteReactionMs ?? 0)) {
-        transition(visit, GUEST_STATES.leaving, config.points.exit);
-      }
+      return;
+    }
+    visit.servingTableId = station.servingTableId;
+    transition(visit, GUEST_STATES.approachingOrder, getServicePoint(visit.servingTableId));
+  }
+
+  function updateOfferedOrder(visit) {
+    if (!getTavernOpen() || !isOrderItemActive(visit.order.itemId) || visit.orderTimedOut) {
+      leaveWithoutFailure(visit);
     }
   }
 
-  function reserveServiceClaims(guestId, acceptableItemIds) {
-    const excludedServingTableIds = [];
-    while (true) {
-      const reservation = reserveItem(guestId, { excludedServingTableIds, acceptableItemIds });
-      if (!reservation) return null;
-      if (reservation.itemId !== "fried-potato-dish") return { reservation, diningTableId: null };
-      const diningTableId = reserveSeat(guestId)?.diningTableId ?? null;
-      if (diningTableId) return { reservation, diningTableId };
-      releaseReservation(guestId, reservation.servingTableId);
-      if (excludedServingTableIds.includes(reservation.servingTableId)) return null;
-      excludedServingTableIds.push(reservation.servingTableId);
+  function updateAcceptedOrder(visit) {
+    if (visit.orderTimedOut) {
+      transitionOrder(visit.order, ORDER_STATUS.failed);
+      visit.failureRecorded = true;
+      releaseOrderStation(visit.id, visit.servingTableId);
+      onOrderFailure(orderSnapshot(visit));
+      onOrderChange(orderSnapshot(visit));
+      visit.stateElapsedMs = 0;
+      visit.feedback.set("order-failed");
+      return;
+    }
+    reserveAcceptedOrder(visit);
+  }
+
+  function reserveAcceptedOrder(visit) {
+    if (visit.order.itemId === "fried-potato-dish" && !visit.diningTableId) {
+      visit.diningTableId = reserveSeat(visit.id)?.diningTableId ?? null;
+      if (!visit.diningTableId) return false;
+    }
+    const reservation = reserveExactItem(
+      visit.id,
+      visit.servingTableId,
+      visit.order.itemId,
+    );
+    if (!reservation) return false;
+    visit.reservationActive = true;
+    transitionOrder(visit.order, ORDER_STATUS.reserved);
+    onReservationChange({
+      guestId: visit.id,
+      active: true,
+      itemId: reservation.itemId,
+      servingTableId: reservation.servingTableId,
+      diningTableId: visit.diningTableId,
+    });
+    onOrderChange(orderSnapshot(visit));
+    transition(visit, GUEST_STATES.approachingService, getServicePoint(visit.servingTableId), { preserveFeedback: true });
+    return true;
+  }
+
+  function updateFailedOrder(visit) {
+    if (visit.stateElapsedMs >= (config.signReactionMs ?? 900)) {
+      transition(visit, GUEST_STATES.leaving, config.points.exit, { preserveFeedback: true });
+    }
+  }
+
+  function updateEating(visit) {
+    const seatPoint = getSeatPoint(visit.diningTableId);
+    if (!seatPoint) {
+      cancelVisit(visit);
+      return;
+    }
+    if (!visit.mealCompleted && !isNearPoint(visit.character.motor.position, seatPoint, config.arrivalRadius)) {
+      transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
+      return;
+    }
+    if (!visit.mealCompleted && visit.stateElapsedMs >= config.eatingMs) {
+      visit.mealCompleted = true;
+      visit.stateElapsedMs = 0;
+      visit.feedback.set("meal-complete");
+      completePurchase(visit);
+    } else if (visit.mealCompleted && visit.stateElapsedMs >= (config.mealCompleteReactionMs ?? 0)) {
+      transition(visit, GUEST_STATES.leaving, config.points.exit);
     }
   }
 
@@ -245,43 +331,13 @@ export function createGuestRuntime({
       visit.state = GUEST_STATES.checkingSign;
       visit.controller.face(config.signFacing ?? { x: 1, y: 0 });
       visit.feedback.set("checking");
-    } else if (visit.state === GUEST_STATES.entering) {
-      transition(visit, GUEST_STATES.approachingService, config.points.insideDoor);
-    } else if (visit.state === GUEST_STATES.approachingService && samePoint(visit.target, config.points.insideDoor)) {
-      transition(visit, GUEST_STATES.approachingService, getServicePoint(visit.servingTableId));
+    } else if (visit.state === GUEST_STATES.approachingOrder) {
+      visit.state = GUEST_STATES.offered;
+      transitionOrder(visit.order, ORDER_STATUS.offered);
+      setOrderFeedback(visit);
+      onOrderChange(orderSnapshot(visit));
     } else if (visit.state === GUEST_STATES.approachingService) {
-      if (visit.itemId === "fried-potato-dish" && !visit.diningTableId) {
-        visit.diningTableId = reserveSeat(visit.id)?.diningTableId ?? null;
-        if (!visit.diningTableId) return;
-      }
-      const consumed = visit.reservationActive ? consumeReservation(visit.id, visit.servingTableId) : null;
-      if (!consumed) {
-        releaseVisitReservation(visit);
-        transition(visit, GUEST_STATES.leaving, config.points.exit);
-        return;
-      }
-      visit.reservationActive = false;
-      visit.itemId = consumed.itemId;
-      onReservationChange({
-        guestId: visit.id,
-        active: false,
-        itemId: consumed.itemId,
-        servingTableId: consumed.servingTableId,
-        diningTableId: visit.diningTableId,
-        consumed: true,
-      });
-      if (visit.itemId === "lemonade") {
-        visit.feedback.set("carrying-lemonade");
-        completePurchase(visit);
-        transition(visit, GUEST_STATES.leaving, config.points.exit, { preserveFeedback: true });
-      } else {
-        const seatPoint = getSeatPoint(visit.diningTableId);
-        if (!seatPoint) {
-          cancelVisit(visit);
-          return;
-        }
-        transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
-      }
+      serveReservedOrder(visit);
     } else if (visit.state === GUEST_STATES.carryingToSeat) {
       visit.state = GUEST_STATES.eating;
       visit.controller.face({ x: 1, y: 0 });
@@ -291,15 +347,65 @@ export function createGuestRuntime({
     }
   }
 
+  function serveReservedOrder(visit) {
+    const consumed = visit.reservationActive ? consumeReservation(visit.id, visit.servingTableId) : null;
+    if (!consumed || consumed.itemId !== visit.order.itemId) {
+      cancelVisit(visit);
+      return;
+    }
+    visit.reservationActive = false;
+    visit.itemId = consumed.itemId;
+    transitionOrder(visit.order, ORDER_STATUS.served);
+    releaseOrderStation(visit.id, visit.servingTableId);
+    onReservationChange({
+      guestId: visit.id,
+      active: false,
+      itemId: consumed.itemId,
+      servingTableId: consumed.servingTableId,
+      diningTableId: visit.diningTableId,
+      consumed: true,
+    });
+    onOrderChange(orderSnapshot(visit));
+    if (visit.itemId === "lemonade") {
+      visit.feedback.set("carrying-lemonade");
+      visit.state = GUEST_STATES.leaving;
+      completePurchase(visit);
+      transition(visit, GUEST_STATES.leaving, config.points.exit, { preserveFeedback: true });
+      return;
+    }
+    const seatPoint = getSeatPoint(visit.diningTableId);
+    if (!seatPoint) {
+      cancelVisit(visit);
+      return;
+    }
+    transition(visit, GUEST_STATES.carryingToSeat, seatPoint);
+  }
+
+  function acceptGuestOrder(guestId) {
+    const visit = visits.get(guestId);
+    if (!visit || visit.order.status !== ORDER_STATUS.offered) {
+      return { status: "order-not-offered", mutated: false };
+    }
+    transitionOrder(visit.order, ORDER_STATUS.accepted);
+    visit.state = GUEST_STATES.accepted;
+    visit.stateElapsedMs = 0;
+    setOrderFeedback(visit);
+    onOrderChange(orderSnapshot(visit));
+    return { status: "order-accepted", mutated: true, order: { ...visit.order }, guestId: visit.id };
+  }
+
   function completePurchase(visit) {
     if (visit.paid) return;
     visit.paid = true;
+    if (visit.order.status === ORDER_STATUS.served) transitionOrder(visit.order, ORDER_STATUS.completed);
+    onOrderChange(orderSnapshot(visit));
     onPurchaseComplete({
       guestId: visit.id,
       personId: visit.personId,
-      itemId: visit.itemId,
-      value: getSalePrice(visit.itemId),
+      itemId: visit.order.itemId,
+      value: getSalePrice(visit.order.itemId),
       position: { ...visit.character.motor.position },
+      order: { ...visit.order },
     });
   }
 
@@ -312,8 +418,16 @@ export function createGuestRuntime({
     if (!planTo(visit, target)) cancelVisit(visit);
   }
 
+  function leaveWithoutFailure(visit) {
+    releaseVisitReservation(visit);
+    releaseOrderStation(visit.id, visit.servingTableId);
+    releaseSeat(visit.id, visit.diningTableId);
+    visit.diningTableId = null;
+    transition(visit, GUEST_STATES.leaving, config.points.exit);
+  }
+
   function planTo(visit, target, { keepReplans = false } = {}) {
-    if (!visits.has(visit.id)) return false;
+    if (!visits.has(visit.id) || !target) return false;
     const character = visit.character;
     const navigation = createActorNavigation(worldLayout, {
       cellSize: NAVIGATION_CELL_SIZE,
@@ -340,9 +454,9 @@ export function createGuestRuntime({
     if (!visit.path) return;
     let facilityPoint = null;
     if (visit.state === GUEST_STATES.approachingSign) facilityPoint = getSignPoint();
-    else if (visit.state === GUEST_STATES.approachingService
-      && !samePoint(visit.target, config.points.insideDoor)) facilityPoint = getServicePoint(visit.servingTableId);
-    else if (visit.state === GUEST_STATES.carryingToSeat) facilityPoint = getSeatPoint(visit.diningTableId);
+    else if ([GUEST_STATES.approachingOrder, GUEST_STATES.approachingService].includes(visit.state)) {
+      facilityPoint = getServicePoint(visit.servingTableId);
+    } else if (visit.state === GUEST_STATES.carryingToSeat) facilityPoint = getSeatPoint(visit.diningTableId);
     if (facilityPoint && !samePoint(facilityPoint, visit.target)) planTo(visit, facilityPoint);
   }
 
@@ -353,7 +467,7 @@ export function createGuestRuntime({
     if (released) onReservationChange({
       guestId: visit.id,
       active: false,
-      itemId: visit.itemId,
+      itemId: visit.order.itemId,
       servingTableId: visit.servingTableId,
       diningTableId: visit.diningTableId,
     });
@@ -362,6 +476,7 @@ export function createGuestRuntime({
 
   function cancelVisit(visit) {
     releaseVisitReservation(visit);
+    releaseOrderStation(visit.id, visit.servingTableId);
     finishVisit(visit);
   }
 
@@ -370,26 +485,73 @@ export function createGuestRuntime({
     visit.state = GUEST_STATES.finished;
     visit.feedback.destroy();
     releaseSeat(visit.id, visit.diningTableId);
+    releaseOrderStation(visit.id, visit.servingTableId);
     removeGuest(visit.character.id);
     visits.delete(visit.id);
+    onVisitFinished(orderSnapshot(visit));
     syncPersistedState();
   }
 
   function targetForState(visit) {
     if (visit.state === GUEST_STATES.approachingSign) return getSignPoint();
-    if (visit.state === GUEST_STATES.entering) return config.points.outsideDoor;
-    if (visit.state === GUEST_STATES.approachingService) return getServicePoint(visit.servingTableId);
+    if ([GUEST_STATES.approachingOrder, GUEST_STATES.approachingService].includes(visit.state)) {
+      return getServicePoint(visit.servingTableId);
+    }
     if (visit.state === GUEST_STATES.carryingToSeat) return getSeatPoint(visit.diningTableId);
     if (visit.state === GUEST_STATES.leaving) return config.points.exit;
     return null;
   }
 
-  function feedbackForState(visit) {
-    if (visit.state === GUEST_STATES.checkingSign) return "checking";
-    if (visit.state === GUEST_STATES.carryingToSeat) return "carrying-dish";
-    if (visit.state === GUEST_STATES.eating) return visit.mealCompleted ? "meal-complete" : "eating";
-    if (visit.state === GUEST_STATES.leaving && visit.itemId === "lemonade") return "carrying-lemonade";
-    return "moving";
+  function setFeedbackForVisit(visit) {
+    if ([ORDER_STATUS.offered, ORDER_STATUS.accepted, ORDER_STATUS.reserved].includes(visit.order.status)) {
+      setOrderFeedback(visit);
+    } else if (visit.order.status === ORDER_STATUS.failed) visit.feedback.set("order-failed");
+    else if (visit.state === GUEST_STATES.checkingSign) visit.feedback.set("checking");
+    else if (visit.state === GUEST_STATES.carryingToSeat) visit.feedback.set("carrying-dish");
+    else if (visit.state === GUEST_STATES.eating) visit.feedback.set(visit.mealCompleted ? "meal-complete" : "eating");
+    else if (visit.state === GUEST_STATES.leaving && visit.order.itemId === "lemonade") visit.feedback.set("carrying-lemonade");
+    else visit.feedback.set("moving");
+  }
+
+  function setOrderFeedback(visit) {
+    visit.feedback.setOrder?.({
+      displayName: getPersonDisplayName(visit.personId),
+      itemLabel: getItemLabel(visit.order.itemId),
+      status: visit.order.status,
+    });
+  }
+
+  function orderSnapshot(visit) {
+    return {
+      guestId: visit.id,
+      personId: visit.personId,
+      servingTableId: visit.servingTableId,
+      order: { ...visit.order },
+    };
+  }
+
+  function getInteractionDefinitions() {
+    return [...visits.values()]
+      .filter((visit) => visit.order.status === ORDER_STATUS.offered)
+      .map((visit) => ({
+        id: `tavern-order:${visit.id}`,
+        entityId: visit.id,
+        kind: GUEST_ORDER_INTERACTION_KIND,
+        position: { ...visit.character.motor.position },
+        radius: 38,
+        priority: 92,
+        requiresFacing: true,
+        facingDotThreshold: -0.15,
+        prompt: getOrderPrompt(visit.order.itemId),
+        payload: { guestId: visit.id },
+      }));
+  }
+
+  function setOrderElapsedMs(guestId, value) {
+    const visit = visits.get(guestId);
+    if (!visit || ![ORDER_STATUS.offered, ORDER_STATUS.accepted].includes(visit.order.status)) return false;
+    visit.order.statusElapsedMs = Math.max(0, Number(value) || 0);
+    return true;
   }
 
   function syncPersistedState() {
@@ -399,7 +561,8 @@ export function createGuestRuntime({
       state: visit.state,
       stateElapsedMs: visit.stateElapsedMs,
       position: { ...visit.character.motor.position },
-      itemId: visit.itemId,
+      itemId: visit.order.itemId,
+      order: { ...visit.order },
       acceptableItemIds: [...visit.acceptableItemIds],
       servingTableId: visit.servingTableId,
       diningTableId: visit.diningTableId,
@@ -412,16 +575,26 @@ export function createGuestRuntime({
   return {
     update,
     spawnVisit,
+    acceptGuestOrder,
+    getInteractionDefinitions,
+    setOrderElapsedMs,
     getActivePersonIds: () => [...visits.values()].map((visit) => visit.personId),
+    getActivePersonBindings: () => [...visits.values()].map((visit) => ({
+      actorId: visit.id,
+      personId: visit.personId,
+      position: { ...visit.character.motor.position },
+    })),
     isDishReserved: () => [...visits.values()].some((visit) => visit.reservationActive),
     isDiningTableReserved: (tableId) => [...visits.values()].some((visit) => visit.diningTableId === tableId),
     getState: () => {
       const guests = [...visits.values()].map((visit) => ({
         id: visit.id,
         personId: visit.personId,
+        displayName: getPersonDisplayName(visit.personId),
         state: visit.state,
         reservedDish: visit.reservationActive,
-        itemId: visit.itemId,
+        itemId: visit.order.itemId,
+        order: { ...visit.order },
         acceptableItemIds: [...visit.acceptableItemIds],
         servingTableId: visit.servingTableId,
         diningTableId: visit.diningTableId,

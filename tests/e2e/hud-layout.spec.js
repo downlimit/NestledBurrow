@@ -4,11 +4,11 @@ import { expect, test } from "@playwright/test";
 const EVIDENCE_DIR = "artifacts/task-019";
 
 async function bootAtNativeResolution(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  await expect(page.locator("canvas")).toHaveJSProperty("width", 320);
-  await expect(page.locator("canvas")).toHaveJSProperty("height", 180);
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 640);
+  await expect(page.locator("canvas")).toHaveJSProperty("height", 360);
 }
 
 async function bridge(page, method, argument) {
@@ -18,8 +18,8 @@ async function bridge(page, method, argument) {
 async function activateLogical(page, x, y, touch = false) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
-  const targetX = box.x + x * box.width / 320;
-  const targetY = box.y + y * box.height / 180;
+  const targetX = box.x + x * box.width / 640;
+  const targetY = box.y + y * box.height / 360;
   if (touch) await page.touchscreen.tap(targetX, targetY);
   else await page.mouse.click(targetX, targetY);
 }
@@ -27,8 +27,8 @@ async function activateLogical(page, x, y, touch = false) {
 async function captureNativeCanvas(page, testInfo, name) {
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   const image = await page.locator("canvas").screenshot({ path: `${EVIDENCE_DIR}/${name}.png` });
-  expect(image.readUInt32BE(16)).toBe(320);
-  expect(image.readUInt32BE(20)).toBe(180);
+  expect(image.readUInt32BE(16)).toBe(640);
+  expect(image.readUInt32BE(20)).toBe(360);
   await testInfo.attach(name, { body: image, contentType: "image/png" });
 }
 
@@ -43,13 +43,13 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
     newGameConfirming: false,
     areas: {
       options: { x: 8, y: 4, width: 74, height: 30 },
-      clock: { x: 120, y: 4, width: 80, height: 24 },
-      coins: { x: 238, y: 7, width: 46, height: 24 },
-      fullscreen: { x: 286, y: 4, width: 30, height: 30 },
-      resources: { x: 43, y: 156, width: 238, height: 22 },
-      inventory: { x: 43, y: 156, width: 238, height: 22 },
-      energy: { x: 252, y: 38, width: 60, height: 68 },
-      needs: { x: 252, y: 38, width: 60, height: 68 },
+      clock: { x: 280, y: 4, width: 80, height: 24 },
+      coins: { x: 558, y: 7, width: 46, height: 24 },
+      fullscreen: { x: 606, y: 4, width: 30, height: 30 },
+      resources: { x: 201, y: 336, width: 238, height: 22 },
+      inventory: { x: 201, y: 336, width: 238, height: 22 },
+      energy: { x: 572, y: 38, width: 60, height: 68 },
+      needs: { x: 572, y: 38, width: 60, height: 68 },
     },
     resources: {
       woodText: "0",
@@ -74,9 +74,9 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   expect(normal.resources.clockText).toMatch(/^\d{2}:\d{2}$/u);
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(false);
-  expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 30, y: 167 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 585, y: 70 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 210, y: 347 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 180, y: 347 })).toBe(false);
   await captureNativeCanvas(page, testInfo, "normal-hud");
 
   const debrisId = (await bridge(page, "getDebrisState")).definitions[0].id;
@@ -89,7 +89,7 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true, buildLabelVisible: true });
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
   expect(await bridge(page, "isHudPoint", { x: 20, y: 108 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 210, y: 347 })).toBe(false);
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: true, promptVisible: false });
   await captureNativeCanvas(page, testInfo, "options-without-prompt");
 
@@ -106,10 +106,10 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: false, buildLabelVisible: false, newGameConfirming: true });
   expect(await bridge(page, "isHudPoint", { x: 45, y: 19 })).toBe(false);
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 265, y: 70 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 585, y: 70 })).toBe(true);
+  expect(await bridge(page, "isHudPoint", { x: 210, y: 347 })).toBe(false);
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: true, promptVisible: false, dialogueVisible: false });
-  await activateLogical(page, 228, 95);
+  await activateLogical(page, 548, 95);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: false, newGameConfirming: false });
   expect(await bridge(page, "getInteractionHudState")).toMatchObject({ suppressed: false });
   const sessionAfterCancel = await bridge(page, "getSession");
@@ -131,7 +131,7 @@ test("coarse pointer activates only visible Options hit areas", async ({ page },
   await activateLogical(page, 45, 19, true);
   await expect.poll(() => bridge(page, "getHudState")).toMatchObject({ optionsOpen: true });
   expect(await bridge(page, "isHudPoint", { x: 189, y: 54 })).toBe(true);
-  expect(await bridge(page, "isHudPoint", { x: 52, y: 167 })).toBe(false);
+  expect(await bridge(page, "isHudPoint", { x: 210, y: 347 })).toBe(false);
   await activateLogical(page, 189, 54, true);
   await expect.poll(() => bridge(page, "getLanguage")).toBe("en");
 });

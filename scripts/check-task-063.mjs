@@ -9,6 +9,7 @@ import { analyzeSource } from "./scan-owner-impact.mjs";
 
 const read = (path) => readFileSync(path, "utf8");
 const metadata = `<!-- nestled-burrow-delivery:v1
+executor: codex
 player-visible: no
 preview-acceptance: not-required
 auto-merge: yes
@@ -31,7 +32,7 @@ assert.equal(browserWorkflow.autoMerge, true);
 
 const invalid = classifyPullRequest(["src/main.js"], metadata.replace("player-visible: no", "player-visible: maybe"));
 assert.equal(invalid.metadata.valid, false);
-assert.equal(invalid.preview, true, "invalid metadata must preserve path-based preview");
+assert.equal(invalid.preview, false, "invalid metadata must fail closed for public preview");
 assert.equal(invalid.autoMerge, false, "invalid metadata must disable automatic merge routing");
 
 const impact = analyzeSource("src/build/worldBuildCoordinator.js");

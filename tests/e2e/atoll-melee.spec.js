@@ -5,16 +5,14 @@ async function bridge(page, method, argument) {
 }
 
 async function boot(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  await expect(page.locator("canvas")).toHaveJSProperty("width", 320);
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 640);
 }
 
 async function tapAlt(page) {
-  await page.keyboard.down("Alt");
-  await page.waitForTimeout(60);
-  await page.keyboard.up("Alt");
+  await page.keyboard.press("Alt");
 }
 
 async function enterNest(page) {

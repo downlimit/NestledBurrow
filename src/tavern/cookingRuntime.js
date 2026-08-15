@@ -7,10 +7,16 @@ import {
 } from "./cookingDomain.js";
 import { HUD_COLORS, HUD_DEPTH, isPointInRect } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 
-export const COOKING_OVERLAY_AREA = Object.freeze({ x: 42, y: 32, width: 236, height: 86 });
-export const COOKING_SCALE_AREA = Object.freeze({ x: 56, y: 65, width: 208, height: 12 });
-export const COOKING_ATTEMPT_AREA = Object.freeze({ x: 100, y: 88, width: 120, height: 24 });
+export const COOKING_OVERLAY_AREA = Object.freeze({
+  x: Math.round((GAME_WIDTH - 236) / 2),
+  y: Math.round((GAME_HEIGHT - 86) / 2),
+  width: 236,
+  height: 86,
+});
+export const COOKING_SCALE_AREA = Object.freeze({ x: COOKING_OVERLAY_AREA.x + 14, y: COOKING_OVERLAY_AREA.y + 33, width: 208, height: 12 });
+export const COOKING_ATTEMPT_AREA = Object.freeze({ x: COOKING_OVERLAY_AREA.x + 58, y: COOKING_OVERLAY_AREA.y + 56, width: 120, height: 24 });
 
 export function createCookingRuntime(scene, {
   sessionState,

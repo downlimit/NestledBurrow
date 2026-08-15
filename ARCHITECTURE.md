@@ -15,7 +15,7 @@
 - persistent population state, его нормализация и coarse offscreen-реконструкция принадлежат `src/character/populationDomain.js`; session только сохраняет и загружает результат;
 - session save JSON-safe и versioned;
 - developer authoring отделён от gameplay save;
-- HUD, camera, audio и build UI имеют lifecycle owners;
+- HUD, world/UI camera split, audio и build UI имеют lifecycle owners;
 - interaction selection остаётся детерминированным контрактом; collision-valid use position и visual aim position разделены, а общая extractable-группа ресурсов и растений ранжируется по направлению взгляда до локальной дистанции;
 - `WorldLocationCoordinator` владеет реестром локаций, атомарным переключением layout/camera/motor и location-specific lifecycle;
 - повторно используемый world-entity type имеет одного runtime owner и один presentation adapter во всех локациях. Location config передаёт owner только stable ID, placement и location capability; authoring регистрирует экземпляр у того же owner. Отдельные location-specific visuals, targeting, hit feedback и teardown для общего типа запрещены;
@@ -52,7 +52,7 @@
 
 ### Persistent population
 
-`src/character/populationDomain.js` владеет созданием устойчивых person identities, полным canonical need state, стабильными budget/preference profiles и детерминированной coarse-реконструкцией по прошедшему world time. `src/session/gameSessionState.js` и `src/session/sessionPersistence.js` вызывают публичные функции owner для JSON-safe state и schema migration, не размещая у себя population formulas.
+`src/character/populationDomain.js` владеет созданием устойчивых person identities, полным canonical need state, ручной мутацией одной потребности с rebased evaluation time, стабильными budget/preference profiles и детерминированной coarse-реконструкцией по прошедшему world time. `src/character/personInspectionRuntime.js` — отдельный presentation/input owner live person binding, hover/touch lifecycle, card geometry и need-bar hit zones; общую NESTLD-отрисовку игрока и NPC предоставляет `src/ui/needsPanelPresentation.js`. Inspector вызывает публичную population mutation и не владеет visit/order state. `src/session/gameSessionState.js` и `src/session/sessionPersistence.js` вызывают публичные функции owner для JSON-safe state и schema migration, не размещая у себя population formulas.
 
 Tavern, social и profession systems могут позже потреблять один и тот же persisted person state через этот owner. Они не создают собственную population, need vocabulary или offscreen evaluation.
 
@@ -67,11 +67,13 @@ Tavern, social и profession systems могут позже потреблять 
 - grouped undo, preview и demolition highlight;
 - публичный API для authoring и E2E bridge.
 
-`BuildModeRuntime` продолжает владеть UI/input state и создаётся координатором на Phaser rendering host. Facilities, resources/beds, wells/farming, tavern sign и training dummy сохраняют собственные runtime states; координатор только маршрутизирует их мутации через явно переданные adapters. `WorldScene` создаёт координатор, передаёт layout, profiles, runtime owners и ограниченные callbacks, затем делегирует location cleanup. Authoring owners используют публичные методы координатора без доступа к его внутренним `Map`, undo stack и preview state.
+`BuildModeRuntime` продолжает владеть UI/input state и создаётся координатором на Phaser rendering host. Его BUILD и TEST являются двумя transient представлениями одной панели; `src/build/simulationTestPalette.js` содержит малую presentation-группировку canonical inventory IDs и grant-функции, использующие inventory owner. Facilities, resources/beds, wells/farming, tavern sign и training dummy сохраняют собственные runtime states; координатор только маршрутизирует их мутации через явно переданные adapters. `WorldScene` создаёт координатор, передаёт layout, profiles, runtime owners и ограниченные callbacks, затем делегирует location cleanup. Authoring owners используют публичные методы координатора без доступа к его внутренним `Map`, undo stack и preview state.
 
 ### Tavern service
 
-`TavernServiceRuntime` координирует persisted person-backed service, opportunity timer, visitor history, value-bearing coin runtime и дочерний runtime активного меню. Он вызывает публичную offscreen evaluation population owner ровно для выбранного кандидата. `src/tavern/visitDemandDomain.js` владеет food motive, budget/taste/recency формулой и decision breakdown; `src/tavern/saleProfileDomain.js` — canonical price/tag profiles. Таймер/history/snapshot normalization принадлежат `src/tavern/tavernServiceDomain.js`, маршруты live visit — `src/tavern/guestRuntime.js`, recipes/stock/reservations — `src/tavern/cookingDomain.js`, `venueOffer` — `src/tavern/venueOfferDomain.js`, panel presentation/input — `src/tavern/venueMenuRuntime.js`. `WorldScene` только связывает owners и callbacks.
+`TavernServiceRuntime` координирует persisted person-backed service, opportunity timer, visitor history, service-station claims, value-bearing coin runtime и дочерний runtime активного меню. Он вызывает публичную offscreen evaluation population owner ровно для выбранного кандидата. `src/tavern/visitDemandDomain.js` владеет food motive, budget/taste/recency формулой и decision breakdown; `src/tavern/saleProfileDomain.js` — canonical price/tag profiles; `src/tavern/orderDomain.js` — JSON-safe exact order, таймеры и допустимые переходы. Таймер/history/snapshot normalization принадлежат `src/tavern/tavernServiceDomain.js`, live-маршруты заказа — `src/tavern/guestRuntime.js`, recipes/stock/reservations — `src/tavern/cookingDomain.js`, `venueOffer` — `src/tavern/venueOfferDomain.js`, panel presentation/input — `src/tavern/venueMenuRuntime.js`. `WorldScene` только связывает owners и callbacks.
+
+Dynamic order interaction существует только для live guest со статусом `offered`. `TavernServiceRuntime.getOrderInteractionDefinitions()` публикует read-only definitions и `acceptGuestOrder()` делегирует мутацию order owner. `WorldInteractionCoordinator` агрегирует и маршрутизирует этот kind рядом с другими world actions, не хранит order state и не вычисляет tavern rules.
 
 Следующее расширение очереди, staff или нескольких service stations развивает эти owners и не возвращает orchestration в `WorldScene`.
 

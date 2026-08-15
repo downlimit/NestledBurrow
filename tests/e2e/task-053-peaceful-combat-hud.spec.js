@@ -5,11 +5,11 @@ async function bridge(page, method, argument) {
 }
 
 async function boot(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  await expect(page.locator("canvas")).toHaveJSProperty("width", 320);
-  await expect(page.locator("canvas")).toHaveJSProperty("height", 180);
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 640);
+  await expect(page.locator("canvas")).toHaveJSProperty("height", 360);
 }
 
 async function inventoryMode(page) {
@@ -30,8 +30,8 @@ async function canvasPoint(page, point) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
   return {
-    x: box.x + point.x * box.width / 320,
-    y: box.y + point.y * box.height / 180,
+    x: box.x + point.x * box.width / 640,
+    y: box.y + point.y * box.height / 360,
   };
 }
 
@@ -178,7 +178,7 @@ test("held Alt supports persistent drag in both directions between peaceful and 
     combat: { inputEnabled: true },
   });
   let mode = await inventoryMode(page);
-  let source = await transformedSlotPoint(page, mode.peaceful, { x: 43, y: 156, width: 22, height: 22 });
+  let source = await transformedSlotPoint(page, mode.peaceful, { x: 201, y: 336, width: 22, height: 22 });
   let target = await transformedSlotPoint(page, mode.combat, mode.combat.slots[0]);
   await page.mouse.move(source.x, source.y);
   await page.mouse.down();
@@ -204,7 +204,7 @@ test("held Alt supports persistent drag in both directions between peaceful and 
   });
   mode = await inventoryMode(page);
   source = await transformedSlotPoint(page, mode.combat, mode.combat.slots[0]);
-  target = await transformedSlotPoint(page, mode.peaceful, { x: 43, y: 156, width: 22, height: 22 });
+  target = await transformedSlotPoint(page, mode.peaceful, { x: 201, y: 336, width: 22, height: 22 });
   await page.mouse.move(source.x, source.y);
   await page.mouse.down();
   await page.mouse.move(target.x, target.y, { steps: 4 });
@@ -225,7 +225,7 @@ test("combat loadout items can be dropped into the world and combat pickup uses 
   await page.keyboard.down("Alt");
   await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({ mode: "LOADOUT_EDIT", transitioning: false });
   let mode = await inventoryMode(page);
-  let source = await transformedSlotPoint(page, mode.peaceful, { x: 43, y: 156, width: 22, height: 22 });
+  let source = await transformedSlotPoint(page, mode.peaceful, { x: 201, y: 336, width: 22, height: 22 });
   let target = await transformedSlotPoint(page, mode.combat, mode.combat.slots[0]);
   await page.mouse.move(source.x, source.y);
   await page.mouse.down();

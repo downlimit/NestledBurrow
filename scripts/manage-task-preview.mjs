@@ -129,8 +129,8 @@ async function smokeCanvas(url) {
     const dimensions = await canvas.evaluate((element) => ({ width: element.width, height: element.height }));
     await page.waitForTimeout(500);
     const screenshot = await canvas.screenshot();
-    if (dimensions.width !== 320 || dimensions.height !== 180) {
-      throw new Error(`Game canvas is ${dimensions.width}x${dimensions.height}; expected 320x180`);
+    if (dimensions.width !== 640 || dimensions.height !== 360) {
+      throw new Error(`Game canvas is ${dimensions.width}x${dimensions.height}; expected 640x360`);
     }
     if (screenshot.length < 2_048) throw new Error(`Game canvas render is unexpectedly empty (${screenshot.length} bytes)`);
     if (pageErrors.length > 0) throw new Error(`Runtime page error: ${pageErrors.join(" | ")}`);

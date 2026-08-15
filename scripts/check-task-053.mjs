@@ -105,14 +105,14 @@ const actionSlots = Object.fromEntries(
 );
 assert.deepEqual(
   [actionSlots.space.x, actionSlots.lmb.x, actionSlots.rmb.x, actionSlots.shift.x],
-  [259, 235, 283, 259],
+  [417, 393, 441, 417],
   "the combat cross keeps its spacing while Space aligns under the peaceful zero slot",
 );
 assert.equal(actionSlots.space.x, INVENTORY_SLOT_AREAS.at(-1).x, "Space is directly below the peaceful zero slot");
 assert.deepEqual(
   [actionSlots.space.y, actionSlots.lmb.y, actionSlots.rmb.y, actionSlots.shift.y],
-  [124, 136, 136, 148],
-  "all four combat action slots move four logical pixels down",
+  [304, 316, 316, 328],
+  "all four combat action slots keep the expanded viewport baseline",
 );
 assert.equal(
   actionSlots.shift.y - (actionSlots.space.y + actionSlots.space.height),

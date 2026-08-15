@@ -108,7 +108,7 @@ const firstVillageOwners = lifecycle.runtime.mount({ definition: village, layout
 assert.equal(getCurrentWorldScene(), lifecycle.renderingHost, "the location owner registers the world scene independently of facilities");
 assert.deepEqual(
   creationEvents(lifecycle.events),
-  ["presentation", "puddle", "npc", "merchant", "debris", "melee", "facility", "needs", "tavern-sign", "tavern-service", "farming", "cooking", "kitchen", "movement-debug", "build", "interaction-bind", "candidate-reset", "hud-sync"],
+  ["presentation", "puddle", "npc", "merchant", "debris", "melee", "facility", "needs", "tavern-sign", "tavern-service", "person-inspection", "farming", "cooking", "kitchen", "movement-debug", "build", "interaction-bind", "candidate-reset", "hud-sync"],
   "capabilities must mount in canonical order",
 );
 assert(firstVillageOwners.merchantRuntime && firstVillageOwners.worldBuildCoordinator && firstVillageOwners.buildModeRuntime);
@@ -124,6 +124,7 @@ assert.deepEqual(lifecycle.events, [
   "gameplay-time",
   "cooking-update",
   "puddle-update",
+  "person-inspection-update",
   "tavern-update",
   "melee-before",
   "characters-update",
@@ -152,6 +153,7 @@ assert.deepEqual(destroyEvents(firstDestroyEvents), [
   "destroy:movement-debug",
   "destroy:cooking",
   "destroy:farming",
+  "destroy:person-inspection",
   "destroy:tavern-service",
   "destroy:tavern-sign",
   "destroy:facility",
@@ -262,6 +264,10 @@ function createLifecycleHarness() {
         coinRuntime: {},
         update: () => events.push("tavern-update"),
       });
+    },
+    personInspection: () => {
+      events.push("person-inspection");
+      return owner("person-inspection", { update: () => events.push("person-inspection-update") });
     },
     farming: () => {
       events.push("farming");

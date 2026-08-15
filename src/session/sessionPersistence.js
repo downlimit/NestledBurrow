@@ -14,7 +14,7 @@ import { DEFAULT_SERVING_TABLE_ID } from "../tavern/cookingDomain.js";
 import { createStage1Population, normalizePopulation } from "../character/populationDomain.js";
 import { createDefaultVenueOffer, normalizeVenueOffer } from "../tavern/venueOfferDomain.js";
 
-export const SAVE_SCHEMA_VERSION = 15;
+export const SAVE_SCHEMA_VERSION = 16;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -63,6 +63,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 12) envelope = migrateV12Envelope(envelope);
   if (envelope.schemaVersion === 13) envelope = migrateV13Envelope(envelope);
   if (envelope.schemaVersion === 14) envelope = migrateV14Envelope(envelope);
+  if (envelope.schemaVersion === 15) envelope = migrateV15Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -90,6 +91,7 @@ const migrationRegistry = new Map([
   [12, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [13, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [14, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [15, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -387,6 +389,58 @@ function migrateV14Envelope(envelope) {
     guests,
   };
   delete gameplay.tavernService.spawnRemainingMs;
+  state.gameplay = gameplay;
+  state.version = 15;
+  return { schemaVersion: 15, state };
+}
+
+function migrateV15Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const service = isPlainObject(gameplay.tavernService) ? gameplay.tavernService : {};
+  const offerItemIds = normalizeVenueOffer(gameplay.venueOffer).foodItemIds;
+  service.guests = Array.isArray(service.guests) ? service.guests.map((guest) => {
+    const requestedItems = [
+      guest?.order?.itemId,
+      guest?.itemId,
+      ...(Array.isArray(guest?.acceptableItemIds) ? guest.acceptableItemIds : []),
+      ...offerItemIds,
+    ];
+    const itemId = requestedItems.find((candidate) => ["fried-potato-dish", "lemonade"].includes(candidate))
+      ?? "fried-potato-dish";
+    const status = guest?.paid ? "completed"
+      : ["carrying-to-seat", "eating"].includes(guest?.state) ? "served"
+        : guest?.state === "leaving" && guest?.itemId ? "served"
+          : guest?.reservationActive ? "reserved"
+            : guest?.itemId ? "accepted" : "planned";
+    return {
+      ...guest,
+      itemId,
+      order: {
+        itemId,
+        status,
+        statusElapsedMs: Number.isFinite(guest?.order?.statusElapsedMs)
+          ? Math.max(0, guest.order.statusElapsedMs)
+          : 0,
+      },
+    };
+  }) : [];
+  const history = isPlainObject(service.visitorHistoryByPersonId)
+    ? service.visitorHistoryByPersonId
+    : {};
+  service.visitorHistoryByPersonId = Object.fromEntries(Object.entries(history).map(([personId, entry]) => [
+    personId,
+    {
+      ...(isPlainObject(entry) ? entry : {}),
+      failedAcceptedOrderCount: Number.isSafeInteger(entry?.failedAcceptedOrderCount)
+        && entry.failedAcceptedOrderCount >= 0 ? entry.failedAcceptedOrderCount : 0,
+      lastFailedAcceptedOrderWorldTimeSeconds: Number.isFinite(entry?.lastFailedAcceptedOrderWorldTimeSeconds)
+        && entry.lastFailedAcceptedOrderWorldTimeSeconds >= 0
+        ? entry.lastFailedAcceptedOrderWorldTimeSeconds
+        : null,
+    },
+  ]));
+  gameplay.tavernService = service;
   state.gameplay = gameplay;
   state.version = SESSION_STATE_VERSION;
   return { schemaVersion: SAVE_SCHEMA_VERSION, state };

@@ -11,7 +11,7 @@ potato → preparation → frying → serving table → dine-in guest → 4 coin
 lemon + bucket water → juicer → serving table → takeout guest → 2 coins
 ```
 
-Stage 3 uses the target causality: a persistent person first has a reason to go out, considers the menu, then creates demand that available stock may or may not satisfy.
+Stage 4 uses the target causality: a persistent person first has a reason to go out, chooses one exact menu item, offers that order in person and creates a service commitment only after the player accepts it.
 
 ## Demand terminology
 
@@ -102,7 +102,7 @@ The first implemented format remains food service. Additional entertainment such
 
 ## Opening hours and menu activation
 
-Early play uses direct active/inactive control; a later automated venue may support a schedule. The sign always opens one compact panel whose pill switch is labeled **`Меню активно` / `Меню неактивно`** (`Menu active / Menu inactive`) and directly controls service. Closing the panel, including with `Space` or `Escape`, preserves that state. Dish editing is locked while active. Its bounded two-row list scrolls by wheel or touch swipe when more products are added.
+Early play uses direct open/closed control; a later automated venue may support a schedule. The sign always opens one compact panel whose pill switch is labeled **`Заведение открыто` / `Заведение закрыто`** (`Venue open / Venue closed`) and directly controls service. Closing the panel, including with `Space` or `Escape`, preserves that state. Dish editing is locked while open. Its bounded two-row list scrolls by wheel or touch swipe when more products are added.
 
 The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. An inactive venue produces no opportunities or penalty.
 
@@ -148,9 +148,17 @@ Validation proceeds through observable slices that may be revised after playtest
 
 Early play prioritizes optimization, then recognizable people, then need-driven social situations.
 
+## Order and fulfillment
+
+The visit decision's `bestOfferItemId` becomes the persisted planned order. At a claimed serving-table station the guest shows their name/item and waits for ordinary world-interaction acceptance. Before acceptance, menu/venue/station loss or response timeout ends the visit without failed-service history.
+
+Acceptance fixes the commitment and starts a bounded fulfillment window. The assigned station may contain the exact item already or receive it later through the ordinary inventory-to-serving-table interaction. Wrong stock is ignored. Accepted, reserved and served commitments survive menu deactivation and later offer edits. Lemonade continues through takeout and two-coin payment; fried potato continues through dining and four-coin payment.
+
+Fulfillment timeout records one `failedAcceptedOrderCount` and timestamp, negative feedback and no payment. This history affects repeat visits; runtime/path cancellation does not.
+
 ## Implemented stages
 
-Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 persists the active food offer and unifies sign interaction in one menu panel. Stage 3 gives every person a stable budget/taste profile and replaces stock-driven waves with one-person visit opportunities: the selected person's state is reconstructed, satiety creates food motive, menu prices/tastes produce offer fit, recent completed service softens repeat chance, and one roll yields `VISIT` or `NO_VISIT`. The resulting diagnostic breakdown is developer-only.
+Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 persists the active food offer and unifies sign interaction in one menu panel. Stage 3 gives every person a stable budget/taste profile and replaces stock-driven waves with one-person visit opportunities. Stage 4 persists the chosen exact order, routes player acceptance through the shared interaction system, waits for exact station fulfillment and records completed or timed-out accepted service as objective history.
 
 ## Owners
 
@@ -161,6 +169,7 @@ Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 pe
 - sign: `src/tavern/tavernSignRuntime.js`, `src/tavern/guestConfig.js`;
 - guest flow/pathing: `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`;
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
+- order state, timers and legal transitions: `src/tavern/orderDomain.js`;
 - visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags: `src/tavern/saleProfileDomain.js`;
 - active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
 - guest reaction/carried-item presentation: `src/tavern/guestFeedback.js`;
@@ -177,20 +186,22 @@ Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 pe
 - sign interaction always opens the same menu panel; active/inactive service state is controlled only by the panel switch in Stage 2;
 - sign, stock reservation and service lifecycle cannot contradict each other;
 - an active menu produces one opportunity every three to eight real seconds; it evaluates exactly one non-visiting persistent person and a refusal does not select a replacement;
-- `venueOffer` remains independent from physical stock: stock cannot create or block demand, and a person who visits with zero acceptable stock arrives then leaves without purchase or negative opinion;
-- a live visit keeps separate technical `guestId` and stable `personId`; one person cannot have two active visits, and fulfillment may reserve only the decision's `acceptableItemIds`;
-- successful purchase records one completed visit and world-time timestamp under tavern-owned `visitorHistoryByPersonId`; an unfulfilled visit does not change history;
+- `venueOffer` remains independent from physical stock: stock cannot create or block demand, and zero stock does not prevent an exact order from being offered;
+- a live visit keeps separate technical `guestId` and stable `personId`; one person cannot have two active visits, and fulfillment may reserve only exact `order.itemId` after acceptance;
+- one serving-table station belongs to at most one active order, while station selection prefers exact stock, then empty stock, then another free station;
+- successful purchase records one completed visit; an accepted fulfillment timeout records one failed accepted order; unaccepted or technical cancellation changes neither counter;
+- accepted commitments survive menu deactivation and offer edits, and `served` ends the fulfillment timeout;
 - dine-in guests reserve distinct dining-table IDs before consuming a dish; a table currently used by the player is excluded from new seat assignments, and the player cannot start using a guest-reserved table;
 - lemonade is takeout worth two coins; a fried potato dish is dine-in worth four.
 
 ## Current baseline
 
-Potato and lemonade feed independently stocked serving tables with existing dine-in/takeout, reservations, pathing and coin rewards. The sign panel owns offer/activity. New guests now originate only from active-menu opportunities and carry a persistent person identity; decisions use reconstructed satiety, the canonical 4/2 prices, layered preferences and recent completed visits. Physical stock is consulted only after arrival, so missing or unsuitable stock produces a visible visit without purchase.
+Potato and lemonade feed independently stocked serving tables with existing dine-in/takeout, pathing and coin rewards. The sign panel owns offer/activity. Person-backed guests arrive for the decision's exact menu item, claim a live serving station, visibly offer the order and wait for explicit player acceptance. Prepared stock can fulfill immediately after acceptance; later stock uses the same physical serving-table flow. Completed and timed-out accepted orders update objective per-person history exactly once.
 
 ## Not yet
 
-Real orders/fulfillment commitments, recipe book, broader ingredients/storage, influence, popularity/reputation/opinion, group visits, social propagation, configurable schedules, staff and broader venue formats.
+Recipe book, broader ingredients/storage, live guest needs, influence, popularity/reputation/opinion, group visits, social propagation, configurable schedules, staff and broader venue formats.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`; focused service and population Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`; focused service, order and population Browser E2E.

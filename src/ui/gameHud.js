@@ -22,6 +22,7 @@ import {
   INVENTORY_MODES,
 } from "../inventory/inventoryModeRuntime.js";
 import { drawCoinSprite } from "../tavern/coinVisual.js";
+import { needValueFromTrackPointerX } from "./needBarGeometry.js";
 import { worldPointFromPointer } from "../inventory/worldThrowDirection.js";
 import {
   createInventoryGainPresentation,
@@ -32,6 +33,15 @@ import { createTransientMessageRuntime } from "./transientMessageRuntime.js";
 import { createThrowAimIndicator } from "./throwAimIndicator.js";
 import { NEED_FLOW_PROFILE_BY_ARROWS } from "./presentationTuning.js";
 import { needMeterValues } from "../needs/needsFlowRuntime.js";
+import {
+  createNeedsPanelGeometry,
+  drawNeedsPanel,
+  NEED_ROW_IDS,
+  NEED_ROW_SYMBOLS,
+  NEED_VALUE_TRACK,
+} from "./needsPanelPresentation.js";
+
+export { NEED_ROW_IDS, NEED_ROW_SYMBOLS, NEED_VALUE_TRACK };
 
 export const OPTIONS_HIT_AREA = Object.freeze({ x: 8, y: 4, width: 74, height: 30 });
 export const FULLSCREEN_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 34, y: 4, width: 30, height: 30 });
@@ -41,9 +51,9 @@ export const COIN_HUD_AREA = Object.freeze({
   width: 46,
   height: FULLSCREEN_PANEL_AREA.height,
 });
-export const CLOCK_HUD_AREA = Object.freeze({ x: 120, y: 4, width: 80, height: 24 });
+export const CLOCK_HUD_AREA = Object.freeze({ x: Math.round((GAME_WIDTH - 80) / 2), y: 4, width: 80, height: 24 });
 export const TIME_CONTROL_SPEEDS = Object.freeze([0, 1, 4, 16]);
-export const TIME_CONTROL_HUD_AREA = Object.freeze({ x: 120, y: 29, width: 80, height: 13 });
+export const TIME_CONTROL_HUD_AREA = Object.freeze({ x: CLOCK_HUD_AREA.x, y: 29, width: 80, height: 13 });
 export const TIME_CONTROL_AREAS = Object.freeze(TIME_CONTROL_SPEEDS.map((_speed, index) => Object.freeze({
   x: TIME_CONTROL_HUD_AREA.x + index * 20,
   y: TIME_CONTROL_HUD_AREA.y,
@@ -60,17 +70,10 @@ export const SOUND_SLIDER_RECTS = Object.freeze({
 });
 export const OPTIONS_BUILD_LABEL = Object.freeze({ x: 14, y: 102 });
 export const RESOURCE_HUD_AREA = INVENTORY_HUD_AREA;
-export const NEEDS_HUD_AREA = Object.freeze({ x: 252, y: 38, width: 60, height: 68 });
+export const NEEDS_HUD_AREA = Object.freeze({ x: GAME_WIDTH - 68, y: 38, width: 60, height: 68 });
 export const ENERGY_HUD_AREA = NEEDS_HUD_AREA;
-export const NEED_ROW_IDS = Object.freeze(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
-export const NEED_ROW_SYMBOLS = Object.freeze(["N", "E", "S", "T", "L", "D"]);
-export const NEED_VALUE_TRACK = Object.freeze({ xOffset: 12, width: 23 });
-export const NEED_ROW_AREAS = Object.freeze(NEED_ROW_IDS.map((_id, index) => Object.freeze({
-  x: NEEDS_HUD_AREA.x,
-  y: NEEDS_HUD_AREA.y + 4 + index * 10,
-  width: NEEDS_HUD_AREA.width,
-  height: 10,
-})));
+const PLAYER_NEEDS_GEOMETRY = createNeedsPanelGeometry(NEEDS_HUD_AREA.x, NEEDS_HUD_AREA.y);
+export const NEED_ROW_AREAS = PLAYER_NEEDS_GEOMETRY.rows;
 export const NEED_TOOLTIP_AREA = Object.freeze({ x: 32, y: 42, width: 174, height: 54 });
 export const NEW_GAME_CONFIRM_PANEL = Object.freeze({ x: 24, y: 36, width: GAME_WIDTH - 48, height: 78 });
 export const NEW_GAME_CONFIRM_HIT_AREA = Object.freeze({ x: 44, y: 82, width: 96, height: 26 });
@@ -88,8 +91,7 @@ export function isEnergyCritical(currentEnergy, maximumEnergy) {
 }
 
 export function needValueFromPointerX(row, pointerX) {
-  const ratio = (Number(pointerX) - row.x - NEED_VALUE_TRACK.xOffset) / NEED_VALUE_TRACK.width;
-  return Math.round(Math.min(1, Math.max(0, Number.isFinite(ratio) ? ratio : 0)) * 100);
+  return needValueFromTrackPointerX(row.x + NEED_VALUE_TRACK.xOffset, NEED_VALUE_TRACK.width, pointerX);
 }
 
 export function needFlowPulseAlpha(arrows, nowMs, seed = 0) {
@@ -537,8 +539,6 @@ export function createGameHud(scene, options) {
   }
 
   function renderNeeds(gameplay) {
-    energyBarGraphics.fillStyle(HUD_COLORS.panel, 0.86).fillRect(NEEDS_HUD_AREA.x, NEEDS_HUD_AREA.y, NEEDS_HUD_AREA.width, NEEDS_HUD_AREA.height);
-    energyBarGraphics.lineStyle(1, HUD_COLORS.border, 1).strokeRect(NEEDS_HUD_AREA.x + 0.5, NEEDS_HUD_AREA.y + 0.5, NEEDS_HUD_AREA.width - 1, NEEDS_HUD_AREA.height - 1);
     const values = {
       novelty: gameplay.needs?.novelty,
       energy: Number(gameplay.currentEnergy) / Number(gameplay.maximumEnergy) * 100,
@@ -548,17 +548,14 @@ export function createGameHud(scene, options) {
       dialogue: gameplay.needs?.dialogue,
     };
     const flows = { ...gameplay.needsFlow, energy: gameplay.energyFlow };
-    needsRowsState = NEED_ROW_IDS.map((id, index) => {
-      const rect = NEED_ROW_AREAS[index];
-      const ratio = Math.min(1, Math.max(0, Number(values[id]) / 100 || 0));
+    needsRowsState = drawNeedsPanel(energyBarGraphics, {
+      geometry: PLAYER_NEEDS_GEOMETRY,
+      values,
+    }).map((row) => {
+      const { id, rect } = row;
       const flow = flows[id] ?? null;
-      drawBitmapTextInto(energyBarGraphics, rect.x + 3, rect.y + 1, NEED_ROW_SYMBOLS[index], { shadow: 0 });
-      energyBarGraphics.fillStyle(HUD_COLORS.shadow, 1).fillRect(rect.x + NEED_VALUE_TRACK.xOffset - 1, rect.y + 2, NEED_VALUE_TRACK.width + 2, 6);
-      const critical = id === "energy" && ratio < 0.15;
-      const fillWidth = ratio > 0 ? Math.max(1, Math.round(NEED_VALUE_TRACK.width * ratio)) : 0;
-      energyBarGraphics.fillStyle(critical ? 0xd94a4a : HUD_COLORS.mid, 1).fillRect(rect.x + NEED_VALUE_TRACK.xOffset, rect.y + 3, fillWidth, 4);
       drawNeedFlow(energyArrowGraphics, rect.x + 40, rect.y + 2, flow, scene.time.now, id);
-      return { id, symbol: NEED_ROW_SYMBOLS[index], ratio, flow };
+      return { id, symbol: row.symbol, ratio: row.ratio, flow };
     });
     const energy = needsRowsState[1];
     energyRatio = energy.ratio;

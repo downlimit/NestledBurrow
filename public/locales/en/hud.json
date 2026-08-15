@@ -13,6 +13,32 @@
   },
   "buildMode": {
     "title": "BUILD MODE",
+    "tabs": {
+      "build": "BUILD",
+      "test": "TEST"
+    },
+    "test": {
+      "groups": {
+        "food": "FOOD",
+        "produce": "PRODUCE",
+        "seeds": "SEEDS",
+        "resources": "RESOURCES",
+        "economy": "ECONOMY"
+      },
+      "items": {
+        "friedPotato": "Fried potato",
+        "lemonade": "Lemonade",
+        "slicedPotato": "Sliced potato",
+        "potato": "Potato",
+        "lemon": "Lemon",
+        "potatoSeed": "Potato seed",
+        "lemonSeed": "Lemon seed",
+        "wood": "Wood",
+        "stone": "Stone",
+        "ruby": "Ruby",
+        "coins": "Coins"
+      }
+    },
     "groups": {
       "tools": "Tools",
       "ground": "Ground and paths",
@@ -101,6 +127,8 @@
     "servingTableDifferentItem": "A different item is on the table",
     "servingTableFull": "The table already has a portion",
     "servingTableEmpty": "The serving table is empty",
+    "acceptOrderLemonade": "Accept order: Lemonade",
+    "acceptOrderFriedPotato": "Accept order: Fried potato",
     "repairStove": "Repair: 10 wood, 8 stone, 10 coins",
     "repairMissing": "Missing: {categories}",
     "repairCategory": {
@@ -219,8 +247,8 @@
     "title": "MENU",
     "friedPotatoDish": "Fried potato",
     "lemonade": "Lemonade",
-    "active": "Menu active",
-    "inactive": "Menu inactive",
+    "active": "Venue open",
+    "inactive": "Venue closed",
     "closeHint": "Space: close"
   },
   "needs": {

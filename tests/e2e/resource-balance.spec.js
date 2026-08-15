@@ -129,7 +129,7 @@ test("resource classes, rewards, cooldown, sleep scale and build ID share the ru
 
   const canvas = await page.locator("canvas").boundingBox();
   if (!canvas) throw new Error("Game canvas is unavailable");
-  await page.mouse.click(canvas.x + 45 * canvas.width / 320, canvas.y + 19 * canvas.height / 180);
+  await page.mouse.click(canvas.x + 45 * canvas.width / 640, canvas.y + 19 * canvas.height / 360);
   const hud = await bridge(page, "getHudState");
   expect(hud.buildLabelVisible).toBe(true);
   expect(hud.buildLabel).toMatch(/^v (?:[0-9a-f]{7}|local)$/u);

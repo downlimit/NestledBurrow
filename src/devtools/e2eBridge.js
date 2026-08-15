@@ -113,6 +113,13 @@ export function installWorldE2EBridge(scene) {
     placeWell: (point) => getLocationOwners().worldBuildCoordinator?.place?.({ placement: "well" }, point),
     getBuildModeState: () => getLocationOwners().buildModeRuntime?.getState?.() ?? null,
     toggleBuildMode: () => getLocationOwners().buildModeRuntime?.toggle?.(),
+    setBuildPanelView: (view) => getLocationOwners().buildModeRuntime?.setView?.(view) ?? false,
+    grantSimulationTestItem: ({ itemId, quantity = 1 } = {}) => clone(
+      getLocationOwners().buildModeRuntime?.grantTestItem?.(itemId, quantity) ?? null,
+    ),
+    grantSimulationTestCoins: (amount = 100) => clone(
+      getLocationOwners().buildModeRuntime?.grantTestCoins?.(amount) ?? null,
+    ),
     moveTavernSign: ({ x, y }) => {
       const owners = getLocationOwners();
       const state = owners.tavernSignRuntime?.getState?.();
@@ -199,6 +206,23 @@ export function installWorldE2EBridge(scene) {
       return facility;
     },
     forceGuestSpawn: (personId) => getLocationOwners().tavernServiceRuntime?.forceGuestVisit?.(personId),
+    forceGuestOrder: ({ personId = null, itemId = null } = {}) => getLocationOwners()
+      .tavernServiceRuntime?.forceGuestOrder?.(personId, itemId),
+    acceptGuestOrder: (guestId) => clone(getLocationOwners()
+      .tavernServiceRuntime?.acceptGuestOrder?.(guestId) ?? null),
+    setGuestOrderElapsedMs: ({ guestId, value } = {}) => getLocationOwners()
+      .tavernServiceRuntime?.setGuestOrderElapsedMs?.(guestId, value) ?? false,
+    getGuestOrder: (guestId = null) => {
+      const guests = getLocationOwners().guestRuntime?.getState?.().guests ?? [];
+      const guest = guestId ? guests.find((candidate) => candidate.id === guestId) : guests[0];
+      return clone(guest ? {
+        guestId: guest.id,
+        personId: guest.personId,
+        displayName: guest.displayName,
+        servingTableId: guest.servingTableId,
+        order: guest.order,
+      } : null);
+    },
     setGuestRandomValue: (value) => getLocationOwners()
       .tavernServiceRuntime?.setDemandRandomSource?.(() => Number(value)),
     getDemandProfilePerson: (personId) => {
@@ -269,6 +293,12 @@ export function installWorldE2EBridge(scene) {
     getPopulation: () => clone(scene.sessionState.gameplay.population),
     getPopulationPerson: (personId) => clone(
       scene.sessionState.gameplay.population.find((person) => person.id === personId) ?? null,
+    ),
+    getPersonInspectionState: () => clone(getLocationOwners().personInspectionRuntime?.getState?.() ?? null),
+    inspectPopulationPerson: (personId) => getLocationOwners().personInspectionRuntime?.inspectPerson?.(personId) ?? false,
+    forcePersonInspectionExpanded: (personId) => getLocationOwners().personInspectionRuntime?.forceExpanded?.(personId) ?? false,
+    setInspectedPersonNeed: ({ needId, value } = {}) => clone(
+      getLocationOwners().personInspectionRuntime?.setInspectedNeed?.(needId, value) ?? null,
     ),
     evaluatePopulationPerson: (personId) => clone(evaluatePopulationPerson(
       scene.sessionState.gameplay.population,

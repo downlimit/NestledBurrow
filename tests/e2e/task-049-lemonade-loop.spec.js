@@ -43,7 +43,7 @@ async function interactWith(page, entityId) {
 async function openTavern(page) {
   await interactWith(page, "tavern-open-sign");
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(true);
-  const point = await canvasPoint(page, { x: 108, y: 130 });
+  const point = await canvasPoint(page, { x: 268, y: 220 });
   await page.mouse.click(point.x, point.y);
   await expect.poll(async () => (await bridge(page, "getTavernState")).open).toBe(true);
   const closePoint = await canvasPoint(page, { x: 12, y: 90 });
@@ -54,7 +54,7 @@ async function openTavern(page) {
 async function canvasPoint(page, point) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
-  return { x: box.x + point.x * box.width / 320, y: box.y + point.y * box.height / 180 };
+  return { x: box.x + point.x * box.width / 640, y: box.y + point.y * box.height / 360 };
 }
 
 async function dragLogical(page, from, to) {
@@ -82,7 +82,7 @@ test("fresh Task 049 world has four tools, editable kitchen/well and two trees",
   test.skip(testInfo.project.name.startsWith("mobile"), "desktop captures the integrated baseline once");
   await bootFresh(page);
   const session = await bridge(page, "getSession");
-  expect(session.version).toBe(15);
+  expect(session.version).toBe(16);
   expect(session.gameplay.inventory.slots.slice(0, 5).map((item) => item?.id)).toEqual([
     "axe", "pickaxe", "hoe", "water-bucket", "potato-seed",
   ]);
@@ -252,12 +252,19 @@ test("lemonade guests take out and pay two coins", async ({ page }, testInfo) =>
   await bridge(page, "setServingStock", { itemId: "lemonade", quantity: 1 });
   await openTavern(page);
   expect((await bridge(page, "getTavernState")).open).toBe(true);
-  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
+  const guestId = await bridge(page, "forceGuestOrder", { itemId: "lemonade" });
+  expect(guestId).toBe("tavern-guest-1");
   await advanceUntil(
     page,
     async () => (await bridge(page, "getTavernState")).guest.guests[0]?.itemId,
     (itemId) => itemId === "lemonade",
   );
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getGuestOrder", guestId))?.order?.status,
+    (status) => status === "offered",
+  );
+  expect(await bridge(page, "acceptGuestOrder", guestId)).toMatchObject({ status: "order-accepted", mutated: true });
   await advanceUntil(
     page,
     async () => {
@@ -318,7 +325,14 @@ test("fried potato guests dine in and pay four coins", async ({ page }, testInfo
   await bootFresh(page);
   await bridge(page, "setServingStock", { itemId: "fried-potato-dish", quantity: 1 });
   await openTavern(page);
-  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-1");
+  const guestId = await bridge(page, "forceGuestOrder", { itemId: "fried-potato-dish" });
+  expect(guestId).toBe("tavern-guest-1");
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getGuestOrder", guestId))?.order?.status,
+    (status) => status === "offered",
+  );
+  expect(await bridge(page, "acceptGuestOrder", guestId)).toMatchObject({ status: "order-accepted", mutated: true });
   await advanceUntil(
     page,
     async () => (await bridge(page, "getTavernState")).guest.guests[0]?.state,

@@ -86,6 +86,32 @@ export function evaluatePopulationPerson(population, personId, targetWorldTimeSe
   return { status: mutated ? "evaluated" : "unchanged", mutated, person };
 }
 
+export function setPopulationPersonNeed(population, personId, needId, value, worldTimeSeconds) {
+  if (!Array.isArray(population)) return { status: "invalid-population", mutated: false, person: null };
+  if (!NEED_IDS.includes(needId)) return { status: "invalid-need", mutated: false, person: null };
+  const index = population.findIndex((person) => person?.id === personId);
+  if (index < 0) return { status: "unknown-person", mutated: false, person: null };
+  const numericValue = Number(value);
+  const evaluationTime = Number(worldTimeSeconds);
+  if (!Number.isFinite(numericValue)) return { status: "invalid-value", mutated: false, person: null };
+  if (!Number.isFinite(evaluationTime) || evaluationTime < 0) {
+    return { status: "invalid-world-time", mutated: false, person: null };
+  }
+  const previous = population[index];
+  const nextValue = roundNeed(normalizeNeedValue(numericValue));
+  const nextEvaluationTime = evaluationTime;
+  const mutated = previous?.needs?.[needId] !== nextValue
+    || previous?.lastEvaluatedWorldTimeSeconds !== nextEvaluationTime;
+  if (!mutated) return { status: "unchanged", mutated: false, person: previous };
+  const person = {
+    ...previous,
+    needs: { ...previous.needs, [needId]: nextValue },
+    lastEvaluatedWorldTimeSeconds: nextEvaluationTime,
+  };
+  population[index] = person;
+  return { status: "need-set", mutated: true, person };
+}
+
 function createStage1Person(identity, evaluationTime) {
   const demandProfile = createPersonDemandProfile(identity.id);
   return {

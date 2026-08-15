@@ -1,12 +1,13 @@
 <!-- Keep routine PR reports short. Delete optional lines that do not apply. -->
 
 <!-- nestled-burrow-delivery:v1
+executor: choose
 player-visible: choose
 preview-acceptance: choose
 auto-merge: choose
 -->
 
-<!-- Replace every choose value. Invalid or incomplete metadata falls back to path-based preview routing. -->
+<!-- executor: codex|chatgpt; preview-acceptance: pending|accepted|not-required. Public preview requires chatgpt + pending. Invalid metadata fails the scope check and never publishes a preview. -->
 
 # Task
 

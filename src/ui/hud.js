@@ -89,16 +89,16 @@ export function drawBitmapText(scene, x, y, text, options = {}) {
   return graphics;
 }
 
-export function drawBitmapTextInto(graphics, x, y, text, { color = HUD_COLORS.light, shadow = HUD_COLORS.shadow } = {}) {
+export function drawBitmapTextInto(graphics, x, y, text, { color = HUD_COLORS.light, shadow = HUD_COLORS.shadow, alpha = 1 } = {}) {
   let cursorX = Math.round(x);
   const baseY = Math.round(y);
   for (const char of text) {
     const glyph = HUD_GLYPHS[char] ?? HUD_GLYPHS[char.toLowerCase()] ?? HUD_GLYPHS[" "];
     if (shadow) {
-      graphics.fillStyle(shadow, 0.75);
+      graphics.fillStyle(shadow, 0.75 * alpha);
       drawGlyphPixels(graphics, glyph, cursorX + 1, baseY + 1);
     }
-    graphics.fillStyle(color, 0.88);
+    graphics.fillStyle(color, 0.88 * alpha);
     drawGlyphPixels(graphics, glyph, cursorX, baseY);
     cursorX += (char === " " ? SPACE_WIDTH : GLYPH_WIDTH) + GLYPH_SPACING;
   }

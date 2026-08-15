@@ -1,5 +1,6 @@
 import { HUD_COLORS, drawBitmapTextInto } from "../ui/hud.js";
 import { INVENTORY_HUD_AREA, INVENTORY_SLOT_AREAS } from "./inventoryRuntime.js";
+import { GAME_HEIGHT } from "../world/worldConfig.js";
 
 export const INVENTORY_MODES = Object.freeze({
   PEACEFUL: "PEACEFUL",
@@ -27,7 +28,7 @@ const COMBAT_SLOT_WIDTH = 22;
 const COMBAT_SLOT_HEIGHT = 22;
 const COMBAT_SLOT_GAP = 2;
 const COMBAT_ACTION_CENTER_X = INVENTORY_SLOT_AREAS.at(-1).x;
-const COMBAT_ACTION_MIDDLE_Y = 136;
+const COMBAT_ACTION_MIDDLE_Y = GAME_HEIGHT - 44;
 const COMBAT_ACTION_VERTICAL_OFFSET = (COMBAT_SLOT_HEIGHT + COMBAT_SLOT_GAP) / 2;
 
 export const COMBAT_SLOT_DEFINITIONS = Object.freeze([

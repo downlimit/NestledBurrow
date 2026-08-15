@@ -73,6 +73,7 @@ import { preloadFarmingAssets } from "./resources/farmingConfig.js";
 import { preloadLemonadeAssets } from "./tavern/lemonadeConfig.js";
 import { installWorldE2EBridge } from "./devtools/e2eBridge.js";
 import { UiVisibilityCoordinator } from "./ui/uiVisibilityCoordinator.js";
+import { displayZoomForViewport, PresentationCameraRuntime } from "./ui/presentationCameraRuntime.js";
 import { createGameCanvasInputGuard } from "./controls/gameCanvasInputGuard.js";
 import {
   createMeleeStartingWorldItems,
@@ -184,6 +185,7 @@ class WorldScene extends Phaser.Scene {
     this.createInput();
     this.createCharacters();
     this.createAudio();
+    this.presentationCameraRuntime = new PresentationCameraRuntime(this);
     this.createCameraRuntime();
     this.createSessionAndInteractionRuntime();
     this.sleeping = false;
@@ -202,7 +204,8 @@ class WorldScene extends Phaser.Scene {
     });
     this.attachSceneListeners();
     this.createJoystick();
-    this.syncIntegerZoom();
+    this.syncDisplayZoom();
+    this.presentationCameraRuntime.syncObjectLayers();
     this.installE2EBridge();
   }
 
@@ -501,6 +504,7 @@ class WorldScene extends Phaser.Scene {
   get tavernServiceRuntime() { return this.locationOwners.tavernServiceRuntime ?? null; }
   get venueMenuRuntime() { return this.tavernServiceRuntime?.venueMenuRuntime ?? null; }
   get guestRuntime() { return this.locationOwners.guestRuntime ?? null; }
+  get personInspectionRuntime() { return this.locationOwners.personInspectionRuntime ?? null; }
   get coinRuntime() { return this.locationOwners.coinRuntime ?? null; }
   get farmingRuntime() { return this.locationOwners.farmingRuntime ?? null; }
   get cookingRuntime() { return this.locationOwners.cookingRuntime ?? null; }
@@ -858,7 +862,8 @@ class WorldScene extends Phaser.Scene {
       || Boolean(this.interactionHud?.isPointInHud(x, y))
       || Boolean(this.merchantRuntime?.isPointInHud?.(x, y))
       || Boolean(this.cookingRuntime?.isPointInHud?.(x, y))
-      || Boolean(this.venueMenuRuntime?.isPointInHud?.(x, y));
+      || Boolean(this.venueMenuRuntime?.isPointInHud?.(x, y))
+      || Boolean(this.personInspectionRuntime?.isPointInHud?.(x, y));
   }
 
   startNewGame() {
@@ -875,19 +880,19 @@ class WorldScene extends Phaser.Scene {
   attachSceneListeners() {
     this.gameCanvasInputGuard = createGameCanvasInputGuard(this.game.canvas);
     this.onFullscreenChange = () => {
-      this.syncIntegerZoom();
+      this.syncDisplayZoom();
       this.updateFullscreenHud();
     };
 
     document.addEventListener("fullscreenchange", this.onFullscreenChange);
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.syncDisplayZoom, this);
     this.sceneListenersAttached = true;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroySceneListeners, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.destroySceneListeners, this);
   }
 
-  syncIntegerZoom() {
-    const zoom = this.scale.getMaxZoom();
+  syncDisplayZoom() {
+    const zoom = displayZoomForViewport(window.innerWidth, window.innerHeight);
     if (this.scale.zoom !== zoom) this.scale.setZoom(zoom);
   }
 
@@ -903,7 +908,7 @@ class WorldScene extends Phaser.Scene {
     this.gameCanvasInputGuard?.destroy();
     this.gameCanvasInputGuard = null;
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
-    this.scale.off(Phaser.Scale.Events.RESIZE, this.syncIntegerZoom, this);
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.syncDisplayZoom, this);
     this.interactionRuntime?.destroy();
     this.worldLocationRuntime?.destroy?.();
     this.worldLocationRuntime = null;
@@ -918,6 +923,8 @@ class WorldScene extends Phaser.Scene {
     this.worldLocationCoordinator = null;
     this.cameraRuntime?.destroy();
     this.cameraRuntime = null;
+    this.presentationCameraRuntime?.destroy();
+    this.presentationCameraRuntime = null;
     this.uiVisibilityCoordinator?.destroy(); this.uiVisibilityCoordinator = null;
     this.interactionHud?.destroy();
     this.interactionHud = null;
@@ -1012,6 +1019,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   update(_time, delta) {
+    this.presentationCameraRuntime?.syncObjectLayers();
     this.sampleFrameActions();
     this.worldLocationRuntime?.handleFrameActions?.(this.frameActions);
     const realDeltaMs = delta;

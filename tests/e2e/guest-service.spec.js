@@ -40,9 +40,9 @@ async function openTavern(page) {
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(true);
   const canvas = await page.locator("canvas").boundingBox();
   if (!canvas) throw new Error("Game canvas is unavailable");
-  await page.mouse.click(canvas.x + 108 * canvas.width / 320, canvas.y + 130 * canvas.height / 180);
+  await page.mouse.click(canvas.x + 268 * canvas.width / 640, canvas.y + 220 * canvas.height / 360);
   await expect.poll(async () => (await bridge(page, "getTavernState")).open).toBe(true);
-  await page.mouse.click(canvas.x + 12 * canvas.width / 320, canvas.y + 90 * canvas.height / 180);
+  await page.mouse.click(canvas.x + 12 * canvas.width / 640, canvas.y + 90 * canvas.height / 360);
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
 }
 
@@ -69,7 +69,14 @@ test("open guest reserves, eats and consumes the served dish", async ({ page }) 
   await bootFresh(page);
   await bridge(page, "setServingDish", true);
   await openTavern(page);
-  const guestId = await bridge(page, "forceGuestSpawn");
+  const guestId = await bridge(page, "forceGuestOrder", { itemId: "fried-potato-dish" });
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getGuestOrder", guestId))?.order?.status,
+    (status) => status === "offered",
+    { maxMs: 60_000 },
+  );
+  expect(await bridge(page, "acceptGuestOrder", guestId)).toMatchObject({ status: "order-accepted", mutated: true });
   await advanceUntil(
     page,
     async () => (await bridge(page, "getTavernState")).guest.reservedDish,
