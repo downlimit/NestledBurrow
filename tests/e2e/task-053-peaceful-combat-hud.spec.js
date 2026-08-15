@@ -8,8 +8,8 @@ async function boot(page) {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  await expect(page.locator("canvas")).toHaveJSProperty("width", 640);
-  await expect(page.locator("canvas")).toHaveJSProperty("height", 360);
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 1920);
+  await expect(page.locator("canvas")).toHaveJSProperty("height", 1080);
 }
 
 async function inventoryMode(page) {
@@ -260,7 +260,13 @@ test("combat loadout items can be dropped into the world and combat pickup uses 
   expect((await bridge(page, "getSession")).gameplay.combatLoadout.slots[0]).toBeNull();
   await expect.poll(() => inventoryMode(page), { timeout: 1000 }).toMatchObject({ mode: "COMBAT", stableMode: "COMBAT" });
 
-  await page.waitForTimeout(500);
+  await expect.poll(async () => {
+    const before = (await bridge(page, "getSession")).gameplay.worldItems.find((item) => item.item.id === "axe");
+    if (!before) return false;
+    await page.waitForTimeout(100);
+    const after = (await bridge(page, "getSession")).gameplay.worldItems.find((item) => item.item.id === "axe");
+    return Boolean(after && before.x === after.x && before.y === after.y);
+  }, { timeout: 8_000 }).toBe(true);
   const dropped = (await bridge(page, "getSession")).gameplay.worldItems.find((item) => item.item.id === "axe");
   await bridge(page, "placePlayerAt", { x: dropped.x, y: dropped.y, facing: { x: 0, y: 1 } });
   await expect.poll(async () => (await bridge(page, "getSession")).gameplay.worldItems.some((item) => item.item.id === "axe")).toBe(false);

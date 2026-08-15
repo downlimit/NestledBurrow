@@ -232,3 +232,34 @@ The uploaded `incoming/NestledBurrow_SunlitSavePoint.mp3` has Git blob SHA `7676
 - **SHA-256:** `6079ffcf633c3a89debb88aa8a8375abcc3120a5346fde99a030801862ea18f8`.
 - **Git blob SHA:** `5e7b7052e675f788d5f42153b8893560d0e714af`.
 - **Delivery:** immutable Artist-owned runtime input; later code integration must consume these exact bytes and must not regenerate, redraw, resample, recolor, recompress or replace the PNG.
+
+## Task #091 Lead-owned guest overhead and sink sprites
+
+- **Provenance:** exact user-provided project PNG files already committed by the Lead in Base SHA `96b94abc4f335547db86e96af2bfdcae7f187c22`; Codex consumes the existing Git blobs and does not author or transform them.
+- **Delivery:** runtime presentation may scale these sprites, while the tracked source bytes, paths and authored frame geometry remain immutable. Task #091 must contain no tracked binary diff.
+- **Authored semantics:** `MindBubble` is a three-frame loop; `ActionTalk` uses three frames in playback order `2 -> 1 -> 2 -> 3`; the other `Action*` sheets use two horizontal frames; `SatisfactionTiers` contains five discrete horizontal states and is never played as a flipbook.
+- **Integrity proof:** byte length, SHA-256 and Git blob identity below were verified locally against the Base SHA before Task #091 code changes.
+
+| Runtime file | Native size | Byte length | SHA-256 | Git blob SHA |
+| --- | ---: | ---: | --- | --- |
+| `public/assets/project/facilities/NestledBurrow_Sink.png` | `1305x1206` | 414,842 | `3dac0fc0c8417e576dd522311c471c2023b5255c444fafd57d2db7ed005b46b8` | `e9b95065266afa096bf5212943b927f64196fff0` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindBubble.png` | `2172x724` | 525,286 | `863c51c8d30a12850f06c659b75c61ef98acdc77eb3d1d71dc4411c5321b7daa` | `12fc57b99ec9c9082d295db2c34067e93731270b` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindBored.png` | `501x501` | 189,145 | `708294025ddad8bb7b694685758c06cae81708711c2881e1e5810d55fa0360a2` | `062c8c7c712f00b9adb3a56ad245a9bd52a102b1` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindCleanliness.png` | `544x544` | 174,060 | `ebb08ae60ff09059d155ee4f991212655365ddf27e2f0be039fb3dc205af1b89` | `2a456296b4111388e82285e6c98fb113b7914a4d` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindLeave.png` | `515x515` | 185,298 | `e0f9323d1d3103c8fdc5532a783489bb634c732b70c0d453c5f89e188e023f1a` | `2f04b3d2dd78e6e1fe0d37ba0bba21668a0e60fd` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindHunger.png` | `520x520` | 135,226 | `394504e8959b5464bc78911bb91cdcdacaf836b6e1f86067c7c690af4cbbeafe` | `15db4f6063e5e9d2b2796388f0da6dfcd220ed6a` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindLowEnergy.png` | `548x548` | 115,688 | `9f0404c2b87ed5af870021ec1421748f0bb88ec40fd774f5d5f95f96c07167ce` | `56cb8bde8e8f658658ba4a502746c1175dc12131` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindSocial.png` | `532x532` | 145,053 | `8077d492bf974d44b6df82857d4752ab8b82fb5a85f788826b808b7985ec498a` | `40c4e7c27dac838d5335d69038d3832a42e513e2` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindToilet.png` | `560x560` | 185,235 | `30603eb3375cca5cc07336dab1ab55b0238578e70ef3a28d53fdf8a24bdb8833` | `090c49e63dcc8359e58824ce2dc8122b9c4755d4` |
+| `public/assets/project/characters/overhead/NestledBurrow_MindWaiting.png` | `480x480` | 136,433 | `829bdd8996bd289676c5e84b5c606e893ab56fff089698930d823ce9a866a1a0` | `bb86bd8d3bfcf99b157d940e1f59b1e76478c72d` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionChilling.png` | `1774x887` | 592,575 | `da310594277c3738433573c40b34b15539a13544f45bb636df474c7a0bb85cbc` | `a3bfd3e96cc04d9ce92631a5ff1274ef33d3a005` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionDrink.png` | `1774x887` | 828,447 | `ccf2e503300edd074a9ffedab1db72cac9b32c74c5d419df4ff0b9ad45785243` | `3ea82623c498e543bcd42e1c5a4d4ef706ab1bac` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionEat.png` | `1536x1024` | 1,056,571 | `33264794f0f61546bc07d07ca20cd070c00b8c7c1602e74ba84389c905766636` | `f5d10de0d47b0c027390bd3cfc27f1dc03ba4719` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionOrder.png` | `1774x887` | 929,683 | `d4d877eabb38ffefa1e7744e003b3aa99f5435b5446f2624755e615b8044bcb9` | `24a6ef604ccdaaf33febdd984a62eada157d12d4` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionPaying.png` | `1774x887` | 774,456 | `e4763b297647640bcb36bb276ab8c10aa5318990950837420010f9860965214f` | `ec3455f07fddd78912776912058c2890296238d3` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionReadMenu.png` | `1672x941` | 958,459 | `4cc046518edfa6133f6e609d63f9088aa4ba8c429cdaadf12fbb4000334c7623` | `31cce60dbc6d8ed4c507ca66f3fff6d90d348913` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionSleep.png` | `1774x887` | 741,404 | `558b6311d34104129531f8dc4d7ca49266f6fe4a1f7481aa32f37df972d4fd70` | `0c82c110fd8bb1494b908254207e22f98c88a9df` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionTalk.png` | `2172x724` | 603,563 | `02df684f1be9a5529743fa6489f7da3a9f2028c68b177157963b0ea5e5ccff95` | `31e1ede867ccdfe68f9305ebb16103f66793413f` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionWaiting.png` | `1774x887` | 692,993 | `927871b195b1e00aaa2265e815c9601fe12023115305920cb864cb8201dd5fa8` | `19f61672f0f0156dd29528fba0d15b642af55a36` |
+| `public/assets/project/characters/overhead/NestledBurrow_ActionWash.png` | `1774x887` | 814,574 | `b34abf471b9bec9875696e9117d419761b071f2827c63c8af168acd2af3a0224` | `9b054950ba3840290152d21fe1d8a58bac4d0572` |
+| `public/assets/project/characters/overhead/NestledBurrow_SatisfactionTiers.png` | `2172x724` | 756,904 | `812eebe32a4902fa2576bbe6dfe3d96beaf462692654bf559ebb50f58d5034f3` | `7440dea4598c627007a60ee6b9e40dfa31bb345c` |

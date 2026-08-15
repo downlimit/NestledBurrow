@@ -98,7 +98,9 @@ export function computeNeedRates(activity = {}, tuning) {
     novelty: tuning.novelty.base * lustreNoveltyMultiplier * dialogueNoveltyMultiplier,
     satiety: facility === "table" ? tuning.facilityRecoveryPerGameHour : tuning.satiety.base,
     toilet: facility === "toilet" ? tuning.facilityRecoveryPerGameHour : tuning.toilet.base,
-    lustre: facility === "shower" ? tuning.facilityRecoveryPerGameHour : tuning.lustre.base - lustreActivitySurcharge(activity, tuning),
+    lustre: facility === "shower"
+      ? tuning.facilityRecoveryPerGameHour
+      : facility === "sink" ? tuning.facilityRecoveryPerGameHour * 0.5 : tuning.lustre.base - lustreActivitySurcharge(activity, tuning),
     dialogue: sharedRest ? tuning.dialogue.sharedRest : activity.npcNearby ? 0 : tuning.dialogue.base,
   });
 }

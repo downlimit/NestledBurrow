@@ -71,9 +71,16 @@ import {
 } from "./character/characterVisualProfiles.js";
 import { preloadFarmingAssets } from "./resources/farmingConfig.js";
 import { preloadLemonadeAssets } from "./tavern/lemonadeConfig.js";
+import { preloadOverheadAssets } from "./tavern/overheadPresentationRuntime.js";
 import { installWorldE2EBridge } from "./devtools/e2eBridge.js";
 import { UiVisibilityCoordinator } from "./ui/uiVisibilityCoordinator.js";
-import { displayZoomForViewport, PresentationCameraRuntime } from "./ui/presentationCameraRuntime.js";
+import {
+  displayZoomForViewport,
+  PRESENTATION_DENSITY,
+  PresentationCameraRuntime,
+  RENDER_HEIGHT,
+  RENDER_WIDTH,
+} from "./ui/presentationCameraRuntime.js";
 import { createGameCanvasInputGuard } from "./controls/gameCanvasInputGuard.js";
 import {
   createMeleeStartingWorldItems,
@@ -99,6 +106,7 @@ class WorldScene extends Phaser.Scene {
     preloadFacilityAssets(this, import.meta.env.BASE_URL);
     preloadFarmingAssets(this, import.meta.env.BASE_URL);
     preloadLemonadeAssets(this, import.meta.env.BASE_URL);
+    preloadOverheadAssets(this, import.meta.env.BASE_URL);
     preloadMeleeAssets(this);
     preloadPuddleAsset(this, import.meta.env.BASE_URL);
     for (const asset of Object.values(WORLD_TRANSITION_ASSETS)) {
@@ -892,7 +900,7 @@ class WorldScene extends Phaser.Scene {
   }
 
   syncDisplayZoom() {
-    const zoom = displayZoomForViewport(window.innerWidth, window.innerHeight);
+    const zoom = displayZoomForViewport(window.innerWidth, window.innerHeight) / PRESENTATION_DENSITY;
     if (this.scale.zoom !== zoom) this.scale.setZoom(zoom);
   }
 
@@ -1003,6 +1011,7 @@ class WorldScene extends Phaser.Scene {
     this.needsFlow = needsSnapshot.flow;
     const activeFacility = this.facilityRuntime?.getActiveType?.();
     if ((activeFacility === "shower" && this.sessionState.gameplay.needs.lustre >= 100)
+      || (activeFacility === "sink" && this.sessionState.gameplay.needs.lustre >= 70)
       || (activeFacility === "toilet" && this.sessionState.gameplay.needs.toilet >= 100)
       || (activeFacility === "table" && this.sessionState.gameplay.needs.satiety >= 100)) {
       this.needsInteractionCoordinator.exit();
@@ -1194,8 +1203,8 @@ async function bootstrap() {
   type: Phaser.AUTO,
   parent: "game",
   backgroundColor: "#171724",
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
+  width: RENDER_WIDTH,
+  height: RENDER_HEIGHT,
   pixelArt: true,
   antialias: false,
   roundPixels: true,
@@ -1203,7 +1212,7 @@ async function bootstrap() {
   scene: WorldScene,
   scale: {
     mode: Phaser.Scale.NONE,
-    zoom: Phaser.Scale.MAX_ZOOM,
+    zoom: 1 / PRESENTATION_DENSITY,
   },
   });
 }

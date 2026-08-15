@@ -109,10 +109,16 @@ const gameHud = readFileSync("src/ui/gameHud.js", "utf8");
 const interactionHud = readFileSync("src/ui/interactionHud.js", "utf8");
 const main = readFileSync("src/main.js", "utf8");
 const guestFeedback = readFileSync("src/tavern/guestFeedback.js", "utf8");
+const overheadPresentation = readFileSync("src/tavern/overheadPresentationRuntime.js", "utf8");
 assert(gameHud.includes("createManagedText"), "HUD text surfaces use shared text resolution contract");
 assert(interactionHud.includes("createManagedText"), "dialogue and interaction text surfaces use shared text resolution contract");
-assert(guestFeedback.includes("const reaction = createManagedText"), "guest reactions use the shared pixel text renderer");
-assert(guestFeedback.includes("drawPixelThumb") && !guestFeedback.includes("Segoe UI Emoji"), "meal-complete feedback uses a custom pixel thumb without OS emoji rasterization");
+assert(overheadPresentation.includes("const hoverLabel = createManagedText"), "guest overhead labels use the shared pixel text renderer");
+assert(
+  overheadPresentation.includes('satisfaction: asset("SatisfactionTiers"')
+    && !guestFeedback.includes("Segoe UI Emoji")
+    && !overheadPresentation.includes("Segoe UI Emoji"),
+  "guest satisfaction feedback uses the project sprite without OS emoji rasterization",
+);
 assert(interactionHud.includes("speakerText") && interactionHud.includes("bodyText") && interactionHud.includes("promptText"), "dialogue speaker, body and prompt text surfaces are covered");
 assert(gameHud.includes("confirmMessageText") && gameHud.includes("soundTexts"), "confirmation modal and sound panel text surfaces are covered");
 

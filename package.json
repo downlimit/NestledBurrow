@@ -79,7 +79,8 @@
     "check:task-087": "node scripts/check-task-087.mjs",
     "check:task-088": "node scripts/check-task-088.mjs",
     "check:task-089": "node scripts/check-task-089.mjs",
-    "check:task-090": "node scripts/check-task-090.mjs"
+    "check:task-090": "node scripts/check-task-090.mjs",
+    "check:task-091": "node scripts/check-task-091.mjs"
   },
   "dependencies": {
     "@fontsource/pixelify-sans": "5.2.7",

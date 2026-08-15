@@ -59,6 +59,7 @@
       "bed": "Кровать",
       "shower": "Душ",
       "toilet": "Туалет",
+      "sink": "Раковина",
       "table": "Стол",
       "well": "Колодец",
       "tree": "Дерево"
@@ -85,6 +86,8 @@
     "leaveShower": "Выйти из душа",
     "toilet": "Использовать туалет",
     "leaveToilet": "Слезть с туалета",
+    "washAtSink": "Умыться у раковины",
+    "leaveSink": "Закончить умывание",
     "eat": "Поесть",
     "stopEating": "Перестать есть",
     "startPreparation": "Начать подготовку",
@@ -129,6 +132,8 @@
     "servingTableEmpty": "Сервировочный стол пуст",
     "acceptOrderLemonade": "Принять заказ: Лимонад",
     "acceptOrderFriedPotato": "Принять заказ: Жареный картофель",
+    "acceptGuestOrder": "Принять заказ",
+    "talkGuest": "Поговорить",
     "repairStove": "Починить: 10 дерева, 8 камня, 10 монет",
     "repairMissing": "Не хватает: {categories}",
     "repairCategory": {

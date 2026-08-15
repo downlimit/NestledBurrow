@@ -7,8 +7,8 @@ This system owns kitchen transformation, service facilities, tavern opening, ven
 ## Player-visible contract
 
 ```text
-potato → preparation → frying → serving table → dine-in guest → 4 coins
-lemon + bucket water → juicer → serving table → takeout guest → 2 coins
+potato → preparation → frying → claimed service-capable table → dine-in guest → 4 coins
+lemon + bucket water → juicer → claimed service-capable table → dine-in or intent-driven takeout guest → 2 coins
 ```
 
 Stage 4 uses the target causality: a persistent person first has a reason to go out, chooses one exact menu item, offers that order in person and creates a service commitment only after the player accepts it.
@@ -73,13 +73,7 @@ A failed match also matters without requiring a punitive score. A person who arr
 
 ## Persistent people without full offscreen simulation
 
-People remain persistent while offscreen, but their complete life is not simulated frame by frame.
-
-For each person the save keeps the last relevant state and evaluation time. When that person becomes relevant again — visit consideration, scene appearance, phone contact, invitation or another explicit interaction — their current state is reconstructed from the stored state, elapsed world time, person-specific traits when available and bounded variation.
-
-Population members may later form relationships and families, age, reproduce and die through coarse offscreen progression. If the living population drops below the target range, new people may be generated to restore the population. Those lifecycle rules are broader than tavern service but the resulting people remain the same persistent identities consumed by demand.
-
-While a person is physically present, all canonical needs are live. A guest may therefore arrive hungry while also urgently needing the toilet, wanting social contact or lacking energy. These combinations should create systemic situations rather than authored customer scripts.
+Offscreen people retain their last state/evaluation time and reconstruct from elapsed world time, traits and bounded variation only when relevant. A physical guest advances every canonical need live on that same persistent person. Relationships, families, ageing, death and replenishment remain future population work.
 
 ## Venue formats
 
@@ -150,15 +144,18 @@ Early play prioritizes optimization, then recognizable people, then need-driven 
 
 ## Order and fulfillment
 
-The visit decision's `bestOfferItemId` becomes the persisted planned order. At a claimed serving-table station the guest shows their name/item and waits for ordinary world-interaction acceptance. Before acceptance, menu/venue/station loss or response timeout ends the visit without failed-service history.
+- After the sign reaction, a guest claims one free `guest-service` facility; serving tables implement it first. Offer fit gives movement-compatible menu reading `2.5..6 s`; `bestOfferItemId` stays hidden until take-order acceptance.
+- Acceptance persists the commitment and starts fulfillment. Exact stock already on or ordinarily served to the claimed table fulfills it; wrong stock is ignored. Reservation/timer survive need interruption.
+- Dine-in food stays visible on that table until standing consumption ends. Drinks share the flow and become takeout only when onsite intents do not justify staying.
+- One visit-local satisfaction tier precedes paying; the coin spawns after that timeline. Timeout or critical post-acceptance departure fails once; pre-acceptance departure does not.
 
-Acceptance fixes the commitment and starts a bounded fulfillment window. The assigned station may contain the exact item already or receive it later through the ordinary inventory-to-serving-table interaction. Wrong stock is ignored. Accepted, reserved and served commitments survive menu deactivation and later offer edits. Lemonade continues through takeout and two-coin payment; fried potato continues through dining and four-coin payment.
+## Live guest intent
 
-Fulfillment timeout records one `failedAcceptedOrderCount` and timestamp, negative feedback and no payment. This history affects repeat visits; runtime/path cancellation does not.
+`guestIntentDomain` owns deterministic live rates, one hysteretic N/E/S/T/L/D intent, interruption, menu timing, takeout and satisfaction policy; `guestRuntime` owns routes/orders. Critical pressure may interrupt accepted waiting, use ordinary toilet/wash facilities (quick sink before stronger shower), rest, wander or converse, then resume the same valid commitment. Player talk uses shared interaction and never seizes control.
 
 ## Implemented stages
 
-Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 persists the active food offer and unifies sign interaction in one menu panel. Stage 3 gives every person a stable budget/taste profile and replaces stock-driven waves with one-person visit opportunities. Stage 4 persists the chosen exact order, routes player acceptance through the shared interaction system, waits for exact station fulfillment and records completed or timed-out accepted service as objective history.
+Stages 1–4 provide persistent people/reconstruction, saved offer, budget/taste demand and accepted exact-order history. Stage 5 advances live needs, arbitrates an interruptible intent, serves a capability-bearing table and presents the full visit with visit-local satisfaction.
 
 ## Owners
 
@@ -168,11 +165,12 @@ Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 pe
 - facilities: `src/facilities/facilityConfig.js`, `src/facilities/facilityRuntime.js`;
 - sign: `src/tavern/tavernSignRuntime.js`, `src/tavern/guestConfig.js`;
 - guest flow/pathing: `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`;
+- live need/intent policy: `src/tavern/guestIntentDomain.js`;
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
 - order state, timers and legal transitions: `src/tavern/orderDomain.js`;
 - visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags: `src/tavern/saleProfileDomain.js`;
 - active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
-- guest reaction/carried-item presentation: `src/tavern/guestFeedback.js`;
+- overhead thought/action owner: `src/tavern/overheadPresentationRuntime.js`; guest adapter: `src/tavern/guestFeedback.js`;
 - payment: `src/tavern/coinRuntime.js`;
 - persistent people, budgets/preferences and offscreen needs: `src/character/populationDomain.js` (external owner consumed through its public evaluation API);
 - `WorldScene` composes owners and delegates updates and callbacks.
@@ -188,20 +186,22 @@ Stage 1 provides 16 persistent people and coarse need reconstruction. Stage 2 pe
 - an active menu produces one opportunity every three to eight real seconds; it evaluates exactly one non-visiting persistent person and a refusal does not select a replacement;
 - `venueOffer` remains independent from physical stock: stock cannot create or block demand, and zero stock does not prevent an exact order from being offered;
 - a live visit keeps separate technical `guestId` and stable `personId`; one person cannot have two active visits, and fulfillment may reserve only exact `order.itemId` after acceptance;
-- one serving-table station belongs to at most one active order, while station selection prefers exact stock, then empty stock, then another free station;
+- one `guest-service` facility belongs to at most one active guest/order; exact stock, empty stock, then another free table is preferred;
 - successful purchase records one completed visit; an accepted fulfillment timeout records one failed accepted order; unaccepted or technical cancellation changes neither counter;
 - accepted commitments survive menu deactivation and offer edits, and `served` ends the fulfillment timeout;
-- dine-in guests reserve distinct dining-table IDs before consuming a dish; a table currently used by the player is excluded from new seat assignments, and the player cannot start using a guest-reserved table;
-- lemonade is takeout worth two coins; a fried potato dish is dine-in worth four.
+- dine-in food stays on the claimed table through consumption; generic dining tables retain only their ordinary player role;
+- lemonade is two coins and intent-driven takeout; fried potato is four-coin dine-in;
+- canonical needs, exact order and service-table ownership persist; transient intent/presentation may re-arbitrate after load;
+- satisfaction creates no persistent opinion, reputation or popularity.
 
 ## Current baseline
 
-Potato and lemonade feed independently stocked serving tables with existing dine-in/takeout, pathing and coin rewards. The sign panel owns offer/activity. Person-backed guests arrive for the decision's exact menu item, claim a live serving station, visibly offer the order and wait for explicit player acceptance. Prepared stock can fulfill immediately after acceptance; later stock uses the same physical serving-table flow. Completed and timed-out accepted orders update objective per-person history exactly once.
+Person-backed guests read the menu while entering, reveal the item on acceptance and wait at the claimed serving table. Thought/action channels coexist; the waiting thought shows the item, real progress and a hover-only caption. Need interruptions resume the same order and consumption remains at its table. Opening approval uses tier 3, satisfaction precedes paying/coin spawn, and objective history updates once.
 
 ## Not yet
 
-Recipe book, broader ingredients/storage, live guest needs, influence, popularity/reputation/opinion, group visits, social propagation, configurable schedules, staff and broader venue formats.
+Recipe book, broader ingredients/storage, persistent opinion/reputation/popularity, influence, group visits, relationship propagation, configurable schedules, staff, chairs/seated poses and broader venue formats.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`; focused service, order and population Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`; focused service, order, population and live-visit Browser E2E.

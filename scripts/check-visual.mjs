@@ -130,16 +130,20 @@ assert(/BASIC_VILLAGE_ASSET_PATH/.test(mainSource), "scene uses the canonical as
 assert(/load\.spritesheet/.test(mainSource), "verified 16x16 sheets are loaded as spritesheets");
 assert(!/kenney-room|kenney-world-extension/.test(mainSource), "runtime does not reference removed legacy atlases");
 assert(!/ROOM_SCALE|PLAYER_SCALE|Phaser\.Scale\.FIT/.test(mainSource));
-assert(/Phaser\.Scale\.MAX_ZOOM/.test(mainSource), "Phaser retains its pixel-art startup zoom policy");
+assert(/zoom:\s*1\s*\/\s*PRESENTATION_DENSITY/.test(mainSource), "the high-density backing canvas starts at the original presentation size");
 assert(/Phaser\.Scale\.Events\.RESIZE/.test(mainSource), "zoom is recalculated after resize");
-assert(/displayZoomForViewport\(window\.innerWidth, window\.innerHeight\)/.test(mainSource), "display zoom fits narrow viewports and keeps integer enlargement when space allows");
+assert(/displayZoomForViewport\(window\.innerWidth, window\.innerHeight\)/.test(mainSource), "all viewport modes use the same proportional fractional zoom");
+assert(!/fullscreenDisplayZoomForViewport/.test(mainSource), "fullscreen does not fork into a second density path");
 assert(/WORLD_CAMERA_ZOOM\s*=\s*2/.test(presentationCameraSource), "world camera preserves the original 320x180 apparent world view");
-assert(/cameras\.add\(0, 0, GAME_WIDTH, GAME_HEIGHT/.test(presentationCameraSource), "HUD owns a separate 640x360 presentation camera");
+assert(/PRESENTATION_DENSITY\s*=\s*3/.test(presentationCameraSource), "the shared framebuffer renders at 3x density");
+assert(/cameras\.add\(0, 0, RENDER_WIDTH, RENDER_HEIGHT/.test(presentationCameraSource), "HUD owns a full-resolution presentation camera");
+assert(/setOrigin\(0, 0\)\.setScroll\(0, 0\)\.setZoom\(PRESENTATION_DENSITY\)/.test(presentationCameraSource), "the high-density HUD retains the 640x360 logical origin");
 assert(/scrollFactorX/.test(presentationCameraSource) && /cameraFilter/.test(presentationCameraSource), "screen-space objects are isolated from world-camera zoom");
 assert(/new CameraFollowRuntime\(this,/.test(mainSource), "scene composes the camera follow runtime");
-assert(/startFollow\(this\.followTarget, true, 1, 1\)/.test(cameraFollowSource), "camera follow uses a rounded target");
-assert(/cameras\.main\.roundPixels\s*=\s*true/.test(cameraFollowSource), "active camera rounds its scroll for every world visual");
-assert(/followTarget\.setPosition\(Math\.round\(this\.state\.target\.x\), Math\.round\(this\.state\.target\.y\)\)/.test(cameraFollowSource), "camera target is quantized before rendering");
+assert(/startFollow\(this\.followTarget, true, 1, 1\)/.test(cameraFollowSource), "camera follow keeps its existing smoothing");
+assert(/cameras\.main\.roundPixels\s*=\s*true/.test(cameraFollowSource), "active camera keeps world pixels crisp");
+assert(/CAMERA_FOLLOW_PIXEL_STEP\s*=\s*1\s*\/\s*\(WORLD_CAMERA_ZOOM\s*\*\s*PRESENTATION_DENSITY\)/.test(cameraFollowSource), "camera follows the densest backing pixel step");
+assert(/quantizeCameraTarget\(this\.state\.target\.x\)/.test(cameraFollowSource), "camera target is backing-pixel aligned before rendering");
 assert(!/scroll[XY]\s*=\s*Math\.round/.test(mainSource), "camera follow is not overwritten manually");
 assert(/pixelArt:\s*true/.test(mainSource));
 assert(/antialias:\s*false/.test(mainSource));
@@ -282,5 +286,5 @@ for (const frame of preloadTextureKeys) {
 }
 
 console.log(
-  "Visual checks passed: legacy room sources/public atlases removed, Basic Village hashes, native 16px grid, integer zoom, rounded camera follow and four-phase player walk cadence.",
+  "Visual checks passed: legacy room sources/public atlases removed, Basic Village hashes, crisp native 16px grid, proportional canvas scaling, rounded camera follow and high-density overhead textures.",
 );

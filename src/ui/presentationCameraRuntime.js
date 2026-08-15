@@ -2,23 +2,29 @@ import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 
 export const WORLD_CAMERA_ZOOM = 2;
 export const UI_CAMERA_NAME = "presentation-ui";
+export const PRESENTATION_DENSITY = 3;
+export const RENDER_WIDTH = GAME_WIDTH * PRESENTATION_DENSITY;
+export const RENDER_HEIGHT = GAME_HEIGHT * PRESENTATION_DENSITY;
 
 export function displayZoomForViewport(viewportWidth, viewportHeight) {
-  const fit = Math.min(
+  return Math.max(0.1, viewportFit(viewportWidth, viewportHeight));
+}
+
+function viewportFit(viewportWidth, viewportHeight) {
+  return Math.min(
     Math.max(1, Number(viewportWidth) || GAME_WIDTH) / GAME_WIDTH,
     Math.max(1, Number(viewportHeight) || GAME_HEIGHT) / GAME_HEIGHT,
   );
-  return fit >= 1 ? Math.max(1, Math.floor(fit)) : Math.max(0.1, fit);
 }
 
 export class PresentationCameraRuntime {
   constructor(scene) {
     this.scene = scene;
     this.worldCamera = scene.cameras.main;
-    this.worldCamera.setZoom(WORLD_CAMERA_ZOOM);
+    this.worldCamera.setZoom(WORLD_CAMERA_ZOOM * PRESENTATION_DENSITY);
     this.worldCamera.roundPixels = true;
-    this.uiCamera = scene.cameras.add(0, 0, GAME_WIDTH, GAME_HEIGHT, false, UI_CAMERA_NAME);
-    this.uiCamera.setScroll(0, 0).setZoom(1);
+    this.uiCamera = scene.cameras.add(0, 0, RENDER_WIDTH, RENDER_HEIGHT, false, UI_CAMERA_NAME);
+    this.uiCamera.setOrigin(0, 0).setScroll(0, 0).setZoom(PRESENTATION_DENSITY);
     this.uiCamera.roundPixels = true;
     this.syncObjectLayers();
   }

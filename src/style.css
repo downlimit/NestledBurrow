@@ -34,6 +34,11 @@ canvas {
   image-rendering: pixelated;
 }
 
+#game:fullscreen {
+  background: #000;
+}
+
+
 .movement-debug-panel {
   position: fixed;
   top: 40px;

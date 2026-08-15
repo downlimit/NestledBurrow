@@ -3,6 +3,7 @@ import { HUD_DEPTH } from "../ui/hud.js";
 import { needValueFromTrackPointerX } from "../ui/needBarGeometry.js";
 import { createNeedsPanelGeometry, drawNeedsPanel, NEED_PANEL_SIZE } from "../ui/needsPanelPresentation.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
+import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 
 export const NPC_HOVER_EXPAND_MS = 667;
@@ -12,6 +13,7 @@ export const NPC_CARD_LEAVE_GRACE_MS = 660;
 const CARD = Object.freeze({ width: 84, compactHeight: 14, expandedHeight: 82, margin: 4 });
 const NEEDS_PANEL_OFFSET = Object.freeze({ x: Math.round((CARD.width - NEED_PANEL_SIZE.width) / 2), y: CARD.compactHeight });
 const ACTOR_HIT = Object.freeze({ halfWidth: 10, top: -28, bottom: 3 });
+const ACTOR_VISUAL_WORLD_HEIGHT = 16;
 const TOUCH_MOVE_CANCEL_PX = 7;
 
 export function createPersonInspectionRuntime(scene, {
@@ -293,18 +295,21 @@ function pointerWorldPoint(pointer, camera) {
 }
 
 function pointerScreenPoint(pointer) {
-  return { x: Number(pointer?.x ?? Number.NaN), y: Number(pointer?.y ?? Number.NaN) };
+  return {
+    x: Number(pointer?.x ?? Number.NaN) / PRESENTATION_DENSITY,
+    y: Number(pointer?.y ?? Number.NaN) / PRESENTATION_DENSITY,
+  };
 }
 
 function resolveCardRect(camera, actorPosition, width, height) {
   const view = camera?.worldView ?? { x: 0, y: 0, width: GAME_WIDTH, height: GAME_HEIGHT };
   const left = Number(view.x ?? view.left ?? 0);
   const top = Number(view.y ?? view.top ?? 0);
-  const zoom = Number(camera?.zoom) || 1;
-  const actorX = (actorPosition.x - left) * zoom;
-  const actorY = (actorPosition.y - top) * zoom;
+  const zoom = (Number(camera?.zoom) || 1) / PRESENTATION_DENSITY;
+  const actorX = Number(camera?.x || 0) / PRESENTATION_DENSITY + (actorPosition.x - left) * zoom;
+  const actorY = Number(camera?.y || 0) / PRESENTATION_DENSITY + (actorPosition.y - top) * zoom;
   const x = clamp(Math.round(actorX - width / 2), CARD.margin, GAME_WIDTH - width - CARD.margin);
-  const aboveY = Math.round(actorY - 28 * zoom - height - CARD.margin);
+  const aboveY = Math.round(actorY - ACTOR_VISUAL_WORLD_HEIGHT * zoom - height - CARD.margin);
   const belowY = Math.round(actorY + 8 * zoom);
   const y = aboveY >= CARD.margin ? aboveY : clamp(belowY, CARD.margin, GAME_HEIGHT - height - CARD.margin);
   return { x, y, width, height };

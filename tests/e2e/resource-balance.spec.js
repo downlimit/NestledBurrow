@@ -154,11 +154,11 @@ test("resource hit feedback returns to its placement-grid anchor", async ({ page
   const expected = { x: definition.cell.x * 8, y: definition.cell.y * 8 };
   await interact(page, id);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("wood-hit");
-  await page.waitForTimeout(160);
-  expect(await bridge(page, "getResourceVisualState", id)).toMatchObject(expected);
+  await expect.poll(async () => (await bridge(page, "getResourceVisualState", id)).x).toBeCloseTo(expected.x, 5);
+  await expect.poll(async () => (await bridge(page, "getResourceVisualState", id)).y).toBeCloseTo(expected.y, 5);
   await interact(page, id);
-  await page.waitForTimeout(160);
-  expect(await bridge(page, "getResourceVisualState", id)).toMatchObject(expected);
+  await expect.poll(async () => (await bridge(page, "getResourceVisualState", id)).x).toBeCloseTo(expected.x, 5);
+  await expect.poll(async () => (await bridge(page, "getResourceVisualState", id)).y).toBeCloseTo(expected.y, 5);
 });
 
 test("running, exhaustion sleep and wake-up share the energy-flow contract", async ({ page }) => {

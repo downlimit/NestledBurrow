@@ -150,7 +150,7 @@ export function installWorldE2EBridge(scene) {
       if (forced) {
         const facility = getLocationOwners().facilityRuntime?.getDefinition?.(forcedFacilityId);
         const result = scene.worldInteractionCoordinator?.handle?.(interactionCandidate(forced));
-        if (!["shower", "toilet", "table"].includes(facility?.facilityType)) forcedFacilityId = null;
+        if (!["shower", "toilet", "sink", "table"].includes(facility?.facilityType)) forcedFacilityId = null;
         scene.interactionRuntime?.refresh?.();
         return result;
       }

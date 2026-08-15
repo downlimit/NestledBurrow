@@ -14,6 +14,7 @@ assert.deepEqual(pixelAlignedWorldPoint({ x: 392, y: 372.5 }), { x: 392, y: 373 
 assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, footprint.width / 16, footprint.height / 16]), [
   ["shower", 2, 2],
   ["toilet", 1, 1],
+  ["sink", 1, 1],
   ["table", 3, 1],
   ["cutting-table", 2, 1],
   ["gas-stove", 1, 2],
@@ -22,7 +23,7 @@ assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, 
   ["juicer", 1, 1],
 ]);
 assert.deepEqual(FACILITIES.map(({ facilityType, footprint }) => [facilityType, footprint.x / 16, footprint.y / 16]), [
-  ["shower", 27, 20], ["toilet", 33, 20], ["table", 36, 26],
+  ["shower", 27, 20], ["toilet", 33, 20], ["sink", 36, 20], ["table", 36, 26],
   ["cutting-table", 29, 21], ["gas-stove", 31, 20], ["serving-table", 33, 26],
   ["lemon-sack", 27, 24], ["juicer", 29, 24],
 ], "the accepted live furniture arrangement is the default 16 px layout");
@@ -97,7 +98,7 @@ const runtime = createFacilityRuntime(scene, {
   getInventoryState: () => inventory,
   isFacilityReserved: (facilityId) => facilityId === reservedDiningTableId,
 });
-assert.equal(images.length, 9); assert.deepEqual([...colliders.values()].map((bounds) => [(bounds.right - bounds.left) / 16, (bounds.bottom - bounds.top) / 16]), [[2, 2], [1, 1], [3, 1], [2, 1], [1, 2], [2, 1], [1, 1], [1, 1]]);
+assert.equal(images.length, 10); assert.deepEqual([...colliders.values()].map((bounds) => [(bounds.right - bounds.left) / 16, (bounds.bottom - bounds.top) / 16]), [[2, 2], [1, 1], [1, 1], [3, 1], [2, 1], [1, 2], [2, 1], [1, 1], [1, 1]]);
 const motor = { position: null, movement: { velocity: { x: 3, y: -2 } } };
 for (const facility of FACILITIES.filter((candidate) => candidate.editable !== false)) {
   if (["cutting-table", "gas-stove", "serving-table", "juicer", "lemon-sack"].includes(facility.facilityType)) continue;

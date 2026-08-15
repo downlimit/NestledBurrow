@@ -88,7 +88,7 @@ test("open guest reserves, eats and consumes the served dish", async ({ page }) 
     (state) => state === "eating",
     { maxMs: 25_000 },
   );
-  expect((await bridge(page, "getSession")).gameplay.kitchen.servingTables["home-serving-table-01"].quantity).toBe(0);
+  expect((await bridge(page, "getSession")).gameplay.kitchen.servingTables["home-serving-table-01"].quantity).toBe(1);
   await advanceUntil(
     page,
     async () => (await bridge(page, "getCoinState"))[0]?.landed,
@@ -97,6 +97,7 @@ test("open guest reserves, eats and consumes the served dish", async ({ page }) 
   );
   const coinsBeforeCollection = (await bridge(page, "getSession")).gameplay.coins;
   const [coin] = await bridge(page, "getCoinState");
+  expect((await bridge(page, "getSession")).gameplay.kitchen.servingTables["home-serving-table-01"].quantity).toBe(0);
   await bridge(page, "placePlayerAt", { x: coin.x, y: coin.y });
   expect(coin.value).toBe(4);
   await bridge(page, "advanceWorldSimulation", 50);

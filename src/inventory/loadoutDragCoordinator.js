@@ -1,6 +1,7 @@
 import { cloneInventoryItem, swapLoadoutSlots } from "./inventoryDomain.js";
 import { FARMING_TEXTURE_KEY } from "../resources/farmingConfig.js";
 import { HUD_DEPTH, isPointInRect } from "../ui/hud.js";
+import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { renderInventoryItem } from "./inventoryVisuals.js";
 
 const DRAG_THRESHOLD = 3;
@@ -79,18 +80,20 @@ export function createLoadoutDragCoordinator(scene, {
   function begin(panel, index, pointer, event) {
     if (!enabled || destroyed || !panels.has(panel) || !slotsFor(panel)?.[index]) return false;
     stop(pointer, event);
-    candidate = { panel, index, startX: pointer.x, startY: pointer.y };
+    const point = presentationPointer(pointer);
+    candidate = { panel, index, startX: point.x, startY: point.y };
     dragging = false;
     return true;
   }
 
   function handlePointerMove(pointer) {
     if (!enabled || !candidate) return;
-    const distance = Math.hypot(pointer.x - candidate.startX, pointer.y - candidate.startY);
+    const point = presentationPointer(pointer);
+    const distance = Math.hypot(point.x - candidate.startX, point.y - candidate.startY);
     if (!dragging && distance >= DRAG_THRESHOLD) dragging = true;
     if (!dragging) return;
     stop(pointer);
-    renderDrag(pointer);
+    renderDrag(point);
     onAimTarget(pointer);
   }
 
@@ -104,7 +107,8 @@ export function createLoadoutDragCoordinator(scene, {
       panels.get(source.panel)?.onClick?.(source.index);
       return;
     }
-    const target = targetAt(pointer.x, pointer.y);
+    const point = presentationPointer(pointer);
+    const target = targetAt(point.x, point.y);
     if (!target) {
       onWorldDrop(source, pointer);
       return;
@@ -152,7 +156,8 @@ export function createLoadoutDragCoordinator(scene, {
     isEnabled: () => enabled,
     releasePanelAt(x, y) {
       if (!transferredDuringEdit) return null;
-      return targetAt(x, y)?.panel ?? null;
+      const point = presentationPointer({ x, y });
+      return targetAt(point.x, point.y)?.panel ?? null;
     },
     getState: () => ({
       enabled,
@@ -172,5 +177,12 @@ export function createLoadoutDragCoordinator(scene, {
       dragGraphics.destroy();
       dragImage.destroy();
     },
+  };
+}
+
+function presentationPointer(pointer) {
+  return {
+    x: Number(pointer?.x) / PRESENTATION_DENSITY,
+    y: Number(pointer?.y) / PRESENTATION_DENSITY,
   };
 }

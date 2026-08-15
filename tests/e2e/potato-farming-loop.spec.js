@@ -101,8 +101,10 @@ test("time controls pause and accelerate the farming clock", async ({ page }, te
   });
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("time-speed-up");
   const acceleratedAt = (await bridge(page, "getSession")).gameplay.worldTimeSeconds;
-  await page.waitForTimeout(250);
-  expect((await bridge(page, "getSession")).gameplay.worldTimeSeconds - acceleratedAt).toBeGreaterThan(120);
+  await expect.poll(
+    async () => (await bridge(page, "getSession")).gameplay.worldTimeSeconds - acceleratedAt,
+    { timeout: 1_500 },
+  ).toBeGreaterThan(120);
 
   await clickControl(1);
   await expect.poll(async () => bridge(page, "getRuntimeState")).toMatchObject({

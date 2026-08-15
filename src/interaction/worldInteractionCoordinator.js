@@ -3,7 +3,7 @@ import { FACILITY_INTERACTION_KIND } from "../facilities/facilityConfig.js";
 import { shouldShakeEnergyAfterInteraction } from "../ui/gameHud.js";
 import { hitResourceDefinition } from "../session/gameSessionState.js";
 import { TAVERN_SIGN_KIND } from "../tavern/guestConfig.js";
-import { GUEST_ORDER_INTERACTION_KIND } from "../tavern/guestRuntime.js";
+import { GUEST_ORDER_INTERACTION_KIND, GUEST_TALK_INTERACTION_KIND } from "../tavern/guestRuntime.js";
 import { RESOURCE_INTERACTION_KIND } from "../resources/resourceConfig.js";
 import { getResourceProfile, resourceActionForTool, resourceEffectType } from "../resources/resourceDomain.js";
 import { WORLD_IDS, WORLD_TRANSITION_INTERACTION_KIND } from "../world/worldLocationConfig.js";
@@ -77,7 +77,8 @@ export function createWorldInteractionCoordinator({
       ...(locationOwners.debrisRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.facilityRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
-      ...(locationOwners.tavernServiceRuntime?.getOrderInteractionDefinitions?.() ?? []),
+      ...(locationOwners.tavernServiceRuntime?.getGuestInteractionDefinitions?.()
+        ?? locationOwners.tavernServiceRuntime?.getOrderInteractionDefinitions?.() ?? []),
       ...(locationOwners.farmingRuntime?.getInteractionDefinitions?.() ?? []),
       ...(wake ? [wake] : []),
       ...(exhaustedWake ? [exhaustedWake] : []),
@@ -102,7 +103,7 @@ export function createWorldInteractionCoordinator({
     if (isHandled(result)) return result;
     result = handleTavernSign(candidate);
     if (isHandled(result)) return result;
-    result = handleGuestOrder(candidate);
+    result = handleGuestInteraction(candidate);
     if (isHandled(result)) return result;
     result = handleFacility(candidate);
     if (isHandled(result)) return result;
@@ -148,11 +149,12 @@ export function createWorldInteractionCoordinator({
     return result;
   }
 
-  function handleGuestOrder(candidate) {
-    if (candidate.kind !== GUEST_ORDER_INTERACTION_KIND) return IGNORED;
-    const result = locationOwners.tavernServiceRuntime?.acceptGuestOrder?.(
-      candidate.payload.guestId,
-    ) ?? IGNORED;
+  function handleGuestInteraction(candidate) {
+    if (![GUEST_ORDER_INTERACTION_KIND, GUEST_TALK_INTERACTION_KIND].includes(candidate.kind)) return IGNORED;
+    const result = locationOwners.tavernServiceRuntime?.handleGuestInteraction?.(candidate)
+      ?? (candidate.kind === GUEST_ORDER_INTERACTION_KIND
+        ? locationOwners.tavernServiceRuntime?.acceptGuestOrder?.(candidate.payload.guestId)
+        : IGNORED);
     if (!isHandled(result)) return result;
     suppressNextInteract();
     refreshInteractions();

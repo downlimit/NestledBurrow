@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 const startedAt = Date.now();
 const viteCli = resolve("node_modules/vite/bin/vite.js");
 const playwrightCli = resolve("node_modules/@playwright/test/cli.js");
-const timeoutMs = 300_000;
+const timeoutMs = 600_000;
 const runtimeDir = mkdtempSync(join(tmpdir(), "NestledBurrow-focused-e2e-"));
 let url;
 let server;

@@ -1,7 +1,11 @@
+import { PRESENTATION_DENSITY, WORLD_CAMERA_ZOOM } from "../ui/presentationCameraRuntime.js";
+
 export const DEFAULT_CAMERA_TUNING = Object.freeze({
   backPointFollowRate: 5,
   cameraLeadTransitionSeconds: 2,
 });
+
+export const CAMERA_FOLLOW_PIXEL_STEP = 1 / (WORLD_CAMERA_ZOOM * PRESENTATION_DENSITY);
 
 export function normalizeCameraTuning(value = {}) {
   return {
@@ -83,7 +87,10 @@ export class CameraFollowRuntime {
       progress: 0,
       moving: false,
     };
-    this.followTarget?.setPosition(Math.round(presentationPosition.x), Math.round(presentationPosition.y));
+    this.followTarget?.setPosition(
+      quantizeCameraTarget(presentationPosition.x),
+      quantizeCameraTarget(presentationPosition.y),
+    );
   }
 
   update({ presentationPosition, speed, deltaMs, maxPresentationSpeed = null }) {
@@ -95,7 +102,10 @@ export class CameraFollowRuntime {
       maxPresentationSpeed,
       tuning: this.tuning,
     });
-    this.followTarget.setPosition(Math.round(this.state.target.x), Math.round(this.state.target.y));
+    this.followTarget.setPosition(
+      quantizeCameraTarget(this.state.target.x),
+      quantizeCameraTarget(this.state.target.y),
+    );
     return this.getState();
   }
 
@@ -116,6 +126,10 @@ export class CameraFollowRuntime {
     this.followTarget = null;
     this.scene = null;
   }
+}
+
+function quantizeCameraTarget(value) {
+  return Math.round(Number(value) / CAMERA_FOLLOW_PIXEL_STEP) * CAMERA_FOLLOW_PIXEL_STEP;
 }
 
 function clampNumber(value, fallback, min, max) {
