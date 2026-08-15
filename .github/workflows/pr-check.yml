@@ -376,6 +376,6 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: existing.id,
-                body: `${marker}\nИгровая препроверка удалена после закрытия PR.`,
+                body: `${marker}\nПубличная игровая препроверка удалена: текущий PR не находится в ChatGPT pending Draft route.`,
               });
             }
