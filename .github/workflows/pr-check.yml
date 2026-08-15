@@ -148,7 +148,7 @@ jobs:
         run: npx playwright install --only-shell chromium
 
       - name: Run browser checks
-        run: npm run check:e2e -- --shard=${{ matrix.shard }}/3
+        run: npm run check:e2e -- --shard=${{ matrix.shard }}/3 --workers=1
 
       - name: Upload Playwright report
         if: failure()
