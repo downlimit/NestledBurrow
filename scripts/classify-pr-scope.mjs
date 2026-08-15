@@ -36,12 +36,6 @@ const isMicro = (path) =>
   path.endsWith(".bat") ||
   path.endsWith(".cmd");
 
-const isPreviewRelevant = (path) =>
-  !isCiMeta(path) &&
-  !isMicro(path) &&
-  !path.startsWith(".github/workflows/") &&
-  path !== "requirements-dev.txt";
-
 const isBrowserRelevant = (path) =>
   path.startsWith("src/") ||
   path.startsWith("tests/e2e/") ||
@@ -61,15 +55,11 @@ export function classifyPaths(paths) {
   return "micro";
 }
 
-export function requiresPreview(paths) {
-  return paths.filter(Boolean).map(normalize).some(isPreviewRelevant);
-}
-
 export function requiresBrowser(paths) {
   return paths.filter(Boolean).map(normalize).some(isBrowserRelevant);
 }
 
-const DELIVERY_FIELDS = new Set(["player-visible", "preview-acceptance", "auto-merge"]);
+const DELIVERY_FIELDS = new Set(["executor", "player-visible", "preview-acceptance", "auto-merge"]);
 
 export function parseDeliveryMetadata(body = "") {
   const block = body.match(/<!--\s*nestled-burrow-delivery:v1([\s\S]*?)-->/iu);
@@ -91,13 +81,27 @@ export function parseDeliveryMetadata(body = "") {
   }
 
   const allowed = {
+    executor: new Set(["codex", "chatgpt"]),
     "player-visible": new Set(["yes", "no"]),
-    "preview-acceptance": new Set(["required", "not-required"]),
+    "preview-acceptance": new Set(["pending", "accepted", "not-required"]),
     "auto-merge": new Set(["yes", "no"]),
   };
   for (const field of DELIVERY_FIELDS) {
     if (!values[field]) errors.push(`missing metadata field: ${field}`);
     else if (!allowed[field].has(values[field])) errors.push(`invalid ${field}: ${values[field]}`);
+  }
+  if (errors.length === 0) {
+    const visible = values["player-visible"] === "yes";
+    const acceptance = values["preview-acceptance"];
+    if (visible && acceptance === "not-required") {
+      errors.push("player-visible delivery must record pending or accepted preview acceptance");
+    }
+    if (!visible && acceptance !== "not-required") {
+      errors.push("non-player-visible delivery must use preview-acceptance: not-required");
+    }
+    if (acceptance === "pending" && values.executor !== "chatgpt") {
+      errors.push("pending public preview is available only to executor: chatgpt");
+    }
   }
 
   return { present: true, valid: errors.length === 0, values, errors };
@@ -106,12 +110,10 @@ export function parseDeliveryMetadata(body = "") {
 export function classifyPullRequest(paths, body = "") {
   const lane = classifyPaths(paths);
   const metadata = parseDeliveryMetadata(body);
-  let preview = requiresPreview(paths);
-  if (metadata.present && metadata.valid) {
-    const visible = metadata.values["player-visible"] === "yes";
-    const acceptanceRequired = metadata.values["preview-acceptance"] === "required";
-    preview = visible || acceptanceRequired;
-  }
+  const preview = metadata.present && metadata.valid &&
+    metadata.values.executor === "chatgpt" &&
+    metadata.values["player-visible"] === "yes" &&
+    metadata.values["preview-acceptance"] === "pending";
 
   return {
     lane,

@@ -213,11 +213,12 @@ requireText(taskTemplate, [
   "One Ready PR",
 ], "tasks/TEMPLATE.md");
 requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
-requireText(prTemplate, ["nestled-burrow-delivery:v1", "player-visible: choose", "preview-acceptance: choose", "auto-merge: choose", "# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
+requireText(prTemplate, ["nestled-burrow-delivery:v1", "executor: choose", "player-visible: choose", "preview-acceptance: choose", "auto-merge: choose", "chatgpt + pending", "# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
 
 assert(prWorkflow.includes("github.event.pull_request.draft == false"), "Draft PR must defer final validation until Ready");
 assert(architecturePressureWorkflow.includes("github.event.pull_request.draft == false"), "Draft PR must defer architecture gate until Ready");
 assert(prWorkflow.includes("github.event.action != 'ready_for_review'"), "Ready transition must not republish an unchanged accepted preview");
+assert(prWorkflow.includes("github.event.pull_request.draft == true"), "Public preview must be limited to a pre-acceptance Draft PR");
 requireText(prWorkflow, ["Classify Scope", "PR_BODY", "metadata_valid", "needs: scope", "Run metadata checks"], "PR workflow");
 
 requireText(focusedE2E, ["mkdtempSync", "tmpdir()", "PW_OUTPUT_DIR", "PW_REPORT_DIR"], "focused E2E");

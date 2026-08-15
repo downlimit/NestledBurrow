@@ -3,7 +3,7 @@
 
 ## Route
 
-- Normal flow: compact Lead brief → implementation → public PR preview acceptance when visible → one Ready PR → final-head CI → merge.
+- Codex flow: brief → implementation → local preview → `принято` → one Ready PR → CI → merge. Only ChatGPT direct may use a public Draft preview before `принято`.
 - Never ask the user to operate GitHub.
 - Stop before merge only for explicit `не сливать`, report-only work or a real blocker.
 - Draft PR before acceptance is allowed only by explicit user command; it is a preview carrier, not a development or final-CI gate.
@@ -61,7 +61,7 @@ The final report states `Image generation was not invoked.` and confirms that th
 
 Use one strong proof per material risk. A successful proof remains valid until relevant inputs change.
 
-**Feedback gate:** batch remarks, use one healthy public PR preview for user acceptance, add only the smallest check for hidden behavior. A local managed preview is internal proof, not the user-facing link. Defer diff review, build, full checks, screenshots and E2E until acceptance.
+**Feedback gate:** batch remarks and prove only hidden behavior. Codex uses one local managed preview for acceptance; ChatGPT direct may use one public Draft preview. Defer broad proof until acceptance.
 
 **Micro-feedback:** presentation-only value changes may reuse prior proof and preview health. Hidden contract changes still receive one targeted check.
 
@@ -98,18 +98,18 @@ Environment:
 
 Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
-1. Use `npm run preview:task` only for local health: exact URL, HTTP, page errors and 640×360 canvas.
-2. After an explicitly authorized Draft exception, push the task branch. The PR workflow publishes the direct static preview from the exact current head while final validation remains deferred.
-3. Give the user only the stable public link posted by the PR workflow. StackBlitz, Codespaces and other links that first construct a development environment are forbidden as acceptance previews.
-4. Reuse the same PR URL through feedback; every synchronize event updates its contents.
+1. Codex uses `npm run preview:task` for local acceptance and publishes nothing before `принято`.
+2. An authorized ChatGPT Draft carrier uses `executor: chatgpt` and `preview-acceptance: pending`; its workflow publishes the exact-head static preview.
+3. Public PR links belong only to that ChatGPT route. StackBlitz/Codespaces are forbidden.
+4. ChatGPT reuses one Draft URL through feedback.
 5. Before `принято`: no Ready PR, auto-merge or merge. For ChatGPT direct implementation, `препроверка принята` authorizes only the task branch and Draft preview carrier.
-6. After `принято`: preserve the accepted head unless a real repair or rebase is required; mark the same SHA Ready, run one final-head CI, then merge. Do not hand the task to another role unless the user explicitly asks.
+6. After `принято`: set `preview-acceptance: accepted`, remove any ChatGPT preview, open/mark Ready, run final-head CI and merge. Preserve the SHA unless repair/rebase is required.
 7. Player-visible repair returns to preview only when it changes the accepted experience.
-8. Private-repository preview fallback: after accepted managed preview, PR CI verifies and uploads the exact-head static `dist` artifact and posts its authenticated link. Anonymous CDN publication remains the public-repository route.
+8. Private preview artifacts use the same ChatGPT-only pending Draft gate. Accepted and Codex PRs publish no link.
 
 ## GitHub
 
-Prefer the connector. Fill the `nestled-burrow-delivery:v1` PR metadata with explicit values; incomplete metadata falls back to path-based preview routing. Create one non-draft PR after acceptance/local validation, enable native auto-merge through the connector when metadata permits it, verify the exact PR head SHA, then use one bounded final-head CI wait.
+Prefer the connector. Fill every `nestled-burrow-delivery:v1` field, including `executor`; invalid metadata fails scope and public preview. Codex creates one accepted non-draft PR. Only a ChatGPT pre-acceptance Draft may be `pending`. Eligible invisible work may enable native auto-merge through the connector. Verify head SHA and wait once for final CI.
 
 When ChatGPT direct implementation has no local worktree, a coherent multi-file edit is published atomically: create one Git tree, one commit and move the task branch once. Contents API `create_file` / `update_file` publication is reserved for a genuinely single-file change. Never push one commit per edited file.
 

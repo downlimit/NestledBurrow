@@ -87,9 +87,9 @@ Task #001 — Первая расчистка участка
 
 Player-visible gameplay, UI, input, localization, animation, audio и assets требуют `Preview acceptance: required`.
 
-До `принято`: один прямой публичный URL собранной игры и пакетные feedback-правки. StackBlitz/Codespaces, поднимающие dev-среду, не считаются preview.
+До `принято` публичный URL разрешён только для ChatGPT direct implementation и только из Draft PR. Feedback-правки пакетные. Codex использует local managed preview; GitHack не публикует. StackBlitz/Codespaces не считаются preview.
 
-После `принято` неизменный accepted head не получает status/documentation/empty commit: тот же SHA переводится в Ready, проходит один final-head CI и мержится этим же Лидом. Diff review и targeted checks выполняются только для рисков, ещё не доказанных на текущем head. Draft PR до приёмки разрешён только прямой командой пользователя; принятие чат-макета считается такой командой только для ChatGPT direct implementation.
+После `принято`: `preview-acceptance: accepted`, публичная ссылка удаляется. Тот же accepted SHA без status/docs/empty commit переводится в Ready, проходит final-head CI и мержится Лидом. Проверяются заново только недоказанные риски. Draft PR до приёмки разрешён прямой командой пользователя только для ChatGPT direct implementation.
 
 ## Visual assets
 

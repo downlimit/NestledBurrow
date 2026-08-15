@@ -4,7 +4,6 @@ import {
   classifyPullRequest,
   parseDeliveryMetadata,
   requiresBrowser,
-  requiresPreview,
 } from "./classify-pr-scope.mjs";
 
 assert.equal(classifyPaths(["docs/readme.md", "NestledBurrow_local.bat"]), "micro");
@@ -15,12 +14,6 @@ assert.equal(classifyPaths([".github/workflows/pr-check.yml"]), "strict");
 assert.equal(classifyPaths(["playwright.config.js"]), "strict");
 assert.equal(classifyPaths(["src/main.js", "package-lock.json"]), "strict");
 
-assert.equal(requiresPreview(["GAME.md", "ROADMAP.md"]), false);
-assert.equal(requiresPreview([".github/workflows/pr-check.yml", "scripts/check-pr-preview-contract.mjs"]), false);
-assert.equal(requiresPreview(["requirements-dev.txt"]), false);
-assert.equal(requiresPreview(["src/main.js"]), true);
-assert.equal(requiresPreview(["package-lock.json"]), true);
-assert.equal(requiresPreview([".github/workflows/pr-check.yml", "src/main.js"]), true);
 assert.equal(requiresBrowser([".github/workflows/pr-check.yml"]), true);
 assert.equal(requiresBrowser(["package.json"]), false);
 assert.equal(requiresBrowser(["playwright.config.js"]), true);
@@ -29,34 +22,42 @@ assert.equal(requiresBrowser(["src/build/worldBuildCoordinator.js", "package.jso
 assert.equal(requiresBrowser(["public/locales/en/translation.json"]), true);
 
 const noPreviewBody = `<!-- nestled-burrow-delivery:v1
+executor: codex
 player-visible: no
 preview-acceptance: not-required
 auto-merge: yes
 -->`;
-const visibleBody = `<!-- nestled-burrow-delivery:v1
+const publicPendingBody = `<!-- nestled-burrow-delivery:v1
+executor: chatgpt
 player-visible: yes
-preview-acceptance: required
+preview-acceptance: pending
 auto-merge: no
 -->`;
+const codexAcceptedBody = publicPendingBody
+  .replace("executor: chatgpt", "executor: codex")
+  .replace("preview-acceptance: pending", "preview-acceptance: accepted");
 
 assert.deepEqual(parseDeliveryMetadata(noPreviewBody).errors, []);
 assert.equal(classifyPullRequest(["package.json"], noPreviewBody).preview, false);
 assert.equal(classifyPullRequest(["package.json"], noPreviewBody).browser, false);
 assert.equal(classifyPullRequest(["package.json"], noPreviewBody).autoMerge, true);
-assert.equal(classifyPullRequest(["ROADMAP.md"], visibleBody).preview, true);
-assert.equal(classifyPullRequest(["ROADMAP.md"], visibleBody).autoMerge, false);
+assert.equal(classifyPullRequest(["ROADMAP.md"], publicPendingBody).preview, true);
+assert.equal(classifyPullRequest(["src/main.js"], publicPendingBody.replace("preview-acceptance: pending", "preview-acceptance: accepted")).preview, false);
+assert.equal(classifyPullRequest(["src/main.js"], codexAcceptedBody).preview, false);
+assert.equal(classifyPullRequest(["ROADMAP.md"], publicPendingBody).autoMerge, false);
 assert.equal(
-  classifyPullRequest(["ROADMAP.md"], visibleBody.replace("auto-merge: no", "auto-merge: yes")).autoMerge,
+  classifyPullRequest(["ROADMAP.md"], publicPendingBody.replace("auto-merge: no", "auto-merge: yes")).autoMerge,
   false,
 );
-assert.equal(classifyPullRequest(["src/main.js"], "").preview, true);
+assert.equal(classifyPullRequest(["src/main.js"], "").preview, false);
+assert.equal(parseDeliveryMetadata(publicPendingBody.replace("executor: chatgpt", "executor: codex")).valid, false);
 
 const malformed = classifyPullRequest(
   ["src/main.js"],
   "<!-- nestled-burrow-delivery:v1\nplayer-visible: perhaps\n-->"
 );
 assert.equal(malformed.metadata.valid, false);
-assert.equal(malformed.preview, true);
+assert.equal(malformed.preview, false);
 assert.equal(malformed.autoMerge, false);
 
-console.log("PR scope classifier passed: lanes, browser coverage and fail-safe delivery metadata are stable");
+console.log("PR scope classifier passed: browser coverage and explicit ChatGPT pre-acceptance preview routing are stable");
