@@ -32,6 +32,16 @@ Fixed-world placement and `collisionEnabled` are per-instance authoring data. Co
 
 Canon export commits the collider draft and downloads `nestledburrow-authoring-canon.json` with layout, colliders, profiles and fixed-world state. Crop keeps one visible pixel; browser storage may hold drafts/backups; `NEW GAME` restores baseline.
 
+## Prototype simulation tooling
+
+The construction panel is currently a prototype surface and may also host direct simulation-test controls. This is intentionally allowed to live in ordinary gameplay UI until the production construction flow is finalized.
+
+- A dedicated test/items view may reuse the build panel to grant canonical inventory items directly for fast system proof: prepared food, finished food/drinks, harvested produce, seeds and ordinary resources.
+- Item grants must call existing inventory ownership/mutation APIs and canonical item metadata; the panel must not create a second item registry or mutate kitchen stock behind the normal inventory/serving-table flow.
+- Typical test actions may include `+1`, larger stack grants, inventory clearing and coin grants where they materially shorten validation. Unique physical ownership rules must still be respected.
+- Harvested potato/lemon or other produce can be granted as their normal inventory item. Field growth itself should be controlled through farming state/actions rather than inventing a separate "mature crop item" representation.
+- These controls are prototype instrumentation and may later move to a dedicated developer surface without constraining the final construction UI.
+
 ## Owners
 
 - orchestration: `src/build/worldBuildCoordinator.js`;
