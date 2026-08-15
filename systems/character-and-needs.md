@@ -15,6 +15,16 @@ The same need dimensions and meanings apply to persistent people in the populati
 - While physically present, a person's needs are live and may drive behavior. Different people can therefore arrive with several simultaneous pressures rather than a single scripted reason.
 - Sharing the need vocabulary does not require every NPC to use the player's exact drain rates, motor penalties or accident presentation. Those remain role-specific behavior layered on the same state semantics.
 
+## Prototype person observability
+
+The current prototype may expose simulation state directly in ordinary in-game UI rather than hiding it behind a separate developer console. This is tooling, not a commitment to the final information-reveal design.
+
+- Hovering a visible persistent person should show their display name immediately; holding the pointer roughly `1..2 s` expands that same tag into a compact six-need view using N/E/S/T/L/D and the canonical `0..100` state.
+- Expanded NPC need bars are directly editable with the same pointer-to-value semantics already used by the player HUD. Editing mutates that exact persistent person's canonical need state rather than a guest-local copy.
+- A manual NPC need edit also advances that person's evaluation timestamp to the current world time so immediate offscreen reconstruction cannot overwrite the test value as stale state.
+- Fine-pointer hover/hold is the primary prototype interaction. A coarse-pointer equivalent may pin/expand the same card without creating a second data model.
+- This observability layer can later be hidden, restricted by relationship knowledge or moved into developer tooling without changing need ownership or simulation formulas.
+
 ## Time, energy and satiety
 
 One hour is `60` real seconds. Waking E/hour: ordinary `5`, walking `5.5`, running `8`. Base actions: axe `0.2`, pickaxe `0.3`, hoe `0.15`, watering `0.1`, sword `0.75`, battle axe `0.1`. Targets: `20h` near-idle, `16..18h` normal, `14..16h` heavy.
