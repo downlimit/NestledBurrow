@@ -76,22 +76,23 @@ test("BUILD/TEST grants and persistent person inspection share canonical gamepla
     persistentBefore.needs.dialogue,
   ]);
 
-  expect(await bridge(page, "setInspectedPersonNeed", { needId: "satiety", value: 10 })).toMatchObject({
-    status: "need-set",
-    mutated: true,
-  });
   const mutationSnapshot = await page.evaluate((inspectedPersonId) => {
     const e2e = window.__NESTLED_BURROW_E2E__;
+    const mutation = e2e.setInspectedPersonNeed({ needId: "satiety", value: 10 });
     return {
+      mutation,
       persistentPerson: e2e.getPopulationPerson(inspectedPersonId),
       worldTimeSeconds: e2e.getSession().gameplay.worldTimeSeconds,
     };
   }, personId);
+  expect(mutationSnapshot.mutation).toMatchObject({
+    status: "need-set",
+    mutated: true,
+  });
   const persistentAfter = mutationSnapshot.persistentPerson;
   expect(persistentAfter.needs.satiety).toBe(10);
   const worldTimeAfterMutation = mutationSnapshot.worldTimeSeconds;
-  expect(persistentAfter.lastEvaluatedWorldTimeSeconds).toBeLessThanOrEqual(worldTimeAfterMutation);
-  expect(worldTimeAfterMutation - persistentAfter.lastEvaluatedWorldTimeSeconds).toBeLessThanOrEqual(2);
+  expect(persistentAfter.lastEvaluatedWorldTimeSeconds).toBe(worldTimeAfterMutation);
   for (const needId of ["novelty", "energy", "toilet", "lustre", "dialogue"]) {
     expect(persistentAfter.needs[needId]).toBe(persistentBefore.needs[needId]);
   }
