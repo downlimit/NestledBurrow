@@ -80,15 +80,15 @@ assert.equal(FULLSCREEN_HIT_AREA.width, 30, "fullscreen hit area remains touch s
 assert.equal(COIN_HUD_AREA.y, FULLSCREEN_PANEL_AREA.y, "coin panel aligns vertically with the visible fullscreen button");
 assert.equal(COIN_HUD_AREA.height, FULLSCREEN_PANEL_AREA.height, "coin panel matches the visible fullscreen button height");
 assert.equal(INVENTORY_SLOT_AREAS.length, 10, "hotbar exposes ten slots");
-assert.equal(INVENTORY_HUD_AREA.x, 43, "hotbar shifts two pixels right to separate its standard first-slot outline from the Q/E ear");
-assert.equal(INVENTORY_HUD_AREA.x + INVENTORY_HUD_AREA.width, 281, "shifted hotbar remains inside the 320 px viewport");
+assert.equal(INVENTORY_HUD_AREA.x, Math.round((GAME_WIDTH - INVENTORY_HUD_AREA.width) / 2), "hotbar is centered in the expanded viewport");
+assert.equal(INVENTORY_HUD_AREA.x + INVENTORY_HUD_AREA.width / 2, GAME_WIDTH / 2, "hotbar remains centered in the logical viewport");
 assert.equal(PEACEFUL_EAR_AREA.x + PEACEFUL_EAR_AREA.width, INVENTORY_HUD_AREA.x - 1, "Q/E ear leaves one logical pixel before the standard first-slot outline");
 assert.deepEqual(COMBAT_SLOT_DEFINITIONS.map(({ label }) => label), ["SPACE", "LMB", "RMB", "SHIFT", "1", "2", "3", "4", "5", "6"]);
 assert.equal(COMBAT_SLOT_DEFINITIONS.length, 10, "combat HUD exposes four action slots and six numbered slots");
 const loadoutLayout = INVENTORY_MODE_LAYOUTS[INVENTORY_MODES.LOADOUT_EDIT];
 const loadoutPeacefulRect = transformPresentationRect(INVENTORY_HUD_AREA, loadoutLayout.peaceful);
 const loadoutCombatRect = transformPresentationRect(COMBAT_PANEL_AREA, loadoutLayout.combat);
-assert(loadoutPeacefulRect.y + loadoutPeacefulRect.height < loadoutCombatRect.y, "loadout panels remain vertically separated at 320x180");
+assert(loadoutPeacefulRect.y + loadoutPeacefulRect.height < loadoutCombatRect.y, "loadout panels remain vertically separated in the native viewport");
 assert.equal(loadoutLayout.peaceful.alpha, 1);
 assert.equal(loadoutLayout.combat.alpha, 1);
 assert.equal(THROW_AIM_SIZE, 8, "throw aim is exactly 8x8 logical pixels");
@@ -232,6 +232,7 @@ for (const char of "v devabcdef0123456789<>") assert(HUD_GLYPHS[char], `bitmap g
 
 const main = readFileSync("src/main.js", "utf8");
 const gameHud = readFileSync("src/ui/gameHud.js", "utf8");
+const needsPanelPresentation = readFileSync("src/ui/needsPanelPresentation.js", "utf8");
 const inventoryRuntime = readFileSync("src/inventory/inventoryRuntime.js", "utf8");
 const inventoryModeRuntime = readFileSync("src/inventory/inventoryModeRuntime.js", "utf8");
 const throwAimIndicator = readFileSync("src/ui/throwAimIndicator.js", "utf8");
@@ -271,7 +272,7 @@ assert(gameHud.includes("throwAimIndicator.show(worldPointFromPointer(scene, poi
 assert(inventoryRuntime.includes("setThrowAimTarget(worldPointFromPointer(scene, pointer))"), "inventory drag shares its cursor point with the throw aim");
 assert(throwAimIndicator.includes("throwAimPixels(pose.direction)") && throwAimIndicator.includes("graphics.fillRect(x, y, 1, 1)"), "throw aim rerasterizes an eight-pixel triangle without rotated antialiasing");
 assert(throwAimIndicator.includes('worldDepthFromAnchorY(sprite.y, "throw-aim", 499)'), "player world depth remains above the throw aim");
-assert(gameHud.includes("ratio > 0 ? Math.max(1, Math.round(NEED_VALUE_TRACK.width * ratio))"), "low non-zero needs remain visibly filled");
+assert(needsPanelPresentation.includes("ratio > 0 ? Math.max(1, Math.round(NEED_VALUE_TRACK.width * ratio))"), "low non-zero needs remain visibly filled");
 assert(gameHud.includes("targets: energyBarGraphics"), "low-energy feedback remains intact");
 assert(gameHud.includes("renderNeedTooltip"), "need tooltip remains intact");
 assert(interactionHud.includes("setSuppressed(value)"), "interaction HUD suppression remains intact");

@@ -4,11 +4,17 @@ import { purchaseSeed, SEED_OFFERS } from "./merchantDomain.js";
 import { HUD_COLORS, HUD_DEPTH, isPointInRect } from "../ui/hud.js";
 import { SEED_MERCHANT_INTERACTION_KIND } from "../interaction/interactionConfig.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 
-export const SEED_MERCHANT_PANEL = Object.freeze({ x: 66, y: 43, width: 176, height: 107 });
+export const SEED_MERCHANT_PANEL = Object.freeze({
+  x: Math.round((GAME_WIDTH - 176) / 2),
+  y: Math.round((GAME_HEIGHT - 107) / 2),
+  width: 176,
+  height: 107,
+});
 export const SEED_MERCHANT_BUY_BUTTONS = Object.freeze([
-  Object.freeze({ itemId: "potato-seed", x: 76, y: 108, width: 74, height: 25 }),
-  Object.freeze({ itemId: "lemon-seed", x: 158, y: 108, width: 74, height: 25 }),
+  Object.freeze({ itemId: "potato-seed", x: SEED_MERCHANT_PANEL.x + 10, y: SEED_MERCHANT_PANEL.y + 65, width: 74, height: 25 }),
+  Object.freeze({ itemId: "lemon-seed", x: SEED_MERCHANT_PANEL.x + 92, y: SEED_MERCHANT_PANEL.y + 65, width: 74, height: 25 }),
 ]);
 export const SEED_MERCHANT_BUY_BUTTON = SEED_MERCHANT_BUY_BUTTONS[0];
 
@@ -56,7 +62,7 @@ export function createMerchantRuntime(scene, {
     graphics.lineStyle(1, HUD_COLORS.border, 1)
       .strokeRect(SEED_MERCHANT_PANEL.x + 0.5, SEED_MERCHANT_PANEL.y + 0.5, SEED_MERCHANT_PANEL.width - 1, SEED_MERCHANT_PANEL.height - 1);
     style(title, scene).setText(localization.t("hud:merchant.title")).setVisible(true);
-    title.setPosition(Math.round(SEED_MERCHANT_PANEL.x + (SEED_MERCHANT_PANEL.width - title.width) / 2), 48);
+    title.setPosition(Math.round(SEED_MERCHANT_PANEL.x + (SEED_MERCHANT_PANEL.width - title.width) / 2), SEED_MERCHANT_PANEL.y + 5);
     const detail = lastStatus && lastStatus !== "purchased"
       ? localization.t(`hud:merchant.${lastStatus}`)
       : localization.t("hud:merchant.balance", { count: sessionState.gameplay.coins });
@@ -67,10 +73,10 @@ export function createMerchantRuntime(scene, {
     }).setText(detail).setVisible(true);
     detailTarget.setPosition(
       Math.round(SEED_MERCHANT_PANEL.x + (SEED_MERCHANT_PANEL.width - detailTarget.width) / 2),
-      64,
+      SEED_MERCHANT_PANEL.y + 21,
     );
     SEED_MERCHANT_BUY_BUTTONS.forEach((button, index) => {
-      images[index].setPosition(button.x + button.width / 2, 82);
+      images[index].setPosition(button.x + button.width / 2, SEED_MERCHANT_PANEL.y + 39);
       graphics.fillStyle(HUD_COLORS.shadow, 0.9).fillRect(button.x, button.y, button.width, button.height);
       graphics.lineStyle(1, HUD_COLORS.light, 0.75).strokeRect(button.x + 0.5, button.y + 0.5, button.width - 1, button.height - 1);
       style(offerLabels[index], scene, { fontSize: "7px" })
@@ -78,7 +84,7 @@ export function createMerchantRuntime(scene, {
         .setVisible(true);
       offerLabels[index].setPosition(
         Math.round(button.x + (button.width - offerLabels[index].width) / 2),
-        93,
+        SEED_MERCHANT_PANEL.y + 50,
       );
       style(buyLabels[index], scene, { fontSize: "7px" })
         .setText(localization.t("hud:merchant.buyPrice", { count: SEED_OFFERS[button.itemId] }))
@@ -93,7 +99,7 @@ export function createMerchantRuntime(scene, {
       .setVisible(true);
     exitLabel.setPosition(
       Math.round(SEED_MERCHANT_PANEL.x + (SEED_MERCHANT_PANEL.width - exitLabel.width) / 2),
-      138,
+      SEED_MERCHANT_PANEL.y + 95,
     );
   }
 

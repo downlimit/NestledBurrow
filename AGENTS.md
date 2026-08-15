@@ -92,13 +92,13 @@ Environment:
 - do not mix elevated and normal operations;
 - on `EPERM`, inspect the exact path once and rerun only the failed command;
 - keep successful logs compact;
-- visible text verifies RU/EN, glyphs, wrapping and overlap at `320×180` and mobile.
+- visible text verifies RU/EN, glyphs, wrapping and overlap at `640×360` and mobile.
 
 ## Preview acceptance
 
 Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
-1. Use `npm run preview:task` only for local health: exact URL, HTTP, page errors and 320×180 canvas.
+1. Use `npm run preview:task` only for local health: exact URL, HTTP, page errors and 640×360 canvas.
 2. After an explicitly authorized Draft exception, push the task branch. The PR workflow publishes the direct static preview from the exact current head while final validation remains deferred.
 3. Give the user only the stable public link posted by the PR workflow. StackBlitz, Codespaces and other links that first construct a development environment are forbidden as acceptance previews.
 4. Reuse the same PR URL through feedback; every synchronize event updates its contents.

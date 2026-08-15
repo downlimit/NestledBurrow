@@ -13,6 +13,32 @@
   },
   "buildMode": {
     "title": "РЕЖИМ СТРОИТЕЛЬСТВА",
+    "tabs": {
+      "build": "СТРОЙКА",
+      "test": "ТЕСТ"
+    },
+    "test": {
+      "groups": {
+        "food": "ЕДА",
+        "produce": "УРОЖАЙ",
+        "seeds": "СЕМЕНА",
+        "resources": "РЕСУРСЫ",
+        "economy": "ЭКОНОМИКА"
+      },
+      "items": {
+        "friedPotato": "Жареный картофель",
+        "lemonade": "Лимонад",
+        "slicedPotato": "Нарезанный картофель",
+        "potato": "Картофель",
+        "lemon": "Лимон",
+        "potatoSeed": "Семена картофеля",
+        "lemonSeed": "Семена лимона",
+        "wood": "Дерево",
+        "stone": "Камень",
+        "ruby": "Рубин",
+        "coins": "Монеты"
+      }
+    },
     "groups": {
       "tools": "Инструменты",
       "ground": "Земля и дорожки",
@@ -101,6 +127,8 @@
     "servingTableDifferentItem": "На столе другой товар",
     "servingTableFull": "На столе уже есть порция",
     "servingTableEmpty": "Сервировочный стол пуст",
+    "acceptOrderLemonade": "Принять заказ: Лимонад",
+    "acceptOrderFriedPotato": "Принять заказ: Жареный картофель",
     "repairStove": "Починить: 10 дерева, 8 камня, 10 монет",
     "repairMissing": "Не хватает: {categories}",
     "repairCategory": {
@@ -219,8 +247,8 @@
     "title": "МЕНЮ",
     "friedPotatoDish": "Жареный картофель",
     "lemonade": "Лимонад",
-    "active": "Меню активно",
-    "inactive": "Меню неактивно",
+    "active": "Заведение открыто",
+    "inactive": "Заведение закрыто",
     "closeHint": "Пробел: закрыть"
   },
   "needs": {

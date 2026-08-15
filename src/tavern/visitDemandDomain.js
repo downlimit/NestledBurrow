@@ -34,7 +34,11 @@ export function scoreFoodPreference(foodPreferences, saleProfile) {
 }
 
 export function recentVisitFactor(visitorHistory, worldTimeSeconds) {
-  const lastVisit = visitorHistory?.lastCompletedVisitWorldTimeSeconds;
+  const meaningfulVisits = [
+    visitorHistory?.lastCompletedVisitWorldTimeSeconds,
+    visitorHistory?.lastFailedAcceptedOrderWorldTimeSeconds,
+  ].filter((value) => Number.isFinite(value) && value >= 0);
+  const lastVisit = meaningfulVisits.length > 0 ? Math.max(...meaningfulVisits) : null;
   if (!Number.isFinite(lastVisit) || lastVisit < 0) {
     return { hoursSinceLastVisit: null, recentVisitFactor: 1 };
   }

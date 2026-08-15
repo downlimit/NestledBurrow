@@ -25,6 +25,8 @@ import {
 } from "../needs/interactionTimelineRuntime.js";
 import {
   TILE_SIZE,
+  GAME_HEIGHT,
+  GAME_WIDTH,
   WORLD_GROUND_OVERLAY_DEPTH,
   WORLD_TRANSITION_ASSETS,
   WORLD_TRANSITION_PROFILE_KEYS,
@@ -34,10 +36,10 @@ const INTERACTION_RADIUS = 44;
 const NEST_ATOLL_ENTRANCE = Object.freeze({ x: 11 * TILE_SIZE, y: 6 * TILE_SIZE });
 const NEST_RETURN_SPAWN = Object.freeze({ x: 11 * TILE_SIZE, y: 9 * TILE_SIZE, facing: { x: 0, y: -1 } });
 const SOUTH_SPAWN = Object.freeze({ ...ATOLL_WORLD_MODEL.spawn });
-const SEGMENT_TITLE_Y = 46;
-const ARENA_TITLE_Y = 56;
+const SEGMENT_TITLE_Y = Math.round(GAME_HEIGHT / 2 - 44);
+const ARENA_TITLE_Y = SEGMENT_TITLE_Y + 10;
 const TITLE_MAX_WIDTH = 180;
-const PROMPT_RECT = Object.freeze({ x: 62, y: 128, width: 196, height: 20 });
+const PROMPT_RECT = Object.freeze({ x: Math.round((GAME_WIDTH - 196) / 2), y: GAME_HEIGHT - 52, width: 196, height: 20 });
 const COLLAPSE_FADE_OUT_MS = 5000;
 const COLLAPSE_BLACK_HOLD_MS = 2000;
 const COLLAPSE_FADE_IN_MS = 3000;
@@ -75,7 +77,7 @@ export function createWildAtollRuntime(scene, {
     fontSize: "8px",
     color: "#f2eadc",
   }).setDepth(HUD_DEPTH + 27).setScrollFactor(0).setVisible(false);
-  const blackout = scene.add.rectangle(0, 0, 320, 180, 0x000000, 1)
+  const blackout = scene.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 1)
     .setOrigin(0)
     .setScrollFactor(0)
     .setDepth(HUD_DEPTH + 200)
@@ -644,11 +646,11 @@ export function createWildAtollRuntime(scene, {
       });
     }
     const width = Math.min(PROMPT_RECT.width, Math.max(88, Math.ceil(promptText.width) + 16));
-    const x = Math.round((320 - width) / 2);
+    const x = Math.round((GAME_WIDTH - width) / 2);
     promptBackground
       .fillStyle(HUD_COLORS.panel, 0.94).fillRect(x, PROMPT_RECT.y, width, PROMPT_RECT.height)
       .lineStyle(1, HUD_COLORS.border, 0.95).strokeRect(x + 0.5, PROMPT_RECT.y + 0.5, width - 1, PROMPT_RECT.height - 1);
-    promptText.setPosition(Math.round((320 - promptText.width) / 2), PROMPT_RECT.y + 5);
+    promptText.setPosition(Math.round((GAME_WIDTH - promptText.width) / 2), PROMPT_RECT.y + 5);
     promptZone.setPosition(x, PROMPT_RECT.y).setSize(width, PROMPT_RECT.height).setInteractive({ useHandCursor: true });
   }
 
@@ -678,7 +680,7 @@ export function createWildAtollRuntime(scene, {
         color,
       });
     }
-    textObject.setPosition(Math.round((320 - textObject.width) / 2), y);
+    textObject.setPosition(Math.round((GAME_WIDTH - textObject.width) / 2), y);
     return true;
   }
 

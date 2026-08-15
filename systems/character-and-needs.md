@@ -8,22 +8,11 @@ The same need dimensions and meanings apply to persistent people in the populati
 
 ## Shared person need contract
 
-- A persistent person uses the same canonical need dimensions as the player: novelty, energy, satiety, toilet, lustre and dialogue/social contact.
-- Each Stage-3 person also keeps a stable `spendingCapacity` and layered `foodPreferences` (`cuisine`, `dishClass`, `ingredient`). These are deterministic from the stable person ID, JSON-safe and normalized by the population owner; venue history remains outside the person profile.
-- Offscreen people are not simulated frame by frame. Their last stored need state and evaluation time are persisted, then reconstructed when the person becomes relevant again: visit consideration, scene appearance, phone contact, invitation or another explicit interaction.
-- Reconstruction uses elapsed world time plus bounded variation and may later use individual traits, age or lifestyle. It must preserve the same `0..100` meanings as live needs.
-- While physically present, a person's needs are live and may drive behavior. Different people can therefore arrive with several simultaneous pressures rather than a single scripted reason.
-- Sharing the need vocabulary does not require every NPC to use the player's exact drain rates, motor penalties or accident presentation. Those remain role-specific behavior layered on the same state semantics.
-
-## Prototype person observability
-
-The current prototype may expose simulation state directly in ordinary in-game UI rather than hiding it behind a separate developer console. This is tooling, not a commitment to the final information-reveal design.
-
-- Hovering a visible persistent person should show their display name immediately; holding the pointer roughly `1..2 s` expands that same tag into a compact six-need view using N/E/S/T/L/D and the canonical `0..100` state.
-- Expanded NPC need bars are directly editable with the same pointer-to-value semantics already used by the player HUD. Editing mutates that exact persistent person's canonical need state rather than a guest-local copy.
-- A manual NPC need edit also advances that person's evaluation timestamp to the current world time so immediate offscreen reconstruction cannot overwrite the test value as stale state.
-- Fine-pointer hover/hold is the primary prototype interaction. A coarse-pointer equivalent may pin/expand the same card without creating a second data model.
-- This observability layer can later be hidden, restricted by relationship knowledge or moved into developer tooling without changing need ownership or simulation formulas.
+- Persistent people share the player's canonical `N E S T L D` dimensions. Stage-3 also persists deterministic, JSON-safe `spendingCapacity` and layered cuisine/dish/ingredient preferences; venue history remains external.
+- Offscreen reconstruction uses the stored needs/evaluation time, elapsed world time and bounded variation when a person becomes relevant. Physically present needs may later drive role-specific behavior without sharing every player rate or penalty.
+- A live actor bound to `personId` shows its display name and expands the shared player-style `N E S T L D` panel after `667 ms`; coarse pointers use tap/long-press.
+- Bar editing maps the pointer to `0..100`, mutates that exact persistent person through the population owner and rebases `lastEvaluatedWorldTimeSeconds`; visits/orders remain unchanged.
+- Hover/pin/expansion are transient prototype tooling and may later move without changing person state or formulas.
 
 ## Time, energy and satiety
 
@@ -104,11 +93,12 @@ The target need is protected through exit; recovery is active-only. Normal cance
 - approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
 - saves exclude debug presets and interaction timeline state.
+- inspection hover, pin and expansion state stay transient; edited persistent-person needs use ordinary population persistence.
 
 ## Current baseline
 
-`src/needs/needsDomain.js` owns canonical need IDs and player formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. `src/character/populationDomain.js` owns the 16-person baseline, stable demand profiles, population normalization and deterministic coarse offscreen reconstruction for all six needs. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
+`src/needs/needsDomain.js` owns canonical need IDs and player formulas; `src/needs/needsRuntime.js` coordinates; `src/needs/needsFlowRuntime.js` measures HUD deltas. `src/character/populationDomain.js` owns the 16-person baseline, stable demand profiles, population normalization, manual need mutation and deterministic coarse offscreen reconstruction for all six needs. `src/character/personInspectionRuntime.js` owns live actor hover/touch selection, screen clamping and need-bar input; desktop expansion starts after 667 ms and survives a 0.66 s cursor transfer to the card. `src/ui/needsPanelPresentation.js` draws the shared player/NPC NESTLD panel. Timeline modules own phases and protection; approach owns reachable perimeter points and profile direction filtering. `src/main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:interaction`; focused browser E2E.

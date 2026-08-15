@@ -49,6 +49,7 @@ export const GUEST_CONFIG = Object.freeze({
   subsequentSpawnDelayMaxMs: 8_000,
   signCheckMs: 1_500,
   signReactionMs: 900,
+  orderStationWaitMs: 10_000,
   dishWaitMs: 10_000,
   emptyTableReactionMs: 900,
   eatingMs: 5_000,

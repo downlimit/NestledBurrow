@@ -30,7 +30,7 @@ async function placeNear(page, entityId) {
 async function clickLogical(page, x, y) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
-  await page.mouse.click(box.x + x * box.width / 320, box.y + y * box.height / 180);
+  await page.mouse.click(box.x + x * box.width / 640, box.y + y * box.height / 360);
 }
 
 async function openNewGameConfirmation(page) {
@@ -129,8 +129,8 @@ test("mobile touch opens the Russian seed shop without joystick capture", async 
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
   await page.touchscreen.tap(
-    box.x + (prompt.promptRect.x + prompt.promptRect.width / 2) * box.width / 320,
-    box.y + (prompt.promptRect.y + prompt.promptRect.height / 2) * box.height / 180,
+    box.x + (prompt.promptRect.x + prompt.promptRect.width / 2) * box.width / 640,
+    box.y + (prompt.promptRect.y + prompt.promptRect.height / 2) * box.height / 360,
   );
   await expect.poll(() => bridge(page, "getMerchantState")).toMatchObject({ active: true, visible: true });
   await expect.poll(async () => (await bridge(page, "getMerchantState")).labels.title).toMatch(/[А-ЯЁ]/);
@@ -224,8 +224,8 @@ test("mobile touch clears a resource through prompt hit area", async ({ page }, 
     await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.prompt).toBe("hud:interaction.chop");
     const prompt = await bridge(page, "getInteractionHudState");
     await page.touchscreen.tap(
-      box.x + (prompt.promptRect.x + prompt.promptRect.width / 2) * box.width / 320,
-      box.y + (prompt.promptRect.y + prompt.promptRect.height / 2) * box.height / 180,
+      box.x + (prompt.promptRect.x + prompt.promptRect.width / 2) * box.width / 640,
+      box.y + (prompt.promptRect.y + prompt.promptRect.height / 2) * box.height / 360,
     );
     await expect.poll(async () => (await bridge(page, "getSession"))?.gameplay?.resourceNodes?.["fallen-log-01"]?.progress).toBeCloseTo(hitCount / 7, 6);
     await bridge(page, "expireHitCooldown");

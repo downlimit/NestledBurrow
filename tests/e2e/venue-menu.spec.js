@@ -16,12 +16,12 @@ async function advanceUntil(page, read, predicate, { maxMs = 30_000, stepMs = 25
     await bridge(page, "advanceWorldSimulation", stepMs);
   }
   const value = await read();
-  expect(predicate(value)).toBe(true);
+  expect(predicate(value), `last observed value: ${JSON.stringify(value)}`).toBe(true);
   return value;
 }
 
 async function bootFresh(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./?movementDebug=1");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
   await page.evaluate(() => localStorage.clear());
@@ -33,8 +33,8 @@ async function clickLogical(page, point) {
   const canvas = await page.locator("canvas").boundingBox();
   if (!canvas) throw new Error("Game canvas is unavailable");
   await page.mouse.click(
-    canvas.x + point.x * canvas.width / 320,
-    canvas.y + point.y * canvas.height / 180,
+    canvas.x + point.x * canvas.width / 640,
+    canvas.y + point.y * canvas.height / 360,
   );
 }
 
@@ -53,7 +53,7 @@ async function openMenu(page) {
 
 async function openTavern(page) {
   await openMenu(page);
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(true);
   await clickLogical(page, { x: 12, y: 90 });
@@ -69,7 +69,7 @@ test("one sign panel edits the offer and switches menu activity without closing"
 
   await openMenu(page);
   expect(await bridge(page, "getTavernOpen")).toBe(false);
-  await clickLogical(page, { x: 160, y: 64 });
+  await clickLogical(page, { x: 320, y: 154 });
   expect(await bridge(page, "getVenueOffer")).toEqual({ foodItemIds: ["lemonade"] });
   await clickLogical(page, { x: 12, y: 90 });
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
@@ -81,7 +81,7 @@ test("one sign panel edits the offer and switches menu activity without closing"
 
   await bridge(page, "setLanguage", "en");
   await openMenu(page);
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   expect((await bridge(page, "getTavernState")).menu.active).toBe(true);
   expect(await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: true })).toMatchObject({
@@ -98,14 +98,14 @@ test("one sign panel edits the offer and switches menu activity without closing"
 
   await openMenu(page);
   expect(await bridge(page, "getTavernOpen")).toBe(true);
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(false);
   expect((await bridge(page, "getTavernState")).menu.active).toBe(true);
-  await clickLogical(page, { x: 160, y: 64 });
+  await clickLogical(page, { x: 320, y: 154 });
   expect(await bridge(page, "getVenueOffer")).toEqual({
     foodItemIds: ["fried-potato-dish", "lemonade"],
   });
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   expect((await bridge(page, "getTavernState")).menu.active).toBe(true);
   await clickLogical(page, { x: 12, y: 90 });
@@ -124,19 +124,31 @@ test("live service never reserves stocked food outside the accepted offer", asyn
     page,
     async () => (await bridge(page, "getTavernState")).guest.active,
     (active) => active === false,
+    { maxMs: 60_000 },
   );
   expect((await bridge(page, "getSession")).gameplay.kitchen.servingTables["home-serving-table-01"].reservations).toEqual([]);
 
   await openMenu(page);
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(false);
   expect((await bridge(page, "getTavernState")).menu.active).toBe(true);
   await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: true });
-  await clickLogical(page, { x: 108, y: 130 });
+  await clickLogical(page, { x: 268, y: 220 });
   await expect.poll(() => bridge(page, "getTavernOpen")).toBe(true);
   await clickLogical(page, { x: 12, y: 90 });
   await expect.poll(async () => (await bridge(page, "getTavernState")).menu?.active).toBe(false);
-  expect(await bridge(page, "forceGuestSpawn")).toBe("tavern-guest-2");
+  const secondGuestId = await bridge(page, "forceGuestSpawn");
+  expect(secondGuestId).toBe("tavern-guest-2");
+  await advanceUntil(
+    page,
+    async () => (await bridge(page, "getGuestOrder", secondGuestId))?.order?.status,
+    (status) => status === "offered",
+    { maxMs: 60_000 },
+  );
+  expect(await bridge(page, "acceptGuestOrder", secondGuestId)).toMatchObject({
+    status: "order-accepted",
+    mutated: true,
+  });
   await advanceUntil(
     page,
     async () => (await bridge(page, "getTavernState")).guest.guests[0]?.reservedDish,

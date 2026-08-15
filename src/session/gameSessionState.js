@@ -21,7 +21,7 @@ import {
   resetInventory,
 } from "../inventory/inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 15;
+export const SESSION_STATE_VERSION = 16;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);

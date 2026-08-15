@@ -271,12 +271,13 @@ export function interactServingTable(kitchen, inventory, servingTableId, selecte
   return { status: "item-taken", mutated: true, itemId, servingTableId, inventory: inventoryResult };
 }
 
-export function reserveServingItem(kitchen, guestId, servingTableIds = null) {
+export function reserveServingItem(kitchen, guestId, servingTableIds = null, requiredItemId = null) {
   const ids = servingTableIds ?? Object.keys(kitchen?.servingTables ?? {});
   if (findServingReservation(kitchen, guestId)) return null;
   for (const servingTableId of ids) {
     const stock = getServingTableStock(kitchen, servingTableId);
     if (!stock.itemId || stock.quantity <= stock.reservations.length) continue;
+    if (requiredItemId && stock.itemId !== requiredItemId) continue;
     const reservation = { guestId, itemId: stock.itemId };
     stock.reservations.push(reservation);
     return { ...reservation, servingTableId };

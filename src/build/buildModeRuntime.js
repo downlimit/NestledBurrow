@@ -5,11 +5,14 @@ import { HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import { GAME_HEIGHT, TILE_SIZE } from "../world/worldConfig.js";
 import { createPlacementDragState, resolvePlacementDrag, snapPlacementPoint } from "./buildWorldGeometry.js";
+import { SIMULATION_TEST_GROUPS } from "./simulationTestPalette.js";
+import { drawInventoryItem, inventoryItemAsset } from "../inventory/inventoryVisuals.js";
+import { drawCoinSprite } from "../tavern/coinVisual.js";
 
 const PANEL = Object.freeze({
   x: 4,
   y: 4,
-  width: 140,
+  width: 240,
   height: GAME_HEIGHT - 8,
   contentTop: 30,
   contentBottom: GAME_HEIGHT - 8,
@@ -28,6 +31,11 @@ const CLOSE_BUTTON = Object.freeze({
 const PANEL_DRAG_THRESHOLD = 6;
 const PANEL_INERTIA_FRICTION = 0.004;
 const DIRECT_PLACEMENT_TYPES = Object.freeze(["bed", "facility", "tree"]);
+
+export const BUILD_PANEL_VIEWS = Object.freeze({
+  build: "build",
+  test: "test",
+});
 
 export const BUILD_GRID = Object.freeze({
   step: TILE_SIZE,
@@ -156,6 +164,10 @@ export class BuildModeRuntime {
     getPlacementAnchorOffset = () => ({ x: 0, y: 0 }),
     isActivationAllowed = () => true,
     assetGroups = BUILD_ASSET_GROUPS,
+    testGroups = SIMULATION_TEST_GROUPS,
+    onTestGrant = () => ({ status: "ignored", mutated: false }),
+    onTestCoinGrant = () => ({ status: "ignored", mutated: false }),
+    isPointerBlocked = () => false,
   } = {}) {
     this.scene = scene;
     this.localization = localization;
@@ -176,10 +188,17 @@ export class BuildModeRuntime {
     this.getPlacementAnchorOffset = getPlacementAnchorOffset;
     this.isActivationAllowed = isActivationAllowed;
     this.assetGroups = assetGroups;
+    this.testGroups = testGroups;
+    this.onTestGrant = onTestGrant;
+    this.onTestCoinGrant = onTestCoinGrant;
+    this.isPointerBlocked = isPointerBlocked;
     this.active = false;
+    this.view = BUILD_PANEL_VIEWS.build;
     this.selectedId = null;
     this.objects = [];
     this.scrollOffset = 0;
+    this.scrollOffsets = { [BUILD_PANEL_VIEWS.build]: 0, [BUILD_PANEL_VIEWS.test]: 0 };
+    this.maxScrollOffsets = { [BUILD_PANEL_VIEWS.build]: 0, [BUILD_PANEL_VIEWS.test]: 0 };
     this.drag = null;
     this.panelDrag = null;
     this.scrollVelocity = 0;
@@ -220,7 +239,7 @@ export class BuildModeRuntime {
     };
     this.onSceneUpdate = (_time, delta) => this.updateScrollInertia(delta);
     this.onUndoKey = (event) => {
-      if (!this.active || this.actionOpen || event?.repeat || (!event?.ctrlKey && !event?.metaKey)) return;
+      if (!this.active || this.view !== BUILD_PANEL_VIEWS.build || this.actionOpen || event?.repeat || (!event?.ctrlKey && !event?.metaKey)) return;
       event?.preventDefault?.();
       this.onUndo();
     };
@@ -291,16 +310,18 @@ export class BuildModeRuntime {
   createLibrary() {
     this.panel = this.scene.add.graphics().setDepth(PANEL_DEPTH).setScrollFactor(0).setVisible(false);
     this.selection = this.scene.add.graphics().setDepth(PANEL_DEPTH + 2).setScrollFactor(0).setVisible(false);
-    this.title = this.addText(8, 8, "", 7, false);
+    this.title = this.addText(8, 10, "", 7, false);
+    this.testTitle = this.addText(92, 10, "", 7, false);
+    this.createViewTabs();
     let contentY = PANEL.contentTop;
     for (const group of this.assetGroups) {
-      const groupLabel = this.addText(8, contentY, "", 7, true);
+      const groupLabel = this.addText(8, contentY, "", 7, true, BUILD_PANEL_VIEWS.build);
       groupLabel.buildLabelKey = group.labelKey;
       contentY += 10;
       for (const item of group.items) {
         const x = 10;
         const thumbnail = this.createThumbnail(item, x, contentY);
-        const label = this.addText(x + 20, contentY + 4, "", 7, true);
+        const label = this.addText(x + 20, contentY + 4, "", 7, true, BUILD_PANEL_VIEWS.build);
         label.buildLabelKey = item.labelKey;
         const hit = this.scene.add.zone(x, contentY, 124, 18)
           .setOrigin(0)
@@ -316,14 +337,100 @@ export class BuildModeRuntime {
           hit,
           x,
           baseY: contentY,
+          view: BUILD_PANEL_VIEWS.build,
         });
         contentY += 18;
       }
       contentY += 4;
     }
     this.contentHeight = contentY - PANEL.contentTop;
-    this.maxScrollOffset = Math.max(0, contentY - PANEL.contentBottom);
+    this.maxScrollOffsets[BUILD_PANEL_VIEWS.build] = Math.max(0, contentY - PANEL.contentBottom);
+    this.createTestLibrary();
+    this.maxScrollOffset = this.maxScrollOffsets[this.view];
     this.renderLibrary();
+  }
+
+  createViewTabs() {
+    this.title.buildLabelKey = "hud:buildMode.tabs.build";
+    this.testTitle.buildLabelKey = "hud:buildMode.tabs.test";
+    this.viewTabs = [
+      { id: BUILD_PANEL_VIEWS.build, x: 7, width: 74, label: this.title },
+      { id: BUILD_PANEL_VIEWS.test, x: 88, width: 74, label: this.testTitle },
+    ].map((tab) => {
+      const hit = this.scene.add.zone(tab.x, 6, tab.width, 20)
+        .setOrigin(0)
+        .setDepth(PANEL_DEPTH + 5)
+        .setScrollFactor(0)
+        .setVisible(false);
+      hit.on("pointerdown", (pointer, _localX, _localY, event) => {
+        this.activationPointerId = pointer?.id ?? null;
+        event?.stopPropagation?.();
+        this.setView(tab.id);
+      });
+      return { ...tab, hit };
+    });
+  }
+
+  createTestLibrary() {
+    let contentY = PANEL.contentTop;
+    for (const group of this.testGroups) {
+      const groupLabel = this.addText(8, contentY, "", 7, true, BUILD_PANEL_VIEWS.test);
+      groupLabel.buildLabelKey = group.labelKey;
+      contentY += 10;
+      for (const item of group.items) {
+        const quantities = item.quantities ?? [1, 10];
+        const icon = this.createTestIcon(item, 10, contentY + 1);
+        const label = this.addText(30, contentY + 5, "", 7, true, BUILD_PANEL_VIEWS.test);
+        label.buildLabelKey = item.labelKey;
+        const buttons = quantities.map((quantity, index) => {
+          const width = quantity >= 100 ? 30 : quantity >= 10 ? 23 : 19;
+          const x = quantities.length === 1 ? 204 : index === 0 ? 182 : 208;
+          const text = this.addText(x + 3, contentY + 5, `+${quantity}`, 6, true, BUILD_PANEL_VIEWS.test);
+          return { quantity, x, width, text };
+        });
+        const hit = this.scene.add.zone(8, contentY, PANEL.width - 16, 18)
+          .setOrigin(0)
+          .setDepth(PANEL_DEPTH + 3)
+          .setScrollFactor(0);
+        hit.disableInteractive();
+        hit.on("pointerdown", () => {});
+        this.objects.push({
+          type: "test-item",
+          item,
+          icon,
+          label,
+          buttons,
+          hit,
+          x: 8,
+          baseY: contentY,
+          view: BUILD_PANEL_VIEWS.test,
+        });
+        contentY += 18;
+      }
+      contentY += 4;
+    }
+    this.maxScrollOffsets[BUILD_PANEL_VIEWS.test] = Math.max(0, contentY - PANEL.contentBottom);
+  }
+
+  createTestIcon(item, x, y) {
+    if (item.id !== "coins") {
+      const asset = inventoryItemAsset(item.id);
+      if (asset) {
+        return this.scene.add.image(x, y, asset.textureKey, asset.frame)
+          .setOrigin(0)
+          .setDepth(PANEL_DEPTH + 1)
+          .setScrollFactor(0)
+          .setVisible(false);
+      }
+    }
+    const graphics = this.scene.add.graphics()
+      .setPosition(x, y)
+      .setDepth(PANEL_DEPTH + 1)
+      .setScrollFactor(0)
+      .setVisible(false);
+    if (item.id === "coins") drawCoinSprite(graphics, 8, 8);
+    else drawInventoryItem(graphics, item.id);
+    return graphics;
   }
 
   createThumbnail(item, x, y) {
@@ -350,20 +457,35 @@ export class BuildModeRuntime {
     return graphics;
   }
 
-  addText(x, y, text, fontSize, scrolls) {
+  addText(x, y, text, fontSize, scrolls, view = null) {
     const object = createManagedText(this.scene, x, y, text, {
       fontFamily: this.localization.getLocale().fontKey,
       fontSize: `${fontSize}px`,
       color: "#f2eadc",
-      wordWrap: { width: 112 },
+      wordWrap: { width: PANEL.width - 28 },
     }).setDepth(PANEL_DEPTH + 2).setScrollFactor(0).setVisible(false);
-    this.objects.push({ type: "text", object, baseY: y, scrolls });
+    this.objects.push({ type: "text", object, baseY: y, scrolls, view });
     return object;
   }
 
   setScrollOffset(value) {
     this.scrollOffset = Math.max(0, Math.min(this.maxScrollOffset, Math.round(value)));
+    this.scrollOffsets[this.view] = this.scrollOffset;
     this.renderLibrary();
+  }
+
+  setView(view) {
+    if (!Object.values(BUILD_PANEL_VIEWS).includes(view) || view === this.view) return false;
+    this.view = view;
+    this.selectedId = null;
+    this.drag = null;
+    this.cancelPanelDrag();
+    this.onPreviewClear();
+    this.scrollOffset = this.scrollOffsets[view] ?? 0;
+    this.maxScrollOffset = this.maxScrollOffsets[view] ?? 0;
+    this.grid.setVisible(this.gridEnabled && (!this.active || this.view === BUILD_PANEL_VIEWS.build));
+    this.renderLibrary();
+    return true;
   }
 
   isPanelContentPoint(pointer) {
@@ -373,10 +495,11 @@ export class BuildModeRuntime {
   }
 
   getPanelItemAt(x, y) {
-    return this.objects.find((entry) => entry.type === "item"
+    const type = this.view === BUILD_PANEL_VIEWS.test ? "test-item" : "item";
+    return this.objects.find((entry) => entry.type === type
       && y >= entry.baseY - this.scrollOffset
       && y < entry.baseY - this.scrollOffset + 18
-      && x >= entry.x && x <= entry.x + 124);
+      && x >= entry.x && x <= entry.x + PANEL.width - 16);
   }
 
   beginPanelDrag(pointer) {
@@ -399,7 +522,7 @@ export class BuildModeRuntime {
     const deltaX = pointer.x - this.panelDrag.startX;
     const deltaFromStartY = pointer.y - this.panelDrag.startY;
     const entry = this.panelDrag.item;
-    if (entry
+    if (this.view === BUILD_PANEL_VIEWS.build && entry
       && DIRECT_PLACEMENT_TYPES.includes(entry.item.placement)
       && pointer.x > PANEL.x + PANEL.width
       && deltaX >= PANEL_DRAG_THRESHOLD
@@ -430,7 +553,15 @@ export class BuildModeRuntime {
     this.panelDrag = null;
     if (!moved && item) {
       this.onPreviewClear();
-      this.selectedId = this.selectedId === item.item.id ? null : item.item.id;
+      if (this.view === BUILD_PANEL_VIEWS.test) {
+        const button = item.buttons.find(({ x, width }) => pointer.x >= x && pointer.x <= x + width);
+        if (button) {
+          if (item.item.id === "coins") this.grantTestCoins(button.quantity);
+          else this.grantTestItem(item.item.id, button.quantity);
+        }
+      } else {
+        this.selectedId = this.selectedId === item.item.id ? null : item.item.id;
+      }
       this.renderLibrary();
     }
   }
@@ -455,38 +586,56 @@ export class BuildModeRuntime {
     if (!this.active) return;
     this.panel.fillStyle(0x171724, 0.96).fillRect(PANEL.x, PANEL.y, PANEL.width, PANEL.height);
     this.panel.lineStyle(1, 0xd9c18f, 0.9).strokeRect(PANEL.x + 0.5, PANEL.y + 0.5, PANEL.width - 1, PANEL.height - 1);
-    if (this.scrollOffset > 0) this.panel.fillStyle(0xf2eadc, 0.9).fillTriangle(134, 10, 130, 16, 138, 16);
-    if (this.scrollOffset < this.maxScrollOffset) this.panel.fillStyle(0xf2eadc, 0.9).fillTriangle(130, 164, 138, 164, 134, 170);
-    setManagedTextStyle(this.title, this.scene, {
-      fontFamily: this.localization.getLocale().fontKey,
-      fontSize: "7px",
-      color: "#f2eadc",
-    }).setText(this.localization.t("hud:buildMode.title")).setVisible(true);
-
+    const activeTab = this.viewTabs.find((tab) => tab.id === this.view);
+    this.panel.fillStyle(0x42ff75, 0.9).fillRect(activeTab.x, 24, activeTab.width, 1);
+    const scrollMarkerX = CLOSE_BUTTON.x - 12;
+    if (this.scrollOffset > 0) this.panel.fillStyle(0xf2eadc, 0.9).fillTriangle(scrollMarkerX, 10, scrollMarkerX - 4, 16, scrollMarkerX + 4, 16);
+    if (this.scrollOffset < this.maxScrollOffset) this.panel.fillStyle(0xf2eadc, 0.9).fillTriangle(scrollMarkerX - 4, PANEL.contentBottom - 10, scrollMarkerX + 4, PANEL.contentBottom - 10, scrollMarkerX, PANEL.contentBottom - 4);
     for (const entry of this.objects) {
       if (entry.type === "text") {
-        if (entry.object === this.title) continue;
+        if (entry.view && entry.view !== this.view) {
+          entry.object.setVisible(false);
+          continue;
+        }
         const y = entry.scrolls ? entry.baseY - this.scrollOffset : entry.baseY;
-        const visible = this.isContentVisible(y, entry.object.height || 7);
+        const visible = entry.scrolls ? this.isContentVisible(y, entry.object.height || 7) : true;
         entry.object.setPosition(Math.trunc(entry.object.x), Math.trunc(y)).setVisible(visible);
         if (visible && entry.object.buildLabelKey) {
           entry.object.setText(this.localization.t(entry.object.buildLabelKey));
         }
         continue;
       }
+      if (entry.view !== this.view) {
+        entry.hit.disableInteractive();
+        if (entry.thumbnail) entry.thumbnail.setVisible(false);
+        if (entry.icon) entry.icon.setVisible(false);
+        continue;
+      }
       const y = entry.baseY - this.scrollOffset;
       const visible = this.isContentVisible(y, 18);
-      entry.thumbnail.setPosition(entry.x, y).setVisible(visible);
-      entry.label.setPosition(entry.x + 20, y + 4).setVisible(visible);
+      if (entry.type === "test-item") {
+        entry.icon.setPosition(10, y + 1).setVisible(visible);
+        entry.label.setPosition(30, y + 5).setVisible(visible);
+        for (const button of entry.buttons) {
+          button.text.setPosition(button.x + 3, y + 5).setVisible(visible);
+          if (visible) {
+            this.selection.fillStyle(0x2c2b3d, 1).fillRect(button.x, y + 2, button.width, 14);
+            this.selection.lineStyle(1, 0xb39a6a, 0.9).strokeRect(button.x + 0.5, y + 2.5, button.width - 1, 13);
+          }
+        }
+      } else {
+        entry.thumbnail.setPosition(entry.x, y).setVisible(visible);
+        entry.label.setPosition(entry.x + 20, y + 4).setVisible(visible);
+      }
       if (visible) {
         entry.label.setText(this.localization.t(entry.item.labelKey));
         entry.hit.setPosition(entry.x, y).setInteractive({ useHandCursor: true });
       } else {
         entry.hit.disableInteractive();
       }
-      if (visible && entry.item.id === this.selectedId) {
+      if (entry.type === "item" && visible && entry.item.id === this.selectedId) {
         this.selection.lineStyle(1, 0x42ff75, 1)
-          .strokeRect(entry.x - 1.5, y - 1.5, 124, 20);
+          .strokeRect(entry.x - 1.5, y - 1.5, PANEL.width - 16, 20);
       }
     }
   }
@@ -519,7 +668,7 @@ export class BuildModeRuntime {
   }
 
   beginPointerDrag(pointer) {
-    if (!this.active || pointer.x < PANEL.x + PANEL.width) return;
+    if (!this.active || this.view !== BUILD_PANEL_VIEWS.build || pointer.x < PANEL.x + PANEL.width || this.isPointerBlocked(pointer)) return;
     const item = this.getSelectedItem();
     const point = this.getActionPoint(pointer, item);
     if (!item) {
@@ -681,7 +830,7 @@ export class BuildModeRuntime {
   }
 
   updateHoverPreview(pointer) {
-    if (!this.active || pointer.x < PANEL.x + PANEL.width) {
+    if (!this.active || this.view !== BUILD_PANEL_VIEWS.build || pointer.x < PANEL.x + PANEL.width) {
       this.onPreviewClear();
       return;
     }
@@ -707,19 +856,22 @@ export class BuildModeRuntime {
     if (next === this.active) return;
     if (next) this.selectedId = null;
     this.active = next;
-    this.grid.setVisible(this.gridEnabled);
+    this.grid.setVisible(this.gridEnabled && (!next || this.view === BUILD_PANEL_VIEWS.build));
     this.panel.setVisible(next);
     this.selection.setVisible(next);
     this.openButton.setVisible(!next);
     this.closeButton.setVisible(next);
     this.openButtonHit.setVisible(!next);
     this.closeButtonHit.setVisible(next);
+    for (const tab of this.viewTabs) tab.hit.setVisible(next);
     if (next) {
       this.openButtonHit.disableInteractive();
       this.closeButtonHit.setInteractive();
+      for (const tab of this.viewTabs) tab.hit.setInteractive({ useHandCursor: true });
     } else {
       this.closeButtonHit.disableInteractive();
       this.openButtonHit.setInteractive();
+      for (const tab of this.viewTabs) tab.hit.disableInteractive();
     }
     if (!next) {
       this.activationPointerId = null;
@@ -732,9 +884,14 @@ export class BuildModeRuntime {
       this.onPreviewClear();
       for (const entry of this.objects) {
         if (entry.type === "text") entry.object.setVisible(false);
-        else {
+        else if (entry.type === "item") {
           entry.thumbnail.setVisible(false);
           entry.label.setVisible(false);
+          entry.hit.disableInteractive();
+        } else {
+          entry.icon.setVisible(false);
+          entry.label.setVisible(false);
+          for (const button of entry.buttons) button.text.setVisible(false);
           entry.hit.disableInteractive();
         }
       }
@@ -754,18 +911,31 @@ export class BuildModeRuntime {
 
   setGridEnabled(value) {
     this.gridEnabled = Boolean(value);
-    this.grid.setVisible(this.gridEnabled);
+    this.grid.setVisible(this.gridEnabled && (!this.active || this.view === BUILD_PANEL_VIEWS.build));
+  }
+
+  grantTestItem(itemId, quantity) {
+    const exists = this.testGroups.some((group) => group.items.some((item) => item.id === itemId && item.id !== "coins"));
+    return exists ? this.onTestGrant(itemId, quantity) : { status: "invalid-test-item", mutated: false };
+  }
+
+  grantTestCoins(amount = 100) {
+    const exists = this.testGroups.some((group) => group.items.some((item) => item.id === "coins"));
+    return exists ? this.onTestCoinGrant(amount) : { status: "invalid-test-item", mutated: false };
   }
 
   getState() {
     return {
       active: this.active,
+      view: this.view,
       selectedId: this.selectedId,
       scrollOffset: this.scrollOffset,
       gridEnabled: this.gridEnabled,
       maxScrollOffset: this.maxScrollOffset,
       grid: BUILD_GRID,
       groupIds: BUILD_ASSET_GROUPS.map((group) => group.id),
+      testGroupIds: this.testGroups.map((group) => group.id),
+      testItemIds: this.testGroups.flatMap((group) => group.items.map((item) => item.id)),
     };
   }
 
@@ -788,11 +958,15 @@ export class BuildModeRuntime {
     this.openButtonHit.destroy();
     this.closeButton.destroy();
     this.closeButtonHit.destroy();
+    for (const tab of this.viewTabs) tab.hit.destroy();
     for (const entry of this.objects) {
       if (entry.type === "text") entry.object.destroy();
-      else {
+      else if (entry.type === "item") {
         entry.thumbnail.destroy();
         entry.hit.destroy();
+      } else {
+        entry.hit.destroy();
+        entry.icon.destroy();
       }
     }
     this.objects = [];

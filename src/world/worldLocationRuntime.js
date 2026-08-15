@@ -23,6 +23,9 @@ import { RESOURCE_OBJECTS } from "../resources/resourceConfig.js";
 import { createTavernServiceRuntime } from "../tavern/tavernServiceRuntime.js";
 import { createTavernSignRuntime } from "../tavern/tavernSignRuntime.js";
 import { createWorldBuildCoordinator } from "../build/worldBuildCoordinator.js";
+import { grantSimulationTestCoins, grantSimulationTestItem } from "../build/simulationTestPalette.js";
+import { createPersonInspectionRuntime } from "../character/personInspectionRuntime.js";
+import { setPopulationPersonNeed } from "../character/populationDomain.js";
 import { createPuddleRuntime } from "./puddleRuntime.js";
 import { createWildAtollRuntime } from "./wildAtollRuntime.js";
 import { WORLD_IDS } from "./worldLocationConfig.js";
@@ -44,6 +47,7 @@ const DEFAULT_FACTORIES = Object.freeze({
   kitchenInteraction: createKitchenInteractionRuntime,
   movementDebugPanel: (options) => new MovementDebugPanel(options),
   worldBuildCoordinator: createWorldBuildCoordinator,
+  personInspection: createPersonInspectionRuntime,
   puddle: createPuddleRuntime,
   wildAtoll: createWildAtollRuntime,
 });
@@ -147,6 +151,8 @@ export class WorldLocationRuntime {
     this.owners.kitchenInteractionRuntime = null;
     this.owners.farmingRuntime?.destroy?.();
     this.owners.farmingRuntime = null;
+    this.owners.personInspectionRuntime?.destroy?.();
+    this.owners.personInspectionRuntime = null;
     this.owners.tavernServiceRuntime?.destroy?.();
     this.owners.tavernServiceRuntime = null;
     this.owners.guestRuntime = null;
@@ -184,6 +190,7 @@ export class WorldLocationRuntime {
     this.callbacks.updateGameplayTime?.(deltaMs);
     this.owners.cookingRuntime?.update?.(deltaMs);
     this.owners.puddleRuntime?.update?.(deltaMs);
+    this.owners.personInspectionRuntime?.update?.(deltaMs);
   }
 
   runWorldStep(deltaMs, updateCharacters) {
@@ -426,6 +433,19 @@ export class WorldLocationRuntime {
     });
     this.owners.guestRuntime = this.owners.tavernServiceRuntime.guestRuntime;
     this.owners.coinRuntime = this.owners.tavernServiceRuntime.coinRuntime;
+    this.owners.personInspectionRuntime = this.factories.personInspection(this.renderingHost, {
+      getActivePersonBindings: () => this.owners.guestRuntime?.getActivePersonBindings?.() ?? [],
+      getPerson: (personId) => this.sessionState.gameplay.population.find((person) => person.id === personId) ?? null,
+      setPersonNeed: (personId, needId, value) => setPopulationPersonNeed(
+        this.sessionState.gameplay.population,
+        personId,
+        needId,
+        value,
+        this.sessionState.gameplay.worldTimeSeconds,
+      ),
+      onPersistentMutation: () => this.callbacks.saveSession?.(),
+      isCoarsePointer: () => this.renderingHost.isCoarsePointer?.() ?? false,
+    });
   }
 
   mountFarming() {
@@ -563,6 +583,28 @@ export class WorldLocationRuntime {
         this.callbacks.getMobileJoystick?.()?.reset?.();
         if (!active) this.globalOwners.interactionRuntime?.refresh?.();
       },
+      onTestGrant: (itemId, quantity) => {
+        const result = grantSimulationTestItem(this.sessionState.gameplay, itemId, quantity);
+        if (result.mutated) {
+          this.globalOwners.gameHud?.notifyInventoryGain?.(result);
+          this.globalOwners.gameHud?.render?.();
+          this.globalOwners.interactionRuntime?.refresh?.();
+          this.callbacks.saveSession?.();
+        } else if (result.status === "inventory-full") {
+          this.globalOwners.gameHud?.showTransientMessage?.("hud:interaction.inventoryFull");
+        }
+        return result;
+      },
+      onTestCoinGrant: (amount) => {
+        const result = grantSimulationTestCoins(this.sessionState.gameplay, amount);
+        if (result.mutated) {
+          this.globalOwners.gameHud?.notifyCoinDelta?.(result.value);
+          this.globalOwners.gameHud?.render?.();
+          this.callbacks.saveSession?.();
+        }
+        return result;
+      },
+      isPointerBlocked: (pointer) => this.renderingHost.isHudPoint?.(pointer.x, pointer.y) ?? false,
       constructionEnabled,
       getFixedWorldAuthoringInstances: () => [
         ...(this.presentationRuntime.getTransitionAuthoringInstances?.() ?? []),
@@ -638,10 +680,12 @@ export class WorldLocationRuntime {
       farmingRuntime: this.owners.farmingRuntime,
       tavernSignRuntime: this.owners.tavernSignRuntime,
       venueMenuRuntime: this.owners.tavernServiceRuntime?.venueMenuRuntime ?? null,
+      tavernServiceRuntime: this.owners.tavernServiceRuntime,
       facilityRuntime: this.owners.facilityRuntime,
       kitchenInteractionRuntime: this.owners.kitchenInteractionRuntime,
       needsInteractionCoordinator: this.owners.needsInteractionCoordinator,
       cookingRuntime: this.owners.cookingRuntime,
+      personInspectionRuntime: this.owners.personInspectionRuntime,
       debrisRuntime: this.owners.debrisRuntime,
     };
   }
@@ -690,6 +734,7 @@ function createEmptyOwners() {
     movementDebugPanel: null,
     worldBuildCoordinator: null,
     buildModeRuntime: null,
+    personInspectionRuntime: null,
     puddleRuntime: null,
     wildAtollRuntime: null,
   };

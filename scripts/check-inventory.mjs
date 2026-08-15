@@ -153,8 +153,8 @@ assert.equal(normalizeInventory({ slots: [...inventory.slots, createInventoryIte
 assert.deepEqual(normalizeWorldItems([{ id: "dropped-item-1", item: { id: "wood", quantity: 2 }, x: 20, y: 30 }]), [{ id: "dropped-item-1", item: { id: "wood", kind: "loot", quantity: 2 }, x: 20, y: 30 }]);
 
 assert.equal(INVENTORY_SLOT_AREAS.length, 10);
-assert.equal(INVENTORY_HUD_AREA.x, 43);
-assert.equal(INVENTORY_HUD_AREA.y, 156);
+assert.equal(INVENTORY_HUD_AREA.x, 201);
+assert.equal(INVENTORY_HUD_AREA.y, 336);
 assert.equal(INVENTORY_HUD_AREA.width, 238);
 assert.equal(shouldRenderInventoryQuantity(createInventoryItem("lemonade", 1)), true, "single consumables keep a visible quantity label");
 assert.equal(shouldRenderInventoryQuantity(createInventoryItem("water-bucket")), false, "tools do not show quantity labels");

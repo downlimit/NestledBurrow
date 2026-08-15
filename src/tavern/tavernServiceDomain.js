@@ -1,4 +1,5 @@
 import { SELLABLE_ITEM_IDS } from "./cookingDomain.js";
+import { normalizeOrder, ORDER_STATUS } from "./orderDomain.js";
 
 export const VISIT_OPPORTUNITY_INTERVAL_MIN_MS = 3_000;
 export const VISIT_OPPORTUNITY_INTERVAL_MAX_MS = 8_000;
@@ -49,13 +50,19 @@ export function normalizeTavernServiceState(value = {}, { population = [] } = {}
     ids.add(id);
     activePersonIds.add(personId);
     const itemId = SELLABLE_ITEM_IDS.includes(raw.itemId) ? raw.itemId : null;
+    const order = normalizeOrder(raw.order, {
+      fallbackItemId: itemId ?? normalizeAcceptableItemIds(raw.acceptableItemIds)[0] ?? null,
+      fallbackStatus: legacyOrderStatus(raw),
+    });
+    if (!order) continue;
     guests.push({
       id,
       personId,
       state: String(raw.state ?? "approaching-sign"),
       stateElapsedMs: nonNegativeNumber(raw.stateElapsedMs, 0, `Guest ${id} elapsed time`),
       position: { x, y },
-      itemId,
+      itemId: itemId ?? order.itemId,
+      order,
       acceptableItemIds: normalizeAcceptableItemIds(raw.acceptableItemIds, itemId),
       servingTableId: furnitureId(raw.servingTableId),
       diningTableId: furnitureId(raw.diningTableId),
@@ -74,9 +81,25 @@ export function recordCompletedVisit(serviceState, personId, worldTimeSeconds) {
   const history = {
     completedVisitCount: previous.completedVisitCount + 1,
     lastCompletedVisitWorldTimeSeconds: nonNegativeNumber(worldTimeSeconds, 0, "Completed visit time"),
+    failedAcceptedOrderCount: previous.failedAcceptedOrderCount,
+    lastFailedAcceptedOrderWorldTimeSeconds: previous.lastFailedAcceptedOrderWorldTimeSeconds,
   };
   serviceState.visitorHistoryByPersonId[personId] = history;
   return { status: "completed-visit-recorded", mutated: true, history: { ...history } };
+}
+
+export function recordFailedAcceptedOrder(serviceState, personId, worldTimeSeconds) {
+  if (!isSafePersonId(personId)) return { status: "invalid-person", mutated: false, history: null };
+  serviceState.visitorHistoryByPersonId ??= {};
+  const previous = normalizeHistoryEntry(serviceState.visitorHistoryByPersonId[personId]);
+  const history = {
+    completedVisitCount: previous.completedVisitCount,
+    lastCompletedVisitWorldTimeSeconds: previous.lastCompletedVisitWorldTimeSeconds,
+    failedAcceptedOrderCount: previous.failedAcceptedOrderCount + 1,
+    lastFailedAcceptedOrderWorldTimeSeconds: nonNegativeNumber(worldTimeSeconds, 0, "Failed accepted order time"),
+  };
+  serviceState.visitorHistoryByPersonId[personId] = history;
+  return { status: "failed-accepted-order-recorded", mutated: true, history: { ...history } };
 }
 
 function normalizeVisitorHistory(value, validPersonIds) {
@@ -91,7 +114,29 @@ function normalizeHistoryEntry(value) {
   const completedVisitCount = nonNegativeInteger(source.completedVisitCount, 0, "Completed visit count");
   const lastVisit = source.lastCompletedVisitWorldTimeSeconds;
   const lastCompletedVisitWorldTimeSeconds = Number.isFinite(lastVisit) && lastVisit >= 0 ? lastVisit : null;
-  return { completedVisitCount, lastCompletedVisitWorldTimeSeconds };
+  const failedAcceptedOrderCount = nonNegativeInteger(
+    source.failedAcceptedOrderCount,
+    0,
+    "Failed accepted order count",
+  );
+  const lastFailure = source.lastFailedAcceptedOrderWorldTimeSeconds;
+  const lastFailedAcceptedOrderWorldTimeSeconds = Number.isFinite(lastFailure) && lastFailure >= 0
+    ? lastFailure
+    : null;
+  return {
+    completedVisitCount,
+    lastCompletedVisitWorldTimeSeconds,
+    failedAcceptedOrderCount,
+    lastFailedAcceptedOrderWorldTimeSeconds,
+  };
+}
+
+function legacyOrderStatus(raw) {
+  if (raw?.paid) return ORDER_STATUS.completed;
+  if (["carrying-to-seat", "eating", "leaving"].includes(raw?.state) && raw?.itemId) return ORDER_STATUS.served;
+  if (raw?.reservationActive) return ORDER_STATUS.reserved;
+  if (raw?.itemId) return ORDER_STATUS.accepted;
+  return ORDER_STATUS.planned;
 }
 
 function normalizeAcceptableItemIds(value, fallbackItemId = null) {

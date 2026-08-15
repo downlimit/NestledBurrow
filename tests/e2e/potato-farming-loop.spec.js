@@ -13,7 +13,7 @@ async function bridge(page, method, argument) {
 }
 
 async function boot(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
 }
@@ -29,8 +29,8 @@ async function clickLogical(page, point) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
   await page.mouse.click(
-    box.x + point.x * box.width / 320,
-    box.y + point.y * box.height / 180,
+    box.x + point.x * box.width / 640,
+    box.y + point.y * box.height / 360,
   );
 }
 
@@ -131,9 +131,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
     labels: { title: "SEED MERCHANT" },
   });
   const merchantLayout = await bridge(page, "getMerchantState");
-  expect(merchantLayout.panel.y).toBeGreaterThanOrEqual(34);
-  expect(merchantLayout.panel.y + merchantLayout.panel.height).toBeLessThan(156);
-  expect(merchantLayout.panel.x + merchantLayout.panel.width).toBeLessThanOrEqual(242);
+  expect(merchantLayout.panel).toEqual({ x: 232, y: 127, width: 176, height: 107 });
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getMerchantState")).active).toBe(false);
   await expect.poll(async () => (await bridge(page, "getAudioEffectState")).lastEffectType).toBe("menu-close");
@@ -202,7 +200,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   await expect.poll(async () => (await bridge(page, "getInteractionState"))?.candidate?.kind).toBe("farm-till");
   const prompt = await bridge(page, "getInteractionHudState");
   expect(prompt.promptRect).toMatchObject({ height: 18 });
-  expect(prompt.promptRect.y + prompt.promptRect.height).toBeLessThan(156);
+  expect(prompt.promptRect.y + prompt.promptRect.height).toBeLessThan(336);
   await pressInteract(page);
   await expect.poll(async () => (await bridge(page, "getFarmingState")).farm.soilCells).toHaveLength(1);
 

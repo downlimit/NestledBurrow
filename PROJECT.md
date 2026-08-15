@@ -6,7 +6,7 @@
 `PROJECT.md` — короткий маршрутизатор контекста. Он не хранит историю задач, подробное состояние каждой механики или инструкции исполнителя.
 
 Репозиторий: `downlimit/NestledBurrow`.
-Runtime: Phaser 4, Vite, browser 2D, logical viewport `320×180`.
+Runtime: Phaser 4, Vite, browser 2D, logical viewport `640×360` with a `2×` world camera.
 
 ## Роли
 

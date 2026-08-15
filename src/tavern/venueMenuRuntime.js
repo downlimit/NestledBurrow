@@ -1,5 +1,6 @@
 import { HUD_COLORS, HUD_DEPTH, isPointInRect } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 import { SELLABLE_ITEM_IDS } from "./cookingDomain.js";
 import {
   isVenueOfferItemActive,
@@ -7,8 +8,8 @@ import {
   toggleVenueOfferItem,
 } from "./venueOfferDomain.js";
 
-export const VENUE_MENU_PANEL_AREA = Object.freeze({ x: 72, y: 23, width: 176, height: 134 });
-export const VENUE_MENU_LIST_AREA = Object.freeze({ x: 84, y: 52, width: 152, height: 55 });
+export const VENUE_MENU_PANEL_AREA = Object.freeze({ x: Math.round((GAME_WIDTH - 176) / 2), y: Math.round((GAME_HEIGHT - 134) / 2), width: 176, height: 134 });
+export const VENUE_MENU_LIST_AREA = Object.freeze({ x: VENUE_MENU_PANEL_AREA.x + 12, y: VENUE_MENU_PANEL_AREA.y + 29, width: 152, height: 55 });
 export const VENUE_MENU_VISIBLE_ROW_COUNT = 2;
 const VENUE_MENU_ROW_HEIGHT = 25;
 const VENUE_MENU_ROW_STEP = 30;
@@ -21,9 +22,9 @@ export const VENUE_MENU_ROW_AREAS = Object.freeze(Array.from(
     height: VENUE_MENU_ROW_HEIGHT,
   }),
 ));
-export const VENUE_MENU_ACTIVITY_AREA = Object.freeze({ x: 84, y: 116, width: 152, height: 28 });
-const VENUE_MENU_SWITCH_AREA = Object.freeze({ x: 91, y: 123, width: 34, height: 14 });
-const VENUE_MENU_SCREEN_AREA = Object.freeze({ x: 0, y: 0, width: 320, height: 180 });
+export const VENUE_MENU_ACTIVITY_AREA = Object.freeze({ x: VENUE_MENU_PANEL_AREA.x + 12, y: VENUE_MENU_PANEL_AREA.y + 93, width: 152, height: 28 });
+const VENUE_MENU_SWITCH_AREA = Object.freeze({ x: VENUE_MENU_PANEL_AREA.x + 19, y: VENUE_MENU_PANEL_AREA.y + 100, width: 34, height: 14 });
+const VENUE_MENU_SCREEN_AREA = Object.freeze({ x: 0, y: 0, width: GAME_WIDTH, height: GAME_HEIGHT });
 const MENU_SWIPE_THRESHOLD = 9;
 const ITEM_LABEL_KEYS = Object.freeze({
   "fried-potato-dish": "hud:venueMenu.friedPotatoDish",
@@ -64,7 +65,7 @@ export function createVenueMenuRuntime(scene, {
   const graphics = scene.add.graphics().setDepth(HUD_DEPTH + 60).setScrollFactor(0).setVisible(false);
   const titleText = createText(scene, 10);
   const rowTexts = VENUE_MENU_ROW_AREAS.map(() => createText(scene, 8));
-  const activityText = createText(scene, 8);
+  const activityText = createText(scene, 7);
   const closeHintText = createText(scene, 6);
   const backdropHit = createZone(scene, VENUE_MENU_SCREEN_AREA, HUD_DEPTH + 61).disableInteractive();
   const panelHit = createZone(scene, VENUE_MENU_PANEL_AREA, HUD_DEPTH + 62).disableInteractive();
@@ -237,7 +238,7 @@ export function createVenueMenuRuntime(scene, {
     }
     if (!interactive) return;
 
-    graphics.fillStyle(0x000000, 0.58).fillRect(0, 0, 320, 180);
+    graphics.fillStyle(0x000000, 0.58).fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     graphics.fillStyle(HUD_COLORS.panel, 0.98)
       .fillRect(VENUE_MENU_PANEL_AREA.x, VENUE_MENU_PANEL_AREA.y, VENUE_MENU_PANEL_AREA.width, VENUE_MENU_PANEL_AREA.height);
     graphics.lineStyle(1, HUD_COLORS.border, 1)
@@ -263,8 +264,9 @@ export function createVenueMenuRuntime(scene, {
       }
     });
     const maxScrollIndex = venueMenuMaxScrollIndex(SELLABLE_ITEM_IDS.length);
-    if (scrollIndex > 0) graphics.fillStyle(HUD_COLORS.light, 0.9).fillTriangle(241, 56, 238, 61, 244, 61);
-    if (scrollIndex < maxScrollIndex) graphics.fillStyle(HUD_COLORS.light, 0.9).fillTriangle(238, 98, 244, 98, 241, 103);
+    const scrollMarkerX = VENUE_MENU_PANEL_AREA.x + 169;
+    if (scrollIndex > 0) graphics.fillStyle(HUD_COLORS.light, 0.9).fillTriangle(scrollMarkerX, VENUE_MENU_PANEL_AREA.y + 33, scrollMarkerX - 3, VENUE_MENU_PANEL_AREA.y + 38, scrollMarkerX + 3, VENUE_MENU_PANEL_AREA.y + 38);
+    if (scrollIndex < maxScrollIndex) graphics.fillStyle(HUD_COLORS.light, 0.9).fillTriangle(scrollMarkerX - 3, VENUE_MENU_PANEL_AREA.y + 75, scrollMarkerX + 3, VENUE_MENU_PANEL_AREA.y + 75, scrollMarkerX, VENUE_MENU_PANEL_AREA.y + 80);
 
     const tavernActive = Boolean(sessionState.gameplay.tavernOpen);
     graphics.fillStyle(HUD_COLORS.shadow, 0.72)
@@ -292,10 +294,10 @@ export function createVenueMenuRuntime(scene, {
     setText(
       activityText,
       localization.t(tavernActive ? "hud:venueMenu.active" : "hud:venueMenu.inactive"),
-      133,
+      VENUE_MENU_SWITCH_AREA.x + VENUE_MENU_SWITCH_AREA.width + 7,
       VENUE_MENU_ACTIVITY_AREA.y + 10,
     );
-    setText(closeHintText, localization.t("hud:venueMenu.closeHint"), 0, 148, "#b9aa93");
+    setText(closeHintText, localization.t("hud:venueMenu.closeHint"), 0, VENUE_MENU_PANEL_AREA.y + VENUE_MENU_PANEL_AREA.height - 10, "#b9aa93");
     closeHintText.setX(Math.round(VENUE_MENU_PANEL_AREA.x + (VENUE_MENU_PANEL_AREA.width - closeHintText.width) / 2));
   }
 

@@ -3,6 +3,7 @@ import { FACILITY_INTERACTION_KIND } from "../facilities/facilityConfig.js";
 import { shouldShakeEnergyAfterInteraction } from "../ui/gameHud.js";
 import { hitResourceDefinition } from "../session/gameSessionState.js";
 import { TAVERN_SIGN_KIND } from "../tavern/guestConfig.js";
+import { GUEST_ORDER_INTERACTION_KIND } from "../tavern/guestRuntime.js";
 import { RESOURCE_INTERACTION_KIND } from "../resources/resourceConfig.js";
 import { getResourceProfile, resourceActionForTool, resourceEffectType } from "../resources/resourceDomain.js";
 import { WORLD_IDS, WORLD_TRANSITION_INTERACTION_KIND } from "../world/worldLocationConfig.js";
@@ -49,6 +50,7 @@ export function createWorldInteractionCoordinator({
       farmingRuntime: next.farmingRuntime ?? null,
       tavernSignRuntime: next.tavernSignRuntime ?? null,
       venueMenuRuntime: next.venueMenuRuntime ?? null,
+      tavernServiceRuntime: next.tavernServiceRuntime ?? null,
       facilityRuntime: next.facilityRuntime ?? null,
       kitchenInteractionRuntime: next.kitchenInteractionRuntime ?? null,
       needsInteractionCoordinator: next.needsInteractionCoordinator ?? null,
@@ -75,6 +77,7 @@ export function createWorldInteractionCoordinator({
       ...(locationOwners.debrisRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.facilityRuntime?.getInteractionDefinitions?.() ?? []),
       ...(locationOwners.tavernSignRuntime?.getInteractionDefinitions?.() ?? []),
+      ...(locationOwners.tavernServiceRuntime?.getOrderInteractionDefinitions?.() ?? []),
       ...(locationOwners.farmingRuntime?.getInteractionDefinitions?.() ?? []),
       ...(wake ? [wake] : []),
       ...(exhaustedWake ? [exhaustedWake] : []),
@@ -98,6 +101,8 @@ export function createWorldInteractionCoordinator({
     result = handleFarming(candidate);
     if (isHandled(result)) return result;
     result = handleTavernSign(candidate);
+    if (isHandled(result)) return result;
+    result = handleGuestOrder(candidate);
     if (isHandled(result)) return result;
     result = handleFacility(candidate);
     if (isHandled(result)) return result;
@@ -140,6 +145,17 @@ export function createWorldInteractionCoordinator({
     const result = locationOwners.venueMenuRuntime?.handleSignInteraction?.() ?? IGNORED;
     if (!isHandled(result)) return result;
     suppressNextInteract();
+    return result;
+  }
+
+  function handleGuestOrder(candidate) {
+    if (candidate.kind !== GUEST_ORDER_INTERACTION_KIND) return IGNORED;
+    const result = locationOwners.tavernServiceRuntime?.acceptGuestOrder?.(
+      candidate.payload.guestId,
+    ) ?? IGNORED;
+    if (!isHandled(result)) return result;
+    suppressNextInteract();
+    refreshInteractions();
     return result;
   }
 
@@ -322,6 +338,7 @@ function emptyLocationOwners() {
     farmingRuntime: null,
     tavernSignRuntime: null,
     venueMenuRuntime: null,
+    tavernServiceRuntime: null,
     facilityRuntime: null,
     kitchenInteractionRuntime: null,
     needsInteractionCoordinator: null,

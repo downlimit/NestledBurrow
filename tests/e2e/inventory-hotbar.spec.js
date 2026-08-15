@@ -2,24 +2,24 @@ import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 const EVIDENCE_DIR = "artifacts/task-046";
-const SLOT_CENTERS = Array.from({ length: 10 }, (_, index) => ({ x: 52 + index * 24, y: 167 }));
+const SLOT_CENTERS = Array.from({ length: 10 }, (_, index) => ({ x: 210 + index * 24, y: 347 }));
 
 async function bridge(page, method, argument) {
   return page.evaluate(({ method, argument }) => window.__NESTLED_BURROW_E2E__?.[method]?.(argument), { method, argument });
 }
 
 async function boot(page) {
-  await page.setViewportSize({ width: 320, height: 180 });
+  await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./");
   await page.waitForFunction(() => Boolean(window.__NESTLED_BURROW_E2E__));
-  await expect(page.locator("canvas")).toHaveJSProperty("width", 320);
-  await expect(page.locator("canvas")).toHaveJSProperty("height", 180);
+  await expect(page.locator("canvas")).toHaveJSProperty("width", 640);
+  await expect(page.locator("canvas")).toHaveJSProperty("height", 360);
 }
 
 async function canvasPoint(page, point) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Game canvas is unavailable");
-  return { x: box.x + point.x * box.width / 320, y: box.y + point.y * box.height / 180 };
+  return { x: box.x + point.x * box.width / 640, y: box.y + point.y * box.height / 360 };
 }
 
 async function dragLogical(page, from, to) {

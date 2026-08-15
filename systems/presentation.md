@@ -16,11 +16,13 @@ Owns screen-space feedback and sensory presentation; gameplay rules remain with 
 - transient and interaction UI: `src/ui/transientMessageRuntime.js`, `src/ui/interactionHud.js`;
 - transient world puddles: `src/world/puddleRuntime.js`, `src/world/puddleDomain.js`;
 - text/localization: `localization/`, `src/ui/textResolution.js`, `src/ui/hud.js`, `public/locales/{ru,en}`;
-- camera/audio/day-night: `src/character/cameraFollowRuntime.js`, `src/audio/`, `src/session/gameClock.js`.
+- camera/audio/day-night: `src/character/cameraFollowRuntime.js`, `src/ui/presentationCameraRuntime.js`, `src/audio/`, `src/session/gameClock.js`.
 
 ## Invariants
 
-- logical viewport is `320×180`; visible strings exist in RU/EN and fit native/mobile layouts;
+- logical viewport is `640×360`; the world camera uses `2×` zoom to retain the former world scale, while screen-space UI renders through a separate `1×` camera;
+- display zoom uses integer enlargement when the viewport permits it and fractional fit on screens narrower than `640×360`;
+- visible strings exist in RU/EN and fit native/mobile layouts;
 - compact pixel-HUD copy uses the supported ASCII hyphen `-`, never typographic dash glyphs that render as `?`;
 - a missing localization entry fails closed: its technical key is never shown to the player;
 - arena/path labels have explicit text-length budgets and may reduce font size before clipping;

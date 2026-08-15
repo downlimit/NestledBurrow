@@ -10,6 +10,7 @@ import {
 import { drawInventoryItem, inventoryItemAsset, renderInventoryItem } from "./inventoryVisuals.js";
 import { HUD_COLORS, HUD_DEPTH, drawBitmapTextInto, isPointInRect, measureBitmapText } from "../ui/hud.js";
 import { FARMING_TEXTURE_KEY } from "../resources/farmingConfig.js";
+import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 import { worldDepthFromAnchorY } from "../build/buildWorldGeometry.js";
 import {
   throwDirectionTowardPoint,
@@ -23,8 +24,8 @@ export const INVENTORY_QUANTITY_DEPTH = HUD_DEPTH + 22;
 export const INVENTORY_WATER_BAR_WIDTH = 4;
 export const INVENTORY_WATER_BAR_HEIGHT = 16;
 export const INVENTORY_HUD_AREA = Object.freeze({
-  x: 43,
-  y: 156,
+  x: Math.round((GAME_WIDTH - (INVENTORY_SLOT_COUNT * INVENTORY_SLOT_SIZE + (INVENTORY_SLOT_COUNT - 1) * INVENTORY_SLOT_GAP)) / 2),
+  y: GAME_HEIGHT - 24,
   width: INVENTORY_SLOT_COUNT * INVENTORY_SLOT_SIZE + (INVENTORY_SLOT_COUNT - 1) * INVENTORY_SLOT_GAP,
   height: INVENTORY_SLOT_SIZE,
 });

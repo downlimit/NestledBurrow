@@ -1,5 +1,5 @@
-export const GAME_WIDTH = 320;
-export const GAME_HEIGHT = 180;
+export const GAME_WIDTH = 640;
+export const GAME_HEIGHT = 360;
 export const TILE_SIZE = 16;
 export const WORLD_COLUMNS = 64;
 export const WORLD_ROWS = 48;

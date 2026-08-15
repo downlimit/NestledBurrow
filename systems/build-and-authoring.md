@@ -7,6 +7,8 @@ Owns construction, placeable lifecycle and asset/layout editing.
 ## Player-facing build contract
 
 - walls/surfaces support placement, demolition and grouped undo; objects also move through one owner;
+- `BUILD / TEST` views expose construction and prototype simulation grants; TEST never starts placement, move or demolition;
+- TEST grants use canonical inventory capacity/stack rules or coin balance, then ordinary persistence/HUD refresh;
 - the library shows object names/previews and contains all editable catalog objects;
 - placement uses the `16 px` grid and one canonical placement position;
 - the cursor anchor is the midpoint between the current pivot and current effective collider centre;
@@ -16,11 +18,11 @@ Owns construction, placeable lifecycle and asset/layout editing.
 ## Universal placeable lifecycle
 
 Every catalog object declares one `placeableOwner` and `place → move → remove → restore`; one descriptor drives hover, commit and grouped undo.
-Resource profiles such as `berry-bush` use that lifecycle; authoring selection keeps the cursor anchor at the midpoint between the current pivot and current effective collider centre; preview and commit share the same pose.
+Resource profiles such as `berry-bush` use the same lifecycle and placement pose; authoring selection shares it.
 
 ## Developer-authoring contract
 
-One versioned profile owns collider, pivot, visual/crop/interaction offsets, approach directions, render policy and optional timeline target plus enter/exit duration. Mouse and `1 px` arrow edits suppress movement.
+One versioned profile owns collider, pivot, visual/crop/interaction offsets, approach, render policy and optional timeline target/durations. Mouse and `1 px` arrow edits suppress movement.
 
 `assetAuthoringRegistry` validates one typed instance contract and feeds the same eight modes everywhere: collider, pivot, visual offset, crop, approach, interaction point, render and timeline. Visible sprite bounds select the instance even when its collider is elsewhere. Point markers support drag/arrows; approach keeps a `3×3` grid.
 
@@ -28,23 +30,14 @@ Render policy is `below-character`, `pivot-depth` or `above-character`. Enabled 
 
 Fixed-world stairs and gliders use ordinary move authoring while their runtime owner synchronizes interaction and presentation. They stay outside the construction catalog and cannot be created or demolished.
 
-Fixed-world placement and `collisionEnabled` are per-instance authoring data. Collision OFF preserves selection/profile editing and interaction while removing physical blocking. Move synchronizes sprite, collider, interaction and depth without changing destination safe-spawn. Grid and fixed-world move are capability/instance-driven without full home construction.
+Fixed-world placement and `collisionEnabled` are per-instance data. Collision OFF preserves selection/editing/interaction while removing blocking. Move synchronizes sprite, collider, interaction and depth without changing safe-spawn. Grid/move are capability-driven.
 
 Canon export commits the collider draft and downloads `nestledburrow-authoring-canon.json` with layout, colliders, profiles and fixed-world state. Crop keeps one visible pixel; browser storage may hold drafts/backups; `NEW GAME` restores baseline.
-
-## Prototype simulation tooling
-
-The construction panel is currently a prototype surface and may also host direct simulation-test controls. This is intentionally allowed to live in ordinary gameplay UI until the production construction flow is finalized.
-
-- A dedicated test/items view may reuse the build panel to grant canonical inventory items directly for fast system proof: prepared food, finished food/drinks, harvested produce, seeds and ordinary resources.
-- Item grants must call existing inventory ownership/mutation APIs and canonical item metadata; the panel must not create a second item registry or mutate kitchen stock behind the normal inventory/serving-table flow.
-- Typical test actions may include `+1`, larger stack grants, inventory clearing and coin grants where they materially shorten validation. Unique physical ownership rules must still be respected.
-- Harvested potato/lemon or other produce can be granted as their normal inventory item. Field growth itself should be controlled through farming state/actions rather than inventing a separate "mature crop item" representation.
-- These controls are prototype instrumentation and may later move to a dedicated developer surface without constraining the final construction UI.
 
 ## Owners
 
 - orchestration: `src/build/worldBuildCoordinator.js`;
+- prototype simulation palette/config and canonical grant actions: `src/build/simulationTestPalette.js`;
 - lifecycle/placement: `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeablePlacementPose.js`;
 - profiles/input: `src/build/assetProfiles.js`, `src/build/assetAuthoringInput.js`;
 - registry/authoring/export: `src/build/assetAuthoringRegistry.js`, `src/build/universalPlaceableAuthoring.js`, `src/build/fixedWorldAuthoringState.js`, `src/build/authoringBackup.js`;
@@ -72,12 +65,8 @@ The construction panel is currently a prototype surface and may also host direct
 
 ## Current baseline
 
-Furniture, facilities, resources and special objects use the full village construction lifecycle. Burrow/Nest stairs, the Nest Atoll entrance and Atoll exits share fixed-world move/collider/collision-toggle authoring across locations; only the village exposes the construction catalog.
-
-## Not yet
-
-Rotation, gameplay construction persistence, history, general map editing and multiplayer editing.
+Village objects use the full construction lifecycle. BUILD holds the catalog; TEST grants canonical food, produce, seeds, resources and coins. Burrow/Nest stairs, the Atoll entrance and exits share fixed-world move/collider/collision authoring; only the village exposes construction.
 
 ## Evidence
 
-`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `check:task-074`, `check:task-085`, `authoring-persistence.spec.js`.
+`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `check:task-074`, `check:task-085`, `check:task-090`, `authoring-persistence.spec.js`.
