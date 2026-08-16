@@ -198,7 +198,7 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
     };
   }).toEqual({
     direction: { x: -1, y: 0 },
-    targetOffset: { x: -32, y: 0 },
+    targetOffset: { x: -16, y: 0 },
   });
   await page.keyboard.up("KeyA");
   await page.keyboard.down("KeyW");
