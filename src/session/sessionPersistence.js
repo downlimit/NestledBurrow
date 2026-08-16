@@ -13,8 +13,9 @@ import { STARTER_WELL, WATER_BUCKET_CAPACITY } from "../resources/farmingConfig.
 import { DEFAULT_SERVING_TABLE_ID } from "../tavern/cookingDomain.js";
 import { createStage1Population, normalizePopulation } from "../character/populationDomain.js";
 import { createDefaultVenueOffer, normalizeVenueOffer } from "../tavern/venueOfferDomain.js";
+import { createNeutralTavernFeedbackState } from "../tavern/tavernFeedbackDomain.js";
 
-export const SAVE_SCHEMA_VERSION = 16;
+export const SAVE_SCHEMA_VERSION = 17;
 export const DEFAULT_STORAGE_KEY = "nestledburrow.save.v1";
 
 function createDiagnostic(kind, error) {
@@ -64,6 +65,7 @@ export function deserializeSessionEnvelope(rawValue, { createFreshState = create
   if (envelope.schemaVersion === 13) envelope = migrateV13Envelope(envelope);
   if (envelope.schemaVersion === 14) envelope = migrateV14Envelope(envelope);
   if (envelope.schemaVersion === 15) envelope = migrateV15Envelope(envelope);
+  if (envelope.schemaVersion === 16) envelope = migrateV16Envelope(envelope);
   if (envelope.schemaVersion !== SAVE_SCHEMA_VERSION) {
     return { status: "unsupported", schemaVersion: envelope.schemaVersion, diagnostic: { kind: "unsupported-schema", message: `Unsupported save schema version: ${String(envelope.schemaVersion)}` } };
   }
@@ -92,6 +94,7 @@ const migrationRegistry = new Map([
   [13, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [14, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [15, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
+  [16, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
   [SAVE_SCHEMA_VERSION, (envelope, options) => deserializeSessionEnvelope(JSON.stringify(envelope), options)],
 ]);
 
@@ -442,8 +445,20 @@ function migrateV15Envelope(envelope) {
   ]));
   gameplay.tavernService = service;
   state.gameplay = gameplay;
-  state.version = SESSION_STATE_VERSION;
-  return { schemaVersion: SAVE_SCHEMA_VERSION, state };
+  state.version = 16;
+  return { schemaVersion: 16, state };
+}
+
+function migrateV16Envelope(envelope) {
+  const state = cloneJsonSafe(envelope.state ?? {});
+  const gameplay = state.gameplay ?? {};
+  const worldTimeSeconds = Number.isFinite(Number(gameplay.worldTimeSeconds))
+    ? Math.max(0, Number(gameplay.worldTimeSeconds))
+    : 0;
+  gameplay.tavernFeedback = createNeutralTavernFeedbackState(gameplay.population, worldTimeSeconds);
+  state.gameplay = gameplay;
+  state.version = 17;
+  return { schemaVersion: 17, state };
 }
 
 function migrateLegacyTools(gameplay) {

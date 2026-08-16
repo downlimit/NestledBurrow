@@ -29,8 +29,8 @@ import {
   serializeSessionEnvelope,
 } from "../src/session/sessionPersistence.js";
 
-assert.equal(SESSION_STATE_VERSION, 16);
-assert.equal(SAVE_SCHEMA_VERSION, 16);
+assert.equal(SESSION_STATE_VERSION, 17);
+assert.equal(SAVE_SCHEMA_VERSION, 17);
 assert.equal(ORDER_ACCEPTANCE_TIMEOUT_MS, 30_000);
 assert.equal(ORDER_FULFILLMENT_TIMEOUT_MS, 120_000);
 
@@ -97,7 +97,7 @@ migratedSource.gameplay.tavernService.guests = [{
 }];
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 15, state: migratedSource }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 16);
+assert.equal(migrated.schemaVersion, 17);
 assert.deepEqual(migrated.state.gameplay.tavernService.guests[0].order, {
   itemId: "lemonade",
   status: "reserved",

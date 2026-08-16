@@ -43,8 +43,8 @@ function assertPopulation(population) {
   }
 }
 
-assert.equal(SESSION_STATE_VERSION, 16);
-assert.equal(SAVE_SCHEMA_VERSION, 16);
+assert.equal(SESSION_STATE_VERSION, 17);
+assert.equal(SAVE_SCHEMA_VERSION, 17);
 assert.deepEqual(NEED_IDS, ["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
 
 const fresh = createFreshGameSessionState();
@@ -93,8 +93,8 @@ v12State.version = 12;
 delete v12State.gameplay.population;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 12, state: v12State }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 16);
-assert.equal(migrated.state.version, 16);
+assert.equal(migrated.schemaVersion, 17);
+assert.equal(migrated.state.version, 17);
 assertPopulation(migrated.state.gameplay.population);
 assert(migrated.state.gameplay.population.every((person) => (
   person.lastEvaluatedWorldTimeSeconds === migrated.state.gameplay.worldTimeSeconds

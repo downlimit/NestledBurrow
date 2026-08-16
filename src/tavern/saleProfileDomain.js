@@ -28,3 +28,13 @@ export function getSalePrice(itemId) {
 export function getSaleProfiles(itemIds = SELLABLE_ITEM_IDS) {
   return itemIds.map((itemId) => getSaleProfile(itemId)).filter(Boolean);
 }
+
+export function getSaleProfileTags(profileOrItemId) {
+  const profile = typeof profileOrItemId === "string" ? getSaleProfile(profileOrItemId) : profileOrItemId;
+  if (!profile) return [];
+  return [
+    `cuisine:${profile.cuisine}`,
+    `dishClass:${profile.dishClass}`,
+    ...profile.ingredients.map((ingredient) => `ingredient:${ingredient}`),
+  ];
+}

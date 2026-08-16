@@ -27,8 +27,8 @@ import {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-assert.equal(SESSION_STATE_VERSION, 16);
-assert.equal(SAVE_SCHEMA_VERSION, 16);
+assert.equal(SESSION_STATE_VERSION, 17);
+assert.equal(SAVE_SCHEMA_VERSION, 17);
 assert.deepEqual(SELLABLE_ITEM_IDS, ["fried-potato-dish", "lemonade"]);
 assert.deepEqual(createDefaultVenueOffer(), { foodItemIds: [...SELLABLE_ITEM_IDS] });
 assert.deepEqual(
@@ -76,8 +76,8 @@ delete v13State.gameplay.venueOffer;
 const v13Gameplay = clone(v13State.gameplay);
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 13, state: v13State }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 16);
-assert.equal(migrated.state.version, 16);
+assert.equal(migrated.schemaVersion, 17);
+assert.equal(migrated.state.version, 17);
 assert.deepEqual(migrated.state.gameplay.venueOffer, createDefaultVenueOffer());
 const migratedGameplay = clone(migrated.state.gameplay);
 delete migratedGameplay.venueOffer;
