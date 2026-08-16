@@ -4,28 +4,26 @@
 ## Route
 
 - Codex flow: brief → implementation → local preview → `принято` → one Ready PR → CI → merge. Only ChatGPT direct may use a public Draft preview before `принято`.
-- Never ask the user to operate GitHub.
-- Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or `Delivery escalation` below.
+- Never ask the user to operate GitHub. Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or `Delivery escalation`.
 - Codex never creates a Draft PR before acceptance and never publishes an online preview. Online preview is ChatGPT-only.
 - Acceptance, Ready state, PR number and merge status never justify a source/documentation commit. Never create an empty commit.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
-- Late Task-number collision: when a number was free at work start and becomes occupied on `origin/main` before publication finishes, Codex may assign the current `ROADMAP.md` next-free number without further confirmation. Rebase onto current `origin/main` and update the Task identity, task-specific files/checks, branch, commit and PR consistently while preserving the accepted name and scope.
-- If the collided number already has a PR, close that obsolete PR, establish one replacement Ready PR, and then remove the obsolete remote branch. Treat this replacement as the same publication cycle.
+- Late Task-number collision: if a number free at work start becomes occupied on `origin/main`, assign the current `ROADMAP.md` next-free number without further confirmation; rebase and update Task identity, checks, branch, commit and PR consistently.
+- If the collided number already has a PR, close it, establish one replacement Ready PR, then remove the obsolete branch. Treat this replacement as the same publication cycle.
 
 ## Context
 
 Read:
-
 1. the prompt;
 2. this file and `AGENTS.override.md`;
 3. only the system documents named in the prompt or selected through `LIBRARY.md`;
 4. relevant source, tests and config.
 
-Do not read `PROJECT.md`, `LEAD.md`, full `GAME.md`, full `ROADMAP.md`, `FAST_LOOP.md`, every `systems/*.md` or historical `tasks/*.md` unless the task explicitly changes their facts. Expand context only after finding a real dependency.
+Do not read `PROJECT.md`, `LEAD.md`, full `GAME.md`, full `ROADMAP.md`, `FAST_LOOP.md`, every `systems/*.md` or historical `tasks/*.md` unless the task changes their facts. Expand context only after a real dependency appears.
 
-Before editing: fetch, branch from supplied Base SHA/current `origin/main`, preserve unrelated work, then run `npm run codex:preflight -- --base <sha> --install` in the isolated normal-permission worktree. For owner or coordinator refactors, run `npm run codex:impact -- --source <owner-path>` before edits and inspect importers plus contract checks.
+Before editing: fetch, branch from supplied Base SHA/current `origin/main`, preserve unrelated work, then run `npm run codex:preflight -- --base <sha> --install`. For owner/coordinator refactors, run `npm run codex:impact -- --source <owner-path>` and inspect importers plus contract checks.
 
-When resuming accepted local work, reread current `origin/main:AGENTS.md`, fetch and make the accepted commit a descendant of current `origin/main` before first push/PR. Never spend CI on a knowingly stale head.
+When resuming accepted work, reread current `origin/main:AGENTS.md`, fetch and make the accepted commit a descendant of current `origin/main` before first push/PR. Do not spend CI on a knowingly stale head.
 
 ## Scope and architecture
 
@@ -33,92 +31,73 @@ When resuming accepted local work, reread current `origin/main:AGENTS.md`, fetch
 - **Fast:** gameplay, UI, content, config and bounded refactors.
 - **Strict:** persistence/schema, central ownership, broad input/collision, dependencies, workflows/security, external assets or dependent PRs.
 
-Use the smallest clean solution. Explicit exclusions in the task are hard scope limits: do not add authoring/editor/build/persistence/configurability or a generalized lifecycle merely because such a system already exists. Add an excluded capability only when the prompt requests it or a current invariant required for the requested observable result makes it unavoidable; report that concrete conflict instead of silently broadening scope.
+Use the smallest clean solution. Explicit exclusions are hard scope limits. Add an excluded capability only when requested or required by a current invariant for the requested observable result; report that conflict instead of silently broadening scope.
 
-In plain terms: src/main.js is composition only. New domain logic, state machines, persistence, build/editor workflow or service orchestration belongs in a system owner/coordinator. `npm run check:architecture` enforces the current line ceiling; do not bypass it by minifying or compressing code.
+In plain terms: src/main.js is composition only. Domain logic, state machines, persistence, build/editor workflow and service orchestration belong in system owners/coordinators. `npm run check:architecture` enforces the boundary; do not bypass it by compressing code.
 
-The Lead brief contains `Architecture pressure: none` or a concrete owner/trigger. Treat this declaration as binding Integration metadata. For a concrete pressure, read the relevant `ARCHITECTURE.md` section and perform the named local extraction in the same PR together with its system-contract update and targeted proof; do not defer it to an unspecified cleanup task. For `none`, do not invent a broad refactor, but report if the actual implementation necessarily crosses a documented trigger before proceeding.
+The Lead brief declares `Architecture pressure: none` or a concrete owner/trigger. For pressure, read the relevant `ARCHITECTURE.md` section and perform the named local extraction in the same PR with its system-contract update and targeted proof. For `none`, do not invent broad refactors, but report a real trigger before proceeding.
 
-If an accepted change alters a stable system contract, update the corresponding `systems/*.md` in the same PR. Do not add task history or implementation diaries.
+If accepted work changes a stable system contract, update its `systems/*.md` in the same PR. Do not add task diaries.
 
 ## Changed contracts
 
-For a changed identifier, rate, save field, localization key, action, selector, fixture, helper or config value: search once for old values and aliases, classify matches, update real consumers and targeted coverage. Never weaken a valid test for CI.
+For a changed identifier, rate, save field, localization key, action, selector, fixture, helper or config value: search once for old values/aliases, classify matches, update real consumers and targeted coverage. Never weaken a valid test for CI.
 
-Durable regression checks assert current behavior, current contracts or exact assets owned by that check. A completed-task regression protects that behavior, not the old source formatting, internal call shape or unrelated global state. Exact source text is valid only when the text itself is the contract.
+Durable regression checks assert current behavior, current contracts or exact assets owned by that check. A completed-task regression protects that behavior, not old source formatting, internal call shape or unrelated global state. Exact source text is valid only when the text itself is the contract.
 
-Tests use canonical constants/helpers instead of copied magic values. For live time, input, position or other moving state, freeze the irrelevant motion or assert the invariant relative to current state rather than a stale absolute snapshot. If legitimate new behavior breaks an old check, decide which contract is current before editing either side; update a stale test assumption, and change runtime only for a real regression. Prefer durable coverage in the owning system check; keep `check-task-*` only while it still owns a genuinely task-specific contract.
+Tests use canonical constants/helpers instead of copied magic values. For live time, input, position or other moving state, freeze irrelevant motion or assert the invariant relative to current state rather than a stale absolute snapshot. If legitimate new behavior breaks an old check, decide which contract is current first: update a stale test assumption; change runtime only for a real regression. Prefer durable coverage in the owning system check; keep `check-task-*` only while it owns a genuinely task-specific contract.
 
-A historical `check-task-*` must not inspect the current worktree against its old task SHA or `origin/main` to enforce the scope of a completed task; PR scope belongs to the current PR classifier and review.
+A historical `check-task-*` must not compare the current worktree with its old task SHA or `origin/main` to enforce completed-task scope; PR scope belongs to the current classifier and review.
 
 ## Visual assets
 
-Codex never generates, redraws, regenerates, reinterprets, replaces, recompresses, recolors, resizes or otherwise authors game images.
+Codex never generates, redraws, regenerates, reinterprets, replaces, recompresses, recolors, resizes or otherwise authors game images. Use only exact binaries already supplied and committed by the Lead in the stated Base SHA.
 
-Use only exact binaries already supplied and committed by the Lead in the stated Base SHA. Treat their canonical paths, dimensions, frame order, byte length and SHA-256 as immutable integration inputs.
+A missing, mismatched or undecodable required binary is a blocker. Do not use placeholders, procedural substitutes, downloads or package copies. Required binary paths, dimensions, frame order, byte length and SHA-256 are immutable integration inputs.
 
-A missing, mismatched or undecodable required binary is a blocker. Stop before implementation and report the exact missing contract. Do not use placeholders, procedural substitutes, external downloads, package copies or prompt wording as permission to manufacture an image.
-
-The final report states `Image generation was not invoked.` and confirms that the changed-file list contains no new or modified tracked binary files.
+The final report states `Image generation was not invoked.` and confirms no new or modified tracked binary files.
 
 ## Validation
 
-Use one strong proof per material risk. A successful proof remains valid until relevant inputs change.
+Use one strong proof per material risk; a successful proof remains valid until relevant inputs change.
 
-**Feedback gate:** batch remarks and prove only hidden behavior. Codex uses one local managed preview for acceptance; ChatGPT direct may use one public Draft preview. Defer broad repository proof to PR CI.
+**Feedback gate:** batch remarks and prove only hidden behavior. Codex uses one local managed preview; ChatGPT direct may use one public Draft preview. Broad repository proof belongs to PR CI.
 
-**Micro-feedback:** presentation-only value changes may reuse prior proof and preview health. Hidden contract changes still receive one targeted check.
+**Micro-feedback:** presentation-only values may reuse prior proof/preview health; hidden contract changes still get one targeted check.
 
-**Fast publication after `принято`:** acknowledge acceptance, stop local preview and inspect files/full diff once. Run the targeted publication gate below from the final candidate head, then push one Ready PR.
+**Fast publication after `принято`:** stop preview, inspect files/full diff once, run the publication gate, then push one Ready PR. Strict publication adds only missing task-specific proof; PR CI owns broad validation.
 
-**Strict publication:** use the same targeted local gate plus only missing task-specific proof. PR CI owns broad repository validation for both Fast and Strict work.
-
-Use `npm run codex:validate -- --base <sha> --task <number>` for the local syntax/task/direct-check ladder. It already runs `git diff --check` and discovers source-address contract checks. Use `--full` only when an explicit task or repair command specifically requires a local full suite; it is not a publication default.
+Use `npm run codex:validate -- --base <sha> --task <number>` for the local syntax/task/direct-check ladder. Use `--full` only when explicitly required.
 
 ### Publication gate
 
-After acceptance, player-visible or cross-system work gets one short local gate before the first push:
-
 1. `npm run codex:validate -- --base <sha> --task <number>`;
-2. run only missing task-specific proof whose relevant inputs changed since its last success; use focused specs/checks rather than the full repository corpus;
-3. push one final candidate head as the Ready PR. GitHub runs owner/system contracts, historical regressions and build first; full browser regression starts only after that static gate is green.
+2. run only missing task-specific proof whose relevant inputs changed;
+3. push one final candidate head as the Ready PR. GitHub runs owner/system contracts, regressions and build before browser regression.
 
-Do not run full `npm run check` or full Playwright locally merely to mirror PR CI. Do not repeat `git diff --check` outside `codex:validate`. Repair confirmed task-local causes as one batch and rerun only invalidated targeted proof. The normal goal is one short local gate and one final-head CI cycle.
+Do not mirror full PR CI locally, repeat `git diff --check`, or rerun proofs whose inputs did not change. Repair confirmed task-local causes as one batch. Static source-contract checks normalize CRLF/LF before exact multiline matching.
 
-Never point local Playwright at the persistent preview on port `4173`; it may lack the E2E bridge or serve another checkout. Validate required PR metadata and Architecture pressure before marking the PR Ready. Static source-contract checks must normalize CRLF/LF before exact multiline matching.
-
-Environment:
-
-- install dependencies only when missing/changed;
-- Python checks use `scripts/run-python-check.mjs`;
-- preview/E2E state belongs in OS temp;
-- do not mix elevated and normal operations;
-- on `EPERM`, inspect the exact path once and rerun only the failed command;
-- keep successful logs compact;
-- visible text verifies RU/EN, glyphs, wrapping and overlap at `640×360` and mobile.
+Environment: install dependencies only when missing/changed; Python checks use `scripts/run-python-check.mjs`; preview/E2E state belongs in OS temp; do not mix elevated/normal operations; on `EPERM`, inspect the exact path once and rerun only the failed command; visible text verifies RU/EN, glyphs, wrapping and overlap at `640×360` and mobile.
 
 ## Preview acceptance
 
 Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
-1. Codex uses `npm run preview:task` for local acceptance and publishes nothing before `принято`; it does not create a pre-acceptance PR.
-2. An authorized ChatGPT Draft carrier uses `executor: chatgpt` and `preview-acceptance: pending`; its workflow publishes the exact-head static preview.
-3. Public PR links belong only to that ChatGPT route. StackBlitz/Codespaces are forbidden.
-4. ChatGPT reuses one Draft URL through feedback.
-5. Before `принято`: no Ready PR, auto-merge or merge. For ChatGPT direct implementation, `препроверка принята` authorizes only the task branch and Draft preview carrier.
-6. After `принято`: set `preview-acceptance: accepted` while the PR is still Draft, remove the ChatGPT preview, then mark the same PR Ready, run final-head CI and merge. Preserve the SHA unless repair/rebase is required.
-7. Player-visible repair returns to preview only when it changes the accepted experience.
-8. Private preview artifacts use the same ChatGPT-only pending Draft gate. Accepted and Codex PRs publish no link.
+1. Codex uses `npm run preview:task`, publishes nothing and creates no pre-acceptance PR.
+2. ChatGPT Draft carrier uses `executor: chatgpt` + `preview-acceptance: pending`; only this route may publish a public/private preview before `принято`.
+3. Before `принято`: no Ready PR, auto-merge or merge. `препроверка принята` authorizes only the ChatGPT task branch/Draft preview carrier.
+4. After `принято`: set `preview-acceptance: accepted`, remove preview, mark the same PR Ready, run final-head CI and merge. Preserve SHA unless repair/rebase is required.
+5. Player-visible repair returns to preview only when it changes the accepted experience. StackBlitz/Codespaces are forbidden.
 
 ## GitHub
 
-Prefer the connector. Fill every `nestled-burrow-delivery:v1` field, including `executor`; invalid metadata fails scope and public preview. Codex creates one accepted non-draft PR. Only a ChatGPT pre-acceptance Draft may be `pending`. Eligible invisible work may enable native auto-merge through the connector. Verify head SHA and wait once for final CI.
+Prefer the connector. Fill every `nestled-burrow-delivery:v1` field, including `executor`. Eligible invisible work may enable native auto-merge through the connector. Verify head SHA and final CI once.
 
-Never write or push directly to `main`. Every repository mutation, including docs/process-only micro work, uses a branch and PR. Invisible micro work needs no preview or user gate: create one Ready PR, let required CI run, then merge automatically when eligible.
+Never write or push directly to `main`. Every repository mutation, including docs/process-only micro work, uses a branch and PR. Invisible micro work needs no preview or user gate: create one Ready PR, run required CI, then merge.
 
-When ChatGPT direct implementation has no local worktree, a coherent multi-file edit is published atomically: create one Git tree, one commit and move the task branch once. Contents API `create_file` / `update_file` publication is reserved for a genuinely single-file change. Never push one commit per edited file.
+Without a local worktree, ChatGPT publishes a coherent multi-file edit atomically with one Git tree/commit/branch move. Contents API publication is only for a genuinely single-file change.
 
-Before repair, wait until every job for current head is terminal and collect failures in one pass. Load only failing steps. Poll at least 45 seconds apart; prefer auto-merge and one bounded wait.
+Before repair, wait for all jobs on current head to become terminal, collect failures once and load only failing steps. Re-run only infrastructure failures.
 
 After green CI, merge and update local `main` unless prohibited. Never create review requests, issues, replacement PRs or extra branches without request.
 
