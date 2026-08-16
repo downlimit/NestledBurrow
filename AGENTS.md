@@ -45,7 +45,11 @@ If an accepted change alters a stable system contract, update the corresponding 
 
 For a changed identifier, rate, save field, localization key, action, selector, fixture, helper or config value: search once for old values and aliases, classify matches, update real consumers and targeted coverage. Never weaken a valid test for CI.
 
-Durable regression checks assert current behavior, current contracts or exact assets owned by that check. A historical `check-task-*` must not inspect the current worktree against its old task SHA or `origin/main` to enforce the scope of a completed task; PR scope belongs to the current PR classifier and review.
+Durable regression checks assert current behavior, current contracts or exact assets owned by that check. A completed-task regression protects that behavior, not the old source formatting, internal call shape or unrelated global state. Exact source text is valid only when the text itself is the contract.
+
+Tests use canonical constants/helpers instead of copied magic values. For live time, input, position or other moving state, freeze the irrelevant motion or assert the invariant relative to current state rather than a stale absolute snapshot. If legitimate new behavior breaks an old check, decide which contract is current before editing either side; update a stale test assumption, and change runtime only for a real regression. Prefer durable coverage in the owning system check; keep `check-task-*` only while it still owns a genuinely task-specific contract.
+
+A historical `check-task-*` must not inspect the current worktree against its old task SHA or `origin/main` to enforce the scope of a completed task; PR scope belongs to the current PR classifier and review.
 
 ## Visual assets
 
@@ -109,6 +113,8 @@ Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and
 ## GitHub
 
 Prefer the connector. Fill every `nestled-burrow-delivery:v1` field, including `executor`; invalid metadata fails scope and public preview. Codex creates one accepted non-draft PR. Only a ChatGPT pre-acceptance Draft may be `pending`. Eligible invisible work may enable native auto-merge through the connector. Verify head SHA and wait once for final CI.
+
+Never write or push directly to `main`. Every repository mutation, including docs/process-only micro work, uses a branch and PR. Invisible micro work needs no preview or user gate: create one Ready PR, let required CI run, then merge automatically when eligible.
 
 When ChatGPT direct implementation has no local worktree, a coherent multi-file edit is published atomically: create one Git tree, one commit and move the task branch once. Contents API `create_file` / `update_file` publication is reserved for a genuinely single-file change. Never push one commit per edited file.
 
