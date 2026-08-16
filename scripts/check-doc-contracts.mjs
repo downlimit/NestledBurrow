@@ -52,7 +52,7 @@ requireText(project, [
 
 requireText(lead, [
   "<!-- audience: lead-chat -->",
-  "## Режим",
+  "## Сначала определить режим",
   "## Контекстный бюджет",
   "максимум два system-документа",
   "20–50",
