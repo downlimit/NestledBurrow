@@ -224,7 +224,7 @@ requireText(prWorkflow, ["Classify Scope", "PR_BODY", "metadata_valid", "needs: 
 requireText(focusedE2E, ["mkdtempSync", "tmpdir()", "PW_OUTPUT_DIR", "PW_REPORT_DIR"], "focused E2E");
 requireText(managedPreview, ["tmpdir()", "task-preview.json", "smokeCanvas", "detached: true"], "managed preview");
 requireText(pythonLauncher, ["NESTLEDBURROW_PYTHON", "NESTLEDBURROW_ARTIFACT_DIR", "codex-runtimes", "python_embed", "No usable Python 3 runtime was found"], "Python launcher");
-requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"delivery:timing"', '"check:task-063"', '"check:task-086"', '"check:architecture": "node scripts/check-architecture-boundaries.mjs"'], "package.json");
+requireText(packageJson, ['"codex:preflight"', '"codex:impact"', '"codex:validate"', '"delivery:timing"', '"check:task-063"', '"check:task-086"', '"check:architecture": "node scripts/check-architecture-boundaries.mjs"'], "package.json");
 
 for (const [label, text, limit] of [
   ["PROJECT.md", project, 7000],
