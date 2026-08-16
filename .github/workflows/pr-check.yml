@@ -49,6 +49,12 @@ jobs:
           METADATA_VALID: ${{ steps.classify.outputs.metadata_valid }}
         run: test "$METADATA_VALID" = "true"
 
+      - name: Enforce pending preview phase
+        if: steps.classify.outputs.preview == 'true'
+        env:
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: test "$IS_DRAFT" = "true"
+
       - name: Verify scope classifier
         run: node scripts/check-pr-scope.mjs
 
