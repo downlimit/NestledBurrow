@@ -6,7 +6,7 @@
 - Codex flow: brief → implementation → local preview → `принято` → one Ready PR → CI → merge. Only ChatGPT direct may use a public Draft preview before `принято`.
 - Never ask the user to operate GitHub.
 - Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or `Delivery escalation` below.
-- Codex never creates a Draft PR before acceptance or an online/public preview before `принято`. An explicit request for an online preview does not change executor ownership: report that the ChatGPT direct route owns that carrier instead of publishing one from Codex.
+- Codex never creates a Draft PR before acceptance and never publishes an online preview. Online preview belongs only to ChatGPT direct.
 - Acceptance, Ready state, PR number and merge status never justify a source/documentation commit. Never create an empty commit.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
 - Late Task-number collision: when a number was free at work start and becomes occupied on `origin/main` before publication finishes, Codex may assign the current `ROADMAP.md` next-free number without further confirmation. Rebase onto current `origin/main` and update the Task identity, task-specific files/checks, branch, commit and PR consistently while preserving the accepted name and scope.
