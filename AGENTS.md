@@ -86,7 +86,7 @@ Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and
 1. Codex uses `npm run preview:task`, publishes nothing and creates no pre-acceptance PR.
 2. ChatGPT Draft carrier uses `executor: chatgpt` + `preview-acceptance: pending`; only this route may publish a public/private preview before `принято`.
 3. Before `принято`: no Ready PR, auto-merge or merge. `препроверка принята` authorizes only the ChatGPT task branch/Draft preview carrier.
-4. After `принято`: set `preview-acceptance: accepted`, remove preview, mark the same PR Ready, run final-head CI and merge. Preserve SHA unless repair/rebase is required.
+4. After `принято`: set `preview-acceptance: accepted` while the PR is still Draft, remove preview, mark the same PR Ready, run final-head CI and merge. Preserve SHA unless repair/rebase is required.
 5. Player-visible repair returns to preview only when it changes the accepted experience. StackBlitz/Codespaces are forbidden.
 
 ## GitHub
