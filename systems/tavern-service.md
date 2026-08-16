@@ -81,6 +81,8 @@ Target guest flow must increase planfully over meaningful play time and remain b
 
 Established flow also creates an availability expectation. If the player closes a previously active venue for a sustained period, people who would otherwise have considered or attempted visits can receive missed-availability experiences even without being physically spawned at the door. Repeated closure should reduce future flow, potentially by a large factor after several days of downtime, and reopening should recover it progressively through renewed successful activity rather than instantly restoring the previous level. Exact rates, thresholds and recovery curves are balance parameters.
 
+Closure feedback must be materially weaker per missed visit than failure while the venue is open. Finding a venue closed means the service was unavailable; arriving while it presents itself as open but cannot admit, seat or serve the person means the venue failed an active service expectation and should create substantially stronger negative personal and social feedback. This severity ordering is canonical even though exact multipliers remain balance parameters.
+
 ## Persistent people without full offscreen simulation
 
 Offscreen people retain their last state/evaluation time and reconstruct from elapsed world time, traits and bounded variation only when relevant. A physical guest advances every canonical need live on that same persistent person. Relationships, families, ageing, death and replenishment remain future population work.
@@ -125,7 +127,7 @@ A completed or attempted visit can be affected by:
 
 Preference-sensitive qualities are not universally positive or negative. Cleanliness, noise, social intensity, conflict frequency, cuisine and similar venue traits may attract one audience and repel another when matching person preferences exist.
 
-Core service reliability is universal rather than taste-relative. Accepting a service commitment and then failing to fulfill it, delivering the wrong committed result, or otherwise leaving the promised service nonfunctional is negative for every person; no future personality trait should make broken service intrinsically desirable.
+Core service reliability is universal rather than taste-relative. Accepting a service commitment and then failing to fulfill it, delivering the wrong committed result, or otherwise leaving the promised service nonfunctional is negative for every person; no future personality trait should make broken service intrinsically desirable. An open venue that repeatedly cannot actually admit or serve willing visitors belongs to this stronger service-failure class rather than to the weaker closed-venue availability penalty.
 
 An unavailable dish before an order is accepted is not a service failure. Once the venue accepts an order or equivalent commitment, failure to fulfill it can reduce satisfaction and personal opinion and may later contribute negative service-reliability reputation evidence.
 
