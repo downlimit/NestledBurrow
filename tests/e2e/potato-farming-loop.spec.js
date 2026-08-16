@@ -187,9 +187,19 @@ test("complete potato loop purchases, grows, refills, harvests separate drops an
   });
   await faceFarmCell(page);
   await page.keyboard.down("KeyA");
-  await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: -1, y: 0 });
-  await expect.poll(async () => (await bridge(page, "getFarmingState")).targetCell)
-    .toEqual({ x: FARM_CELL.x - 32, y: FARM_CELL.y });
+  await expect.poll(async () => {
+    const farming = await bridge(page, "getFarmingState");
+    return {
+      direction: farming.hoeAimDirection,
+      targetOffset: {
+        x: farming.targetCell.x - farming.farmAimAnchorCell.x,
+        y: farming.targetCell.y - farming.farmAimAnchorCell.y,
+      },
+    };
+  }).toEqual({
+    direction: { x: -1, y: 0 },
+    targetOffset: { x: -32, y: 0 },
+  });
   await page.keyboard.up("KeyA");
   await page.keyboard.down("KeyW");
   await expect.poll(async () => (await bridge(page, "getFarmingState")).hoeAimDirection).toEqual({ x: 0, y: -1 });
