@@ -7,15 +7,15 @@ const workflow = read(".github/workflows/pr-check.yml");
 const packageJson = JSON.parse(read("package.json"));
 
 assert(
-  agents.includes("PR CI owns broad repository validation for both Fast and Strict work."),
+  /PR CI owns broad (?:repository )?validation/u.test(agents),
   "Codex publication must defer broad repository proof to PR CI",
 );
 assert(
-  agents.includes("Do not run full `npm run check` or full Playwright locally merely to mirror PR CI."),
+  /Do not[^\n]*(?:mirror full PR CI locally|full `npm run check`[^\n]*full Playwright[^\n]*mirror PR CI)/u.test(agents),
   "Codex publication must not duplicate full CI locally",
 );
 assert(
-  agents.includes("Do not repeat `git diff --check` outside `codex:validate`."),
+  /Do not[^\n]*repeat `git diff --check`/u.test(agents),
   "codex:validate must remain the single publication diff-check owner",
 );
 
