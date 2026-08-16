@@ -5,7 +5,7 @@
 
 - Codex flow: brief → implementation → local preview → `принято` → one Ready PR → CI → merge. Only ChatGPT direct may use a public Draft preview before `принято`.
 - Never ask the user to operate GitHub.
-- Stop before merge only for explicit `не сливать`, report-only work or a real blocker.
+- Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or `Delivery escalation` below.
 - Draft PR before acceptance is allowed only by explicit user command; it is a preview carrier, not a development or final-CI gate.
 - Acceptance, Ready state, PR number and merge status never justify a source/documentation commit. Never create an empty commit.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
@@ -116,6 +116,10 @@ When ChatGPT direct implementation has no local worktree, a coherent multi-file 
 Before repair, wait until every job for current head is terminal and collect failures in one pass. Load only failing steps. Poll at least 45 seconds apart; prefer auto-merge and one bounded wait.
 
 After green CI, merge and update local `main` unless prohibited. Never create review requests, issues, replacement PRs or extra branches without request.
+
+## Delivery escalation
+
+After `принято`, Codex owns one publication cycle and at most one task-local repair. On a second failed repaired head, unrelated legacy failure, required workflow/shared-harness change, unjustified same-head rerun, or failures migrating across unrelated suites: read `DELIVERY_ESCALATION.md`, emit its handoff, and stop. Resume only by explicit user repair command.
 
 ## Special
 
