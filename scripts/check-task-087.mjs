@@ -95,7 +95,7 @@ assert.deepEqual(recovered.gameplay.population, corrupted.gameplay.population);
 
 const serviceSource = readFileSync("src/tavern/tavernServiceRuntime.js", "utf8");
 const guestSource = readFileSync("src/tavern/guestRuntime.js", "utf8");
-assert(serviceSource.includes("guestRuntime.spawnVisit(candidate.id, decision.bestOfferItemId, decision.acceptableItemIds, { offerFit: decision.bestOfferFit })"));
+assert(/guestRuntime\.spawnVisit\(\s*candidate\.id,\s*decision\.bestOfferItemId,\s*decision\.acceptableItemIds,\s*\{ offerFit: decision\.bestOfferFit \},?\s*\)/u.test(serviceSource));
 assert(serviceSource.includes("isOrderItemActive: (itemId) => isVenueOfferItemActive(sessionState.gameplay.venueOffer, itemId)"));
 assert(guestSource.includes("isOrderItemActive(visit.order.itemId)"));
 const coordinatorSource = readFileSync("src/interaction/worldInteractionCoordinator.js", "utf8");
