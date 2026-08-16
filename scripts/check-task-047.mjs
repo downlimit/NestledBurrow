@@ -184,7 +184,7 @@ delete legacy.entities["seed-merchant"];
 delete legacy.gameplay.farm;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 7, state: legacy }));
 assert.equal(migrated.status, "loaded");
-assert.equal(SAVE_SCHEMA_VERSION, 16);
+assert.equal(SAVE_SCHEMA_VERSION, 17);
 assert(migrated.state.entities["seed-merchant"]);
 assert.equal(migrated.state.entities["home-npc"], undefined);
 assert.equal(migrated.state.entities["street-npc"], undefined);

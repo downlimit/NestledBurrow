@@ -3,6 +3,7 @@ import { drawBed } from "../resources/debrisRuntime.js";
 import { drawFacility } from "../facilities/facilityPreviewVisuals.js";
 import { HUD_DEPTH } from "../ui/hud.js";
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
+import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { GAME_HEIGHT, TILE_SIZE } from "../world/worldConfig.js";
 import { createPlacementDragState, resolvePlacementDrag, snapPlacementPoint } from "./buildWorldGeometry.js";
 import { SIMULATION_TEST_GROUPS } from "./simulationTestPalette.js";
@@ -46,6 +47,13 @@ export const BUILD_GRID = Object.freeze({
 
 export function shouldToggleBuildMode(event) {
   return !event?.repeat;
+}
+
+function logicalScreenPoint(pointer) {
+  return {
+    x: Number(pointer?.x ?? 0) / PRESENTATION_DENSITY,
+    y: Number(pointer?.y ?? 0) / PRESENTATION_DENSITY,
+  };
 }
 
 export function snapBuildPoint(point) {
@@ -489,9 +497,10 @@ export class BuildModeRuntime {
   }
 
   isPanelContentPoint(pointer) {
+    const point = logicalScreenPoint(pointer);
     return this.active
-      && pointer.x >= PANEL.x && pointer.x <= PANEL.x + PANEL.width
-      && pointer.y >= PANEL.contentTop && pointer.y <= PANEL.contentBottom;
+      && point.x >= PANEL.x && point.x <= PANEL.x + PANEL.width
+      && point.y >= PANEL.contentTop && point.y <= PANEL.contentBottom;
   }
 
   getPanelItemAt(x, y) {
@@ -504,27 +513,29 @@ export class BuildModeRuntime {
 
   beginPanelDrag(pointer) {
     if (!this.isPanelContentPoint(pointer)) return false;
+    const point = logicalScreenPoint(pointer);
     this.scrollVelocity = 0;
     this.panelDrag = {
       pointerId: pointer.id,
-      startX: pointer.x,
-      startY: pointer.y,
-      lastY: pointer.y,
+      startX: point.x,
+      startY: point.y,
+      lastY: point.y,
       lastTime: Number(pointer.event?.timeStamp ?? Date.now()),
       moved: false,
-      item: this.getPanelItemAt(pointer.x, pointer.y),
+      item: this.getPanelItemAt(point.x, point.y),
     };
     return true;
   }
 
   continuePanelDrag(pointer) {
     if (pointer.id !== this.panelDrag.pointerId) return;
-    const deltaX = pointer.x - this.panelDrag.startX;
-    const deltaFromStartY = pointer.y - this.panelDrag.startY;
+    const point = logicalScreenPoint(pointer);
+    const deltaX = point.x - this.panelDrag.startX;
+    const deltaFromStartY = point.y - this.panelDrag.startY;
     const entry = this.panelDrag.item;
     if (this.view === BUILD_PANEL_VIEWS.build && entry
       && DIRECT_PLACEMENT_TYPES.includes(entry.item.placement)
-      && pointer.x > PANEL.x + PANEL.width
+      && point.x > PANEL.x + PANEL.width
       && deltaX >= PANEL_DRAG_THRESHOLD
       && Math.abs(deltaX) > Math.abs(deltaFromStartY)) {
       this.panelDrag = null;
@@ -536,25 +547,26 @@ export class BuildModeRuntime {
       return;
     }
     const now = Number(pointer.event?.timeStamp ?? Date.now());
-    const deltaY = pointer.y - this.panelDrag.lastY;
+    const deltaY = point.y - this.panelDrag.lastY;
     const elapsed = Math.max(1, now - this.panelDrag.lastTime);
-    if (Math.abs(pointer.y - this.panelDrag.startY) >= PANEL_DRAG_THRESHOLD) this.panelDrag.moved = true;
+    if (Math.abs(point.y - this.panelDrag.startY) >= PANEL_DRAG_THRESHOLD) this.panelDrag.moved = true;
     if (this.panelDrag.moved) {
       this.setScrollOffset(this.scrollOffset - deltaY);
       this.scrollVelocity = -deltaY / elapsed;
     }
-    this.panelDrag.lastY = pointer.y;
+    this.panelDrag.lastY = point.y;
     this.panelDrag.lastTime = now;
   }
 
   endPanelDrag(pointer) {
     if (pointer.id !== this.panelDrag.pointerId) return;
+    const point = logicalScreenPoint(pointer);
     const { moved, item } = this.panelDrag;
     this.panelDrag = null;
     if (!moved && item) {
       this.onPreviewClear();
       if (this.view === BUILD_PANEL_VIEWS.test) {
-        const button = item.buttons.find(({ x, width }) => pointer.x >= x && pointer.x <= x + width);
+        const button = item.buttons.find(({ x, width }) => point.x >= x && point.x <= x + width);
         if (button) {
           if (item.item.id === "coins") this.grantTestCoins(button.quantity);
           else this.grantTestItem(item.item.id, button.quantity);

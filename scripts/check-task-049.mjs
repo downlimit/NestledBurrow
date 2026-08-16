@@ -62,8 +62,8 @@ import {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-assert.equal(SESSION_STATE_VERSION, 16);
-assert.equal(SAVE_SCHEMA_VERSION, 16);
+assert.equal(SESSION_STATE_VERSION, 17);
+assert.equal(SAVE_SCHEMA_VERSION, 17);
 assert.deepEqual(INVENTORY_TOOL_IDS, ["axe", "pickaxe", "hoe", "water-bucket", "sword", "battle-axe"]);
 for (const id of ["pickaxe", "water-bucket", "lemon-seed", "lemon", "sliced-potato", "lemonade", "fried-potato-dish"]) {
   assert(INVENTORY_ITEM_IDS.includes(id), `inventory contains ${id}`);

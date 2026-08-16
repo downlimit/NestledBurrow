@@ -21,9 +21,20 @@ import {
   GUEST_ACTIVE_CAP,
   recordCompletedVisit,
   recordFailedAcceptedOrder,
-  sampleVisitOpportunityDelay,
 } from "./tavernServiceDomain.js";
-import { decideFoodVisit, selectVisitCandidate } from "./visitDemandDomain.js";
+import {
+  advanceTavernFeedbackTime,
+  boostTavernFlowPressure,
+  cloneTavernFeedbackState,
+  recordAcceptedOrderFailureFeedback,
+  recordCompletedVisitFeedback,
+  recordOpenUnservedFeedback,
+  sampleVisitOpportunityDelay,
+  selectReputationBiasedCandidate,
+  setTavernFlowPressure,
+  visitFeedbackFactors,
+} from "./tavernFeedbackDomain.js";
+import { decideFoodVisit } from "./visitDemandDomain.js";
 
 export function createTavernServiceRuntime(scene, {
   sessionState,
@@ -135,19 +146,26 @@ export function createTavernServiceRuntime(scene, {
 
   function runVisitOpportunity({ personId = null, roll = null } = {}) {
     if (!sessionState.gameplay.tavernOpen) return { status: "menu-inactive", decision: null, guestId: null };
-    if (guestRuntime.getActivePersonIds().length >= GUEST_ACTIVE_CAP) {
-      return { status: "guest-cap-reached", decision: null, guestId: null };
-    }
     const requestedPersonId = personId ?? forcedCandidatePersonId;
     forcedCandidatePersonId = null;
     const activePersonIds = guestRuntime.getActivePersonIds();
     const candidate = requestedPersonId
       ? sessionState.gameplay.population.find((person) => person.id === requestedPersonId
         && !activePersonIds.includes(person.id)) ?? null
-      : selectVisitCandidate(sessionState.gameplay.population, activePersonIds, candidateRandomSource);
+      : selectReputationBiasedCandidate(
+        sessionState.gameplay.population,
+        sessionState.gameplay.tavernFeedback,
+        activePersonIds,
+        candidateRandomSource,
+      );
     if (!candidate) return { status: "no-candidate", decision: null, guestId: null };
     const evaluation = evaluatePopulationPerson(
       sessionState.gameplay.population,
+      candidate.id,
+      getWorldTimeSeconds(),
+    );
+    const feedbackFactors = visitFeedbackFactors(
+      sessionState.gameplay.tavernFeedback,
       candidate.id,
       getWorldTimeSeconds(),
     );
@@ -155,28 +173,61 @@ export function createTavernServiceRuntime(scene, {
       person: evaluation.person,
       venueOffer: sessionState.gameplay.venueOffer,
       visitorHistory: sessionState.gameplay.tavernService.visitorHistoryByPersonId[candidate.id],
+      ...feedbackFactors,
       worldTimeSeconds: getWorldTimeSeconds(),
       randomSource: Number.isFinite(Number(roll)) ? () => Number(roll) : decisionRandomSource,
     });
-    const guestId = decision.decision === "VISIT"
-      ? guestRuntime.spawnVisit(candidate.id, decision.bestOfferItemId, decision.acceptableItemIds, { offerFit: decision.bestOfferFit })
-      : null;
-    lastDecision = { ...decision, guestId: guestId || null };
+    let guestId = null;
+    let capacityOutcome = null;
+    if (decision.decision === "VISIT" && activePersonIds.length >= GUEST_ACTIVE_CAP) {
+      capacityOutcome = recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
+        personId: candidate.id,
+        worldTimeSeconds: getWorldTimeSeconds(),
+      });
+    } else if (decision.decision === "VISIT") {
+      guestId = guestRuntime.spawnVisit(
+        candidate.id,
+        decision.bestOfferItemId,
+        decision.acceptableItemIds,
+        { offerFit: decision.bestOfferFit },
+      );
+    }
+    lastDecision = {
+      ...decision,
+      guestId: guestId || null,
+      capacityOutcome: capacityOutcome?.outcome ?? null,
+    };
     onPersistentMutation({
       status: "visit-opportunity-evaluated",
-      mutated: Boolean(evaluation.mutated || guestId),
+      mutated: Boolean(evaluation.mutated || guestId || capacityOutcome),
       personId: candidate.id,
       decision: lastDecision,
+      feedback: capacityOutcome,
     });
-    return { status: guestId ? "visit-started" : "decision-complete", decision: { ...lastDecision }, guestId: guestId || null };
+    return {
+      status: capacityOutcome ? "visitor-turned-away-cap" : guestId ? "visit-started" : "decision-complete",
+      decision: { ...lastDecision },
+      guestId: guestId || null,
+      feedback: capacityOutcome,
+    };
   }
 
   function updateOpportunityScheduler(deltaMs) {
+    const timeResult = advanceTavernFeedbackTime(sessionState.gameplay.tavernFeedback, {
+      worldTimeSeconds: getWorldTimeSeconds(),
+      tavernOpen: sessionState.gameplay.tavernOpen,
+    });
+    if (timeResult.flowDelta !== 0) {
+      onPersistentMutation({ status: "tavern-closure-feedback", mutated: true, ...timeResult });
+    }
     if (!sessionState.gameplay.tavernOpen) return;
     const serviceState = sessionState.gameplay.tavernService;
     serviceState.opportunityRemainingMs = Math.max(0, serviceState.opportunityRemainingMs - deltaMs);
     if (serviceState.opportunityRemainingMs > 0) return;
-    serviceState.opportunityRemainingMs = sampleVisitOpportunityDelay(candidateRandomSource);
+    serviceState.opportunityRemainingMs = sampleVisitOpportunityDelay(
+      candidateRandomSource,
+      sessionState.gameplay.tavernFeedback.flowPressure,
+    );
     runVisitOpportunity();
   }
 
@@ -253,6 +304,10 @@ export function createTavernServiceRuntime(scene, {
         personId,
         getWorldTimeSeconds(),
       );
+      const feedback = recordAcceptedOrderFailureFeedback(sessionState.gameplay.tavernFeedback, {
+        personId,
+        worldTimeSeconds: getWorldTimeSeconds(),
+      });
       onPersistentMutation({
         status: "guest-order-failed",
         mutated: true,
@@ -260,10 +315,25 @@ export function createTavernServiceRuntime(scene, {
         personId,
         order,
         history: history.history,
+        feedback,
+      });
+    },
+    onOpenUnserved: ({ guestId, personId, reason }) => {
+      const feedback = recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
+        personId,
+        worldTimeSeconds: getWorldTimeSeconds(),
+      });
+      onPersistentMutation({
+        status: "guest-open-unserved",
+        mutated: true,
+        guestId,
+        personId,
+        reason,
+        feedback,
       });
     },
     onVisitFinished: () => scene.interactionRuntime?.refresh?.(),
-    onPurchaseComplete: ({ position, value, itemId, personId }) => {
+    onPurchaseComplete: ({ position, value, itemId, personId, satisfactionTier }) => {
       facilityRuntime?.syncKitchenVisuals?.();
       scene.audioRuntime?.playEffect?.("coin-toss");
       coinRuntime.spawn(position, value);
@@ -272,7 +342,21 @@ export function createTavernServiceRuntime(scene, {
         personId,
         getWorldTimeSeconds(),
       );
-      onPersistentMutation({ status: "guest-purchase", mutated: true, value, itemId, personId, history: history.history });
+      const feedback = recordCompletedVisitFeedback(sessionState.gameplay.tavernFeedback, {
+        personId,
+        satisfactionTier,
+        itemId,
+        worldTimeSeconds: getWorldTimeSeconds(),
+      });
+      onPersistentMutation({
+        status: "guest-purchase",
+        mutated: true,
+        value,
+        itemId,
+        personId,
+        history: history.history,
+        feedback,
+      });
     },
     getSalePrice,
     getPersonDisplayName: (personId) => sessionState.gameplay.population
@@ -333,6 +417,17 @@ export function createTavernServiceRuntime(scene, {
     },
     getLastDecision: () => lastDecision ? { ...lastDecision, acceptableItemIds: [...lastDecision.acceptableItemIds] } : null,
     getVisitorHistory: () => JSON.parse(JSON.stringify(sessionState.gameplay.tavernService.visitorHistoryByPersonId)),
+    getFeedbackState: () => cloneTavernFeedbackState(sessionState.gameplay.tavernFeedback),
+    setFlowPressure(value) {
+      const result = setTavernFlowPressure(sessionState.gameplay.tavernFeedback, value);
+      if (result.mutated) onPersistentMutation({ status: "tavern-flow-set", ...result });
+      return result;
+    },
+    boostFlowPressure(amount) {
+      const result = boostTavernFlowPressure(sessionState.gameplay.tavernFeedback, amount);
+      if (result.mutated) onPersistentMutation({ status: "tavern-flow-boosted", ...result });
+      return result;
+    },
     dropWalletCoin({ position, playerSprite, facing, pointerWorld } = {}) {
       if (!position || sessionState.gameplay.coins < 1) {
         return { status: "wallet-empty", mutated: false };
@@ -364,8 +459,10 @@ export function createTavernServiceRuntime(scene, {
       needFacilities: Object.fromEntries(needFacilityByGuest),
       demand: {
         opportunityRemainingMs: sessionState.gameplay.tavernService.opportunityRemainingMs,
+        flowPressure: sessionState.gameplay.tavernFeedback.flowPressure,
         lastDecision: lastDecision ? { ...lastDecision } : null,
       },
+      feedback: cloneTavernFeedbackState(sessionState.gameplay.tavernFeedback),
     }),
     destroy() {
       venueMenuRuntime.destroy();

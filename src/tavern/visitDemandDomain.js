@@ -55,6 +55,10 @@ export function decideFoodVisit({
   person,
   venueOffer,
   visitorHistory = null,
+  venueOpinionScore = 0,
+  venueOpinionFactor = 1,
+  serviceReliability = 0,
+  serviceReliabilityFactor = 1,
   worldTimeSeconds = 0,
   randomSource = Math.random,
 } = {}) {
@@ -72,7 +76,13 @@ export function decideFoodVisit({
     !selected || candidate.offerFit > selected.offerFit ? candidate : selected
   ), null);
   const recency = recentVisitFactor(visitorHistory, worldTimeSeconds);
-  const visitChance = round(foodMotive * (best?.offerFit ?? 0) * recency.recentVisitFactor);
+  const opinionFactor = clamp(Number(venueOpinionFactor), 0.25, 1.75);
+  const reliabilityFactor = clamp(Number(serviceReliabilityFactor), 0.65, 1.35);
+  const visitChance = round(clamp(
+    foodMotive * (best?.offerFit ?? 0) * recency.recentVisitFactor * opinionFactor * reliabilityFactor,
+    0,
+    1,
+  ));
   const base = {
     personId: person.id,
     displayName: person.displayName,
@@ -88,6 +98,10 @@ export function decideFoodVisit({
     bestOfferFit: best?.offerFit ?? 0,
     hoursSinceLastVisit: recency.hoursSinceLastVisit,
     recentVisitFactor: recency.recentVisitFactor,
+    venueOpinionScore: clamp(Number(venueOpinionScore), -1, 1),
+    venueOpinionFactor: opinionFactor,
+    serviceReliability: clamp(Number(serviceReliability), -1, 1),
+    serviceReliabilityFactor: reliabilityFactor,
     visitChance,
   };
   if (foodMotive === 0) return { ...base, roll: null, decision: "NO_VISIT", reason: "no-food-motive" };

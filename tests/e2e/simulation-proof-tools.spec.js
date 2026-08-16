@@ -29,6 +29,29 @@ function inventoryQuantity(session, itemId) {
     .reduce((total, slot) => total + slot.quantity, 0);
 }
 
+async function clickLogical(page, x, y, touch = false) {
+  const canvas = await page.locator("canvas").boundingBox();
+  if (!canvas) throw new Error("Game canvas is unavailable");
+  const targetX = canvas.x + x * canvas.width / 640;
+  const targetY = canvas.y + y * canvas.height / 360;
+  if (touch) await page.touchscreen.tap(targetX, targetY);
+  else await page.mouse.click(targetX, targetY);
+}
+
+test("visible TEST + buttons grant inventory items", async ({ page }, testInfo) => {
+  await bootFresh(page);
+  await bridge(page, "toggleBuildMode");
+  await bridge(page, "setBuildPanelView", "test");
+  const before = await bridge(page, "getSession");
+
+  await clickLogical(page, 191, 49, testInfo.project.name.startsWith("mobile"));
+
+  await expect.poll(async () => inventoryQuantity(
+    await bridge(page, "getSession"),
+    "fried-potato-dish",
+  )).toBe(inventoryQuantity(before, "fried-potato-dish") + 1);
+});
+
 test("BUILD/TEST grants and persistent person inspection share canonical gameplay state", async ({ page }) => {
   await bootFresh(page);
   await bridge(page, "toggleBuildMode");

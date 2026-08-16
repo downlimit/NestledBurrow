@@ -70,6 +70,7 @@ export function createGuestRuntime({
   onReservationChange = () => {},
   onOrderChange = () => {},
   onOrderFailure = () => {},
+  onOpenUnserved = () => {},
   onVisitFinished = () => {},
   onPurchaseComplete = () => {},
   getSalePrice = () => 0,
@@ -344,7 +345,15 @@ export function createGuestRuntime({
     }
     const place = claimServicePlace(visit.id, visit.order.itemId, visit.servingTableId);
     if (!place) {
-      if (visit.stateElapsedMs >= (config.signReactionMs ?? 0) + (config.orderStationWaitMs ?? 10_000)) leaveWithoutFailure(visit);
+      if (visit.stateElapsedMs >= (config.signReactionMs ?? 0) + (config.orderStationWaitMs ?? 10_000)) {
+        onOpenUnserved({
+          guestId: visit.id,
+          personId: visit.personId,
+          itemId: visit.order.itemId,
+          reason: "service-capacity-unavailable",
+        });
+        leaveWithoutFailure(visit);
+      }
       return;
     }
     visit.servingTableId = place.servingTableId;

@@ -1,8 +1,12 @@
 import { SELLABLE_ITEM_IDS } from "./cookingDomain.js";
 import { normalizeOrder, ORDER_STATUS } from "./orderDomain.js";
+import { VISIT_OPPORTUNITY_INTERVAL_MIN_MS } from "./tavernFeedbackDomain.js";
 
-export const VISIT_OPPORTUNITY_INTERVAL_MIN_MS = 3_000;
-export const VISIT_OPPORTUNITY_INTERVAL_MAX_MS = 8_000;
+export {
+  sampleVisitOpportunityDelay,
+  VISIT_OPPORTUNITY_INTERVAL_MAX_MS,
+  VISIT_OPPORTUNITY_INTERVAL_MIN_MS,
+} from "./tavernFeedbackDomain.js";
 export const GUEST_ACTIVE_CAP = 6;
 
 export const DEFAULT_TAVERN_SERVICE_STATE = Object.freeze({
@@ -11,12 +15,6 @@ export const DEFAULT_TAVERN_SERVICE_STATE = Object.freeze({
   visitorHistoryByPersonId: Object.freeze({}),
   guests: Object.freeze([]),
 });
-
-export function sampleVisitOpportunityDelay(randomSource = Math.random) {
-  const unit = randomUnit(randomSource);
-  return VISIT_OPPORTUNITY_INTERVAL_MIN_MS
-    + unit * (VISIT_OPPORTUNITY_INTERVAL_MAX_MS - VISIT_OPPORTUNITY_INTERVAL_MIN_MS);
-}
 
 export function normalizeTavernServiceState(value = {}, { population = [] } = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Tavern service state must be an object");
@@ -159,11 +157,6 @@ function furnitureId(value) {
 function isSafePersonId(value) {
   return typeof value === "string" && /^person-[a-z0-9-]+$/i.test(value)
     && !["__proto__", "constructor", "prototype"].includes(value);
-}
-
-function randomUnit(randomSource) {
-  const value = Number(randomSource?.());
-  return Number.isFinite(value) ? Math.min(0.999999999, Math.max(0, value)) : 0;
 }
 
 function nonNegativeInteger(value, fallback, label) {

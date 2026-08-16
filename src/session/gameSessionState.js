@@ -6,6 +6,7 @@ import { normalizePopulation } from "../character/populationDomain.js";
 import { normalizeKitchenState } from "../tavern/cookingDomain.js";
 import { createFreshFarmState, normalizeFarmState } from "../resources/farmingDomain.js";
 import { normalizeTavernServiceState } from "../tavern/tavernServiceDomain.js";
+import { normalizeTavernFeedbackState } from "../tavern/tavernFeedbackDomain.js";
 import { normalizeVenueOffer } from "../tavern/venueOfferDomain.js";
 import {
   addInventoryItem,
@@ -21,7 +22,7 @@ import {
   resetInventory,
 } from "../inventory/inventoryDomain.js";
 
-export const SESSION_STATE_VERSION = 16;
+export const SESSION_STATE_VERSION = 17;
 export const DEFAULT_WORLD_ID = "village";
 export const DEFAULT_PLAYER_ID = "player";
 export const DEFAULT_ENTITY_IDS = Object.freeze(["seed-merchant"]);
@@ -162,6 +163,7 @@ function normalizeGameplayState(value = {}) {
   const kitchen = normalizeKitchenState(value.kitchen ?? {});
   const population = normalizePopulation(value.population, { worldTimeSeconds });
   const tavernService = normalizeTavernServiceState(value.tavernService ?? {}, { population });
+  const tavernFeedback = normalizeTavernFeedbackState(value.tavernFeedback ?? {}, { population, worldTimeSeconds });
   const resumableReservations = new Map(tavernService.guests
     .filter((guest) => guest.reservationActive)
     .map((guest) => [guest.id, guest.servingTableId]));
@@ -183,6 +185,7 @@ function normalizeGameplayState(value = {}) {
     population,
     kitchen,
     tavernService,
+    tavernFeedback,
     venueOffer: normalizeVenueOffer(value.venueOffer),
     tavernOpen: normalizeBoolean(value.tavernOpen, false, "Tavern open"),
     coins: normalizeNonNegativeInteger(value.coins, 3, "Coins"),

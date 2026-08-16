@@ -245,6 +245,12 @@ export function installWorldE2EBridge(scene) {
       (getLocationOwners().guestRuntime?.getState?.().guests ?? []).map(({ id, personId }) => [id, personId]),
     ),
     getVisitorHistory: () => clone(getLocationOwners().tavernServiceRuntime?.getVisitorHistory?.() ?? {}),
+    getTavernFeedback: () => clone(getLocationOwners().tavernServiceRuntime?.getFeedbackState?.()
+      ?? scene.sessionState.gameplay.tavernFeedback),
+    setTavernFlowPressure: (value) => clone(getLocationOwners()
+      .tavernServiceRuntime?.setFlowPressure?.(value) ?? null),
+    boostTavernFlowPressure: (amount) => clone(getLocationOwners()
+      .tavernServiceRuntime?.boostFlowPressure?.(amount) ?? null),
     setVisitOpportunityRemainingMs: (value) => {
       scene.sessionState.gameplay.tavernService.opportunityRemainingMs = Math.max(0, Number(value) || 0);
       return scene.sessionState.gameplay.tavernService.opportunityRemainingMs;

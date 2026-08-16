@@ -56,12 +56,12 @@ requireText(lead, [
   "## Контекстный бюджет",
   "максимум два system-документа",
   "20–50",
-  "Draft PR до приёмки",
+  "публичный URL разрешён только для ChatGPT direct implementation и только из Draft PR",
   "src/main.js",
   "Codex никогда не генерирует",
-  "отдельной роли Художника",
+  "роли Художника",
   "code-only integration task",
-  "визуальная «пиксельность» не является доказательством native asset",
+  "Для pixel art визуальная пиксельность не доказывает native asset",
   "точной native frame grid",
   "integer nearest-neighbor preview",
 ], "LEAD.md");
@@ -137,7 +137,7 @@ requireText(agents, [
 
 const forbiddenImagePermission = "Codex image generation explicitly allowed";
 assert(!lead.includes(forbiddenImagePermission), "LEAD.md must not contain a prompt-level Codex image-generation bypass");
-assert(!artist.includes(forbiddenImagePermission), "ARTIST.md must not contain a Codex image-generation bypass");
+assert(!artist.includes(forbiddenImagePermission), "ARTIST.md must not contain a prompt-level Codex image-generation bypass");
 assert(!agents.includes(forbiddenImagePermission), "AGENTS.md must not contain a prompt-level Codex image-generation bypass");
 assert(!taskTemplate.includes(forbiddenImagePermission), "tasks/TEMPLATE.md must not contain a prompt-level Codex image-generation bypass");
 
@@ -232,7 +232,7 @@ for (const [label, text, limit] of [
   ["ARTIST.md", artist, 18000],
   ["AGENTS.md", agents, 11000],
   ["REVIEW.md", review, 5000],
-  ["GAME.md", game, 11000],
+  ["GAME.md", game, 13000],
   ["ROADMAP.md", roadmap, 4500],
   ["LIBRARY.md", library, 7500],
 ]) {
