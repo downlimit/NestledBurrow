@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #093`.
+**Следующий свободный номер:** `Task #094`.
 
 ## Сейчас
 
-### Task #092 — Эскалация дорогой публикации из Codex в Интегратор
+### Task #093 — Воронка публикационных проверок
 
-**Результат:** после пользовательского `принято` Codex выполняет один обычный publication cycle и максимум один task-local repair. Повторный blocking failure, unrelated legacy test debt, CI/test-harness repair или иной признак разрастающегося integration loop останавливает Codex через минимальный `codex-delivery-escalation:v1`; текущая task-ветка/PR сохраняется, а ChatGPT-Интегратор самостоятельно продолжает диагностику, repair, CI и merge без возврата работы в Codex, если пользователь явно этого не попросил. Широкая test coverage сама по себе этой задачей не сокращается.
+**Результат:** после `принято` Codex выполняет только targeted publication proof и не зеркалит полный repository/browser CI локально. Ready PR сначала проходит owner/system contracts, historical regressions и build; browser E2E запускается только на зелёном static gate. Полный regression coverage сохраняется, `check:task-091` возвращён в full suite, а дублирующие publication actions исключены.
 
 ## Следующий продуктовый вопрос
 

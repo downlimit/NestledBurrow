@@ -61,26 +61,25 @@ The final report states `Image generation was not invoked.` and confirms that th
 
 Use one strong proof per material risk. A successful proof remains valid until relevant inputs change.
 
-**Feedback gate:** batch remarks and prove only hidden behavior. Codex uses one local managed preview for acceptance; ChatGPT direct may use one public Draft preview. Defer broad proof until acceptance.
+**Feedback gate:** batch remarks and prove only hidden behavior. Codex uses one local managed preview for acceptance; ChatGPT direct may use one public Draft preview. Defer broad repository proof to PR CI.
 
 **Micro-feedback:** presentation-only value changes may reuse prior proof and preview health. Hidden contract changes still receive one targeted check.
 
-**Fast publication after `принято`:** acknowledge acceptance, stop local preview and inspect files/full diff once. Before the first push, run the publication gate below from the final candidate head. Do not use PR CI to discover failures that the local gate covers.
+**Fast publication after `принято`:** acknowledge acceptance, stop local preview and inspect files/full diff once. Run the targeted publication gate below from the final candidate head, then push one Ready PR.
 
-**Strict publication:** run the same publication gate with `codex:validate --full` plus only missing task-specific proof.
+**Strict publication:** use the same targeted local gate plus only missing task-specific proof. PR CI owns broad repository validation for both Fast and Strict work.
 
-Use `npm run codex:validate -- --base <sha> --task <number>` for the local syntax/task/direct-check ladder. Add `--full` exactly once for Strict work. The ladder discovers source-address contract checks; do not rerun successful levels manually.
+Use `npm run codex:validate -- --base <sha> --task <number>` for the local syntax/task/direct-check ladder. It already runs `git diff --check` and discovers source-address contract checks. Use `--full` only when an explicit task or repair command specifically requires a local full suite; it is not a publication default.
 
 ### Publication gate
 
-After acceptance, player-visible or cross-system work gets one complete local gate before the first push:
+After acceptance, player-visible or cross-system work gets one short local gate before the first push:
 
-1. `git diff --check`;
-2. `npm run codex:validate -- --base <sha> --task <number>` (`--full` for Strict);
-3. `npm run check` when the change affects shared runtime, interaction, persistence, build/authoring, world transitions or CI-sensitive contracts;
-4. full Playwright through `npm run check:e2e:focused -- --workers=3`, which owns an ephemeral Vite port and sets `VITE_E2E=1`.
+1. `npm run codex:validate -- --base <sha> --task <number>`;
+2. run only missing task-specific proof whose relevant inputs changed since its last success; use focused specs/checks rather than the full repository corpus;
+3. push one final candidate head as the Ready PR. GitHub runs owner/system contracts, historical regressions and build first; full browser regression starts only after that static gate is green.
 
-Collect every failure from the complete run before editing. Repair confirmed causes as one batch, run the failing specs for fast feedback, then rerun only the invalidated gate levels. Push one final candidate head. The target is one local gate and one final-head CI cycle, normally 5–10 minutes for Fast work.
+Do not run full `npm run check` or full Playwright locally merely to mirror PR CI. Do not repeat `git diff --check` outside `codex:validate`. Repair confirmed task-local causes as one batch and rerun only invalidated targeted proof. The normal goal is one short local gate and one final-head CI cycle.
 
 Never point local Playwright at the persistent preview on port `4173`; it may lack the E2E bridge or serve another checkout. Validate required PR metadata and Architecture pressure before marking the PR Ready. Static source-contract checks must normalize CRLF/LF before exact multiline matching.
 

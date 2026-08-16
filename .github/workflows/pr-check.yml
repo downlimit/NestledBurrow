@@ -53,7 +53,7 @@ jobs:
         run: node scripts/check-pr-scope.mjs
 
   build:
-    name: Validate
+    name: Static Validation
     needs: scope
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
@@ -87,11 +87,19 @@ jobs:
         if: needs.scope.outputs.full_validation == 'true'
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
-      - name: Run project checks
+      - name: Run owner and system checks
         if: needs.scope.outputs.full_validation == 'true'
         env:
           NESTLEDBURROW_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-        run: npm run check
+        run: npm run check:owners
+
+      - name: Run historical regressions
+        if: needs.scope.outputs.full_validation == 'true'
+        run: npm run check:history
+
+      - name: Build production bundle
+        if: needs.scope.outputs.full_validation == 'true'
+        run: npm run build
 
       - name: Run metadata checks
         if: needs.scope.outputs.full_validation == 'false'
@@ -103,6 +111,7 @@ jobs:
           node scripts/check-task-identity-contract.mjs
           node scripts/check-pr-preview-contract.mjs
           node scripts/check-pr-scope.mjs
+          node scripts/check-validation-funnel.mjs
           git diff --check "$BASE_SHA" "$HEAD_SHA"
 
       - name: Upload world previews
@@ -121,10 +130,11 @@ jobs:
 
   browser-shard:
     name: Browser E2E Shard ${{ matrix.shard }}/3
-    needs: scope
+    needs: [scope, build]
     if: >-
       github.event.pull_request.draft == false &&
-      needs.scope.outputs.browser == 'true'
+      needs.scope.outputs.browser == 'true' &&
+      needs.build.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -170,11 +180,12 @@ jobs:
 
   browser:
     name: Browser E2E
-    needs: [scope, browser-shard]
+    needs: [scope, build, browser-shard]
     if: >-
       always() &&
       github.event.pull_request.draft == false &&
-      needs.scope.outputs.browser == 'true'
+      needs.scope.outputs.browser == 'true' &&
+      needs.build.result == 'success'
     runs-on: ubuntu-latest
 
     steps:

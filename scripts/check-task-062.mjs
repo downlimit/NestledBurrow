@@ -85,6 +85,7 @@ assert(authoring.includes("buildCoordinator.getPlacedObjects()"), "developer aut
 assert(startingLayout.includes("requireBuildCoordinator(scene)"), "starting-layout authoring must resolve the coordinator public API");
 
 assert.equal(packageJson.scripts["check:task-062"], "node scripts/check-task-062.mjs");
-assert(packageJson.scripts.check.includes("npm run check:task-062"), "the full check must include Task #062 ownership coverage");
+assert(packageJson.scripts.check.includes("npm run check:history"), "the full check must include the historical regression group");
+assert(packageJson.scripts["check:history"].includes("npm run check:task-062"), "the historical regression group must include Task #062 ownership coverage");
 
 console.log("Task #062 contracts passed: WorldBuildCoordinator owns build session state, orchestration, previews, grouped undo, runtime routing, and lifecycle");

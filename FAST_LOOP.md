@@ -70,6 +70,15 @@ PR был открыт на устаревшей базе, первый CI ст�
 
 Решение: после одного обычного publication cycle и не более одного task-local repair Codex использует `codex-delivery-escalation:v1` при повторном либо unrelated failure. ChatGPT-Интегратор принимает текущую ветку/PR и самостоятельно заканчивает repair, CI и merge. Codex quota остаётся прежде всего для реализации и feedback-итераций игры.
 
+### Task #093
+
+- локальный publication gate повторял `git diff --check`, а Strict route мог повторно запускать полный `npm run check`;
+- Codex обязан был гонять полный Playwright локально, после чего GitHub повторял тот же broad regression;
+- GitHub запускал browser shards параллельно со static validation, поэтому заведомо красный contract head всё равно расходовал browser runners и мог породить несвязанный диагностический шум;
+- `check:task-091` существовал, но не входил в полный `npm run check`.
+
+Решение: Codex publication остаётся targeted и не зеркалит full CI. GitHub сначала выполняет owner/system contracts, затем historical regressions и build; browser shards стартуют только после зелёного static gate. Полный `npm run check` сохраняет покрытие, но структурирован как owner → history → build, включая regression #091.
+
 ## Когда менять процесс снова
 
 Новая process-задача оправдана, когда:
