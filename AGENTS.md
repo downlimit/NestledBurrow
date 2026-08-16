@@ -6,7 +6,7 @@
 - Codex flow: brief → implementation → local preview → `принято` → one Ready PR → CI → merge. Only ChatGPT direct may use a public Draft preview before `принято`.
 - Never ask the user to operate GitHub.
 - Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or `Delivery escalation` below.
-- Draft PR before acceptance is allowed only by explicit user command; it is a preview carrier, not a development or final-CI gate.
+- Codex never creates a Draft PR before acceptance and never publishes an online preview. Online preview is ChatGPT-only.
 - Acceptance, Ready state, PR number and merge status never justify a source/documentation commit. Never create an empty commit.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
 - Late Task-number collision: when a number was free at work start and becomes occupied on `origin/main` before publication finishes, Codex may assign the current `ROADMAP.md` next-free number without further confirmation. Rebase onto current `origin/main` and update the Task identity, task-specific files/checks, branch, commit and PR consistently while preserving the accepted name and scope.
@@ -97,12 +97,12 @@ Environment:
 
 Required for gameplay, HUD/UI, input, scenes, localization, animation, audio and visual assets.
 
-1. Codex uses `npm run preview:task` for local acceptance and publishes nothing before `принято`.
+1. Codex uses `npm run preview:task` for local acceptance and publishes nothing before `принято`; it does not create a pre-acceptance PR.
 2. An authorized ChatGPT Draft carrier uses `executor: chatgpt` and `preview-acceptance: pending`; its workflow publishes the exact-head static preview.
 3. Public PR links belong only to that ChatGPT route. StackBlitz/Codespaces are forbidden.
 4. ChatGPT reuses one Draft URL through feedback.
 5. Before `принято`: no Ready PR, auto-merge or merge. For ChatGPT direct implementation, `препроверка принята` authorizes only the task branch and Draft preview carrier.
-6. After `принято`: set `preview-acceptance: accepted`, remove any ChatGPT preview, open/mark Ready, run final-head CI and merge. Preserve the SHA unless repair/rebase is required.
+6. After `принято`: set `preview-acceptance: accepted` while the PR is still Draft, remove the ChatGPT preview, then mark the same PR Ready, run final-head CI and merge. Preserve the SHA unless repair/rebase is required.
 7. Player-visible repair returns to preview only when it changes the accepted experience.
 8. Private preview artifacts use the same ChatGPT-only pending Draft gate. Accepted and Codex PRs publish no link.
 

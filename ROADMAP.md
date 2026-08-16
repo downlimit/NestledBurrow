@@ -13,13 +13,13 @@ Task #001 — Первая расчистка участка
 
 Номера не переиспользуются. Ветка: `task/<number>-<slug>`.
 
-**Следующий свободный номер:** `Task #094`.
+**Следующий свободный номер:** `Task #095`.
 
 ## Сейчас
 
-### Task #093 — Воронка публикационных проверок
+### Task #094 — Разведение preview-маршрутов ChatGPT и Codex
 
-**Результат:** после `принято` Codex выполняет только targeted publication proof и не зеркалит полный repository/browser CI локально. Ready PR сначала проходит owner/system contracts, historical regressions и build; browser E2E запускается только на зелёном static gate. Полный regression coverage сохраняется, `check:task-091` возвращён в full suite, а дублирующие publication actions исключены.
+**Результат:** player-visible задачи имеют два явно раздельных acceptance carrier: Codex до `принято` использует только локальный managed preview и не создаёт Draft/online preview; ChatGPT direct использует один Draft PR с `executor: chatgpt` и `preview-acceptance: pending`, который публикует онлайн-сборку exact head для пользовательской игры и feedback. Pending-preview технически обязан оставаться Draft; после `принято` ChatGPT сначала переводит metadata в `accepted`, затем тот же PR становится Ready и входит в общий staged CI/merge route.
 
 ## Следующий продуктовый вопрос
 
