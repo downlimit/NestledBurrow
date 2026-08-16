@@ -62,6 +62,14 @@ PR был открыт на устаревшей базе, первый CI ст�
 3. Product, roadmap и system memory разделены; исполнители не читают весь проект.
 4. `src/main.js` получил hard line budget и обязан перестать расти.
 
+### Задачи #089–#091
+
+- #089/#090 и особенно #091 показали повторяющийся post-acceptance bottleneck: уже принятая игровая работа превращалась в несколько CI/repair циклов;
+- часть repair относилась к legacy E2E, timing assumptions и CI/test infrastructure, а не к принятому observable result;
+- широкие проверки сами по себе пока не признаны лишними: проблема в расходовании ограниченного Codex-контекста на длинный integration tail.
+
+Решение: после одного обычного publication cycle и не более одного task-local repair Codex использует `codex-delivery-escalation:v1` при повторном либо unrelated failure. ChatGPT-Интегратор принимает текущую ветку/PR и самостоятельно заканчивает repair, CI и merge. Codex quota остаётся прежде всего для реализации и feedback-итераций игры.
+
 ## Когда менять процесс снова
 
 Новая process-задача оправдана, когда:
