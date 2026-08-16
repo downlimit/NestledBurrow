@@ -117,6 +117,10 @@ test("desktop HUD separates permanent zones and keeps Options modal-safe", async
   const { worldTimeSeconds: _afterTime, currentEnergy: _afterEnergy, needs: _afterNeeds, ...gameplayAfterCancel } = sessionAfterCancel.gameplay;
   delete gameplayBeforeConfirmation.farm.lastProcessedWorldTimeSeconds;
   delete gameplayAfterCancel.farm.lastProcessedWorldTimeSeconds;
+  delete gameplayBeforeConfirmation.tavernFeedback.lastEvaluatedWorldTimeSeconds;
+  delete gameplayAfterCancel.tavernFeedback.lastEvaluatedWorldTimeSeconds;
+  delete gameplayBeforeConfirmation.tavernFeedback.closureElapsedWorldSeconds;
+  delete gameplayAfterCancel.tavernFeedback.closureElapsedWorldSeconds;
   expect({ ...sessionAfterCancel, gameplay: gameplayAfterCancel }).toEqual({ ...sessionBeforeConfirmation, gameplay: gameplayBeforeConfirmation });
 });
 
