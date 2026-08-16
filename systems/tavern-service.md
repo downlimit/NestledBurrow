@@ -79,6 +79,8 @@ The current one-opportunity-every-`3..8`-real-seconds cadence is prototype instr
 
 Target guest flow must increase planfully over meaningful play time and remain bounded by the finite population, individual willingness, recent visits and physical service capacity. A short sequence of good visits must not create a runaway feedback loop or an immediate crowd at the entrance. Personal experience should be a major determinant of whether an individual returns; future word of mouth may weakly alter other people's willingness, but the aggregate effect must remain slower than direct personal learning.
 
+Established flow also creates an availability expectation. If the player closes a previously active venue for a sustained period, people who would otherwise have considered or attempted visits can receive missed-availability experiences even without being physically spawned at the door. Repeated closure should reduce future flow, potentially by a large factor after several days of downtime, and reopening should recover it progressively through renewed successful activity rather than instantly restoring the previous level. Exact rates, thresholds and recovery curves are balance parameters.
+
 ## Persistent people without full offscreen simulation
 
 Offscreen people retain their last state/evaluation time and reconstruct from elapsed world time, traits and bounded variation only when relevant. A physical guest advances every canonical need live on that same persistent person. Relationships, families, ageing, death and replenishment remain future population work.
@@ -106,7 +108,7 @@ The first implemented format remains food service. Additional entertainment such
 
 Early play uses direct open/closed control; a later automated venue may support a schedule. The sign always opens one compact panel whose pill switch is labeled **`Заведение открыто` / `Заведение закрыто`** (`Venue open / Venue closed`) and directly controls service. Closing the panel, including with `Space` or `Escape`, preserves that state. Dish editing is locked while open. Its bounded two-row list scrolls by wheel or touch swipe when more products are added.
 
-The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. An inactive venue produces no opportunities or penalty.
+The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. The current prototype produces no opportunities while inactive; Stage 6 target feedback allows sustained closure after an established flow to create missed-availability consequences and reduce later demand.
 
 ## Experience and negative feedback
 
