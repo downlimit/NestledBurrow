@@ -5,7 +5,7 @@
 
 - Codex flow: brief → implementation → local preview → `принято` → one Ready PR → CI → merge. Only ChatGPT direct may use a public Draft preview before `принято`.
 - Never ask the user to operate GitHub.
-- Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or the `Delivery escalation` route below.
+- Stop before merge only for explicit `не сливать`, report-only work, a real blocker, or `Delivery escalation` below.
 - Draft PR before acceptance is allowed only by explicit user command; it is a preview carrier, not a development or final-CI gate.
 - Acceptance, Ready state, PR number and merge status never justify a source/documentation commit. Never create an empty commit.
 - Preserve Task identity: `Task #<number> — <name>` and `task/<number>-<slug>`.
@@ -119,37 +119,7 @@ After green CI, merge and update local `main` unless prohibited. Never create re
 
 ## Delivery escalation
 
-Codex quota is reserved primarily for implementation and user-feedback iteration. After `принято`, publication ownership is deliberately bounded.
-
-Codex may perform one normal publication gate, first push/Ready PR and final-head CI. If that CI has a blocking failure clearly caused by the current task and the repair is bounded to the task's owners or task-specific proof, Codex may perform one repair batch and publish one repaired head.
-
-Escalate immediately instead of continuing the delivery loop when any condition is true:
-
-- the repaired head fails blocking CI again;
-- a blocking failure belongs to an unrelated legacy test/system and fixing it would touch unrelated gameplay or test contracts;
-- fixing publication would require `.github/workflows/**`, runner policy or shared test-harness changes not requested by the task;
-- a same-head rerun is being considered without a concrete runner/network/transient infrastructure signal;
-- failures migrate across unrelated suites or cannot be reduced to one task-local repair batch.
-
-On escalation:
-
-1. stop further diagnosis, local broad reruns and repair edits; do not create a cleanup or handoff commit;
-2. preserve the current task state. If a PR exists, leave it open. If no PR exists yet, push the current task branch/head so ChatGPT can take over, but do not open a knowingly failing PR only to obtain more CI;
-3. output only the minimal handoff below; do not paste logs, full diffs, timelines or speculative analysis;
-4. do not resume that delivery unless the user explicitly sends Codex a new concrete repair command.
-
-```text
-codex-delivery-escalation:v1
-ты интегратор. Продолжи публикацию Task #<number> — <name>.
-PR: #<number> | none
-Branch: task/<number>-<slug>
-Current head: <sha>
-Accepted head: <sha>
-Trigger: <one factual sentence>
-Failing evidence: <workflow/job/spec names in one line>
-```
-
-The handoff is sufficient. ChatGPT retrieves PR state, CI, logs and diff from GitHub and owns repair/CI/merge from that point.
+After `принято`, Codex owns one publication cycle and at most one task-local repair. On a second failed repaired head, unrelated legacy failure, required workflow/shared-harness change, unjustified same-head rerun, or failures migrating across unrelated suites: read `DELIVERY_ESCALATION.md`, emit its handoff, and stop. Resume only by explicit user repair command.
 
 ## Special
 
