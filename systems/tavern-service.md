@@ -24,9 +24,9 @@ These terms are canonical. They describe different layers of the same system and
 - **Needs (`needs`)** — the canonical person needs defined by `systems/character-and-needs.md`. Food uses satiety/hunger as its main motive, but social contact, novelty, energy, toilet and lustre can also affect a visit or create behavior after arrival.
 - **Visit motive (`visitMotive`)** — the concrete reason a person is considering the venue now. Hunger can create a food motive; future attractions such as karaoke, sauna, jacuzzi, exhibitions or other profession-specific services can satisfy different motives.
 - **Visit opportunity (`visitOpportunity`)** — one chance for someone in the population to consider the venue. The current prototype schedules these directly; target flow density must remain bounded and grow deliberately rather than exploding from positive feedback.
-- **Popularity (`popularity`)** — the working reach/flow concept for how broadly and often the venue is considered. It must not describe audience composition or make a person like the venue. Its exact source and whether it remains a standalone scalar are still Stage 6 product decisions; no formula is canonical yet.
-- **Reputation profile (`reputationProfile`)** — what the venue is known for. Reputation is descriptive rather than a single good/bad score and primarily shapes audience composition: a venue increasingly associated with one cuisine, atmosphere or activity should increasingly attract people whose preferences fit it, while mismatched people remain possible rather than becoming impossible.
-- **Personal venue opinion (`venueOpinion`)** — one person's own current attitude toward the venue, derived from remembered visits and direct interactions. Positive and negative opinions both drift gradually toward neutral when no reinforcing experience occurs.
+- **Popularity / flow pressure (`popularity`)** — the separate persistent aggregate that controls how often visit opportunities occur. It describes overall density of attention, not audience composition or how much any individual likes the venue. Organic reinforcement must be slow; future rare events or developer proof controls may change it sharply. It never guarantees that a candidate actually visits.
+- **Reputation profile (`reputationProfile`)** — what the venue is known for. Reputation is descriptive rather than a single good/bad score and primarily shapes audience composition: a venue increasingly associated with one cuisine, atmosphere or activity should increasingly attract people whose preferences fit it, while mismatched people remain possible rather than becoming impossible. Universal service reliability is a separate reputation dimension that can lower willingness across the audience without becoming a taste.
+- **Personal venue opinion (`venueOpinion`)** — one person's own current attitude toward the venue, derived from remembered visits and direct interactions. Direct experience is the strongest feedback for that person. Positive and negative opinions both drift gradually toward neutral when no reinforcing experience occurs.
 - **Venue offer (`venueOffer`)** — what the venue currently promises or makes available: active menu items, displayed takeout goods, self-service food, entertainment, facilities, exhibitions or other supported services. Inventory that is not actually offered does not attract demand.
 - **Food preference (`foodPreference`)** — a layered taste profile. Current target order is cuisine/origin as the strongest level, dish class such as hot food/cold food/drinks/desserts as the next level, and individual ingredients as the finer level. Exact weights are balance parameters.
 - **Offer fit (`offerFit`)** — how well the current venue offer fits one person's motive, tastes and spending capacity. Prices are fixed by the game; affordability affects selection but is not itself a service failure.
@@ -41,31 +41,32 @@ These terms are canonical. They describe different layers of the same system and
 
 ## How demand is formed
 
-The causal order is fixed where stated even though the eventual Stage 6 balance formulas are not yet fixed.
+The causal order is fixed where stated even though exact balance formulas remain tunable.
 
 ```text
 venue is open or scheduled open
-→ a visit opportunity occurs
-→ one persistent person becomes a candidate
+→ popularity / flow pressure schedules a visit opportunity
+→ one persistent person becomes a candidate, biased by reputation but never hard-locked by it
 → that person's offscreen needs are reconstructed
 → current needs create one or more possible visit motives
 → venue offer is compared with motive, tastes and spending capacity
 → reputation fit, personal venue opinion and recent-visit suppression are applied
 → the person decides whether to visit, alone or eventually with a group
-→ service capacity determines whether the visit can currently be accepted
-→ the same persistent person enters the world as a guest
+→ physical service capacity determines whether the willing visit can actually be served
+→ the same persistent person enters the world as a guest when materialized
 → all of that person's needs become live while present
 → service, facilities and other people produce an actual experience
 → the visit updates personal memory and opinion
-→ the experience may contribute reputation evidence and later spread socially
+→ the experience contributes reputation evidence and may weakly reinforce aggregate flow
+→ later social systems propagate that experience selectively through real relationships
 ```
 
 The system separates four different questions:
 
-- **Reach / flow density:** how often people get a chance to consider the venue; the final Stage 6 source and formula remain open, but growth must be slow and bounded.
+- **Reach / flow density:** popularity answers how often people get a chance to consider the venue. It changes much more slowly through ordinary service than individual opinions do, remains bounded, and can receive explicit future external impulses.
 - **Motive:** the person's reconstructed needs answer why they want to go somewhere now.
 - **Choice / audience composition:** offer, tastes, budget, reputation and personal opinion answer why this person chooses this venue or rejects it.
-- **Conversion:** service capacity and actual service answer how much potential demand becomes completed visits and money.
+- **Conversion:** physical capacity and actual service answer how much willing demand becomes completed visits and money.
 
 Higher reach must not silently create wealthier people. Expensive demand grows when the venue becomes suitable for existing people with higher spending capacity and matching motives.
 
@@ -77,11 +78,13 @@ A venue's established audience should have inertia. If the player abruptly repla
 
 The current one-opportunity-every-`3..8`-real-seconds cadence is prototype instrumentation for quickly exercising demand and service. It is not target progression balance.
 
-Target guest flow must increase planfully over meaningful play time and remain bounded by the finite population, individual willingness, recent visits and physical service capacity. A short sequence of good visits must not create a runaway feedback loop or an immediate crowd at the entrance. Personal experience should be a major determinant of whether an individual returns; future word of mouth may weakly alter other people's willingness, but the aggregate effect must remain slower than direct personal learning.
+Target guest flow must increase planfully over meaningful play time. A short sequence of good visits must not create a runaway feedback loop or an immediate crowd at the entrance. A person's own experience is a major determinant of whether they return; reputation weakly transfers evidence to other people, while ordinary positive service changes aggregate popularity more slowly still.
 
-Established flow also creates an availability expectation. If the player closes a previously active venue for a sustained period, people who would otherwise have considered or attempted visits can receive missed-availability experiences even without being physically spawned at the door. Repeated closure should reduce future flow, potentially by a large factor after several days of downtime, and reopening should recover it progressively through renewed successful activity rather than instantly restoring the previous level. Exact rates, thresholds and recovery curves are balance parameters.
+A large external popularity impulse may temporarily create far more willing visitors than the venue can comfortably serve. The game must not silently discard that pressure as a hard capacity cap: an open venue that cannot admit or serve willing people creates real negative experience. Personal opinions and universal service-reliability reputation then reduce later willingness, so actual guest flow can settle back toward a sustainable range unless the player expands capacity and successfully retains the higher demand. Excess demand does not require physically spawning an unbounded crowd; deterministic offscreen turned-away outcomes are valid when the visual/runtime guest cap is reached.
 
-Closure feedback must be materially weaker per missed visit than failure while the venue is open. Finding a venue closed means the service was unavailable; arriving while it presents itself as open but cannot admit, seat or serve the person means the venue failed an active service expectation and should create substantially stronger negative personal and social feedback. This severity ordering is canonical even though exact multipliers remain balance parameters.
+Established flow also creates an availability expectation. Before configurable schedules exist, sustained manual closure may weakly erode aggregate popularity over elapsed world time even while the tavern is not physically simulated. This closure effect is materially weaker than failure while the venue is open and recovers progressively after renewed successful activity. Exact rates, thresholds and recovery curves are balance parameters.
+
+Once configurable opening hours exist, hours deliberately marked closed by the player's schedule are normal operating policy rather than service failure. The schedule becomes a load-management control: shortening hours reduces forecast demand and required production, while opening during declared hours still carries the stronger obligation to admit and serve the demand the venue accepts.
 
 ## Persistent people without full offscreen simulation
 
@@ -110,7 +113,9 @@ The first implemented format remains food service. Additional entertainment such
 
 Early play uses direct open/closed control; a later automated venue may support a schedule. The sign always opens one compact panel whose pill switch is labeled **`Заведение открыто` / `Заведение закрыто`** (`Venue open / Venue closed`) and directly controls service. Closing the panel, including with `Space` or `Escape`, preserves that state. Dish editing is locked while open. Its bounded two-row list scrolls by wheel or touch swipe when more products are added.
 
-The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. The current prototype produces no opportunities while inactive; Stage 6 target feedback allows sustained closure after an established flow to create missed-availability consequences and reduce later demand.
+The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. The current prototype produces no physical opportunities while inactive; Stage 6 feedback may still reconstruct the weaker effect of sustained manual closure from elapsed world time.
+
+Future management UI should expose practical forecasts rather than hidden coefficients: expected visitors over a useful day/week horizon, available service capacity, food output, ingredient production, helper output and material/fuel consumption. Changing opening hours should update those forecasts directly so schedule, production and demand can be balanced from one readable view.
 
 ## Experience and negative feedback
 
@@ -127,9 +132,9 @@ A completed or attempted visit can be affected by:
 
 Preference-sensitive qualities are not universally positive or negative. Cleanliness, noise, social intensity, conflict frequency, cuisine and similar venue traits may attract one audience and repel another when matching person preferences exist.
 
-Core service reliability is universal rather than taste-relative. Accepting a service commitment and then failing to fulfill it, delivering the wrong committed result, or otherwise leaving the promised service nonfunctional is negative for every person; no future personality trait should make broken service intrinsically desirable. An open venue that repeatedly cannot actually admit or serve willing visitors belongs to this stronger service-failure class rather than to the weaker closed-venue availability penalty.
+Core service reliability is universal rather than taste-relative. Accepting a service commitment and then failing to fulfill it, delivering the wrong committed result, or otherwise leaving the promised service nonfunctional is negative for every person; no future personality trait should make broken service intrinsically desirable. An open venue that cannot actually admit or serve a willing visitor belongs to this stronger service-failure class rather than to the weaker manual-closure availability penalty.
 
-An unavailable dish before an order is accepted is not a service failure. Once the venue accepts an order or equivalent commitment, failure to fulfill it can reduce satisfaction and personal opinion and may later contribute negative service-reliability reputation evidence.
+An unavailable dish before an order is accepted is not a service failure. Once the venue accepts an order or equivalent commitment, failure to fulfill it can reduce satisfaction and personal opinion and contribute negative service-reliability reputation evidence.
 
 ## Social depth
 
@@ -150,7 +155,7 @@ Validation proceeds through observable slices that may be revised after playtest
 3. **Visit decision:** one persistent person evaluates needs, offer, budget and history.
 4. **Order and fulfillment:** the chosen product becomes a service commitment and payment.
 5. **Live guest needs:** every canonical need can affect an onsite visit.
-6. **Feedback:** venue reputation, personal opinion and the bounded source of aggregate flow stay distinct; exact popularity/reach representation is finalized here rather than assumed.
+6. **Feedback:** persistent personal opinion, descriptive venue reputation and aggregate popularity/flow pressure form one causal but non-collapsed feedback loop.
 7. **Groups and time:** relationships and schedules shape plausible visitors.
 8. **Venue formats:** infrastructure and offer produce takeaway, restaurant, event or self-service behavior.
 9. **Social lifecycle:** relationships, families, ageing, death and replenishment deepen the population.
