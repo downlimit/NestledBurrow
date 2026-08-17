@@ -241,16 +241,16 @@ export function setPopulationPersonNeed(population, personId, needId, value, wor
     return { status: "invalid-world-time", mutated: false, person: null };
   }
   const previous = population[index];
-  const evaluated = evaluatePersonOffscreen(previous, evaluationTime);
+  const lifecycle = advancePersonLifecycle(previous, evaluationTime);
   const nextValue = roundNeed(normalizeNeedValue(numericValue));
-  const mutated = evaluated.needs[needId] !== nextValue
-    || evaluated.lastEvaluatedWorldTimeSeconds !== previous.lastEvaluatedWorldTimeSeconds
-    || evaluated.ageYears !== previous.ageYears
-    || evaluated.lifeStage !== previous.lifeStage;
+  const mutated = previous.needs[needId] !== nextValue
+    || previous.lastEvaluatedWorldTimeSeconds !== evaluationTime
+    || lifecycle.mutated;
   if (!mutated) return { status: "unchanged", mutated: false, person: previous };
   const person = {
-    ...evaluated,
-    needs: { ...evaluated.needs, [needId]: nextValue },
+    ...previous,
+    needs: { ...previous.needs, [needId]: nextValue },
+    lastEvaluatedWorldTimeSeconds: evaluationTime,
   };
   population[index] = person;
   return { status: "need-set", mutated: true, person };
