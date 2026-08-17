@@ -206,8 +206,10 @@ export function installWorldE2EBridge(scene) {
       return facility;
     },
     forceGuestSpawn: (personId) => getLocationOwners().tavernServiceRuntime?.forceGuestVisit?.(personId),
-    forceGuestOrder: ({ personId = null, itemId = null } = {}) => getLocationOwners()
-      .tavernServiceRuntime?.forceGuestOrder?.(personId, itemId),
+    forceGuestOrder: ({ personId = null, itemId = null, serviceFormat = "assisted" } = {}) => getLocationOwners()
+      .tavernServiceRuntime?.forceGuestOrder?.(personId, itemId, { serviceFormat }),
+    forceGuestGroup: (participants = []) => clone(getLocationOwners()
+      .tavernServiceRuntime?.forceGuestGroup?.(participants) ?? false),
     acceptGuestOrder: (guestId) => clone(getLocationOwners()
       .tavernServiceRuntime?.acceptGuestOrder?.(guestId) ?? null),
     setGuestOrderElapsedMs: ({ guestId, value } = {}) => getLocationOwners()
@@ -220,6 +222,8 @@ export function installWorldE2EBridge(scene) {
         personId: guest.personId,
         displayName: guest.displayName,
         servingTableId: guest.servingTableId,
+        serviceFormat: guest.serviceFormat,
+        servicePlaceActive: guest.servicePlaceActive,
         order: guest.order,
       } : null);
     },
@@ -258,9 +262,17 @@ export function installWorldE2EBridge(scene) {
       scene.sessionState.gameplay.tavernService.opportunityRemainingMs = Math.max(0, Number(value) || 0);
       return scene.sessionState.gameplay.tavernService.opportunityRemainingMs;
     },
-    setPopulationPersonDemand: ({ personId, satiety, spendingCapacity, foodPreferences } = {}) => {
+    setPopulationPersonDemand: ({ personId, satiety, needs, spendingCapacity, foodPreferences } = {}) => {
       const person = scene.sessionState.gameplay.population.find((candidate) => candidate.id === personId);
       if (!person) return false;
+      if (needs && typeof needs === "object") {
+        for (const needId of ["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]) {
+          if (Number.isFinite(Number(needs[needId]))) {
+            person.needs[needId] = Math.min(100, Math.max(0, Number(needs[needId])));
+          }
+        }
+        person.lastEvaluatedWorldTimeSeconds = scene.sessionState.gameplay.worldTimeSeconds;
+      }
       if (Number.isFinite(Number(satiety))) {
         person.needs.satiety = Math.min(100, Math.max(0, Number(satiety)));
         person.lastEvaluatedWorldTimeSeconds = scene.sessionState.gameplay.worldTimeSeconds;

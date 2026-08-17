@@ -77,7 +77,7 @@ const legacy = createFreshGameSessionState();
 legacy.version = 4;
 delete legacy.gameplay.tavernOpen;
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 4, state: legacy }));
-assert.equal(SAVE_SCHEMA_VERSION, 18);
+assert.equal(SAVE_SCHEMA_VERSION, 19);
 assert.equal(migrated.status, "loaded");
 assert.equal(migrated.state.gameplay.tavernOpen, false);
 assert.equal(migrated.state.gameplay.coins, 0);
@@ -169,6 +169,7 @@ function scenario({
   servingTables = null,
   servicePoints = null,
   seatPoints = null,
+  serviceFormat = null,
 }) {
   const tableStocks = servingTables ?? {
     "serving-1": { itemId, quantity, reservations: [] },
@@ -252,7 +253,7 @@ function scenario({
     }
   }
   function spawn(index = 1, exactItemId = itemId ?? Object.values(tableStocks).find((stock) => stock.itemId)?.itemId) {
-    return runtime.spawnVisit(`person-test-${index}`, exactItemId, [exactItemId]);
+    return runtime.spawnVisit(`person-test-${index}`, exactItemId, [exactItemId], { serviceFormat });
   }
   function finish(limit = 1200) {
     for (let index = 0; index < limit && runtime.getState().active; index += 1) tick();
@@ -273,7 +274,7 @@ assert.equal(closed.states.includes(GUEST_STATES.entering), false);
 assert.equal(closed.kitchen.servingTables["serving-1"].quantity, 1);
 assert.deepEqual(closed.kitchen.servingTables["serving-1"].reservations, []);
 
-const takeout = scenario({ open: true, itemId: "lemonade" });
+const takeout = scenario({ open: true, itemId: "lemonade", serviceFormat: "takeaway" });
 assert.equal(takeout.spawn(), "tavern-guest-1");
 takeout.finish();
 assert(takeout.feedback.includes("carrying-lemonade"));

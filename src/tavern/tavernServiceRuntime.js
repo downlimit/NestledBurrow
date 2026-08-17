@@ -16,7 +16,11 @@ import { createGuestRuntime } from "./guestRuntime.js";
 import { evaluatePopulationPerson } from "../character/populationDomain.js";
 import { isVenueOfferItemActive } from "./venueOfferDomain.js";
 import { createVenueMenuRuntime } from "./venueMenuRuntime.js";
-import { getSalePrice } from "./saleProfileDomain.js";
+import {
+  chooseServiceFormat,
+  getSalePrice,
+  SERVICE_FORMATS,
+} from "./saleProfileDomain.js";
 import {
   hasCapacityForVisitGroup,
   recordCompletedVisit,
@@ -109,6 +113,48 @@ export function createTavernServiceRuntime(scene, {
     servicePlaceByGuest.delete(guestId);
     guestByServicePlace.delete(tableId);
     return true;
+  };
+  const claimVisitService = (guestId, itemId, {
+    preferredServingTableId = null,
+    preferTakeaway = false,
+    requestedFormat = null,
+  } = {}) => {
+    const candidates = servingTableIds()
+      .filter((tableId) => !guestByServicePlace.has(tableId) || guestByServicePlace.get(tableId) === guestId);
+    const exactStockTableIds = candidates.filter((tableId) => {
+      const stock = getServingTableStock(sessionState.gameplay.kitchen, tableId);
+      return stock.itemId === itemId && stock.quantity > stock.reservations.length;
+    });
+    let serviceFormat = chooseServiceFormat(itemId, {
+      hasSelfServiceStock: exactStockTableIds.length > 0,
+      hasServicePlace: candidates.length > 0,
+      preferTakeaway,
+      requestedFormat,
+    });
+    if (!serviceFormat && requestedFormat && candidates.length > 0) {
+      serviceFormat = chooseServiceFormat(itemId, {
+        hasSelfServiceStock: exactStockTableIds.length > 0,
+        hasServicePlace: true,
+        preferTakeaway,
+      });
+    }
+    if (serviceFormat === SERVICE_FORMATS.selfService) {
+      for (const tableId of exactStockTableIds) {
+        const reservation = reserveServingItem(sessionState.gameplay.kitchen, guestId, [tableId], itemId);
+        if (!reservation) continue;
+        const place = claimServicePlace(guestId, itemId, tableId);
+        if (place) return { ...place, serviceFormat, reservation };
+        releaseServingReservation(sessionState.gameplay.kitchen, guestId, tableId);
+      }
+      serviceFormat = chooseServiceFormat(itemId, {
+        hasSelfServiceStock: false,
+        hasServicePlace: candidates.length > 0,
+        preferTakeaway,
+      });
+    }
+    if (!serviceFormat) return null;
+    const place = claimServicePlace(guestId, itemId, preferredServingTableId);
+    return place ? { ...place, serviceFormat, reservation: null } : null;
   };
   const claimNeedFacility = (guestId, intent, preferredFacilityId = null) => {
     const existing = needFacilityByGuest.get(guestId);
@@ -354,6 +400,7 @@ export function createTavernServiceRuntime(scene, {
     getSignPoint,
     getServicePoint,
     claimServicePlace,
+    claimVisitService,
     releaseServicePlace,
     claimNeedFacility,
     releaseNeedFacility,
@@ -485,16 +532,39 @@ export function createTavernServiceRuntime(scene, {
         person.id,
         itemId,
         sessionState.gameplay.venueOffer.foodItemIds,
-        { offerFit: 0.75 },
+        { offerFit: 0.75, serviceFormat: SERVICE_FORMATS.assisted },
       ) : false;
     },
-    forceGuestOrder(personId = null, itemId = null) {
+    forceGuestOrder(personId = null, itemId = null, { serviceFormat = SERVICE_FORMATS.assisted } = {}) {
       const active = guestRuntime.getActivePersonIds();
       const person = personId
         ? sessionState.gameplay.population.find((candidate) => candidate.id === personId && !active.includes(candidate.id))
         : sessionState.gameplay.population.find((candidate) => !active.includes(candidate.id));
       const exactItemId = itemId ?? sessionState.gameplay.venueOffer.foodItemIds[0] ?? null;
-      return person ? guestRuntime.spawnVisit(person.id, exactItemId, [exactItemId], { offerFit: 1 }) : false;
+      return person ? guestRuntime.spawnVisit(person.id, exactItemId, [exactItemId], {
+        offerFit: 1,
+        serviceFormat: serviceFormat === "auto" ? null : serviceFormat,
+      }) : false;
+    },
+    forceGuestGroup(participants = []) {
+      const active = new Set(guestRuntime.getActivePersonIds());
+      const requested = Array.isArray(participants) ? participants : [];
+      const materializable = requested.map((participant) => {
+        const person = sessionState.gameplay.population.find((candidate) => (
+          candidate.id === participant?.personId && !active.has(candidate.id)
+        ));
+        if (!person) return null;
+        return {
+          personId: person.id,
+          orderItemId: participant.itemId,
+          acceptableItemIds: [participant.itemId],
+          options: {
+            offerFit: 1,
+            serviceFormat: participant.serviceFormat === "auto" ? null : participant.serviceFormat,
+          },
+        };
+      });
+      return materializable.every(Boolean) ? guestRuntime.spawnVisitGroup(materializable) : false;
     },
     getOrderInteractionDefinitions: () => guestRuntime.getInteractionDefinitions(),
     getGuestInteractionDefinitions: () => guestRuntime.getInteractionDefinitions(),

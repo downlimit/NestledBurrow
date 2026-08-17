@@ -35,14 +35,16 @@ const rejectedFoodPreferences = {
   ingredient: { potato: -1, lemon: -1 },
 };
 
-assert.equal(SESSION_STATE_VERSION, 18);
-assert.equal(SAVE_SCHEMA_VERSION, 18);
+assert.equal(SESSION_STATE_VERSION, 19);
+assert.equal(SAVE_SCHEMA_VERSION, 19);
 assert.deepEqual(SPENDING_CAPACITY_VALUES, [2, 4, 6]);
 assert.deepEqual(SALE_PROFILES["fried-potato-dish"], {
   itemId: "fried-potato-dish", price: 4, cuisine: "local", dishClass: "hot", ingredients: ["potato"],
+  serviceFormats: ["assisted", "self-service"],
 });
 assert.deepEqual(SALE_PROFILES.lemonade, {
   itemId: "lemonade", price: 2, cuisine: "local", dishClass: "drink", ingredients: ["lemon"],
+  serviceFormats: ["assisted", "takeaway", "self-service"],
 });
 assert.equal(getSalePrice("fried-potato-dish"), 4);
 assert.equal(getSalePrice("lemonade"), 2);
@@ -153,8 +155,8 @@ v14.gameplay.tavernService = {
 };
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 14, state: v14 }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 18);
-assert.equal(migrated.state.version, 18);
+assert.equal(migrated.schemaVersion, 19);
+assert.equal(migrated.state.version, 19);
 assert.equal(migrated.state.gameplay.tavernService.opportunityRemainingMs, 4_500);
 assert.deepEqual(migrated.state.gameplay.tavernService.visitorHistoryByPersonId, {});
 assert.equal(new Set(migrated.state.gameplay.tavernService.guests.map(({ personId }) => personId)).size, 2);

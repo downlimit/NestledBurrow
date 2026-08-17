@@ -20,6 +20,7 @@ import {
   shouldInterruptOrder,
   stableIntentDurationMs,
 } from "./guestIntentDomain.js";
+import { isServiceFormatAllowed, SERVICE_FORMATS } from "./saleProfileDomain.js";
 
 const NAVIGATION_CELL_SIZE = 16;
 const TARGET_SEARCH_RADIUS_CELLS = 2;
@@ -55,6 +56,7 @@ export function createGuestRuntime({
   getSignPoint = () => config.points.sign,
   getServicePoint,
   claimServicePlace = () => null,
+  claimVisitService = null,
   releaseServicePlace = () => false,
   claimNeedFacility = () => null,
   releaseNeedFacility = () => false,
@@ -84,6 +86,16 @@ export function createGuestRuntime({
   if (typeof getSignPoint !== "function" || typeof getServicePoint !== "function") {
     throw new Error("Guest runtime requires live sign and service-place point resolvers");
   }
+  const claimServiceForVisit = typeof claimVisitService === "function"
+    ? claimVisitService
+    : (guestId, itemId, options = {}) => {
+      const place = claimServicePlace(guestId, itemId, options.preferredServingTableId);
+      const requested = options.requestedFormat;
+      const serviceFormat = requested !== SERVICE_FORMATS.selfService && isServiceFormatAllowed(itemId, requested)
+        ? requested
+        : SERVICE_FORMATS.assisted;
+      return place ? { ...place, serviceFormat, reservation: null } : null;
+    };
   const visits = new Map();
   let playerFeedback = null;
   let playerTalkGuestId = null;
@@ -162,6 +174,7 @@ export function createGuestRuntime({
       order,
       acceptableItemIds,
       offerFit: options.offerFit,
+      requestedServiceFormat: options.serviceFormat,
     });
     visits.set(id, visit);
     visit.feedback.set("arriving");
@@ -211,7 +224,17 @@ export function createGuestRuntime({
     return guestIds;
   }
 
-  function baseVisit({ id, personId, character, controller, feedback, order, acceptableItemIds, offerFit = 0.5 }) {
+  function baseVisit({
+    id,
+    personId,
+    character,
+    controller,
+    feedback,
+    order,
+    acceptableItemIds,
+    offerFit = 0.5,
+    requestedServiceFormat = null,
+  }) {
     return {
       id,
       personId,
@@ -231,6 +254,9 @@ export function createGuestRuntime({
       orderTimedOut: false,
       acceptableItemIds: [...acceptableItemIds],
       servingTableId: null,
+      serviceFormat: null,
+      requestedServiceFormat,
+      servicePlaceActive: false,
       reservationActive: false,
       servedItemOnTable: false,
       mealCompleted: false,
@@ -275,6 +301,8 @@ export function createGuestRuntime({
       stateElapsedMs: snapshot.stateElapsedMs,
       signDecision: true,
       servingTableId: snapshot.servingTableId,
+      serviceFormat: snapshot.serviceFormat,
+      servicePlaceActive: snapshot.servicePlaceActive,
       reservationActive: snapshot.reservationActive,
       servedItemOnTable: Boolean(snapshot.servedItemOnTable || snapshot.order.status === ORDER_STATUS.served && snapshot.reservationActive),
       mealCompleted: snapshot.mealCompleted,
@@ -286,7 +314,9 @@ export function createGuestRuntime({
       menuComplete: Boolean(snapshot.menuComplete || snapshot.order.status !== ORDER_STATUS.planned),
       fulfillmentElapsedMs: Number(snapshot.fulfillmentElapsedMs) || snapshot.order.statusElapsedMs || 0,
     });
-    if (visit.servingTableId) claimServicePlace(visit.id, visit.order.itemId, visit.servingTableId);
+    if (visit.servicePlaceActive && visit.servingTableId) {
+      claimServicePlace(visit.id, visit.order.itemId, visit.servingTableId);
+    }
     if (visit.reservationActive) reserveExactItem(visit.id, visit.servingTableId, visit.order.itemId);
     visits.set(visit.id, visit);
     visit.atServiceTable = isNearPoint(visit.character.motor.position, getServicePoint(visit.servingTableId), config.arrivalRadius);
@@ -382,8 +412,12 @@ export function createGuestRuntime({
       leaveWithoutFailure(visit);
       return;
     }
-    const place = claimServicePlace(visit.id, visit.order.itemId, visit.servingTableId);
-    if (!place) {
+    const service = claimServiceForVisit(visit.id, visit.order.itemId, {
+      preferredServingTableId: visit.servingTableId,
+      preferTakeaway: shouldDrinkTakeout(getPerson(visit.personId)),
+      requestedFormat: visit.requestedServiceFormat,
+    });
+    if (!service) {
       if (visit.stateElapsedMs >= (config.signReactionMs ?? 0) + (config.orderStationWaitMs ?? 10_000)) {
         onOpenUnserved({
           guestId: visit.id,
@@ -395,9 +429,35 @@ export function createGuestRuntime({
       }
       return;
     }
-    visit.servingTableId = place.servingTableId;
+    visit.servingTableId = service.servingTableId;
+    visit.serviceFormat = service.serviceFormat;
+    visit.servicePlaceActive = true;
+    if (service.reservation) {
+      commitSelfService(visit, service.reservation);
+      return;
+    }
     visit.menuStarted = true;
     visit.feedback.set("reading-menu");
+    transition(visit, GUEST_STATES.approachingOrder, getServicePoint(visit.servingTableId), { preserveFeedback: true });
+  }
+
+  function commitSelfService(visit, reservation) {
+    visit.menuStarted = true;
+    visit.menuComplete = true;
+    visit.menuElapsedMs = visit.menuDurationMs;
+    transitionOrder(visit.order, ORDER_STATUS.offered);
+    transitionOrder(visit.order, ORDER_STATUS.accepted);
+    transitionOrder(visit.order, ORDER_STATUS.reserved);
+    visit.reservationActive = true;
+    onReservationChange({
+      guestId: visit.id,
+      active: true,
+      itemId: reservation.itemId,
+      servingTableId: reservation.servingTableId,
+      serviceFormat: visit.serviceFormat,
+    });
+    onOrderChange(orderSnapshot(visit));
+    setOrderFeedback(visit);
     transition(visit, GUEST_STATES.approachingOrder, getServicePoint(visit.servingTableId), { preserveFeedback: true });
   }
 
@@ -432,13 +492,19 @@ export function createGuestRuntime({
   }
 
   function beginConsumption(visit, person) {
+    visit.takeoutDrink = visit.serviceFormat === SERVICE_FORMATS.takeaway;
+    if (visit.takeoutDrink && !consumeTableItem(visit)) {
+      failAcceptedOrder(visit, "takeaway-item-missing");
+      return;
+    }
     transitionOrder(visit.order, ORDER_STATUS.served);
     visit.servedItemOnTable = true;
     visit.stateElapsedMs = 0;
-    visit.takeoutDrink = visit.order.itemId === "lemonade" && shouldDrinkTakeout(person);
     onOrderChange(orderSnapshot(visit));
     if (visit.takeoutDrink) {
-      consumeTableItem(visit);
+      visit.servedItemOnTable = false;
+      visit.mealCompleted = true;
+      releaseVisitServicePlace(visit);
       applyGuestNeedResolution(person, GUEST_INTENTS.food, 35);
       beginOutcome(visit, person);
       return;
@@ -672,6 +738,7 @@ export function createGuestRuntime({
       order: { ...visit.order },
       itemLabel: getItemLabel(visit.order.itemId),
       guestId: visit.id,
+      serviceFormat: visit.serviceFormat,
     };
   }
 
@@ -728,7 +795,7 @@ export function createGuestRuntime({
       transitionOrder(visit.order, ORDER_STATUS.failed);
     }
     visit.failureRecorded = true;
-    releaseServicePlace(visit.id, visit.servingTableId);
+    releaseVisitServicePlace(visit);
     releaseNeedFacility(visit.id, visit.needFacilityId);
     onOrderFailure({ ...orderSnapshot(visit), reason });
     onOrderChange(orderSnapshot(visit));
@@ -747,7 +814,7 @@ export function createGuestRuntime({
 
   function leaveWithoutFailure(visit) {
     releaseVisitReservation(visit);
-    releaseServicePlace(visit.id, visit.servingTableId);
+    releaseVisitServicePlace(visit);
     releaseNeedFacility(visit.id, visit.needFacilityId);
     transition(visit, GUEST_STATES.leaving, config.points.exit);
   }
@@ -823,7 +890,7 @@ export function createGuestRuntime({
     if (!visits.has(visit.id)) return;
     visit.state = GUEST_STATES.finished;
     visit.feedback.destroy();
-    releaseServicePlace(visit.id, visit.servingTableId);
+    releaseVisitServicePlace(visit);
     releaseNeedFacility(visit.id, visit.needFacilityId);
     stopPlayerConversation(visit);
     removeGuest(visit.character.id);
@@ -869,8 +936,16 @@ export function createGuestRuntime({
       guestId: visit.id,
       personId: visit.personId,
       servingTableId: visit.servingTableId,
+      serviceFormat: visit.serviceFormat,
       order: { ...visit.order },
     };
+  }
+
+  function releaseVisitServicePlace(visit) {
+    if (!visit.servicePlaceActive) return false;
+    const released = releaseServicePlace(visit.id, visit.servingTableId);
+    visit.servicePlaceActive = false;
+    return released;
   }
 
   function getInteractionDefinitions() {
@@ -916,6 +991,8 @@ export function createGuestRuntime({
       order: { ...visit.order },
       acceptableItemIds: [...visit.acceptableItemIds],
       servingTableId: visit.servingTableId,
+      serviceFormat: visit.serviceFormat,
+      servicePlaceActive: visit.servicePlaceActive,
       reservationActive: visit.reservationActive,
       servedItemOnTable: visit.servedItemOnTable,
       mealCompleted: visit.mealCompleted,
@@ -943,7 +1020,8 @@ export function createGuestRuntime({
       position: { ...visit.character.motor.position },
     })),
     isDishReserved: () => [...visits.values()].some((visit) => visit.reservationActive),
-    isServicePlaceReserved: (tableId) => [...visits.values()].some((visit) => visit.servingTableId === tableId),
+    isServicePlaceReserved: (tableId) => [...visits.values()]
+      .some((visit) => visit.servicePlaceActive && visit.servingTableId === tableId),
     isDiningTableReserved: () => false,
     getState: () => {
       const guests = [...visits.values()].map((visit) => ({
@@ -960,6 +1038,8 @@ export function createGuestRuntime({
         order: { ...visit.order },
         acceptableItemIds: [...visit.acceptableItemIds],
         servingTableId: visit.servingTableId,
+        serviceFormat: visit.serviceFormat,
+        servicePlaceActive: visit.servicePlaceActive,
         diningTableId: null,
         position: { ...visit.character.motor.position },
         menu: { elapsedMs: visit.menuElapsedMs, durationMs: visit.menuDurationMs, complete: visit.menuComplete },

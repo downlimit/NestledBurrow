@@ -7,8 +7,8 @@ This system owns kitchen transformation, service facilities, tavern opening, ven
 ## Player-visible contract
 
 ```text
-potato → preparation → frying → claimed service-capable table → dine-in guest → 4 coins
-lemon + bucket water → juicer → claimed service-capable table → dine-in or intent-driven takeout guest → 2 coins
+potato → preparation → frying → assisted or exact-stock self-service dine-in guest → 4 coins
+lemon + bucket water → juicer → assisted, takeaway or exact-stock self-service guest → 2 coins
 ```
 
 Stage 4 uses the target causality: a persistent person first has a reason to go out, chooses one exact menu item, offers that order in person and creates a service commitment only after the player accepts it.
@@ -65,15 +65,7 @@ Four separate questions remain visible: popularity controls **reach**; reconstru
 
 ## Flow density and pacing
 
-The current one-opportunity-every-`3..8`-real-seconds cadence is prototype instrumentation for quickly exercising demand and service. It is not target progression balance.
-
-Target guest flow must increase planfully over meaningful play time. A short sequence of good visits must not create a runaway feedback loop or an immediate crowd at the entrance. A person's own experience is a major determinant of whether they return; reputation weakly transfers evidence to other people, while ordinary positive service changes aggregate popularity more slowly still.
-
-A large external popularity impulse may temporarily create far more willing visitors than the venue can comfortably serve. The game must not silently discard that pressure as a hard capacity cap: an open venue that cannot admit or serve willing people creates real negative experience. Personal opinions and universal service-reliability reputation then reduce later willingness, so actual guest flow can settle back toward a sustainable range unless the player expands capacity and successfully retains the higher demand. Excess demand does not require physically spawning an unbounded crowd; deterministic offscreen turned-away outcomes are valid when the visual/runtime guest cap is reached.
-
-Established flow also creates an availability expectation. Before configurable schedules exist, sustained manual closure may weakly erode aggregate popularity over elapsed world time even while the tavern is not physically simulated. This closure effect is materially weaker than failure while the venue is open and recovers progressively after renewed successful activity. Exact rates, thresholds and recovery curves are balance parameters.
-
-Once configurable opening hours exist, hours deliberately marked closed by the player's schedule are normal operating policy rather than service failure. The schedule becomes a load-management control: shortening hours reduces forecast demand and required production, while opening during declared hours still carries the stronger obligation to admit and serve the demand the venue accepts.
+The current one-opportunity-every-`3..8`-real-seconds cadence is prototype instrumentation. Flow grows slowly; personal experience dominates return choice, reputation transfers weaker evidence, and positive service changes aggregate popularity more slowly still. Overload above `GUEST_ACTIVE_CAP` records deterministic offscreen `open-unserved` outcomes. Sustained manual closure has a weaker recoverable flow penalty than failure while open. Exact rates remain balance parameters.
 
 ## Persistent people without full offscreen simulation
 
@@ -81,7 +73,9 @@ Offscreen people retain their last state/evaluation time and reconstruct from el
 
 ## Venue formats
 
-Offer and infrastructure may later produce takeaway, cafe/bar, buffet/event or canteen/self-service behavior without explicit mode switches. Food service is implemented first. Future activities may add non-food motives and reuse the same demand structure for other professions.
+Stage 8 derives one visit-local service format from the canonical sale profile and live service infrastructure. The venue has no persisted format setting. `fried-potato-dish` allows assisted dine-in and dine-in self-service; `lemonade` additionally allows takeaway. Exact unreserved stock on a free service-capable table takes the self-service path. Otherwise an available service place supports assisted service or, for a portable item and a guest without another onsite intent, takeaway.
+
+Self-service atomically claims the free table and reserves its exact displayed item. The order advances through the ordinary commitment states without a player `take-order` action. A failed exact capture may fall back to a still-available assisted/takeaway place. Missing live service capacity after a positive visit decision remains `open-unserved`. Event service stays unavailable until real activity infrastructure exists.
 
 ## Food offer and pricing
 
@@ -96,20 +90,9 @@ Early play uses direct open/closed control; a later automated venue may support 
 
 The persisted `venueOffer.foodItemIds` reuses canonical kitchen sellable IDs; `NEW GAME` enables fried potato and lemonade. Offer and physical stock remain independent, and person-backed guests can reserve only accepted items active in the offer. The current prototype produces no physical opportunities while inactive; Stage 6 feedback may still reconstruct the weaker effect of sustained manual closure from elapsed world time.
 
-Future management UI should expose practical forecasts rather than hidden coefficients: expected visitors over a useful day/week horizon, available service capacity, food output, ingredient production, helper output and material/fuel consumption. Changing opening hours should update those forecasts directly so schedule, production and demand can be balanced from one readable view.
-
 ## Experience and negative feedback
 
-A completed or attempted visit can be affected by:
-
-- waiting too long after an accepted order;
-- receiving the wrong order;
-- unavailable or inadequate toilet access when the person needs it;
-- dirt or poor cleanliness;
-- lack of seating or usable space;
-- low-quality ingredients or poor cooking quality;
-- direct conflict with the player;
-- conflict with other guests.
+A visit may react to accepted-order delay/wrong fulfillment, unavailable needed facilities, cleanliness/space/quality and direct conflict.
 
 Preference-sensitive qualities are not universally positive or negative. Cleanliness, noise, social intensity, conflict frequency, cuisine and similar venue traits may attract one audience and repel another when matching person preferences exist.
 
@@ -132,7 +115,7 @@ Validation proceeds through observable slices that may be revised after playtest
 5. **Live guest needs:** every canonical need can affect an onsite visit.
 6. **Feedback:** persistent personal opinion, descriptive venue reputation and aggregate popularity/flow pressure form one causal but non-collapsed feedback loop.
 7. **Groups and time:** stable relationships and shared-clock schedule profiles shape plausible visitors and groups of up to three.
-8. **Venue formats:** infrastructure and offer produce takeaway, restaurant, event or self-service behavior.
+8. **Venue formats:** ordered food and live infrastructure produce assisted dine-in, takeaway or self-service behavior per visit.
 9. **Social lifecycle:** relationships, families, ageing, death and replenishment deepen the population.
 
 Early play prioritizes optimization, then recognizable people, then need-driven social situations.
@@ -141,7 +124,9 @@ Early play prioritizes optimization, then recognizable people, then need-driven 
 
 - After the sign reaction, a guest claims one free `guest-service` facility; serving tables implement it first. Offer fit gives movement-compatible menu reading `2.5..6 s`; `bestOfferItemId` stays hidden until take-order acceptance.
 - Acceptance persists the commitment and starts fulfillment. Exact stock already on or ordinarily served to the claimed table fulfills it; wrong stock is ignored. Reservation/timer survive need interruption.
-- Dine-in food stays visible on that table until standing consumption ends. Drinks share the flow and become takeout only when onsite intents do not justify staying.
+- Assisted service keeps the established menu → offer → player acceptance → fulfillment → payment cycle. Dine-in food stays visible on the claimed table until standing consumption ends.
+- Takeaway keeps player acceptance and exact fulfillment, consumes the handed-over item, releases the service place immediately after transfer, then completes its own satisfaction/payment/history/feedback once while leaving.
+- Self-service reserves pre-existing exact stock before commitment, skips the `take-order` interaction and continues through the same served/completed/payment/history/feedback contracts. One portion can have one reservation.
 - One visit-local satisfaction tier precedes paying; the coin spawns after that timeline. Timeout or critical post-acceptance departure fails once; pre-acceptance departure does not.
 
 ## Live guest intent
@@ -150,7 +135,7 @@ Early play prioritizes optimization, then recognizable people, then need-driven 
 
 ## Implemented stages
 
-Stages 1–4 provide persistent people, offer, demand, order and history; Stage 5 adds live needs/service/satisfaction; Stage 6 adds opinion, reputation and flow. Stage 7 independently combines reputation/time, invites linked on-time people and keeps each agreeing guest independent.
+Stages 1–4 provide persistent people, offer, demand, order and history; Stage 5 adds live needs/service/satisfaction; Stage 6 adds opinion, reputation and flow. Stage 7 independently combines reputation/time, invites linked on-time people and keeps each agreeing guest independent. Stage 8 derives assisted, takeaway and self-service behavior per participant from the ordered item and live infrastructure.
 
 ## Owners
 
@@ -165,7 +150,7 @@ Stages 1–4 provide persistent people, offer, demand, order and history; Stage 
 - persistent opinion, descriptive reputation, flow cadence and overload/closure feedback formulas: `src/tavern/tavernFeedbackDomain.js`;
 - time/reputation candidate diagnostics and linked-party selection: `src/tavern/visitPartyDomain.js`;
 - order state, timers and legal transitions: `src/tavern/orderDomain.js`;
-- visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags: `src/tavern/saleProfileDomain.js`;
+- visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags/allowed service formats: `src/tavern/saleProfileDomain.js`;
 - active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
 - overhead thought/action owner: `src/tavern/overheadPresentationRuntime.js`; guest adapter: `src/tavern/guestFeedback.js`;
 - payment: `src/tavern/coinRuntime.js`;
@@ -183,11 +168,15 @@ Stages 1–4 provide persistent people, offer, demand, order and history; Stage 
 - an active menu uses bounded flow pressure to scale the prototype three-to-eight-second opportunity cadence; this interval is not target progression balance;
 - `venueOffer` remains independent from physical stock: stock cannot create or block demand, and zero stock does not prevent an exact order from being offered;
 - a live visit keeps separate technical `guestId` and stable `personId`; one person cannot have two active visits, and fulfillment may reserve only exact `order.itemId` after acceptance;
+- the sale profile bounds allowed visit-local formats: potato never becomes takeaway; lemonade may be assisted, takeaway or exact-stock self-service;
+- self-service atomically claims one free service place and one exact displayed portion, creates no `take-order` interaction and falls back to a physically available ordinary path after a failed capture;
+- takeaway releases its service place at item transfer; assisted/self-service dine-in retains the place through onsite consumption;
+- accepted `serviceFormat` and whether its service place remains active persist with the guest snapshot and restore without reselection;
 - one `guest-service` facility belongs to at most one active guest/order; exact stock, empty stock, then another free table is preferred;
 - successful purchase records one completed visit; an accepted fulfillment timeout records one failed accepted order; unaccepted or technical cancellation changes neither counter;
 - accepted commitments survive menu deactivation and offer edits, and `served` ends the fulfillment timeout;
 - dine-in food stays on the claimed table through consumption; generic dining tables retain only their ordinary player role;
-- lemonade is two coins and intent-driven takeout; fried potato is four-coin dine-in;
+- lemonade is two coins and may use takeaway; fried potato is four-coin dine-in;
 - canonical needs, exact order and service-table ownership persist; transient intent/presentation may re-arbitrate after load;
 - satisfaction tier 3 is neutral, tiers 4–5 strengthen that person's opinion and tiers 1–2 weaken it; satisfaction itself is never persisted;
 - completed sales reinforce their canonical cuisine/dish-class/ingredient tags with inertia, while universal service reliability remains a separate reputation dimension;
@@ -200,12 +189,12 @@ Stages 1–4 provide persistent people, offer, demand, order and history; Stage 
 
 ## Current baseline
 
-Guests read the menu while entering, reveal the item on acceptance and wait at their table; interruptions resume the same order, satisfaction precedes payment, and history updates once. Opinion/reliability affect willingness; reputation and coarse time independently bias candidates; flow controls cadence. Related on-time people may arrive together with separate visit state. E2E exposes lead, factors and group membership without ordinary UI.
+Guests independently receive assisted, takeaway or self-service behavior after demand/group selection. Assisted orders retain manual acceptance, takeaway frees the handoff table after transfer, and pre-set exact stock may be captured without `take-order`. Interruptions resume the same order, satisfaction precedes payment, and history/feedback update once per person. Opinion/reliability affect willingness; reputation and coarse time independently bias candidates; flow controls cadence.
 
 ## Not yet
 
-Recipe book, broader ingredients/storage, influence, relationship propagation, configurable schedules, families, staff, chairs/seated poses, shared tables/group payment, a visible queue/forecast panel and broader venue formats.
+Recipe book, broader ingredients/storage, influence, relationship propagation, configurable schedules, families, staff, chairs/seated poses, shared tables/group payment, a visible queue/forecast panel, event format and non-food venue formats.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`; focused service, order, population, feedback, group and live-visit Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`; focused service-format, order, population, feedback, group and live-visit Browser E2E.

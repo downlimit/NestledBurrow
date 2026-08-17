@@ -31,8 +31,8 @@ const person = population[0];
 person.needs.satiety = 0;
 person.spendingCapacity = 4;
 
-assert.equal(SESSION_STATE_VERSION, 18);
-assert.equal(SAVE_SCHEMA_VERSION, 18);
+assert.equal(SESSION_STATE_VERSION, 19);
+assert.equal(SAVE_SCHEMA_VERSION, 19);
 
 const neutral = createNeutralTavernFeedbackState(population, 100);
 assert.equal(neutral.flowPressure, 0.5);
@@ -202,8 +202,8 @@ v16.gameplay.tavernService.guests = [{
 }];
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 16, state: v16 }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 18);
-assert.equal(migrated.state.version, 18);
+assert.equal(migrated.schemaVersion, 19);
+assert.equal(migrated.state.version, 19);
 assert.equal(migrated.state.gameplay.coins, 77);
 assert.equal(migrated.state.gameplay.needs.satiety, 31);
 assert.deepEqual(migrated.state.gameplay.venueOffer.foodItemIds, ["lemonade"]);
