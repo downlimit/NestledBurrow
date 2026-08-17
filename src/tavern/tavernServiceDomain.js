@@ -1,5 +1,6 @@
 import { SELLABLE_ITEM_IDS } from "./cookingDomain.js";
 import { normalizeOrder, ORDER_STATUS } from "./orderDomain.js";
+import { isServiceFormatAllowed } from "./saleProfileDomain.js";
 import { VISIT_OPPORTUNITY_INTERVAL_MIN_MS } from "./tavernFeedbackDomain.js";
 
 export {
@@ -59,6 +60,11 @@ export function normalizeTavernServiceState(value = {}, { population = [] } = {}
       fallbackStatus: legacyOrderStatus(raw),
     });
     if (!order) continue;
+    const servingTableId = furnitureId(raw.servingTableId);
+    const serviceFormat = normalizeServiceFormat(raw.serviceFormat, order.itemId);
+    const servicePlaceActive = raw.servicePlaceActive === undefined
+      ? Boolean(servingTableId && !raw.paid && ![ORDER_STATUS.completed, ORDER_STATUS.failed].includes(order.status))
+      : Boolean(raw.servicePlaceActive && servingTableId);
     guests.push({
       id,
       personId,
@@ -68,7 +74,9 @@ export function normalizeTavernServiceState(value = {}, { population = [] } = {}
       itemId: itemId ?? order.itemId,
       order,
       acceptableItemIds: normalizeAcceptableItemIds(raw.acceptableItemIds, itemId),
-      servingTableId: furnitureId(raw.servingTableId),
+      servingTableId,
+      serviceFormat,
+      servicePlaceActive,
       reservationActive: Boolean(raw.reservationActive),
       servedItemOnTable: Boolean(raw.servedItemOnTable),
       mealCompleted: Boolean(raw.mealCompleted),
@@ -81,6 +89,12 @@ export function normalizeTavernServiceState(value = {}, { population = [] } = {}
     });
   }
   return { nextGuestId, opportunityRemainingMs, visitorHistoryByPersonId, guests };
+}
+
+function normalizeServiceFormat(value, itemId) {
+  if (value === undefined || value === null) return null;
+  const serviceFormat = String(value);
+  return isServiceFormatAllowed(itemId, serviceFormat) ? serviceFormat : null;
 }
 
 export function recordCompletedVisit(serviceState, personId, worldTimeSeconds) {

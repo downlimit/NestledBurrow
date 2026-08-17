@@ -251,7 +251,7 @@ test("lemonade guests take out and pay two coins", async ({ page }, testInfo) =>
   await bridge(page, "setServingStock", { itemId: "lemonade", quantity: 1 });
   await openTavern(page);
   expect((await bridge(page, "getTavernState")).open).toBe(true);
-  const guestId = await bridge(page, "forceGuestOrder", { itemId: "lemonade" });
+  const guestId = await bridge(page, "forceGuestOrder", { itemId: "lemonade", serviceFormat: "takeaway" });
   expect(guestId).toBe("tavern-guest-1");
   await advanceUntil(
     page,

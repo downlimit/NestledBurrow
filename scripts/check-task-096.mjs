@@ -35,8 +35,8 @@ import {
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const population = createStage1Population(6 * 60 * 60);
 
-assert.equal(SESSION_STATE_VERSION, 18);
-assert.equal(SAVE_SCHEMA_VERSION, 18);
+assert.equal(SESSION_STATE_VERSION, 19);
+assert.equal(SAVE_SCHEMA_VERSION, 19);
 assert.equal(GUEST_ACTIVE_CAP, 6);
 assert.equal(VISIT_GROUP_MAX_SIZE, 3);
 assert.equal(VISIT_TIME_BALANCE.offScheduleCandidateWeight > 0, true);
@@ -179,8 +179,8 @@ for (const person of v17.gameplay.population) {
 }
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 17, state: v17 }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 18);
-assert.equal(migrated.state.version, 18);
+assert.equal(migrated.schemaVersion, 19);
+assert.equal(migrated.state.version, 19);
 for (const person of migrated.state.gameplay.population) {
   assert.deepEqual(person.relatedPersonIds, createPersonSocialProfile(person.id).relatedPersonIds);
   assert.deepEqual(person.preferredVisitPeriods, createPersonSocialProfile(person.id).preferredVisitPeriods);
@@ -196,4 +196,4 @@ for (const method of ["getDemandProfilePerson", "forceVisitOpportunity", "getLas
   assert(bridgeSource.includes(`${method}:`), `E2E bridge exposes ${method}`);
 }
 
-console.log("Task #096 relationships, time profiles, group visits and schema v18 contracts OK");
+console.log("Task #096 relationships, time profiles, group visits and current schema contracts OK");
