@@ -9,7 +9,7 @@ Persistent people use the same need dimensions. The player keeps live runtime; o
 ## Shared person need contract
 
 - Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic JSON-safe `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
-- Stage 9 derives canonical `ageYears`, `lifeStage`, alive `lifeStatus` and reciprocal family `relationships` (`partner`, `parent`, `child`, `sibling`) from `personId`; `relatedPersonIds` is their visit-group projection. Aging uses `7` game days per life year. Death, birth, relationship mutation and replenishment remain inactive.
+- Stage 9 keeps canonical life/family identity. Aging is stage-based: `newborn 4`, `infant 20`, `toddler 28`, `child 56`, `teen 84`, `youngAdult 112`, `adult 168`, `elder 56+` game days. Death, birth, relationship mutation and replenishment remain inactive.
 - `populationDomain` derives links and preferred periods. Periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`. No social score/global state exists.
 - Relevance reconstructs offscreen needs once from stored state and elapsed world time. A physical guest then advances canonical needs live and rebases evaluation time; no guest-local copy or repeated reconstruction exists.
 - One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume it. Role policy stays outside `populationDomain`.
