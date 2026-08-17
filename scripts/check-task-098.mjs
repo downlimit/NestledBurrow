@@ -26,10 +26,14 @@ const inverseKind = {
 };
 
 assert.equal(SESSION_STATE_VERSION, 19);
-assert.equal(SAVE_SCHEMA_VERSION, 19, "identity-derived life profiles add no mutable save schema fact");
-assert.equal(lifeStageForAgeYears(17), PERSON_LIFE_STAGES.child);
-assert.equal(lifeStageForAgeYears(18), PERSON_LIFE_STAGES.adult);
-assert.equal(lifeStageForAgeYears(64), PERSON_LIFE_STAGES.adult);
+assert.equal(SAVE_SCHEMA_VERSION, 19);
+assert.equal(lifeStageForAgeYears(0), PERSON_LIFE_STAGES.newborn);
+assert.equal(lifeStageForAgeYears(0.25), PERSON_LIFE_STAGES.infant);
+assert.equal(lifeStageForAgeYears(1), PERSON_LIFE_STAGES.toddler);
+assert.equal(lifeStageForAgeYears(5), PERSON_LIFE_STAGES.child);
+assert.equal(lifeStageForAgeYears(13), PERSON_LIFE_STAGES.teen);
+assert.equal(lifeStageForAgeYears(18), PERSON_LIFE_STAGES.youngAdult);
+assert.equal(lifeStageForAgeYears(35), PERSON_LIFE_STAGES.adult);
 assert.equal(lifeStageForAgeYears(65), PERSON_LIFE_STAGES.elder);
 
 const population = createStage1Population(8 * 60 * 60);
@@ -46,17 +50,14 @@ for (const person of population) {
     lifeProfile,
   );
   assert.equal(person.lifeStatus, PERSON_LIFE_STATUSES.alive);
-  assert(Number.isInteger(person.ageYears) && person.ageYears >= 0);
+  assert(Number.isFinite(person.ageYears) && person.ageYears >= 0);
   assert.equal(person.lifeStage, lifeStageForAgeYears(person.ageYears));
   assert.deepEqual(
     person.relatedPersonIds,
     person.relationships.map(({ personId }) => personId),
     "legacy visit grouping remains a projection of typed relationships",
   );
-  assert.deepEqual(
-    createPersonSocialProfile(person.id).relatedPersonIds,
-    person.relatedPersonIds,
-  );
+  assert.deepEqual(createPersonSocialProfile(person.id).relatedPersonIds, person.relatedPersonIds);
   assert.equal(new Set(person.relatedPersonIds).size, person.relatedPersonIds.length);
   for (const relationship of person.relationships) {
     assert.notEqual(relationship.personId, person.id);
@@ -88,7 +89,7 @@ assert(lev.relationships.some(({ personId, kind }) => (
 
 const evaluated = evaluatePersonOffscreen(mira, mira.lastEvaluatedWorldTimeSeconds + 6 * 60 * 60);
 assert.deepEqual(evaluated.relationships, mira.relationships);
-assert.equal(evaluated.ageYears, mira.ageYears);
+assert(evaluated.ageYears > mira.ageYears);
 assert.equal(evaluated.lifeStage, mira.lifeStage);
 assert.equal(evaluated.lifeStatus, mira.lifeStatus);
 
@@ -111,7 +112,7 @@ assert.deepEqual(
     ...createPersonLifeProfile("person-mira"),
     relatedPersonIds: createPersonSocialProfile("person-mira").relatedPersonIds,
   },
-  "Stage 9 baseline life identity is canonical and cannot be forged through save payloads",
+  "invalid life data recovers while family identity stays canonical",
 );
 
 const fresh = createFreshGameSessionState();
@@ -119,4 +120,4 @@ const roundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(fresh));
 assert.equal(roundTrip.status, "loaded");
 assert.deepEqual(roundTrip.state.gameplay.population, fresh.gameplay.population);
 
-console.log("Task #098 age, life-stage and typed family relationship baseline contracts OK");
+console.log("Task #098 age baseline and typed family relationship contracts OK");

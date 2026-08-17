@@ -1,3 +1,4 @@
+import { advancePersonLifecycle } from "../character/populationDomain.js";
 import { NEED_IDS, normalizeNeedValue } from "../needs/needsDomain.js";
 
 export const GUEST_INTENTS = Object.freeze({
@@ -63,6 +64,10 @@ export function advanceLiveGuestNeeds(person, deltaMs, {
   const seconds = Math.max(0, Number(deltaMs) || 0) / 1000;
   const gameHours = seconds / 60;
   let mutated = false;
+  if (Number.isFinite(Number(worldTimeSeconds)) && Number(worldTimeSeconds) >= 0) {
+    const lifecycle = advancePersonLifecycle(person, Number(worldTimeSeconds));
+    mutated = lifecycle.mutated || mutated;
+  }
   for (const needId of NEED_IDS) {
     const baseRate = LIVE_GUEST_NEED_RATES_PER_GAME_HOUR[needId] ?? 0;
     const movementRate = moving && needId === "energy" ? -0.5 : moving && needId === "lustre" ? -0.3 : 0;
