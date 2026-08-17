@@ -1,4 +1,5 @@
 import { NEED_IDS, normalizeNeedValue } from "../needs/needsDomain.js";
+import { secondsOfDay } from "../session/gameClock.js";
 
 export const STAGE1_POPULATION_SIZE = 16;
 export const SPENDING_CAPACITY_VALUES = Object.freeze([2, 4, 6]);
@@ -6,6 +7,16 @@ export const FOOD_PREFERENCE_TAGS = Object.freeze({
   cuisine: Object.freeze(["local"]),
   dishClass: Object.freeze(["hot", "drink"]),
   ingredient: Object.freeze(["potato", "lemon"]),
+});
+export const VISIT_TIME_PERIODS = Object.freeze({
+  night: "night",
+  morning: "morning",
+  day: "day",
+  evening: "evening",
+});
+export const VISIT_TIME_BALANCE = Object.freeze({
+  preferredCandidateWeight: 1,
+  offScheduleCandidateWeight: 0.2,
 });
 
 const STAGE1_IDENTITIES = Object.freeze([
@@ -26,6 +37,34 @@ const STAGE1_IDENTITIES = Object.freeze([
   Object.freeze({ id: "person-lev", displayName: "Lev" }),
   Object.freeze({ id: "person-zoya", displayName: "Zoya" }),
 ]);
+
+const STAGE1_SOCIAL_GROUPS = Object.freeze([
+  Object.freeze(["person-mira", "person-rowan", "person-ilya"]),
+  Object.freeze(["person-anya", "person-tomas", "person-lida"]),
+  Object.freeze(["person-pavel", "person-vera", "person-niko"]),
+  Object.freeze(["person-sonya", "person-emil", "person-daria"]),
+  Object.freeze(["person-mark", "person-nina"]),
+  Object.freeze(["person-lev", "person-zoya"]),
+]);
+
+const STAGE1_PREFERRED_VISIT_PERIODS = Object.freeze({
+  "person-mira": Object.freeze([VISIT_TIME_PERIODS.morning]),
+  "person-rowan": Object.freeze([VISIT_TIME_PERIODS.morning]),
+  "person-ilya": Object.freeze([VISIT_TIME_PERIODS.morning, VISIT_TIME_PERIODS.day]),
+  "person-anya": Object.freeze([VISIT_TIME_PERIODS.day]),
+  "person-tomas": Object.freeze([VISIT_TIME_PERIODS.day]),
+  "person-lida": Object.freeze([VISIT_TIME_PERIODS.day, VISIT_TIME_PERIODS.evening]),
+  "person-pavel": Object.freeze([VISIT_TIME_PERIODS.evening]),
+  "person-vera": Object.freeze([VISIT_TIME_PERIODS.evening]),
+  "person-niko": Object.freeze([VISIT_TIME_PERIODS.evening, VISIT_TIME_PERIODS.night]),
+  "person-sonya": Object.freeze([VISIT_TIME_PERIODS.night]),
+  "person-emil": Object.freeze([VISIT_TIME_PERIODS.night]),
+  "person-daria": Object.freeze([VISIT_TIME_PERIODS.night, VISIT_TIME_PERIODS.morning]),
+  "person-mark": Object.freeze([VISIT_TIME_PERIODS.morning, VISIT_TIME_PERIODS.evening]),
+  "person-nina": Object.freeze([VISIT_TIME_PERIODS.morning, VISIT_TIME_PERIODS.evening]),
+  "person-lev": Object.freeze([VISIT_TIME_PERIODS.day, VISIT_TIME_PERIODS.night]),
+  "person-zoya": Object.freeze([VISIT_TIME_PERIODS.day, VISIT_TIME_PERIODS.night]),
+});
 
 export function createStage1Population(worldTimeSeconds = 0) {
   const evaluationTime = normalizeWorldTime(worldTimeSeconds, 0);
@@ -71,6 +110,8 @@ export function evaluatePersonOffscreen(person, targetWorldTimeSeconds) {
     needs,
     spendingCapacity: baseline.spendingCapacity,
     foodPreferences: baseline.foodPreferences,
+    relatedPersonIds: baseline.relatedPersonIds,
+    preferredVisitPeriods: baseline.preferredVisitPeriods,
     lastEvaluatedWorldTimeSeconds: targetTime,
   };
 }
@@ -114,12 +155,15 @@ export function setPopulationPersonNeed(population, personId, needId, value, wor
 
 function createStage1Person(identity, evaluationTime) {
   const demandProfile = createPersonDemandProfile(identity.id);
+  const socialProfile = createPersonSocialProfile(identity.id);
   return {
     id: identity.id,
     displayName: identity.displayName,
     needs: initialNeeds(identity.id),
     spendingCapacity: demandProfile.spendingCapacity,
     foodPreferences: demandProfile.foodPreferences,
+    relatedPersonIds: socialProfile.relatedPersonIds,
+    preferredVisitPeriods: socialProfile.preferredVisitPeriods,
     lastEvaluatedWorldTimeSeconds: evaluationTime,
   };
 }
@@ -140,6 +184,42 @@ export function createPersonDemandProfile(personId) {
   };
 }
 
+export function createPersonSocialProfile(personId) {
+  const id = String(personId ?? "").trim();
+  if (!id) throw new Error("Person social profile requires a stable id");
+  const group = STAGE1_SOCIAL_GROUPS.find((candidate) => candidate.includes(id));
+  const fallbackPeriods = Object.values(VISIT_TIME_PERIODS);
+  const fallbackPeriod = fallbackPeriods[Math.min(
+    fallbackPeriods.length - 1,
+    Math.floor(stableUnit(`${id}:preferred-visit-period`) * fallbackPeriods.length),
+  )];
+  return {
+    relatedPersonIds: group ? group.filter((relatedPersonId) => relatedPersonId !== id) : [],
+    preferredVisitPeriods: [...(STAGE1_PREFERRED_VISIT_PERIODS[id] ?? [fallbackPeriod])],
+  };
+}
+
+export function visitTimePeriod(worldTimeSeconds) {
+  const hour = secondsOfDay(worldTimeSeconds) / (60 * 60);
+  if (hour < 6) return VISIT_TIME_PERIODS.night;
+  if (hour < 12) return VISIT_TIME_PERIODS.morning;
+  if (hour < 18) return VISIT_TIME_PERIODS.day;
+  return VISIT_TIME_PERIODS.evening;
+}
+
+export function visitTimeFactorForPerson(person, worldTimeSeconds) {
+  const period = visitTimePeriod(worldTimeSeconds);
+  const preferred = Array.isArray(person?.preferredVisitPeriods)
+    && person.preferredVisitPeriods.includes(period);
+  return {
+    period,
+    preferred,
+    timeFactor: preferred
+      ? VISIT_TIME_BALANCE.preferredCandidateWeight
+      : VISIT_TIME_BALANCE.offScheduleCandidateWeight,
+  };
+}
+
 function normalizeStage1Person(value, identity, recoveryTime) {
   const fallback = createStage1Person(identity, recoveryTime);
   if (!isPlainRecord(value)) return fallback;
@@ -149,6 +229,8 @@ function normalizeStage1Person(value, identity, recoveryTime) {
     needs: normalizePersonNeeds(value.needs, fallback.needs),
     spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, fallback.spendingCapacity),
     foodPreferences: normalizeFoodPreferences(value.foodPreferences, fallback.foodPreferences),
+    relatedPersonIds: fallback.relatedPersonIds,
+    preferredVisitPeriods: fallback.preferredVisitPeriods,
     lastEvaluatedWorldTimeSeconds: Math.min(
       recoveryTime,
       normalizeWorldTime(value.lastEvaluatedWorldTimeSeconds, recoveryTime),
@@ -161,12 +243,15 @@ function normalizeEvaluationPerson(value) {
   if (!nonEmptyString(value.displayName)) throw new Error(`Population person ${value.id} requires a display name`);
   const evaluationTime = normalizeWorldTime(value.lastEvaluatedWorldTimeSeconds, 0);
   const demandProfile = createPersonDemandProfile(value.id.trim());
+  const socialProfile = createPersonSocialProfile(value.id.trim());
   return {
     id: value.id.trim(),
     displayName: value.displayName.trim(),
     needs: normalizePersonNeeds(value.needs, initialNeeds(value.id.trim())),
     spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, demandProfile.spendingCapacity),
     foodPreferences: normalizeFoodPreferences(value.foodPreferences, demandProfile.foodPreferences),
+    relatedPersonIds: socialProfile.relatedPersonIds,
+    preferredVisitPeriods: socialProfile.preferredVisitPeriods,
     lastEvaluatedWorldTimeSeconds: evaluationTime,
   };
 }

@@ -232,6 +232,8 @@ export function installWorldE2EBridge(scene) {
         displayName: person.displayName,
         spendingCapacity: person.spendingCapacity,
         foodPreferences: person.foodPreferences,
+        relatedPersonIds: person.relatedPersonIds,
+        preferredVisitPeriods: person.preferredVisitPeriods,
       }) : null;
     },
     setVisitCandidatePersonId: (personId) => getLocationOwners()
@@ -241,6 +243,7 @@ export function installWorldE2EBridge(scene) {
     forceVisitOpportunity: (options) => clone(getLocationOwners()
       .tavernServiceRuntime?.forceVisitOpportunity?.(options) ?? null),
     getLastVisitDecision: () => clone(getLocationOwners().tavernServiceRuntime?.getLastDecision?.() ?? null),
+    getLastVisitGroup: () => clone(getLocationOwners().tavernServiceRuntime?.getLastVisitGroup?.() ?? null),
     getGuestPersonMapping: () => Object.fromEntries(
       (getLocationOwners().guestRuntime?.getState?.().guests ?? []).map(({ id, personId }) => [id, personId]),
     ),
@@ -258,7 +261,10 @@ export function installWorldE2EBridge(scene) {
     setPopulationPersonDemand: ({ personId, satiety, spendingCapacity, foodPreferences } = {}) => {
       const person = scene.sessionState.gameplay.population.find((candidate) => candidate.id === personId);
       if (!person) return false;
-      if (Number.isFinite(Number(satiety))) person.needs.satiety = Math.min(100, Math.max(0, Number(satiety)));
+      if (Number.isFinite(Number(satiety))) {
+        person.needs.satiety = Math.min(100, Math.max(0, Number(satiety)));
+        person.lastEvaluatedWorldTimeSeconds = scene.sessionState.gameplay.worldTimeSeconds;
+      }
       if (Number.isFinite(Number(spendingCapacity))) person.spendingCapacity = Number(spendingCapacity);
       if (foodPreferences && typeof foodPreferences === "object") person.foodPreferences = clone(foodPreferences);
       return true;

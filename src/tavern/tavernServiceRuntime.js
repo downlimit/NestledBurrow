@@ -18,7 +18,7 @@ import { isVenueOfferItemActive } from "./venueOfferDomain.js";
 import { createVenueMenuRuntime } from "./venueMenuRuntime.js";
 import { getSalePrice } from "./saleProfileDomain.js";
 import {
-  GUEST_ACTIVE_CAP,
+  hasCapacityForVisitGroup,
   recordCompletedVisit,
   recordFailedAcceptedOrder,
 } from "./tavernServiceDomain.js";
@@ -30,11 +30,16 @@ import {
   recordCompletedVisitFeedback,
   recordOpenUnservedFeedback,
   sampleVisitOpportunityDelay,
-  selectReputationBiasedCandidate,
   setTavernFlowPressure,
   visitFeedbackFactors,
 } from "./tavernFeedbackDomain.js";
 import { decideFoodVisit } from "./visitDemandDomain.js";
+import {
+  buildVisitCandidateWeights,
+  describeVisitCandidate,
+  selectRelatedVisitCandidates,
+  selectVisitLead,
+} from "./visitPartyDomain.js";
 
 export function createTavernServiceRuntime(scene, {
   sessionState,
@@ -64,6 +69,7 @@ export function createTavernServiceRuntime(scene, {
   let decisionRandomSource = randomSource;
   let forcedCandidatePersonId = null;
   let lastDecision = null;
+  let lastVisitGroup = null;
 
   const definitionsByType = (facilityType) => facilityRuntime?.getDefinitions?.()
     ?.filter((facility) => facility.facilityType === facilityType) ?? [];
@@ -144,72 +150,167 @@ export function createTavernServiceRuntime(scene, {
     syncSign,
   });
 
-  function runVisitOpportunity({ personId = null, roll = null } = {}) {
+  function runVisitOpportunity({
+    personId = null,
+    roll = null,
+    rollsByPersonId = null,
+    includeGroup = null,
+  } = {}) {
     if (!sessionState.gameplay.tavernOpen) return { status: "menu-inactive", decision: null, guestId: null };
     const requestedPersonId = personId ?? forcedCandidatePersonId;
     forcedCandidatePersonId = null;
     const activePersonIds = guestRuntime.getActivePersonIds();
-    const candidate = requestedPersonId
-      ? sessionState.gameplay.population.find((person) => person.id === requestedPersonId
-        && !activePersonIds.includes(person.id)) ?? null
-      : selectReputationBiasedCandidate(
+    const worldTimeSeconds = getWorldTimeSeconds();
+    const selection = requestedPersonId
+      ? forcedVisitLead(requestedPersonId, activePersonIds, worldTimeSeconds)
+      : selectVisitLead(
         sessionState.gameplay.population,
         sessionState.gameplay.tavernFeedback,
         activePersonIds,
+        worldTimeSeconds,
         candidateRandomSource,
       );
+    const candidate = selection.person;
     if (!candidate) return { status: "no-candidate", decision: null, guestId: null };
+    const primary = evaluateVisitParticipant(candidate, worldTimeSeconds, explicitRoll(
+      candidate.id,
+      rollsByPersonId,
+      roll,
+    ));
+    const shouldBuildGroup = includeGroup === null ? requestedPersonId === null : Boolean(includeGroup);
+    const relatedCandidates = primary.decision.decision === "VISIT" && shouldBuildGroup
+      ? selectRelatedVisitCandidates(
+        sessionState.gameplay.population,
+        primary.evaluation.person,
+        activePersonIds,
+        worldTimeSeconds,
+      )
+      : [];
+    const evaluated = [primary, ...relatedCandidates.map((person) => evaluateVisitParticipant(
+      person,
+      worldTimeSeconds,
+      explicitRoll(person.id, rollsByPersonId),
+    ))];
+    const agreed = evaluated.filter(({ decision }) => decision.decision === "VISIT");
+    const capacityAvailable = agreed.length > 0
+      && hasCapacityForVisitGroup(activePersonIds.length, agreed.length);
+    const capacityFeedbacks = !capacityAvailable && agreed.length > 0
+      ? agreed.map(({ person }) => recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
+        personId: person.id,
+        worldTimeSeconds,
+      }))
+      : [];
+    const spawnedGuestIds = capacityAvailable
+      ? guestRuntime.spawnVisitGroup(agreed.map(({ person, decision }) => ({
+        personId: person.id,
+        orderItemId: decision.bestOfferItemId,
+        acceptableItemIds: decision.acceptableItemIds,
+        options: { offerFit: decision.bestOfferFit },
+      })))
+      : [];
+    const guestIds = Array.isArray(spawnedGuestIds) ? spawnedGuestIds : [];
+    const guestIdByPersonId = Object.fromEntries(agreed.map(({ person }, index) => [
+      person.id,
+      guestIds[index] ?? null,
+    ]));
+    const capacityFeedbackByPersonId = Object.fromEntries(capacityFeedbacks.map((feedback) => [
+      feedback.personId,
+      feedback,
+    ]));
+    const primaryCapacityOutcome = capacityFeedbackByPersonId[candidate.id] ?? null;
+    const guestId = guestIdByPersonId[candidate.id] ?? null;
+    lastDecision = {
+      ...primary.decision,
+      guestId: guestId || null,
+      capacityOutcome: primaryCapacityOutcome?.outcome ?? null,
+    };
+    lastVisitGroup = {
+      worldTimeSeconds,
+      period: selection.selected.period,
+      primaryCandidate: { ...selection.selected },
+      candidateWeights: selection.candidateWeights.map((candidateWeight) => ({ ...candidateWeight })),
+      relatedCandidatePersonIds: relatedCandidates.map(({ id }) => id),
+      agreedPersonIds: agreed.map(({ person }) => person.id),
+      materializedPersonIds: agreed.filter(({ person }) => guestIdByPersonId[person.id]).map(({ person }) => person.id),
+      guestIds: [...guestIds],
+      decisions: evaluated.map(({ person, decision, evaluation }) => ({
+        personId: person.id,
+        time: describeVisitCandidate(person, sessionState.gameplay.tavernFeedback, worldTimeSeconds),
+        decision: { ...decision },
+        guestId: guestIdByPersonId[person.id] ?? null,
+        capacityOutcome: capacityFeedbackByPersonId[person.id]?.outcome ?? null,
+        populationEvaluated: evaluation.mutated,
+      })),
+    };
+    onPersistentMutation({
+      status: "visit-opportunity-evaluated",
+      mutated: Boolean(evaluated.some(({ evaluation }) => evaluation.mutated)
+        || guestIds.length > 0 || capacityFeedbacks.length > 0),
+      personId: candidate.id,
+      personIds: evaluated.map(({ person }) => person.id),
+      decision: lastDecision,
+      visitGroup: lastVisitGroup,
+      feedback: primaryCapacityOutcome,
+      feedbacks: capacityFeedbacks,
+    });
+    const turnedAway = capacityFeedbacks.length > 0;
+    return {
+      status: turnedAway
+        ? agreed.length > 1 ? "group-turned-away-cap" : "visitor-turned-away-cap"
+        : guestIds.length > 1 ? "group-visit-started" : guestId ? "visit-started" : "decision-complete",
+      decision: { ...lastDecision },
+      guestId: guestId || null,
+      guestIds: [...guestIds],
+      visitGroup: clone(lastVisitGroup),
+      feedback: primaryCapacityOutcome,
+      feedbacks: capacityFeedbacks.map((feedback) => ({ ...feedback })),
+    };
+  }
+
+  function forcedVisitLead(personId, activePersonIds, worldTimeSeconds) {
+    const person = sessionState.gameplay.population.find((candidate) => candidate.id === personId
+      && !activePersonIds.includes(candidate.id)) ?? null;
+    if (!person) return { person: null, selected: null, candidateWeights: [] };
+    return {
+      person,
+      selected: describeVisitCandidate(person, sessionState.gameplay.tavernFeedback, worldTimeSeconds),
+      candidateWeights: buildVisitCandidateWeights(
+        sessionState.gameplay.population,
+        sessionState.gameplay.tavernFeedback,
+        activePersonIds,
+        worldTimeSeconds,
+      ).map(({ person: _person, ...candidateWeight }) => candidateWeight),
+    };
+  }
+
+  function evaluateVisitParticipant(person, worldTimeSeconds, requestedRoll = null) {
     const evaluation = evaluatePopulationPerson(
       sessionState.gameplay.population,
-      candidate.id,
-      getWorldTimeSeconds(),
+      person.id,
+      worldTimeSeconds,
     );
     const feedbackFactors = visitFeedbackFactors(
       sessionState.gameplay.tavernFeedback,
-      candidate.id,
-      getWorldTimeSeconds(),
+      person.id,
+      worldTimeSeconds,
     );
     const decision = decideFoodVisit({
       person: evaluation.person,
       venueOffer: sessionState.gameplay.venueOffer,
-      visitorHistory: sessionState.gameplay.tavernService.visitorHistoryByPersonId[candidate.id],
+      visitorHistory: sessionState.gameplay.tavernService.visitorHistoryByPersonId[person.id],
       ...feedbackFactors,
-      worldTimeSeconds: getWorldTimeSeconds(),
-      randomSource: Number.isFinite(Number(roll)) ? () => Number(roll) : decisionRandomSource,
+      worldTimeSeconds,
+      randomSource: isFiniteRoll(requestedRoll) ? () => Number(requestedRoll) : decisionRandomSource,
     });
-    let guestId = null;
-    let capacityOutcome = null;
-    if (decision.decision === "VISIT" && activePersonIds.length >= GUEST_ACTIVE_CAP) {
-      capacityOutcome = recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
-        personId: candidate.id,
-        worldTimeSeconds: getWorldTimeSeconds(),
-      });
-    } else if (decision.decision === "VISIT") {
-      guestId = guestRuntime.spawnVisit(
-        candidate.id,
-        decision.bestOfferItemId,
-        decision.acceptableItemIds,
-        { offerFit: decision.bestOfferFit },
-      );
-    }
-    lastDecision = {
-      ...decision,
-      guestId: guestId || null,
-      capacityOutcome: capacityOutcome?.outcome ?? null,
-    };
-    onPersistentMutation({
-      status: "visit-opportunity-evaluated",
-      mutated: Boolean(evaluation.mutated || guestId || capacityOutcome),
-      personId: candidate.id,
-      decision: lastDecision,
-      feedback: capacityOutcome,
-    });
-    return {
-      status: capacityOutcome ? "visitor-turned-away-cap" : guestId ? "visit-started" : "decision-complete",
-      decision: { ...lastDecision },
-      guestId: guestId || null,
-      feedback: capacityOutcome,
-    };
+    return { person: evaluation.person, evaluation, decision };
+  }
+
+  function explicitRoll(personId, rollsByPersonId, primaryRoll = null) {
+    const requested = rollsByPersonId && typeof rollsByPersonId === "object"
+      ? rollsByPersonId[personId]
+      : undefined;
+    if (isFiniteRoll(requested)) return Number(requested);
+    return isFiniteRoll(primaryRoll) ? Number(primaryRoll) : null;
   }
 
   function updateOpportunityScheduler(deltaMs) {
@@ -416,6 +517,7 @@ export function createTavernServiceRuntime(scene, {
       return true;
     },
     getLastDecision: () => lastDecision ? { ...lastDecision, acceptableItemIds: [...lastDecision.acceptableItemIds] } : null,
+    getLastVisitGroup: () => clone(lastVisitGroup),
     getVisitorHistory: () => JSON.parse(JSON.stringify(sessionState.gameplay.tavernService.visitorHistoryByPersonId)),
     getFeedbackState: () => cloneTavernFeedbackState(sessionState.gameplay.tavernFeedback),
     setFlowPressure(value) {
@@ -470,4 +572,12 @@ export function createTavernServiceRuntime(scene, {
       coinRuntime.destroy();
     },
   };
+}
+
+function clone(value) {
+  return value === null || value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+function isFiniteRoll(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }

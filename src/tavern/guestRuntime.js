@@ -1,5 +1,6 @@
 import { createActorNavigation, findGridPath } from "./gridPathfinder.js";
 import { GUEST_ACTIVE_CAP } from "./tavernServiceDomain.js";
+import { VISIT_GROUP_MAX_SIZE } from "./visitPartyDomain.js";
 import {
   advanceOrderTimer,
   createPlannedOrder,
@@ -151,7 +152,7 @@ export function createGuestRuntime({
     try { order = createPlannedOrder(orderItemId); } catch { return false; }
     const id = `tavern-guest-${++serviceState.nextGuestId}`;
     const controller = config.createController();
-    const character = createGuest(controller, id, config.points.spawn);
+    const character = createGuest(controller, id, options.spawnPosition ?? config.points.spawn);
     const visit = baseVisit({
       id,
       personId,
@@ -170,6 +171,44 @@ export function createGuestRuntime({
     }
     syncPersistedState();
     return id;
+  }
+
+  function spawnVisitGroup(participants) {
+    if (!Array.isArray(participants) || participants.length === 0
+      || participants.length > VISIT_GROUP_MAX_SIZE) return false;
+    if (destroyed || visits.size + participants.length > GUEST_ACTIVE_CAP) return false;
+    const activePersonIds = new Set([...visits.values()].map((visit) => visit.personId));
+    const requestedPersonIds = new Set();
+    for (const participant of participants) {
+      if (!participant?.personId || activePersonIds.has(participant.personId)
+        || requestedPersonIds.has(participant.personId)) return false;
+      try { createPlannedOrder(participant.orderItemId); } catch { return false; }
+      requestedPersonIds.add(participant.personId);
+    }
+    const offsets = participants.length === 1 ? [0] : participants.length === 2 ? [-5, 5] : [-7, 0, 7];
+    const guestIds = [];
+    for (let index = 0; index < participants.length; index += 1) {
+      const participant = participants[index];
+      const guestId = spawnVisit(
+        participant.personId,
+        participant.orderItemId,
+        participant.acceptableItemIds,
+        {
+          ...(participant.options ?? {}),
+          spawnPosition: {
+            x: config.points.spawn.x + offsets[index],
+            y: config.points.spawn.y,
+          },
+        },
+      );
+      if (!guestId) {
+        for (const spawnedGuestId of guestIds) finishVisit(visits.get(spawnedGuestId));
+        syncPersistedState();
+        return false;
+      }
+      guestIds.push(guestId);
+    }
+    return guestIds;
   }
 
   function baseVisit({ id, personId, character, controller, feedback, order, acceptableItemIds, offerFit = 0.5 }) {
@@ -892,6 +931,7 @@ export function createGuestRuntime({
   return Object.freeze({
     update,
     spawnVisit,
+    spawnVisitGroup,
     acceptGuestOrder,
     handleGuestInteraction,
     getInteractionDefinitions,

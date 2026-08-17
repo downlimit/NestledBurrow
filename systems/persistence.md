@@ -8,7 +8,7 @@ This system separates player session progress from developer-authored project de
 
 `src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, persistent population/demand profiles, inventory/loadout/world items, resources, farm/water, kitchen, `venueOffer`, tavern sign/timer/history/guest orders, tavern-owned opinions/reputation/flow/outcome counts and coins. Visit-local satisfaction, selection, decision diagnostics and open presentation state are transient.
+Session data includes player/world progress, needs, persistent population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. Visit-local satisfaction, group selection/diagnostics and open presentation are transient.
 
 The BUILD/TEST panel view and person-inspection hover/pin/expansion are transient prototype UI state and add no schema fields. TEST item/coin grants mutate existing canonical gameplay fields; inspector edits mutate existing population needs and rebase the stored evaluation timestamp, so ordinary save/reload preserves their results.
 
@@ -34,6 +34,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 - schema v14 migrates once to v15 by adding deterministic spending/preferences, the opportunity timer, per-person visitor history and unique `personId`/acceptable items to active guest snapshots while preserving their technical IDs and service state;
 - schema v15 migrates once to v16 by deriving one deterministic exact order for every retained active guest, preserving reservations/stations and adding zeroed failed-accepted-order history fields; accepted order item, status and elapsed fulfillment wait persist thereafter;
 - schema v16 migrates once to v17 by adding neutral tavern-owned opinions and descriptive reputation plus baseline bounded flow pressure while preserving all population, needs, menu, kitchen, active guest/order, objective history, inventory and coin progress;
+- schema v17→v18 derives canonical relationships/visit periods while preserving all progress;
 - the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
 - dropped items persist only stable ID, item payload and logical position;
 - selected slot, in-flight drag state, throw arc, gain feedback and fade timers are not persisted;
@@ -41,7 +42,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v17 save/reload and migrations work. The normalized food offer survives alongside stable population IDs, names, needs, budgets/preferences and evaluation timestamps. Tavern opinions, descriptive reputation, flow pressure and feedback outcome counts survive with opportunity state, objective completed/failed service history and active guest→person→exact-order mappings, assigned stations, remaining wait semantics, inventory, farm, kitchen stock/repair and coins. Authoring backups survive page reload and `NEW GAME`.
+Schema v18 persists normalized people including demand, reciprocal links and visit periods, plus offer, feedback/flow, history, active guest→person→order mappings, stations, inventory, farm, kitchen and coins. Group diagnostics stay transient; authoring backups survive reload and `NEW GAME`.
 
 ## Not yet
 
@@ -49,4 +50,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, domain-specific checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, domain-specific checks, `check:authoring`, persistence Browser E2E.
