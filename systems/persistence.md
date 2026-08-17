@@ -8,13 +8,15 @@ This system separates player session progress from developer-authored project de
 
 `src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, persistent population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. An accepted active guest also persists the selected service format and live service-place ownership. Visit-local satisfaction, group selection/diagnostics and open presentation are transient.
+Session data includes player/world progress, needs, population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. Accepted guests also persist service format/place ownership. Visit-local satisfaction, group diagnostics and presentation are transient.
 
-The BUILD/TEST panel view and person-inspection hover/pin/expansion are transient prototype UI state and add no schema fields. TEST item/coin grants mutate existing canonical gameplay fields; inspector edits mutate existing population needs and rebase the stored evaluation timestamp, so ordinary save/reload preserves their results.
+Stage-9 age/life/family fields are canonical projections of `personId`; forged or missing copies normalize under schema v19. Task #098 adds no mutable save fact or migration. Aging, death, birth and relationship mutation need a later persistence contract.
+
+BUILD/TEST view and person-inspection hover/pin/expansion are transient. TEST grants use existing gameplay fields; inspector edits use existing population needs and rebase evaluation time, so save/reload preserves results.
 
 ## Authoring data
 
-Starting layout, collider/profile drafts and authoring backups are developer tools. They may use browser storage and local dev write endpoints, but are not automatically part of gameplay construction save.
+Starting layout, collider/profile drafts and authoring backups are developer tools. Browser storage/dev write endpoints do not make them gameplay save data.
 
 ## `NEW GAME`
 
@@ -43,7 +45,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v19 persists normalized people including demand, reciprocal links and visit periods, plus offer, feedback/flow, history, active guest→person→order→service-format mappings, active station ownership, inventory, farm, kitchen and coins. Group diagnostics stay transient; authoring backups survive reload and `NEW GAME`.
+Schema v19 persists people, offer, feedback/flow, history, active guest→person→order→service-format mappings, station ownership, inventory, farm, kitchen and coins. Age/life/family derives from canonical identity on normalize/load, including older v19 payloads. Group diagnostics stay transient; authoring backups survive `NEW GAME`.
 
 ## Not yet
 
@@ -51,4 +53,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, domain-specific checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-098`, domain-specific checks, `check:authoring`, persistence Browser E2E.
