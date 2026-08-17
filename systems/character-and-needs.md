@@ -4,18 +4,17 @@
 
 Owns movement, time, sleep, energy and the canonical `0..100` need set. HUD order for the player: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure; no passive bonus stack.
 
-The same need dimensions and meanings apply to persistent people in the population. The player keeps the full live runtime; offscreen people use bounded coarse reconstruction and future visible NPC behavior may use person-specific rates without inventing a separate need vocabulary.
+Persistent people use the same need dimensions. The player keeps live runtime; offscreen people use coarse reconstruction and may later have person-specific rates without another need set.
 
 ## Shared person need contract
 
-- Persistent people share the player's canonical `N E S T L D` dimensions. Stage-3 also persists deterministic, JSON-safe `spendingCapacity` and layered cuisine/dish/ingredient preferences; venue history remains external.
-- Stage-9 baseline derives a stable prototype `ageYears`, `lifeStage`, alive `lifeStatus` and reciprocal typed family `relationships` from identity. Supported relationship kinds are partner, parent, child and sibling. `relatedPersonIds` remains the compatibility projection consumed by current group visits.
-- Age/family data is identity-derived in this slice: save payloads cannot forge it, and missing copies are reconstructed from `personId` without a new mutable save schema fact. Aging, death, birth, relationship mutation and population replenishment are not active yet.
-- `populationDomain` derives links and preferred periods from identity. `worldTimeSeconds` periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; prototype preferred/off-schedule factors are `1/0.2`. No social score or global state exists.
-- Relevance reconstructs offscreen needs once from stored state, elapsed world time and bounded variation. A physical guest then advances the canonical population needs live and rebases evaluation time; there is no guest-local copy or repeated reconstruction.
-- One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume its commitment. Role policy stays outside `populationDomain`.
-- A live actor bound to `personId` shows its display name and expands the shared player-style `N E S T L D` panel after `667 ms`; coarse pointers use tap/long-press.
-- Bar editing maps the pointer to `0..100`, mutates that exact persistent person through the population owner and rebases `lastEvaluatedWorldTimeSeconds`; visits/orders remain unchanged.
+- Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic JSON-safe `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
+- Stage-9 baseline derives canonical `ageYears`, `lifeStage`, alive `lifeStatus` and reciprocal family `relationships` (`partner`, `parent`, `child`, `sibling`) from `personId`; `relatedPersonIds` is their visit-group projection. Save data cannot forge these values. Aging, death, birth, relationship mutation and population replenishment remain inactive.
+- `populationDomain` derives links and preferred periods. Periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`. No social score/global state exists.
+- Relevance reconstructs offscreen needs once from stored state and elapsed world time. A physical guest then advances canonical needs live and rebases evaluation time; no guest-local copy or repeated reconstruction exists.
+- One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume it. Role policy stays outside `populationDomain`.
+- A live `personId` actor shows its name and expands the shared `N E S T L D` panel after `667 ms`; coarse pointers use tap/long-press.
+- Bar editing maps to `0..100`, mutates that person through the population owner and rebases `lastEvaluatedWorldTimeSeconds`; visits/orders stay unchanged.
 - Hover/pin/expansion are transient prototype tooling and may later move without changing person state or formulas.
 
 ## Time, energy and satiety
@@ -101,7 +100,7 @@ The target need is protected through exit; recovery is active-only. Normal cance
 
 ## Current baseline
 
-`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, stable age/life/family profiles, budget/preferences, visit links/time profiles and deterministic coarse reconstruction. Tavern-local `guestIntentDomain` owns live advancement/arbitration; `guestRuntime` retains `personId` and resolves the canonical person. `personInspectionRuntime` owns actor selection and need-bar input, so edits reach the next guest arbitration. `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
+`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, age/life/family, budget/preferences, visit profiles and coarse reconstruction. `guestIntentDomain` owns live guest arbitration; `guestRuntime` resolves canonical `personId`. `personInspectionRuntime` owns actor selection/need edits; `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
 
 ## Evidence
 
