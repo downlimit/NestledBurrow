@@ -24,6 +24,14 @@ assert(workflow.includes("Run owner and system checks"), "owner/system contracts
 assert(workflow.includes("Run historical regressions"), "historical regressions must remain in full CI");
 assert(workflow.includes("needs: [scope, build]"), "browser shards must wait for static validation");
 assert(workflow.includes("needs.build.result == 'success'"), "browser regression must not start on a red static head");
+assert(
+  /github\.event\.action == 'edited' \|\|\s*needs\.scope\.outputs\.full_validation == 'false'/u.test(workflow),
+  "Ready PR metadata edits must use the lightweight metadata gate",
+);
+assert(
+  (workflow.match(/github\.event\.action != 'edited'/gu) ?? []).length >= 2,
+  "PR body/title edits must not restart full static/browser validation",
+);
 
 assert.equal(
   packageJson.scripts.check,
@@ -37,4 +45,4 @@ assert(
   "Task #091 regression must participate in the full historical suite",
 );
 
-console.log("validation funnel contract passed: Codex stays targeted while CI owns ordered broad regression");
+console.log("validation funnel contract passed: Codex stays targeted, PR metadata edits stay cheap, and CI owns ordered broad regression");

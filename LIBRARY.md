@@ -3,7 +3,7 @@
 
 ## Назначение
 
-`GAME.md` — фантазия и направление игры; `LIBRARY.md` — краткая карта систем и маршруты к `systems/*.md`, владельцам и проверкам. Подробности живут в system-документах.
+`GAME.md` — фантазия игры; `LIBRARY.md` — карта систем, `systems/*.md` — подробности.
 
 Обычная задача читает один system-документ. Два допустимы, когда изменение действительно пересекает системы. Все документы заранее не загружаются.
 
@@ -62,7 +62,7 @@ Visual runtime binaries размещаются по правилам `ARTIST.md`
 
 - Лид: `PROJECT.md` + `LEAD.md`.
 - Художник: `PROJECT.md` + `ARTIST.md` + `ASSETS.md` + `BINARY_IMPORT.md`.
-- Прямая реализация/Codex: `AGENTS.md` + `AGENTS.override.md`.
+- Исполнение: ChatGPT — `CHATGPT.md`; Codex — `AGENTS.md` + `AGENTS.override.md`.
 - Интегратор: `PROJECT.md` + `REVIEW.md`.
 - Бинарные assets вне Artist-route: `ASSETS.md` + `BINARY_IMPORT.md`.
 - Скоростной аудит: `FAST_LOOP.md` только при отдельной ретроспективе.
