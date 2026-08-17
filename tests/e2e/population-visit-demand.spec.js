@@ -142,7 +142,6 @@ test("acceptable stock completes once, persists personId and updates visitor his
     spendingCapacity: 2,
     foodPreferences: lemonadePreference,
   });
-  await bridge(page, "setServingStock", { itemId: "lemonade", quantity: 1 });
   await openTavern(page);
   await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
   await bridge(page, "setVisitCandidatePersonId", person.id);
@@ -155,6 +154,7 @@ test("acceptable stock completes once, persists personId and updates visitor his
     (status) => status === "offered",
   );
   expect(await bridge(page, "acceptGuestOrder", visit.guestId)).toMatchObject({ status: "order-accepted", mutated: true });
+  await bridge(page, "setServingStock", { itemId: "lemonade", quantity: 1 });
   await advanceUntil(page, async () => (await bridge(page, "getCoinState")).length, (count) => count === 1);
   const history = await bridge(page, "getVisitorHistory");
   expect(history[person.id].completedVisitCount).toBe(1);
