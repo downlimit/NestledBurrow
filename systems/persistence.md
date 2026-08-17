@@ -8,9 +8,11 @@ This system separates player session progress from developer-authored project de
 
 `src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. Accepted guests also persist service format/place ownership. Visit-local satisfaction, group diagnostics and presentation are transient.
+Session data includes player/world progress, needs, population demand/social/time/life profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. Accepted guests also persist service format/place ownership. Visit-local satisfaction, group diagnostics and presentation are transient.
 
-Stage-9 age/life/family fields are canonical projections of `personId`; forged or missing copies normalize under schema v19. Task #098 adds no mutable save fact or migration. Aging, death, birth and relationship mutation need a later persistence contract.
+Stage 9 keeps family/status identity derived from `personId`, while the already-persisted `ageYears` and `lastEvaluatedWorldTimeSeconds` now carry lifecycle progress. `lifeStage` is rederived from safe age progress on normalize/load. Missing or invalid age falls back to the canonical baseline; forged status/family copies remain ignored.
+
+Task #099 adds no structural save field, so schema remains v19. Existing v19 saves already contain age/time fields; they continue from their saved age without replaying historical world time. Death, birth and relationship mutation need later persistence contracts.
 
 BUILD/TEST view and person-inspection hover/pin/expansion are transient. TEST grants use existing gameplay fields; inspector edits use existing population needs and rebase evaluation time, so save/reload preserves results.
 
@@ -34,10 +36,11 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 - schema v12 migrates once to v13 by creating the valid 16-person Stage-1 population at the saved world time;
 - schema v13 migrates once to v14 by adding the default two-item `venueOffer` while preserving population, needs, kitchen, tavern service and coins;
 - schema v14 migrates once to v15 by adding deterministic spending/preferences, the opportunity timer, per-person visitor history and unique `personId`/acceptable items to active guest snapshots while preserving their technical IDs and service state;
-- schema v15 migrates once to v16 by deriving one deterministic exact order for every retained active guest, preserving reservations/stations and adding zeroed failed-accepted-order history fields; accepted order item, status and elapsed fulfillment wait persist thereafter;
-- schema v16 migrates once to v17 by adding neutral tavern-owned opinions and descriptive reputation plus baseline bounded flow pressure while preserving all population, needs, menu, kitchen, active guest/order, objective history, inventory and coin progress;
+- schema v15 migrates once to v16 by deriving one deterministic exact order for every retained active guest, preserving reservations/stations and adding zeroed failed-accepted-order history fields;
+- schema v16 migrates once to v17 by adding neutral tavern-owned opinions and descriptive reputation plus baseline bounded flow pressure while preserving progress;
 - schema v17→v18 derives canonical relationships/visit periods while preserving all progress;
 - schema v18→v19 adds accepted active-visit service format and service-place activity, deriving legacy commitments as assisted while preserving orders, reservations and outcomes;
+- within schema v19, valid `ageYears` is mutable lifecycle progress; `lifeStage` is derived, invalid age recovers, and identity-owned status/family cannot be forged;
 - the one-time Task #049 migration warning is persisted as pending state and cleared after presentation;
 - dropped items persist only stable ID, item payload and logical position;
 - selected slot, in-flight drag state, throw arc, gain feedback and fade timers are not persisted;
@@ -45,7 +48,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v19 persists people, offer, feedback/flow, history, active guest→person→order→service-format mappings, station ownership, inventory, farm, kitchen and coins. Age/life/family derives from canonical identity on normalize/load, including older v19 payloads. Group diagnostics stay transient; authoring backups survive `NEW GAME`.
+Schema v19 persists people, lifecycle age progress, offer, feedback/flow, history, active guest→person→order→service-format mappings, station ownership, inventory, farm, kitchen and coins. Group diagnostics stay transient; authoring backups survive `NEW GAME`.
 
 ## Not yet
 
@@ -53,4 +56,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-098`, domain-specific checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-098`, `check:task-099`, domain-specific checks, `check:authoring`, persistence Browser E2E.

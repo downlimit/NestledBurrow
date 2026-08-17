@@ -4,18 +4,19 @@
 
 Owns movement, time, sleep, energy and the canonical `0..100` need set. HUD order for the player: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure; no passive bonus stack.
 
-Persistent people use the same need dimensions. The player keeps live runtime; offscreen people use coarse reconstruction and may later have person-specific rates without another need set.
+Persistent people use the same need dimensions. The player keeps live runtime; offscreen people use coarse reconstruction.
 
 ## Shared person need contract
 
 - Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic JSON-safe `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
-- Stage 9 keeps canonical life/family identity. Aging is stage-based: `newborn 4`, `infant 20`, `toddler 28`, `child 56`, `teen 84`, `youngAdult 112`, `adult 168`, `elder 56+` game days. Death, birth, relationship mutation and replenishment remain inactive.
-- `populationDomain` derives links and preferred periods. Periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`. No social score/global state exists.
-- Relevance reconstructs offscreen needs once from stored state and elapsed world time. A physical guest then advances canonical needs live and rebases evaluation time; no guest-local copy or repeated reconstruction exists.
-- One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume it. Role policy stays outside `populationDomain`.
-- A live `personId` actor shows its name and expands the shared `N E S T L D` panel after `667 ms`; coarse pointers use tap/long-press.
-- Bar editing maps to `0..100`, mutates that person through the population owner and rebases `lastEvaluatedWorldTimeSeconds`; visits/orders stay unchanged.
-- Hover/pin/expansion are transient prototype tooling and may later move without changing person state or formulas.
+- Stage 9 uses Sims-like life stages with a 100-game-day target: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10`. With one game hour per real minute this is about 40 real hours at `1x`.
+- `ageYears` carries persistent progress inside that lifecycle; `lifeStage` is derived from it. `lifeStatus` and reciprocal family `relationships` (`partner`, `parent`, `child`, `sibling`) remain canonical identity. Invalid age data recovers from the identity baseline.
+- The elder stage stops alive at its current cap until death is implemented. Birth, relationship mutation and population replenishment remain inactive.
+- No general time acceleration is assumed for lifecycle balance. Sleep may advance world time separately. Future skill learning should be tuned to this shorter life rather than assuming player speed-up.
+- `populationDomain` derives links and preferred periods. Periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`.
+- Relevance reconstructs offscreen needs and lifecycle once from stored state and elapsed world time. A physical guest advances both live and rebases evaluation time; no guest-local copy exists.
+- One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume it.
+- A live `personId` actor shows its name and expands the shared NESTLD panel after `667 ms`; coarse pointers use tap/long-press. Bar editing mutates canonical needs and rebases evaluation time.
 
 ## Time, energy and satiety
 
@@ -60,7 +61,7 @@ Running is unavailable below `20 E`.
 | axe/logging or hoe/soil | 3 |
 | pickaxe/mining | 4 |
 
-Resource work overrides running. Tool hits have no discrete L cost. HUD arrows show actual deltas for `660 ms`. Desktop bar clicks set transient debug values; reload restores saved state.
+Resource work overrides running. Tool hits have no discrete L cost. HUD arrows show actual deltas for `660 ms`.
 
 ```text
 lustre speed = 1 - 0.50 * pressure(L,33)
@@ -71,7 +72,7 @@ At `L=0`, speed is `0.5x` and N drain `1.5x`. E/L compose with a `0.5..1` clamp;
 
 ## Novelty and dialogue
 
-After three identical physical actions, repeats cost `1 N` and use `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use has its own key: three free uses, then `-1 N`; another non-ordinary activity resets it. Accepted melee spends E on misses and is blocked when unaffordable. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
+After three identical physical actions, repeats cost `1 N` and use `repetition = 1 + 0.3 * pressure(N,30)`; activity change resets. Bucket self-use has its own key: three free uses, then `-1 N`. Gains: arena `+6`, discovery/event `+8..15`, leisure `+10..25`; no Atoll runtime.
 
 NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may restore D/E. Solo-rest E multiplier is `1 - 0.25 * pressure(D,30)`; D pressure raises novelty drain up to `1.25`.
 
@@ -86,7 +87,7 @@ Long uses `approach -> enter -> active -> exit -> free`. Prompt scans without ga
 | table/eating | S | 500 ms | 650 ms | 300 ms |
 | bed/sleep | E | 1000 ms | 1200 ms | 500 ms |
 
-The target need is protected through exit; recovery is active-only. Normal cancellation starts exit; transitions ignore it. Urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
+The target need is protected through exit; recovery is active-only. Normal cancellation starts exit; urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
 
 ## Invariants
 
@@ -95,13 +96,13 @@ The target need is protected through exit; recovery is active-only. Normal cance
 - presentation never rewrites safe motor position;
 - approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
-- saves exclude debug presets and interaction timeline state; demand/social/time/life identity profiles restore from canonical identity.
-- inspection hover, pin and expansion state stay transient; edited persistent-person needs use ordinary population persistence.
+- saves exclude debug presets and interaction timeline state; lifecycle age progress and edited persistent-person needs persist;
+- demand/social identity, `lifeStage`, `lifeStatus` and family links normalize from their canonical owners.
 
 ## Current baseline
 
-`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, age/life/family, budget/preferences, visit profiles and coarse reconstruction. `guestIntentDomain` owns live guest arbitration; `guestRuntime` resolves canonical `personId`. `personInspectionRuntime` owns actor selection/need edits; `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
+`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, lifecycle, family, demand and coarse reconstruction. `guestIntentDomain` advances live needs and lifecycle before rebasing evaluation time. `guestRuntime` resolves canonical `personId`; `personInspectionRuntime` owns actor selection/need edits. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:task-098`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:task-098`, `check:task-099`, `check:interaction`; focused browser E2E.
