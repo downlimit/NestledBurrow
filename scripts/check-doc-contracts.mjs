@@ -9,6 +9,7 @@ const requireText = (text, tokens, label) => {
 const project = read("PROJECT.md");
 const lead = read("LEAD.md");
 const artist = read("ARTIST.md");
+const chatgpt = read("CHATGPT.md");
 const agents = read("AGENTS.md");
 const override = read("AGENTS.override.md");
 const review = read("REVIEW.md");
@@ -44,6 +45,7 @@ requireText(project, [
   "<!-- audience: project-bootstrap -->",
   "## Режимы запроса Лиду",
   "### Прямая реализация чатом",
+  "CHATGPT.md",
   "AGENTS.md",
   "ARTIST.md",
   "ты художник",
@@ -54,6 +56,7 @@ requireText(lead, [
   "<!-- audience: lead-chat -->",
   "## Сначала определить режим",
   "## Контекстный бюджет",
+  "CHATGPT.md",
   "максимум два system-документа",
   "20–50",
   "публичный URL разрешён только для ChatGPT direct implementation и только из Draft PR",
@@ -112,6 +115,18 @@ assert(artist.includes("Rough sketch не задаёт перспективу"),
 assert(artist.includes("глубина передаётся ритмом ступеней, overlap и map layering, а не перспективным convergence"), "ARTIST.md must keep traversable world assets out of perspective convergence");
 assert(artist.includes("не показывает его как приемлемый candidate"), "ARTIST.md must reject painterly generation before presenting it as a pixel-art candidate");
 
+requireText(chatgpt, [
+  "<!-- audience: chatgpt-direct -->",
+  "## Контекст",
+  "один Git tree → один commit → одно перемещение task branch",
+  "GitHub является владельцем текущего head SHA",
+  "не использовать GitHub Actions как цикл",
+  "один repair commit",
+  "Регрессия защищает текущее поведение",
+  "src/main.js",
+], "CHATGPT.md");
+assert(chatgpt.includes("не читает `AGENTS.md`"), "ChatGPT direct must not pay Codex context cost by default");
+
 requireText(agents, [
   "<!-- audience: codex -->",
   "only the system documents",
@@ -138,6 +153,7 @@ requireText(agents, [
 const forbiddenImagePermission = "Codex image generation explicitly allowed";
 assert(!lead.includes(forbiddenImagePermission), "LEAD.md must not contain a prompt-level Codex image-generation bypass");
 assert(!artist.includes(forbiddenImagePermission), "ARTIST.md must not contain a prompt-level Codex image-generation bypass");
+assert(!chatgpt.includes(forbiddenImagePermission), "CHATGPT.md must not contain a prompt-level Codex image-generation bypass");
 assert(!agents.includes(forbiddenImagePermission), "AGENTS.md must not contain a prompt-level Codex image-generation bypass");
 assert(!taskTemplate.includes(forbiddenImagePermission), "tasks/TEMPLATE.md must not contain a prompt-level Codex image-generation bypass");
 
@@ -180,6 +196,7 @@ requireText(library, [
   "Обычная задача читает один system-документ",
   "## Маршруты",
   "## Межсистемные задачи",
+  "CHATGPT.md",
   "Художник: `PROJECT.md` + `ARTIST.md`",
   "public/assets/project/",
 ], "LIBRARY.md");
@@ -213,7 +230,8 @@ requireText(taskTemplate, [
   "One Ready PR",
 ], "tasks/TEMPLATE.md");
 requireText(override, ["Existing PR repair route", "same branch and PR", "final-head CI"], "AGENTS.override.md");
-requireText(prTemplate, ["nestled-burrow-delivery:v1", "executor: choose", "player-visible: choose", "preview-acceptance: choose", "auto-merge: choose", "chatgpt + pending", "# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
+requireText(prTemplate, ["nestled-burrow-delivery:v1", "executor: choose", "player-visible: choose", "preview-acceptance: choose", "auto-merge: choose", "chatgpt + pending", "GitHub owns the current head SHA", "# Task", "## Result", "## Validation", "PR CI supplies the full repository suite"], "PR template");
+assert(!prTemplate.includes("Final head SHA"), "PR body must not mirror mutable head SHA");
 
 assert(prWorkflow.includes("github.event.pull_request.draft == false"), "Draft PR must defer final validation until Ready");
 assert(architecturePressureWorkflow.includes("github.event.pull_request.draft == false"), "Draft PR must defer architecture gate until Ready");
@@ -230,6 +248,7 @@ for (const [label, text, limit] of [
   ["PROJECT.md", project, 7000],
   ["LEAD.md", lead, 7500],
   ["ARTIST.md", artist, 18000],
+  ["CHATGPT.md", chatgpt, 5000],
   ["AGENTS.md", agents, 11000],
   ["REVIEW.md", review, 5000],
   ["GAME.md", game, 13000],
@@ -239,4 +258,4 @@ for (const [label, text, limit] of [
   assert(text.length <= limit, `${label} exceeds context budget: ${text.length} > ${limit}`);
 }
 
-console.log("documentation contracts passed: Lead, Artist, Codex and Integrator routing, focused system context, active-only roadmap, composition-root guard and native asset delivery are enforced");
+console.log("documentation contracts passed: Lead, Artist, ChatGPT direct, Codex and Integrator routing, focused system context, active-only roadmap, composition-root guard and native asset delivery are enforced");
