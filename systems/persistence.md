@@ -10,6 +10,8 @@ This system separates player session progress from developer-authored project de
 
 Session data includes player/world progress, needs, persistent population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. An accepted active guest also persists the selected service format and live service-place ownership. Visit-local satisfaction, group selection/diagnostics and open presentation are transient.
 
+Stage-9 baseline age, life-stage/status and typed family relationships are canonical identity-derived population descriptors. Missing or forged copies are reconstructed from stable `personId` under schema v19, so Task #098 adds no mutable save fact and no schema migration. Aging, death, birth and relationship mutation require their own later persistence contract.
+
 The BUILD/TEST panel view and person-inspection hover/pin/expansion are transient prototype UI state and add no schema fields. TEST item/coin grants mutate existing canonical gameplay fields; inspector edits mutate existing population needs and rebase the stored evaluation timestamp, so ordinary save/reload preserves their results.
 
 ## Authoring data
@@ -43,7 +45,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v19 persists normalized people including demand, reciprocal links and visit periods, plus offer, feedback/flow, history, active guest→person→order→service-format mappings, active station ownership, inventory, farm, kitchen and coins. Group diagnostics stay transient; authoring backups survive reload and `NEW GAME`.
+Schema v19 persists normalized people including demand and visit-compatible social/time data, plus offer, feedback/flow, history, active guest→person→order→service-format mappings, active station ownership, inventory, farm, kitchen and coins. Age/life/family descriptors are reconstructed from canonical population identity on normalize/load and therefore remain stable even when absent from an older v19 payload. Group diagnostics stay transient; authoring backups survive reload and `NEW GAME`.
 
 ## Not yet
 
@@ -51,4 +53,4 @@ Gameplay save of arbitrary player construction, save slots, cloud sync and multi
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, domain-specific checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-098`, domain-specific checks, `check:authoring`, persistence Browser E2E.

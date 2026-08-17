@@ -9,6 +9,8 @@ The same need dimensions and meanings apply to persistent people in the populati
 ## Shared person need contract
 
 - Persistent people share the player's canonical `N E S T L D` dimensions. Stage-3 also persists deterministic, JSON-safe `spendingCapacity` and layered cuisine/dish/ingredient preferences; venue history remains external.
+- Stage-9 baseline derives a stable prototype `ageYears`, `lifeStage`, alive `lifeStatus` and reciprocal typed family `relationships` from identity. Supported relationship kinds are partner, parent, child and sibling. `relatedPersonIds` remains the compatibility projection consumed by current group visits.
+- Age/family data is identity-derived in this slice: save payloads cannot forge it, and missing copies are reconstructed from `personId` without a new mutable save schema fact. Aging, death, birth, relationship mutation and population replenishment are not active yet.
 - `populationDomain` derives links and preferred periods from identity. `worldTimeSeconds` periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; prototype preferred/off-schedule factors are `1/0.2`. No social score or global state exists.
 - Relevance reconstructs offscreen needs once from stored state, elapsed world time and bounded variation. A physical guest then advances the canonical population needs live and rebases evaluation time; there is no guest-local copy or repeated reconstruction.
 - One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume its commitment. Role policy stays outside `populationDomain`.
@@ -94,13 +96,13 @@ The target need is protected through exit; recovery is active-only. Normal cance
 - presentation never rewrites safe motor position;
 - approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
-- saves exclude debug presets and interaction timeline state; social/time profiles restore from canonical identity.
+- saves exclude debug presets and interaction timeline state; demand/social/time/life identity profiles restore from canonical identity.
 - inspection hover, pin and expansion state stay transient; edited persistent-person needs use ordinary population persistence.
 
 ## Current baseline
 
-`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, stable relationship/time profiles, shared-clock period lookup and coarse reconstruction. Tavern-local `guestIntentDomain` owns live advancement/arbitration; `guestRuntime` retains `personId` and resolves the canonical person. `personInspectionRuntime` owns actor selection and need-bar input, so edits reach the next guest arbitration. `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
+`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, stable age/life/family profiles, budget/preferences, visit links/time profiles and deterministic coarse reconstruction. Tavern-local `guestIntentDomain` owns live advancement/arbitration; `guestRuntime` retains `personId` and resolves the canonical person. `personInspectionRuntime` owns actor selection and need-bar input, so edits reach the next guest arbitration. `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:task-098`, `check:interaction`; focused browser E2E.

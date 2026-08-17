@@ -18,6 +18,20 @@ export const VISIT_TIME_BALANCE = Object.freeze({
   preferredCandidateWeight: 1,
   offScheduleCandidateWeight: 0.2,
 });
+export const PERSON_LIFE_STAGES = Object.freeze({
+  child: "child",
+  adult: "adult",
+  elder: "elder",
+});
+export const PERSON_LIFE_STATUSES = Object.freeze({
+  alive: "alive",
+});
+export const PERSON_RELATIONSHIP_KINDS = Object.freeze({
+  partner: "partner",
+  parent: "parent",
+  child: "child",
+  sibling: "sibling",
+});
 
 const STAGE1_IDENTITIES = Object.freeze([
   Object.freeze({ id: "person-mira", displayName: "Mira" }),
@@ -38,13 +52,40 @@ const STAGE1_IDENTITIES = Object.freeze([
   Object.freeze({ id: "person-zoya", displayName: "Zoya" }),
 ]);
 
-const STAGE1_SOCIAL_GROUPS = Object.freeze([
-  Object.freeze(["person-mira", "person-rowan", "person-ilya"]),
-  Object.freeze(["person-anya", "person-tomas", "person-lida"]),
-  Object.freeze(["person-pavel", "person-vera", "person-niko"]),
-  Object.freeze(["person-sonya", "person-emil", "person-daria"]),
-  Object.freeze(["person-mark", "person-nina"]),
-  Object.freeze(["person-lev", "person-zoya"]),
+const STAGE9_AGE_YEARS = Object.freeze({
+  "person-mira": 36,
+  "person-rowan": 38,
+  "person-ilya": 15,
+  "person-anya": 31,
+  "person-tomas": 33,
+  "person-lida": 11,
+  "person-pavel": 48,
+  "person-vera": 46,
+  "person-niko": 21,
+  "person-sonya": 29,
+  "person-emil": 30,
+  "person-daria": 8,
+  "person-mark": 70,
+  "person-nina": 68,
+  "person-lev": 24,
+  "person-zoya": 22,
+});
+
+const STAGE9_RELATIONSHIP_EDGES = Object.freeze([
+  Object.freeze({ first: "person-mira", second: "person-rowan", firstKind: "partner", secondKind: "partner" }),
+  Object.freeze({ first: "person-mira", second: "person-ilya", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-rowan", second: "person-ilya", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-anya", second: "person-tomas", firstKind: "partner", secondKind: "partner" }),
+  Object.freeze({ first: "person-anya", second: "person-lida", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-tomas", second: "person-lida", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-pavel", second: "person-vera", firstKind: "partner", secondKind: "partner" }),
+  Object.freeze({ first: "person-pavel", second: "person-niko", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-vera", second: "person-niko", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-sonya", second: "person-emil", firstKind: "partner", secondKind: "partner" }),
+  Object.freeze({ first: "person-sonya", second: "person-daria", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-emil", second: "person-daria", firstKind: "parent", secondKind: "child" }),
+  Object.freeze({ first: "person-mark", second: "person-nina", firstKind: "partner", secondKind: "partner" }),
+  Object.freeze({ first: "person-lev", second: "person-zoya", firstKind: "sibling", secondKind: "sibling" }),
 ]);
 
 const STAGE1_PREFERRED_VISIT_PERIODS = Object.freeze({
@@ -107,6 +148,10 @@ export function evaluatePersonOffscreen(person, targetWorldTimeSeconds) {
   return {
     id: baseline.id,
     displayName: baseline.displayName,
+    ageYears: baseline.ageYears,
+    lifeStage: baseline.lifeStage,
+    lifeStatus: baseline.lifeStatus,
+    relationships: baseline.relationships,
     needs,
     spendingCapacity: baseline.spendingCapacity,
     foodPreferences: baseline.foodPreferences,
@@ -156,9 +201,11 @@ export function setPopulationPersonNeed(population, personId, needId, value, wor
 function createStage1Person(identity, evaluationTime) {
   const demandProfile = createPersonDemandProfile(identity.id);
   const socialProfile = createPersonSocialProfile(identity.id);
+  const lifeProfile = createPersonLifeProfile(identity.id);
   return {
     id: identity.id,
     displayName: identity.displayName,
+    ...lifeProfile,
     needs: initialNeeds(identity.id),
     spendingCapacity: demandProfile.spendingCapacity,
     foodPreferences: demandProfile.foodPreferences,
@@ -184,17 +231,42 @@ export function createPersonDemandProfile(personId) {
   };
 }
 
+export function createPersonLifeProfile(personId) {
+  const id = String(personId ?? "").trim();
+  if (!id) throw new Error("Person life profile requires a stable id");
+  const fallbackAge = 20 + Math.floor(stableUnit(`${id}:baseline-age`) * 40);
+  const ageYears = STAGE9_AGE_YEARS[id] ?? fallbackAge;
+  return {
+    ageYears,
+    lifeStage: lifeStageForAgeYears(ageYears),
+    lifeStatus: PERSON_LIFE_STATUSES.alive,
+    relationships: STAGE9_RELATIONSHIP_EDGES.flatMap((edge) => {
+      if (edge.first === id) return [{ personId: edge.second, kind: edge.firstKind }];
+      if (edge.second === id) return [{ personId: edge.first, kind: edge.secondKind }];
+      return [];
+    }),
+  };
+}
+
+export function lifeStageForAgeYears(ageYears) {
+  const age = Number(ageYears);
+  if (!Number.isFinite(age) || age < 0) throw new Error("Person age must be a non-negative finite number");
+  if (age < 18) return PERSON_LIFE_STAGES.child;
+  if (age >= 65) return PERSON_LIFE_STAGES.elder;
+  return PERSON_LIFE_STAGES.adult;
+}
+
 export function createPersonSocialProfile(personId) {
   const id = String(personId ?? "").trim();
   if (!id) throw new Error("Person social profile requires a stable id");
-  const group = STAGE1_SOCIAL_GROUPS.find((candidate) => candidate.includes(id));
+  const lifeProfile = createPersonLifeProfile(id);
   const fallbackPeriods = Object.values(VISIT_TIME_PERIODS);
   const fallbackPeriod = fallbackPeriods[Math.min(
     fallbackPeriods.length - 1,
     Math.floor(stableUnit(`${id}:preferred-visit-period`) * fallbackPeriods.length),
   )];
   return {
-    relatedPersonIds: group ? group.filter((relatedPersonId) => relatedPersonId !== id) : [],
+    relatedPersonIds: lifeProfile.relationships.map(({ personId: relatedPersonId }) => relatedPersonId),
     preferredVisitPeriods: [...(STAGE1_PREFERRED_VISIT_PERIODS[id] ?? [fallbackPeriod])],
   };
 }
@@ -226,6 +298,10 @@ function normalizeStage1Person(value, identity, recoveryTime) {
   return {
     id: identity.id,
     displayName: nonEmptyString(value.displayName) ? value.displayName.trim() : identity.displayName,
+    ageYears: fallback.ageYears,
+    lifeStage: fallback.lifeStage,
+    lifeStatus: fallback.lifeStatus,
+    relationships: fallback.relationships,
     needs: normalizePersonNeeds(value.needs, fallback.needs),
     spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, fallback.spendingCapacity),
     foodPreferences: normalizeFoodPreferences(value.foodPreferences, fallback.foodPreferences),
@@ -241,13 +317,16 @@ function normalizeStage1Person(value, identity, recoveryTime) {
 function normalizeEvaluationPerson(value) {
   if (!isPlainRecord(value) || !nonEmptyString(value.id)) throw new Error("Population person requires a stable id");
   if (!nonEmptyString(value.displayName)) throw new Error(`Population person ${value.id} requires a display name`);
+  const id = value.id.trim();
   const evaluationTime = normalizeWorldTime(value.lastEvaluatedWorldTimeSeconds, 0);
-  const demandProfile = createPersonDemandProfile(value.id.trim());
-  const socialProfile = createPersonSocialProfile(value.id.trim());
+  const demandProfile = createPersonDemandProfile(id);
+  const socialProfile = createPersonSocialProfile(id);
+  const lifeProfile = createPersonLifeProfile(id);
   return {
-    id: value.id.trim(),
+    id,
     displayName: value.displayName.trim(),
-    needs: normalizePersonNeeds(value.needs, initialNeeds(value.id.trim())),
+    ...lifeProfile,
+    needs: normalizePersonNeeds(value.needs, initialNeeds(id)),
     spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, demandProfile.spendingCapacity),
     foodPreferences: normalizeFoodPreferences(value.foodPreferences, demandProfile.foodPreferences),
     relatedPersonIds: socialProfile.relatedPersonIds,
