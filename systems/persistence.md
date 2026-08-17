@@ -8,15 +8,15 @@ This system separates player session progress from developer-authored project de
 
 `src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, persistent population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. An accepted active guest also persists the selected service format and live service-place ownership. Visit-local satisfaction, group selection/diagnostics and open presentation are transient.
+Session data includes player/world progress, needs, population demand/social/time profiles, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. Accepted guests also persist service format/place ownership. Visit-local satisfaction, group diagnostics and presentation are transient.
 
-Stage-9 baseline age, life-stage/status and typed family relationships are canonical identity-derived population descriptors. Missing or forged copies are reconstructed from stable `personId` under schema v19, so Task #098 adds no mutable save fact and no schema migration. Aging, death, birth and relationship mutation require their own later persistence contract.
+Stage-9 age/life/family fields are canonical projections of `personId`; forged or missing copies normalize under schema v19. Task #098 adds no mutable save fact or migration. Aging, death, birth and relationship mutation need a later persistence contract.
 
-The BUILD/TEST panel view and person-inspection hover/pin/expansion are transient prototype UI state and add no schema fields. TEST item/coin grants mutate existing canonical gameplay fields; inspector edits mutate existing population needs and rebase the stored evaluation timestamp, so ordinary save/reload preserves their results.
+BUILD/TEST view and person-inspection hover/pin/expansion are transient. TEST grants use existing gameplay fields; inspector edits use existing population needs and rebase evaluation time, so save/reload preserves results.
 
 ## Authoring data
 
-Starting layout, collider/profile drafts and authoring backups are developer tools. They may use browser storage and local dev write endpoints, but are not automatically part of gameplay construction save.
+Starting layout, collider/profile drafts and authoring backups are developer tools. Browser storage/dev write endpoints do not make them gameplay save data.
 
 ## `NEW GAME`
 
@@ -45,7 +45,7 @@ Starting layout, collider/profile drafts and authoring backups are developer too
 
 ## Current baseline
 
-Schema v19 persists normalized people including demand and visit-compatible social/time data, plus offer, feedback/flow, history, active guest→person→order→service-format mappings, active station ownership, inventory, farm, kitchen and coins. Age/life/family descriptors are reconstructed from canonical population identity on normalize/load and therefore remain stable even when absent from an older v19 payload. Group diagnostics stay transient; authoring backups survive reload and `NEW GAME`.
+Schema v19 persists people, offer, feedback/flow, history, active guest→person→order→service-format mappings, station ownership, inventory, farm, kitchen and coins. Age/life/family derives from canonical identity on normalize/load, including older v19 payloads. Group diagnostics stay transient; authoring backups survive `NEW GAME`.
 
 ## Not yet
 
