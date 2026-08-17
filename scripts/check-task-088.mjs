@@ -35,8 +35,8 @@ const rejectedFoodPreferences = {
   ingredient: { potato: -1, lemon: -1 },
 };
 
-assert.equal(SESSION_STATE_VERSION, 17);
-assert.equal(SAVE_SCHEMA_VERSION, 17);
+assert.equal(SESSION_STATE_VERSION, 18);
+assert.equal(SAVE_SCHEMA_VERSION, 18);
 assert.deepEqual(SPENDING_CAPACITY_VALUES, [2, 4, 6]);
 assert.deepEqual(SALE_PROFILES["fried-potato-dish"], {
   itemId: "fried-potato-dish", price: 4, cuisine: "local", dishClass: "hot", ingredients: ["potato"],
@@ -153,8 +153,8 @@ v14.gameplay.tavernService = {
 };
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 14, state: v14 }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 17);
-assert.equal(migrated.state.version, 17);
+assert.equal(migrated.schemaVersion, 18);
+assert.equal(migrated.state.version, 18);
 assert.equal(migrated.state.gameplay.tavernService.opportunityRemainingMs, 4_500);
 assert.deepEqual(migrated.state.gameplay.tavernService.visitorHistoryByPersonId, {});
 assert.equal(new Set(migrated.state.gameplay.tavernService.guests.map(({ personId }) => personId)).size, 2);
@@ -178,8 +178,8 @@ assert(guestSource.includes("spawnVisit") && guestSource.includes("acceptableIte
 assert(guestSource.includes("if (visit.paid) return"), "successful purchase is recorded once per live visit");
 const serviceSource = readFileSync("src/tavern/tavernServiceRuntime.js", "utf8");
 for (const contract of [
-  "runVisitOpportunity", "evaluatePopulationPerson", "selectReputationBiasedCandidate", "decideFoodVisit",
-  "guestRuntime.spawnVisit", "recordCompletedVisit", "decision.bestOfferItemId",
+  "runVisitOpportunity", "evaluatePopulationPerson", "selectVisitLead", "decideFoodVisit",
+  "guestRuntime.spawnVisitGroup", "recordCompletedVisit", "decision.bestOfferItemId",
 ]) assert(serviceSource.includes(contract), `service runtime owns ${contract}`);
 assert(!serviceSource.includes("getAvailableServingPortions"), "physical stock does not create visit opportunities");
 const bridgeSource = readFileSync("src/devtools/e2eBridge.js", "utf8");

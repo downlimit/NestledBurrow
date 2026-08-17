@@ -27,8 +27,8 @@ import {
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
-assert.equal(SESSION_STATE_VERSION, 17);
-assert.equal(SAVE_SCHEMA_VERSION, 17);
+assert.equal(SESSION_STATE_VERSION, 18);
+assert.equal(SAVE_SCHEMA_VERSION, 18);
 assert.deepEqual(SELLABLE_ITEM_IDS, ["fried-potato-dish", "lemonade"]);
 assert.deepEqual(createDefaultVenueOffer(), { foodItemIds: [...SELLABLE_ITEM_IDS] });
 assert.deepEqual(
@@ -76,8 +76,8 @@ delete v13State.gameplay.venueOffer;
 const v13Gameplay = clone(v13State.gameplay);
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 13, state: v13State }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 17);
-assert.equal(migrated.state.version, 17);
+assert.equal(migrated.schemaVersion, 18);
+assert.equal(migrated.state.version, 18);
 assert.deepEqual(migrated.state.gameplay.venueOffer, createDefaultVenueOffer());
 const migratedGameplay = clone(migrated.state.gameplay);
 delete migratedGameplay.venueOffer;
@@ -95,7 +95,10 @@ assert.deepEqual(recovered.gameplay.population, corrupted.gameplay.population);
 
 const serviceSource = readFileSync("src/tavern/tavernServiceRuntime.js", "utf8");
 const guestSource = readFileSync("src/tavern/guestRuntime.js", "utf8");
-assert(/guestRuntime\.spawnVisit\(\s*candidate\.id,\s*decision\.bestOfferItemId,\s*decision\.acceptableItemIds,\s*\{ offerFit: decision\.bestOfferFit \},?\s*\)/u.test(serviceSource));
+for (const exactOrderContract of [
+  "guestRuntime.spawnVisitGroup", "orderItemId: decision.bestOfferItemId",
+  "acceptableItemIds: decision.acceptableItemIds", "options: { offerFit: decision.bestOfferFit }",
+]) assert(serviceSource.includes(exactOrderContract), `visit materialization keeps ${exactOrderContract}`);
 assert(serviceSource.includes("isOrderItemActive: (itemId) => isVenueOfferItemActive(sessionState.gameplay.venueOffer, itemId)"));
 assert(guestSource.includes("isOrderItemActive(visit.order.itemId)"));
 const coordinatorSource = readFileSync("src/interaction/worldInteractionCoordinator.js", "utf8");

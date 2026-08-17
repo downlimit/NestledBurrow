@@ -31,8 +31,8 @@ const person = population[0];
 person.needs.satiety = 0;
 person.spendingCapacity = 4;
 
-assert.equal(SESSION_STATE_VERSION, 17);
-assert.equal(SAVE_SCHEMA_VERSION, 17);
+assert.equal(SESSION_STATE_VERSION, 18);
+assert.equal(SAVE_SCHEMA_VERSION, 18);
 
 const neutral = createNeutralTavernFeedbackState(population, 100);
 assert.equal(neutral.flowPressure, 0.5);
@@ -202,8 +202,8 @@ v16.gameplay.tavernService.guests = [{
 }];
 const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 16, state: v16 }));
 assert.equal(migrated.status, "loaded");
-assert.equal(migrated.schemaVersion, 17);
-assert.equal(migrated.state.version, 17);
+assert.equal(migrated.schemaVersion, 18);
+assert.equal(migrated.state.version, 18);
 assert.equal(migrated.state.gameplay.coins, 77);
 assert.equal(migrated.state.gameplay.needs.satiety, 31);
 assert.deepEqual(migrated.state.gameplay.venueOffer.foodItemIds, ["lemonade"]);
@@ -272,7 +272,7 @@ const previewSource = readFileSync("scripts/manage-task-preview.mjs", "utf8");
 const architecture = readFileSync("ARCHITECTURE.md", "utf8");
 const library = readFileSync("LIBRARY.md", "utf8");
 for (const contract of [
-  "selectReputationBiasedCandidate", "recordOpenUnservedFeedback", "recordAcceptedOrderFailureFeedback",
+  "selectVisitLead", "recordOpenUnservedFeedback", "recordAcceptedOrderFailureFeedback",
   "recordCompletedVisitFeedback", "visitor-turned-away-cap",
 ]) assert(serviceSource.includes(contract), `service runtime delegates ${contract}`);
 for (const method of ["getTavernFeedback", "setTavernFlowPressure", "boostTavernFlowPressure"]) {
@@ -284,4 +284,4 @@ assert(previewSource.includes("RENDER_WIDTH") && previewSource.includes("RENDER_
 assert(architecture.includes("tavernFeedbackDomain.js"));
 assert(library.includes("src/tavern/tavernFeedbackDomain.js"));
 
-console.log("Task #095 tavern feedback, reputation, flow and schema v17 contracts OK");
+console.log("Task #095 tavern feedback, reputation, flow and current schema contracts OK");

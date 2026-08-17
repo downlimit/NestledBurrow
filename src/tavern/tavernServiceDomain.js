@@ -9,6 +9,12 @@ export {
 } from "./tavernFeedbackDomain.js";
 export const GUEST_ACTIVE_CAP = 6;
 
+export function hasCapacityForVisitGroup(activeGuestCount, groupSize) {
+  const active = Math.max(0, Math.floor(Number(activeGuestCount) || 0));
+  const requested = Math.max(0, Math.floor(Number(groupSize) || 0));
+  return requested > 0 && active + requested <= GUEST_ACTIVE_CAP;
+}
+
 export const DEFAULT_TAVERN_SERVICE_STATE = Object.freeze({
   nextGuestId: 0,
   opportunityRemainingMs: VISIT_OPPORTUNITY_INTERVAL_MIN_MS,

@@ -9,6 +9,7 @@ The same need dimensions and meanings apply to persistent people in the populati
 ## Shared person need contract
 
 - Persistent people share the player's canonical `N E S T L D` dimensions. Stage-3 also persists deterministic, JSON-safe `spendingCapacity` and layered cuisine/dish/ingredient preferences; venue history remains external.
+- `populationDomain` derives links and preferred periods from identity. `worldTimeSeconds` periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; prototype preferred/off-schedule factors are `1/0.2`. No social score or global state exists.
 - Relevance reconstructs offscreen needs once from stored state, elapsed world time and bounded variation. A physical guest then advances the canonical population needs live and rebases evaluation time; there is no guest-local copy or repeated reconstruction.
 - One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume its commitment. Role policy stays outside `populationDomain`.
 - A live actor bound to `personId` shows its display name and expands the shared player-style `N E S T L D` panel after `667 ms`; coarse pointers use tap/long-press.
@@ -75,7 +76,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Prompt scans rank gaze within radius/perimeter/wall checks without gating; A* runs only after activation. Walls block routes. Profiles filter perimeter points by eight directions. A one-cell object exposes eight candidate cells; wider objects expose corners and edge cells. Disabled classes are removed before probe and exact routing; at least one remains enabled. Crossing a point counts as arrival. Enter/exit interpolate presentation without moving the motor. Effects run only in active.
+Long uses `approach -> enter -> active -> exit -> free`. Prompt scans without gating; activation starts A* through reachable profile points. Enter/exit never moves the motor; effects are active-only.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -93,13 +94,13 @@ The target need is protected through exit; recovery is active-only. Normal cance
 - presentation never rewrites safe motor position;
 - approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
-- saves exclude debug presets and interaction timeline state.
+- saves exclude debug presets and interaction timeline state; social/time profiles restore from canonical identity.
 - inspection hover, pin and expansion state stay transient; edited persistent-person needs use ordinary population persistence.
 
 ## Current baseline
 
-`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, persistent mutation and coarse reconstruction. Tavern-local `guestIntentDomain` owns live advancement/arbitration; `guestRuntime` retains `personId` and resolves the canonical person. `personInspectionRuntime` owns actor selection and need-bar input, so edits reach the next guest arbitration. `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
+`needsDomain` owns IDs/player formulas; `needsRuntime` coordinates and `needsFlowRuntime` measures HUD deltas. `populationDomain` owns the 16-person baseline, normalization, stable relationship/time profiles, shared-clock period lookup and coarse reconstruction. Tavern-local `guestIntentDomain` owns live advancement/arbitration; `guestRuntime` retains `personId` and resolves the canonical person. `personInspectionRuntime` owns actor selection and need-bar input, so edits reach the next guest arbitration. `needsPanelPresentation` draws NESTLD. Timeline modules own phases/protection, approach owns reachable points, and `main.js` composes.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:interaction`; focused browser E2E.

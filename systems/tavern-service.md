@@ -119,7 +119,7 @@ An unavailable dish before an order is accepted is not a service failure. Once t
 
 ## Social depth
 
-Persistent identities leave room for repeat visitors, relationships, invitations, guest interaction and conflict. Future word of mouth propagates real experience through relationships: own experience is strongest; receivers with similar tastes or positive/family links get stronger evidence; hostile links weaken it. Social propagation has no separate currency or global broadcast.
+Stable relationships and coarse preferred visit periods now shape lead/group selection. Future word of mouth may use these links; own experience remains strongest and no social currency/global broadcast exists.
 
 ## Development sequence
 
@@ -131,7 +131,7 @@ Validation proceeds through observable slices that may be revised after playtest
 4. **Order and fulfillment:** the chosen product becomes a service commitment and payment.
 5. **Live guest needs:** every canonical need can affect an onsite visit.
 6. **Feedback:** persistent personal opinion, descriptive venue reputation and aggregate popularity/flow pressure form one causal but non-collapsed feedback loop.
-7. **Groups and time:** relationships and schedules shape plausible visitors.
+7. **Groups and time:** stable relationships and shared-clock schedule profiles shape plausible visitors and groups of up to three.
 8. **Venue formats:** infrastructure and offer produce takeaway, restaurant, event or self-service behavior.
 9. **Social lifecycle:** relationships, families, ageing, death and replenishment deepen the population.
 
@@ -150,7 +150,7 @@ Early play prioritizes optimization, then recognizable people, then need-driven 
 
 ## Implemented stages
 
-Stages 1–4 provide persistent people/reconstruction, saved offer, budget/taste demand and accepted exact-order history. Stage 5 advances live needs, arbitrates an interruptible intent, serves a capability-bearing table and presents the full visit with visit-local satisfaction. Stage 6 persists bounded personal opinion, descriptive canonical sale-tag/service-reliability reputation and separate flow pressure. Direct outcomes update those values while visit-local satisfaction remains transient.
+Stages 1–4 provide persistent people, offer, demand, order and history; Stage 5 adds live needs/service/satisfaction; Stage 6 adds opinion, reputation and flow. Stage 7 independently combines reputation/time, invites linked on-time people and keeps each agreeing guest independent.
 
 ## Owners
 
@@ -163,6 +163,7 @@ Stages 1–4 provide persistent people/reconstruction, saved offer, budget/taste
 - live need/intent policy: `src/tavern/guestIntentDomain.js`;
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
 - persistent opinion, descriptive reputation, flow cadence and overload/closure feedback formulas: `src/tavern/tavernFeedbackDomain.js`;
+- time/reputation candidate diagnostics and linked-party selection: `src/tavern/visitPartyDomain.js`;
 - order state, timers and legal transitions: `src/tavern/orderDomain.js`;
 - visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags: `src/tavern/saleProfileDomain.js`;
 - active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
@@ -191,18 +192,20 @@ Stages 1–4 provide persistent people/reconstruction, saved offer, budget/taste
 - satisfaction tier 3 is neutral, tiers 4–5 strengthen that person's opinion and tiers 1–2 weaken it; satisfaction itself is never persisted;
 - completed sales reinforce their canonical cuisine/dish-class/ingredient tags with inertia, while universal service reliability remains a separate reputation dimension;
 - reputation biases candidate weighting while every otherwise eligible person retains a strictly positive discovery weight;
+- shared-clock time multiplies reputation weight independently; off-schedule weight stays positive and flow cadence is unchanged. Only linked, inactive, on-time invitees independently evaluate the existing full visit decision;
+- an agreeing group of at most three fits `GUEST_ACTIVE_CAP` as one unit or nobody spawns and each records `open-unserved`; spawned guests keep separate identity, order, needs, service, payment, history and opinion;
 - flow pressure changes opportunity cadence only and cannot mutate population tastes, wealth, opinions or reputation tags;
 - willing demand at the live cap and a materialized guest timing out without service capacity both record `open-unserved`; accepted-order failure has stronger feedback, sustained manual closure has weaker feedback;
 - the physical guest count remains bounded by `GUEST_ACTIVE_CAP`; excess willing demand becomes offscreen feedback outcomes.
 
 ## Current baseline
 
-Person-backed guests read the menu while entering, reveal the item on acceptance and wait at the claimed serving table. Thought/action channels coexist; the waiting thought shows the item, real progress and a hover-only caption. Need interruptions resume the same order and consumption remains at its table. Opening approval uses tier 3, satisfaction precedes paying/coin spawn, and objective history updates once. Later willingness uses decaying personal opinion and service reliability; reputation tags bias who reaches the candidate stream; bounded flow pressure controls opportunity cadence. Deterministic E2E controls expose feedback read plus flow set/boost without changing audience data.
+Guests read the menu while entering, reveal the item on acceptance and wait at their table; interruptions resume the same order, satisfaction precedes payment, and history updates once. Opinion/reliability affect willingness; reputation and coarse time independently bias candidates; flow controls cadence. Related on-time people may arrive together with separate visit state. E2E exposes lead, factors and group membership without ordinary UI.
 
 ## Not yet
 
-Recipe book, broader ingredients/storage, influence, group visits, relationship propagation, configurable schedules, staff, chairs/seated poses, a visible queue/forecast panel and broader venue formats.
+Recipe book, broader ingredients/storage, influence, relationship propagation, configurable schedules, families, staff, chairs/seated poses, shared tables/group payment, a visible queue/forecast panel and broader venue formats.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`; focused service, order, population, feedback and live-visit Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`; focused service, order, population, feedback, group and live-visit Browser E2E.
