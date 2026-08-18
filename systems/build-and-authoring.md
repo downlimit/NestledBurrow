@@ -9,6 +9,7 @@ Owns construction, placeable lifecycle and asset/layout editing.
 - walls/surfaces support placement, demolition and grouped undo; objects also move through one owner;
 - `BUILD / TEST` views expose construction and prototype simulation grants; TEST never starts placement, move or demolition;
 - TEST grants use canonical inventory capacity/stack rules or coin balance, then ordinary persistence/HUD refresh;
+- every valid TEST action gives a short effects-channel click. Numeric state changes also emit a transient signed delta (`+N`/`-N`) from the affected row: it moves right, briefly holds, then fades. Population proof emits deltas only for counts that actually changed;
 - TEST population proof runs on a transient clone: `+1/+10/+100` days, drop to `240`, reset, alive/dead/stage counts and recent births/deaths. It never advances the real clock or mutates gameplay/save;
 - the library shows object names/previews and contains all editable catalog objects;
 - placement uses the `16 px` grid and one canonical placement position;
@@ -39,6 +40,7 @@ Canon export commits the collider draft and downloads `nestledburrow-authoring-c
 
 - orchestration: `src/build/worldBuildCoordinator.js`;
 - prototype simulation palette/config and canonical grant/proof actions: `src/build/simulationTestPalette.js`;
+- TEST press/delta presentation: `src/build/simulationTestFeedback.js`;
 - lifecycle/placement: `src/build/placeableBuildContract.js`, `src/build/placeableBuildOwners.js`, `src/build/placeablePlacementPose.js`;
 - profiles/input: `src/build/assetProfiles.js`, `src/build/assetAuthoringInput.js`;
 - registry/authoring/export: `src/build/assetAuthoringRegistry.js`, `src/build/universalPlaceableAuthoring.js`, `src/build/fixedWorldAuthoringState.js`, `src/build/authoringBackup.js`;
@@ -62,12 +64,13 @@ Canon export commits the collider draft and downloads `nestledburrow-authoring-c
 - every catalog object has one lifecycle owner; move/demolition resolve the same target;
 - canon export includes live layout, colliders and all profiles;
 - TEST proof sandboxes never become gameplay state;
+- TEST feedback is presentation-only and never changes grant/proof results or persisted state;
 - authoring remains separate from gameplay persistence;
 - build orchestration remains outside `src/main.js`.
 
 ## Current baseline
 
-Village objects use the full construction lifecycle. BUILD holds the catalog; TEST grants canonical food, produce, seeds, resources and coins and can run a transient demographic proof sandbox. Burrow/Nest stairs, the Atoll entrance and exits share fixed-world move/collider/collision authoring; only the village exposes construction.
+Village objects use the full construction lifecycle. BUILD holds the catalog; TEST grants canonical food, produce, seeds, resources and coins and can run a transient demographic proof sandbox with audible presses and signed floating deltas. Burrow/Nest stairs, the Atoll entrance and exits share fixed-world move/collider/collision authoring; only the village exposes construction.
 
 ## Evidence
 
