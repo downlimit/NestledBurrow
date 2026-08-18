@@ -162,9 +162,22 @@ function processPopulationDay(population, boundaryTime, protectedIds) {
 
 function wholeBirthTarget(aliveCount, dayIndex) {
   const rate = birthTargetRateForPopulation(aliveCount);
-  const whole = Math.floor(rate);
-  const fraction = rate - whole;
-  return whole + (stableUnit(`birth-rate:${dayIndex}`) < fraction ? 1 : 0);
+  if (rate <= 0) return 0;
+  const unit = mixedDayUnit(dayIndex);
+  const offset = unit < 0.1 ? -2
+    : unit < 0.3 ? -1
+      : unit < 0.7 ? 0
+        : unit < 0.9 ? 1
+          : 2;
+  return Math.max(0, Math.round(rate + offset));
+}
+
+function mixedDayUnit(dayIndex) {
+  let value = (Math.trunc(Number(dayIndex) || 0) ^ 0x9e3779b9) >>> 0;
+  value = Math.imul(value ^ (value >>> 16), 0x21f0aaad) >>> 0;
+  value = Math.imul(value ^ (value >>> 15), 0x735a2d97) >>> 0;
+  value = (value ^ (value >>> 15)) >>> 0;
+  return value / 0xffffffff;
 }
 
 function eligibleBirthPairs(population, boundaryTime) {
