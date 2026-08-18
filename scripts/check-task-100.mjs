@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  ageYearsForLifeDays,
   createGeneratedPopulationPerson,
   createStage1Population,
   FOOD_PREFERENCE_TAGS,
   lifeDaysForAgeYears,
+  lifeStageForPersonAge,
   PERSON_GAME_DAY_SECONDS,
+  PERSON_LIFE_STAGES,
   PERSON_LIFE_STATUSES,
   PERSON_RELATIONSHIP_KINDS,
   SPENDING_CAPACITY_VALUES,
 } from "../src/character/populationDomain.js";
 import {
+  ACCIDENT_RISK_PER_DAY,
   advancePopulationLifecycle,
   assignGeneratedPopulationNames,
   BIRTH_RATE_ANCHORS,
@@ -19,6 +23,9 @@ import {
   ensurePopulationPartners,
   MATURE_POPULATION_TARGET,
   MIN_BIRTH_SPACING_DAYS,
+  NATURAL_LIFE_MAX_DAYS,
+  NATURAL_LIFE_MIN_DAYS,
+  naturalLifeDaysForPerson,
 } from "../src/character/populationLifecycleDomain.js";
 import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
 import { COMMON_PERSON_NAMES, generatedPopulationName } from "../src/character/personNames.js";
@@ -41,6 +48,9 @@ const inverseKind = {
 
 assert.equal(MATURE_POPULATION_TARGET, 300);
 assert.equal(MIN_BIRTH_SPACING_DAYS, 6);
+assert.equal(NATURAL_LIFE_MIN_DAYS, 98);
+assert.equal(NATURAL_LIFE_MAX_DAYS, 102);
+assert(Object.values(ACCIDENT_RISK_PER_DAY).every((risk) => risk > 0 && risk < 0.001));
 assert.equal(COMMON_PERSON_NAMES.length, 1000);
 assert.equal(new Set(COMMON_PERSON_NAMES.map((name) => name.toLowerCase())).size, 1000);
 assert.deepEqual(BIRTH_RATE_ANCHORS, [
@@ -57,6 +67,14 @@ assert.equal(birthTargetRateForPopulation(300), 3);
 assert.equal(birthTargetRateForPopulation(400), 0);
 assert.equal(SESSION_STATE_VERSION, 19);
 assert.equal(SAVE_SCHEMA_VERSION, 19, "Task #100 reuses the existing person record fields in v19");
+
+const transitionAge = ageYearsForLifeDays(37);
+const transitionStages = new Set(Array.from({ length: 80 }, (_value, index) => (
+  lifeStageForPersonAge(`person-seed-${String(index + 1).padStart(3, "0")}`, transitionAge)
+)));
+assert(transitionStages.has(PERSON_LIFE_STAGES.teen));
+assert(transitionStages.has(PERSON_LIFE_STAGES.youngAdult),
+  "individual stage boundaries vary around the nominal transition by up to about one day");
 
 const population = ensureMaturePopulation(createStage1Population(0), 0);
 assert.equal(population.length, MATURE_POPULATION_TARGET);
@@ -104,7 +122,7 @@ assert.deepEqual(ilyaTree.parents.map(({ displayName, fictional }) => ({ display
   { displayName: "Rowan", fictional: false },
 ]);
 assert.equal(ilyaTree.grandparents.length, 4);
-assert(ilyaTree.grandparents.some(({ fictional }) => fictional), "missing history is visibly filled for the prototype");
+assert(ilyaTree.grandparents.some(({ fictional }) => fictional, "missing history is visibly filled for the prototype"));
 assert.deepEqual(createDisplayFamilyTree(population, "person-ilya"), ilyaTree, "fictional ancestors stay deterministic");
 const ilyaVisibleNodes = [...ilyaTree.grandparents, ...ilyaTree.parents, ilyaTree.focus];
 assert.equal(new Set(ilyaVisibleNodes.map(({ id }) => id)).size, ilyaVisibleNodes.length,
@@ -117,18 +135,31 @@ for (const ancestor of ilyaTree.grandparents.filter(({ fictional }) => fictional
   assert(!byId.has(ancestor.id), "fictional ancestors never become population entities");
 }
 
-const old = createGeneratedPopulationPerson({ id: "person-born-1-0-900", displayName: "Old", ageYears: 83, worldTimeSeconds: 0 });
-const oldLifeDays = lifeDaysForAgeYears(old.ageYears);
-assert(oldLifeDays < 100 && oldLifeDays > 98);
+const oldId = "person-born-1-0-900";
+const oldLimit = naturalLifeDaysForPerson(oldId);
+assert(oldLimit >= NATURAL_LIFE_MIN_DAYS && oldLimit <= NATURAL_LIFE_MAX_DAYS);
+const old = createGeneratedPopulationPerson({
+  id: oldId,
+  displayName: "Old",
+  ageYears: ageYearsForLifeDays(oldLimit - 0.5),
+  worldTimeSeconds: 0,
+});
 const oldPopulation = [old];
-advancePopulationLifecycle(oldPopulation, 4 * PERSON_GAME_DAY_SECONDS);
-assert.equal(oldPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.dead, "natural death occurs around the nominal 100-day life");
+const oldSummary = advancePopulationLifecycle(oldPopulation, PERSON_GAME_DAY_SECONDS);
+assert.equal(oldPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.dead, "natural death follows the person's 98..102 day lifespan");
+assert.equal(oldSummary.naturalDeaths, 1);
 
-const protectedOld = createGeneratedPopulationPerson({ id: "person-born-1-0-901", displayName: "Guest", ageYears: 85, worldTimeSeconds: 0 });
+const protectedId = "person-born-1-0-901";
+const protectedOld = createGeneratedPopulationPerson({
+  id: protectedId,
+  displayName: "Guest",
+  ageYears: ageYearsForLifeDays(naturalLifeDaysForPerson(protectedId)),
+  worldTimeSeconds: 0,
+});
 const protectedPopulation = [protectedOld];
 advancePopulationLifecycle(protectedPopulation, PERSON_GAME_DAY_SECONDS, { protectedPersonIds: [protectedOld.id] });
 assert.equal(protectedPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.alive, "a physical guest is never deleted mid-visit");
-advancePopulationLifecycle(protectedPopulation, 4 * PERSON_GAME_DAY_SECONDS);
+advancePopulationLifecycle(protectedPopulation, 2 * PERSON_GAME_DAY_SECONDS);
 assert.equal(protectedPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.dead);
 
 const activeRun = clone(population);
@@ -136,7 +167,8 @@ const hundredDays = 100 * PERSON_GAME_DAY_SECONDS;
 const activeSummary = advancePopulationLifecycle(activeRun, hundredDays);
 assert(activeSummary.births > 0);
 assert(activeSummary.deaths > 0);
-assert(activeSummary.aliveCount >= 280 && activeSummary.aliveCount <= 320,
+assert.equal(activeSummary.deaths, activeSummary.naturalDeaths + activeSummary.accidentalDeaths);
+assert(activeSummary.aliveCount >= 275 && activeSummary.aliveCount <= 325,
   `steady population remains near 300, got ${activeSummary.aliveCount}`);
 const newborns = activeRun.filter((person) => person.id.startsWith("person-born-"));
 assert(newborns.length > 0);
@@ -177,13 +209,13 @@ for (const days of bornDaysByPair.values()) {
 const lowRun = clone(population);
 for (const person of lowRun.slice(-60)) {
   person.ageYears = 85;
-  person.lifeStage = "elder";
+  person.lifeStage = PERSON_LIFE_STAGES.elder;
   person.lifeStatus = PERSON_LIFE_STATUSES.dead;
 }
 ensurePopulationPartners(lowRun);
 const lowSummary = advancePopulationLifecycle(lowRun, 120 * PERSON_GAME_DAY_SECONDS);
 assert(lowSummary.births > lowSummary.deaths, "aggressive births repair a population deficit");
-assert(lowSummary.aliveCount >= 280 && lowSummary.aliveCount <= 325,
+assert(lowSummary.aliveCount >= 275 && lowSummary.aliveCount <= 330,
   `240-person deficit returns to working range, got ${lowSummary.aliveCount}`);
 
 const fresh = createFreshGameSessionState();
@@ -192,6 +224,15 @@ assert(fresh.gameplay.population.filter((person) => person.id.startsWith("person
 const roundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(fresh));
 assert.equal(roundTrip.status, "loaded");
 assert.deepEqual(roundTrip.state.gameplay.population, fresh.gameplay.population);
+
+const earlyDeathState = createFreshGameSessionState();
+const earlyDead = earlyDeathState.gameplay.population.find((person) => person.id.startsWith("person-seed-"));
+earlyDead.ageYears = 20;
+earlyDead.lifeStatus = PERSON_LIFE_STATUSES.dead;
+const earlyDeathRoundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(earlyDeathState));
+assert.equal(earlyDeathRoundTrip.status, "loaded");
+assert.equal(earlyDeathRoundTrip.state.gameplay.population.find(({ id }) => id === earlyDead.id).lifeStatus,
+  PERSON_LIFE_STATUSES.dead, "an accidental early death stays dead after save/load");
 
 const populationTestGroup = SIMULATION_TEST_GROUPS.find(({ id }) => id === "population");
 assert(populationTestGroup, "TEST exposes population proof controls");
@@ -214,11 +255,22 @@ assert(Array.isArray(sandboxRun.feedbackDeltas), "population proof exposes prese
 let sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
 assert.equal(sandbox.elapsedDays, 100);
 assert(sandbox.lastRun.births > 0 && sandbox.lastRun.deaths > 0);
+assert.equal(sumStages(sandbox), sandbox.aliveCount, "every living sandbox resident belongs to one visible age stage");
 assert.equal(JSON.stringify({
   worldTimeSeconds: fresh.gameplay.worldTimeSeconds,
   population: fresh.gameplay.population,
   coins: fresh.gameplay.coins,
 }), sourceBeforeSandbox, "population proof sandbox never mutates gameplay/save state");
+
+const dailyStates = [];
+for (let index = 0; index < 12; index += 1) {
+  grantSimulationTestCoins(fresh.gameplay, shortRunRow.quantities[0]);
+  sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
+  dailyStates.push(`${sandbox.aliveCount}:${JSON.stringify(sandbox.stageCounts)}`);
+  assert.equal(sandbox.elapsedDays, 101 + index);
+  assert.equal(sumStages(sandbox), sandbox.aliveCount, `visible stage counts reconcile on sandbox day ${sandbox.elapsedDays}`);
+}
+assert(new Set(dailyStates).size > 1, "consecutive +1 day runs must show visible demographic movement");
 
 grantSimulationTestCoins(fresh.gameplay, dropRow.quantities[0]);
 sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
@@ -227,7 +279,7 @@ grantSimulationTestCoins(fresh.gameplay, hundredDayAction);
 grantSimulationTestCoins(fresh.gameplay, shortRunRow.quantities[1]);
 grantSimulationTestCoins(fresh.gameplay, shortRunRow.quantities[1]);
 sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
-assert(sandbox.aliveCount >= 280 && sandbox.aliveCount <= 325,
+assert(sandbox.aliveCount >= 275 && sandbox.aliveCount <= 330,
   `TEST sandbox shows deficit recovery without waiting real hours, got ${sandbox.aliveCount}`);
 assert(sandbox.events.length > 0);
 grantSimulationTestCoins(fresh.gameplay, resetRow.quantities[0]);
@@ -255,4 +307,8 @@ for (const contract of [
   "FEEDBACK_FADE_MS",
 ]) assert(testFeedbackSource.includes(contract), `TEST action feedback exposes ${contract}`);
 
-console.log("Task #100 generational population, proof sandbox, family tree and TEST feedback contracts OK");
+console.log("Task #100 generational population, varied life, common names, proof sandbox, family tree and TEST feedback contracts OK");
+
+function sumStages(snapshot) {
+  return Object.values(snapshot.stageCounts).reduce((total, count) => total + Number(count || 0), 0);
+}
