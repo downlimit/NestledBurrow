@@ -16,6 +16,7 @@ import {
   advancePopulationLifecycle,
   ensureMaturePopulation,
 } from "../character/populationLifecycleDomain.js";
+import { emitSimulationTestActionFeedback } from "./simulationTestFeedback.js";
 import { getCurrentWorldScene } from "./worldSceneRegistry.js";
 
 const POPULATION_TEST_SANDBOXES = new WeakMap();
@@ -144,11 +145,24 @@ export function grantSimulationTestItem(gameplay, itemId, quantity) {
   if (!Number.isSafeInteger(requested) || requested <= 0) {
     return { status: "invalid-quantity", mutated: false, accepted: 0, remaining: 0 };
   }
-  return addInventoryItemUpTo(gameplay.inventory, createInventoryItem(itemId, requested));
+  const result = addInventoryItemUpTo(gameplay.inventory, createInventoryItem(itemId, requested));
+  emitSimulationTestActionFeedback({
+    scene: getCurrentWorldScene(),
+    itemId,
+    delta: result.accepted ?? 0,
+  });
+  return result;
 }
 
 export function grantSimulationTestCoins(gameplay, amount = 100) {
-  if (amount?.populationAction) return applyPopulationTestAction(gameplay, amount.populationAction);
+  if (amount?.populationAction) {
+    const result = applyPopulationTestAction(gameplay, amount.populationAction);
+    emitSimulationTestActionFeedback({
+      scene: getCurrentWorldScene(),
+      deltas: result.feedbackDeltas,
+    });
+    return result;
+  }
   const requested = Number(amount);
   const current = Number(gameplay?.coins);
   if (!gameplay || !Number.isSafeInteger(requested) || requested <= 0 || !Number.isSafeInteger(current) || current < 0) {
@@ -156,7 +170,9 @@ export function grantSimulationTestCoins(gameplay, amount = 100) {
   }
   if (!Number.isSafeInteger(current + requested)) return { status: "coin-limit", mutated: false, value: 0 };
   gameplay.coins = current + requested;
-  return { status: "coins-granted", mutated: true, value: requested, coins: gameplay.coins };
+  const result = { status: "coins-granted", mutated: true, value: requested, coins: gameplay.coins };
+  emitSimulationTestActionFeedback({ scene: getCurrentWorldScene(), itemId: "coins", delta: requested });
+  return result;
 }
 
 export function getSimulationTestItemIds() {
@@ -165,23 +181,7 @@ export function getSimulationTestItemIds() {
 
 export function getSimulationPopulationTestSnapshot(gameplay) {
   const sandbox = ensurePopulationSandbox(gameplay);
-  if (!sandbox) return null;
-  const alive = sandbox.population.filter(isLivingPopulationPerson);
-  const stageCounts = Object.fromEntries(POPULATION_STAGE_ORDER.map((stage) => [stage, 0]));
-  for (const person of alive) {
-    const stage = lifeStageForPersonAge(person.id, person.ageYears);
-    stageCounts[stage] += 1;
-  }
-  return {
-    worldTimeSeconds: sandbox.worldTimeSeconds,
-    elapsedDays: sandbox.elapsedDays,
-    aliveCount: alive.length,
-    deadCount: sandbox.population.length - alive.length,
-    totalCount: sandbox.population.length,
-    stageCounts,
-    lastRun: { ...sandbox.lastRun },
-    events: sandbox.events.map((event) => ({ ...event, parentNames: [...(event.parentNames ?? [])] })),
-  };
+  return sandbox ? populationSnapshotFromSandbox(sandbox) : null;
 }
 
 export function resetSimulationPopulationTest(gameplay) {
@@ -192,10 +192,19 @@ export function resetSimulationPopulationTest(gameplay) {
 
 function applyPopulationTestAction(gameplay, action) {
   const sandbox = ensurePopulationSandbox(gameplay);
-  if (!sandbox) return { status: "population-test-unavailable", mutated: false, value: 0 };
+  if (!sandbox) return { status: "population-test-unavailable", mutated: false, value: 0, feedbackDeltas: [] };
+  const before = populationSnapshotFromSandbox(sandbox);
   if (action.kind === "reset") {
-    resetSimulationPopulationTest(gameplay);
-    return { status: "population-test-reset", mutated: false, value: 0, populationTest: true };
+    POPULATION_TEST_SANDBOXES.delete(gameplay);
+    const nextSandbox = ensurePopulationSandbox(gameplay);
+    const after = populationSnapshotFromSandbox(nextSandbox);
+    return {
+      status: "population-test-reset",
+      mutated: false,
+      value: 0,
+      populationTest: true,
+      feedbackDeltas: populationFeedbackDeltas(before, after),
+    };
   }
   if (action.kind === "drop") {
     const target = Math.max(0, Math.floor(Number(action.value) || 0));
@@ -214,12 +223,21 @@ function applyPopulationTestAction(gameplay, action) {
       stress: true,
     };
     sandbox.events = [{ type: "stress", count: Math.min(removeCount, candidates.length) }];
-    return { status: "population-test-dropped", mutated: false, value: 0, populationTest: true };
+    const after = populationSnapshotFromSandbox(sandbox);
+    return {
+      status: "population-test-dropped",
+      mutated: false,
+      value: 0,
+      populationTest: true,
+      feedbackDeltas: populationFeedbackDeltas(before, after),
+    };
   }
-  if (action.kind !== "advance") return { status: "population-test-invalid-action", mutated: false, value: 0 };
+  if (action.kind !== "advance") {
+    return { status: "population-test-invalid-action", mutated: false, value: 0, feedbackDeltas: [] };
+  }
 
   const days = Math.max(0, Math.floor(Number(action.value) || 0));
-  if (days <= 0) return { status: "population-test-invalid-days", mutated: false, value: 0 };
+  if (days <= 0) return { status: "population-test-invalid-days", mutated: false, value: 0, feedbackDeltas: [] };
   const beforeLiving = new Map(sandbox.population.filter(isLivingPopulationPerson).map((person) => [person.id, person.displayName]));
   const beforeLength = sandbox.population.length;
   const targetTime = sandbox.worldTimeSeconds + days * PERSON_GAME_DAY_SECONDS;
@@ -256,6 +274,7 @@ function applyPopulationTestAction(gameplay, action) {
       parentNames: [],
     }));
   sandbox.events = [...births, ...deaths].slice(-6).reverse();
+  const after = populationSnapshotFromSandbox(sandbox);
   return {
     status: "population-test-advanced",
     mutated: false,
@@ -267,6 +286,7 @@ function applyPopulationTestAction(gameplay, action) {
     naturalDeaths: summary.naturalDeaths,
     accidentalDeaths: summary.accidentalDeaths,
     aliveCount: summary.aliveCount,
+    feedbackDeltas: populationFeedbackDeltas(before, after),
   };
 }
 
@@ -286,6 +306,44 @@ function ensurePopulationSandbox(gameplay) {
   };
   POPULATION_TEST_SANDBOXES.set(gameplay, sandbox);
   return sandbox;
+}
+
+function populationSnapshotFromSandbox(sandbox) {
+  const alive = sandbox.population.filter(isLivingPopulationPerson);
+  const stageCounts = Object.fromEntries(POPULATION_STAGE_ORDER.map((stage) => [stage, 0]));
+  for (const person of alive) {
+    const stage = lifeStageForPersonAge(person.id, person.ageYears);
+    stageCounts[stage] += 1;
+  }
+  return {
+    worldTimeSeconds: sandbox.worldTimeSeconds,
+    elapsedDays: sandbox.elapsedDays,
+    aliveCount: alive.length,
+    deadCount: sandbox.population.length - alive.length,
+    totalCount: sandbox.population.length,
+    stageCounts,
+    lastRun: { ...sandbox.lastRun },
+    events: sandbox.events.map((event) => ({ ...event, parentNames: [...(event.parentNames ?? [])] })),
+  };
+}
+
+function populationFeedbackDeltas(before, after) {
+  const deltas = [];
+  pushFeedbackDelta(deltas, "population-alive", after.aliveCount - before.aliveCount);
+  pushFeedbackDelta(deltas, "population-dead", after.deadCount - before.deadCount);
+  for (const stage of POPULATION_STAGE_ORDER) {
+    pushFeedbackDelta(
+      deltas,
+      `population-stage-${stage}`,
+      Number(after.stageCounts?.[stage] ?? 0) - Number(before.stageCounts?.[stage] ?? 0),
+    );
+  }
+  return deltas;
+}
+
+function pushFeedbackDelta(target, debugId, delta) {
+  const value = Number(delta);
+  if (Number.isFinite(value) && value !== 0) target.push({ debugId, delta: value });
 }
 
 function populationReadoutItem(id, labelFactory) {
