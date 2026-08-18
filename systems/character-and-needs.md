@@ -11,7 +11,7 @@ Persistent people use the same need dimensions. The player keeps live runtime; o
 - Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic JSON-safe `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
 - Stage 9 uses Sims-like life stages with a 100-game-day target: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10`. With one game hour per real minute this is about 40 real hours at `1x`.
 - `ageYears` carries persistent progress inside that lifecycle; `lifeStage` is derived from it. `lifeStatus` and reciprocal family `relationships` (`partner`, `parent`, `child`, `sibling`) remain canonical identity. Invalid age data recovers from the identity baseline.
-- The elder stage stops alive at its current cap until death is implemented. Birth, relationship mutation and population replenishment remain inactive.
+- The elder stage stops alive at its current cap until death is implemented. Birth and population replenishment remain inactive. The mature-world target is `300` persistent residents; the birth/death balancing rule around that target is still open.
 - No general time acceleration is assumed for lifecycle balance. Sleep may advance world time separately. Future skill learning should be tuned to this shorter life rather than assuming player speed-up.
 - `populationDomain` derives links and preferred periods. Periods are night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`.
 - Relevance reconstructs offscreen needs and lifecycle once from stored state and elapsed world time. A physical guest advances both live and rebases evaluation time; no guest-local copy exists.
