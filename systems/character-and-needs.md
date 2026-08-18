@@ -11,8 +11,8 @@ Persistent people share these need dimensions. The player uses live runtime; off
 - Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic JSON-safe `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
 - Stage 9 life stages total `100` game days: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10` — about `40` real hours at `1x`.
 - `ageYears` stores lifecycle progress; `lifeStage` is derived. `lifeStatus` and reciprocal `partner`, `parent`, `child`, `sibling` relationships remain canonical identity. Invalid age recovers from identity baseline.
-- Natural death comes at the elder-stage end, around life day `100`; population balance never kills early. Mature-world target is about `300`: births grow likelier below target, stay normal near it and are strongly suppressed above it.
-- `youngAdult` and `adult` couples may have children, normally `1..3` over the couple's life. Minimum spacing between births is still a tuning value.
+- Natural death comes at the elder-stage end, around life day `100`; population balance never kills early. Mature-world target is about `300`.
+- `youngAdult` and `adult` couples may have children, normally `1..3` over the couple's life, with at least `6` game days between births. Initial whole-population birth targets are births/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:~0`, interpolated between anchors; births, not extra deaths, restore population.
 - Each child is a distinct persistent person; future preferences, character, aptitudes and skill tendencies mix parental influence with variation.
 - Lifecycle balance assumes no general time acceleration; sleep may advance world time. Skill learning must fit the shorter life.
 - `populationDomain` derives links and preferred periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`.
