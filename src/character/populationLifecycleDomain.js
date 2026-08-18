@@ -15,6 +15,7 @@ import {
   STAGE1_POPULATION_SIZE,
   VISIT_TIME_PERIODS,
 } from "./populationDomain.js";
+import { generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 
 export const MATURE_POPULATION_TARGET = 300;
 export const MIN_BIRTH_SPACING_DAYS = 6;
@@ -33,15 +34,17 @@ const REPRODUCTIVE_STAGES = new Set([PERSON_LIFE_STAGES.youngAdult, PERSON_LIFE_
 
 export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
   if (!Array.isArray(population)) throw new Error("Mature population requires an array");
+  assignGeneratedPopulationNames(population);
   if (population.some((person) => isGeneratedPersonId(person?.id)) || population.length > STAGE1_POPULATION_SIZE) {
     return population;
   }
   const evaluationTime = nonNegativeNumber(worldTimeSeconds, 0);
   for (let index = 1; index <= SEED_COUNT; index += 1) {
     const lifeDays = ((index - 0.5) / SEED_COUNT) * PERSON_LIFE_TOTAL_DAYS;
+    const id = `person-seed-${String(index).padStart(3, "0")}`;
     population.push(createGeneratedPopulationPerson({
-      id: `person-seed-${String(index).padStart(3, "0")}`,
-      displayName: `Resident ${String(STAGE1_POPULATION_SIZE + index).padStart(3, "0")}`,
+      id,
+      displayName: generatedPopulationName(id),
       ageYears: ageYearsForLifeDays(lifeDays),
       worldTimeSeconds: evaluationTime,
     }));
@@ -49,6 +52,18 @@ export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
   ensurePopulationPartners(population);
   seedExistingFamilies(population);
   return population;
+}
+
+export function assignGeneratedPopulationNames(population) {
+  if (!Array.isArray(population)) return 0;
+  let renamed = 0;
+  for (const person of population) {
+    if (!isGeneratedPersonId(person?.id)) continue;
+    if (typeof person.displayName === "string" && person.displayName.trim() && !isLegacyResidentName(person.displayName)) continue;
+    person.displayName = generatedPopulationName(person.id);
+    renamed += 1;
+  }
+  return renamed;
 }
 
 export function advancePopulationLifecycle(population, targetWorldTimeSeconds, { protectedPersonIds = [] } = {}) {
@@ -179,7 +194,7 @@ function createBirth(population, [first, second], boundaryTime, slot) {
   const id = `person-born-${dayIndex}-${slot}-${population.length}`;
   const child = createGeneratedPopulationPerson({
     id,
-    displayName: `Resident ${String(population.length + 1).padStart(3, "0")}`,
+    displayName: generatedPopulationName(id),
     ageYears: 0,
     worldTimeSeconds: boundaryTime,
     spendingCapacity: inheritedSpendingCapacity(first, second, id),
