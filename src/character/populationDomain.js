@@ -49,7 +49,9 @@ export const PERSON_RELATIONSHIP_KINDS = Object.freeze({
   sibling: "sibling",
 });
 
-const PERSON_LIFE_MAX_AGE_YEARS = 85;
+const PERSON_LIFE_NOMINAL_MAX_AGE_YEARS = 85;
+const PERSON_LIFE_MAX_AGE_YEARS = 89;
+const PERSON_LIFE_MAX_DAYS = 102;
 const LIFE_STAGE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: PERSON_LIFE_STAGES.newborn, startAgeYears: 0, endAgeYears: 0.25 }),
   Object.freeze({ id: PERSON_LIFE_STAGES.infant, startAgeYears: 0.25, endAgeYears: 1 }),
@@ -58,8 +60,19 @@ const LIFE_STAGE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: PERSON_LIFE_STAGES.teen, startAgeYears: 13, endAgeYears: 18 }),
   Object.freeze({ id: PERSON_LIFE_STAGES.youngAdult, startAgeYears: 18, endAgeYears: 35 }),
   Object.freeze({ id: PERSON_LIFE_STAGES.adult, startAgeYears: 35, endAgeYears: 65 }),
-  Object.freeze({ id: PERSON_LIFE_STAGES.elder, startAgeYears: 65, endAgeYears: PERSON_LIFE_MAX_AGE_YEARS }),
+  Object.freeze({ id: PERSON_LIFE_STAGES.elder, startAgeYears: 65, endAgeYears: PERSON_LIFE_NOMINAL_MAX_AGE_YEARS }),
 ]);
+const PERSONAL_STAGE_ORDER = Object.freeze([
+  PERSON_LIFE_STAGES.newborn,
+  PERSON_LIFE_STAGES.infant,
+  PERSON_LIFE_STAGES.toddler,
+  PERSON_LIFE_STAGES.child,
+  PERSON_LIFE_STAGES.teen,
+  PERSON_LIFE_STAGES.youngAdult,
+  PERSON_LIFE_STAGES.adult,
+  PERSON_LIFE_STAGES.elder,
+]);
+const PERSONAL_STAGE_BOUNDARY_DAYS = Object.freeze([1, 5, 10, 21, 37, 58, 90]);
 
 const STAGE1_IDENTITIES = Object.freeze([
   Object.freeze({ id: "person-mira", displayName: "Mira" }),
@@ -173,7 +186,7 @@ export function createGeneratedPopulationPerson({
     id: personId,
     displayName: nonEmptyString(displayName) ? displayName.trim() : generatedFallbackDisplayName(personId),
     ageYears: safeAge,
-    lifeStage: lifeStageForAgeYears(safeAge),
+    lifeStage: lifeStageForPersonAge(personId, safeAge),
     lifeStatus: normalizeLifeStatus(lifeStatus, safeAge),
     relationships: safeRelationships,
     needs: normalizePersonNeeds(needs, initialNeeds(personId)),
@@ -204,7 +217,7 @@ export function evaluatePersonOffscreen(person, targetWorldTimeSeconds) {
     return [needId, roundNeed(normalizeNeedValue(reconstructed))];
   }));
   const ageYears = advanceLifeAgeYears(baseline.ageYears, elapsed);
-  return { ...baseline, ageYears, lifeStage: lifeStageForAgeYears(ageYears), needs, lastEvaluatedWorldTimeSeconds: targetTime };
+  return { ...baseline, ageYears, lifeStage: lifeStageForPersonAge(baseline.id, ageYears), needs, lastEvaluatedWorldTimeSeconds: targetTime };
 }
 
 export function evaluatePopulationPerson(population, personId, targetWorldTimeSeconds) {
@@ -229,7 +242,7 @@ export function advancePersonLifecycle(person, targetWorldTimeSeconds) {
   const fallbackProfile = createPersonLifeProfile(person.id);
   const previousAge = normalizeLifeAgeYears(person.ageYears, fallbackProfile.ageYears);
   const nextAge = advanceLifeAgeYears(previousAge, elapsed);
-  const nextStage = lifeStageForAgeYears(nextAge);
+  const nextStage = lifeStageForPersonAge(person.id, nextAge);
   const mutated = nextAge !== previousAge || person.lifeStage !== nextStage;
   if (mutated) { person.ageYears = nextAge; person.lifeStage = nextStage; }
   return { status: mutated ? "advanced" : "unchanged", mutated, person };
@@ -288,7 +301,7 @@ export function createPersonLifeProfile(personId) {
   const ageYears = STAGE9_AGE_YEARS[id] ?? fallbackAge;
   return {
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
+    lifeStage: lifeStageForPersonAge(id, ageYears),
     lifeStatus: PERSON_LIFE_STATUSES.alive,
     relationships: canonicalRelationshipsForId(id),
   };
@@ -307,6 +320,18 @@ export function lifeStageForAgeYears(ageYears) {
   return PERSON_LIFE_STAGES.elder;
 }
 
+export function lifeStageForPersonAge(personId, ageYears) {
+  const id = String(personId ?? "").trim();
+  if (!id) return lifeStageForAgeYears(ageYears);
+  const lifeDays = lifeDaysForAgeYears(ageYears);
+  for (let index = 0; index < PERSONAL_STAGE_BOUNDARY_DAYS.length; index += 1) {
+    const amplitude = index === 0 ? 0.5 : 1;
+    const shift = (stableUnit(`${id}:life-stage-boundary:${index}`) * 2 - 1) * amplitude;
+    if (lifeDays < PERSONAL_STAGE_BOUNDARY_DAYS[index] + shift) return PERSONAL_STAGE_ORDER[index];
+  }
+  return PERSON_LIFE_STAGES.elder;
+}
+
 export function lifeDaysForAgeYears(ageYears) {
   const age = normalizeLifeAgeYears(ageYears, 0);
   let elapsedDays = 0;
@@ -317,18 +342,22 @@ export function lifeDaysForAgeYears(ageYears) {
     const progress = span > 0 ? clamp((age - definition.startAgeYears) / span, 0, 1) : 1;
     return roundAge(elapsedDays + durationDays * progress);
   }
-  return PERSON_LIFE_TOTAL_DAYS;
+  const elderYearsPerDay = (PERSON_LIFE_NOMINAL_MAX_AGE_YEARS - 65) / PERSON_LIFE_STAGE_DURATIONS_DAYS[PERSON_LIFE_STAGES.elder];
+  return roundAge(Math.min(PERSON_LIFE_MAX_DAYS,
+    PERSON_LIFE_TOTAL_DAYS + Math.max(0, age - PERSON_LIFE_NOMINAL_MAX_AGE_YEARS) / elderYearsPerDay));
 }
 
 export function ageYearsForLifeDays(lifeDays) {
-  let remaining = clamp(Number(lifeDays) || 0, 0, PERSON_LIFE_TOTAL_DAYS);
+  let remaining = clamp(Number(lifeDays) || 0, 0, PERSON_LIFE_MAX_DAYS);
   for (const definition of LIFE_STAGE_DEFINITIONS) {
     const durationDays = PERSON_LIFE_STAGE_DURATIONS_DAYS[definition.id];
     const span = definition.endAgeYears - definition.startAgeYears;
     if (remaining < durationDays) return roundAge(definition.startAgeYears + span * (remaining / durationDays));
     remaining -= durationDays;
   }
-  return PERSON_LIFE_MAX_AGE_YEARS;
+  const elderYearsPerDay = (PERSON_LIFE_NOMINAL_MAX_AGE_YEARS - 65) / PERSON_LIFE_STAGE_DURATIONS_DAYS[PERSON_LIFE_STAGES.elder];
+  return roundAge(Math.min(PERSON_LIFE_MAX_AGE_YEARS,
+    PERSON_LIFE_NOMINAL_MAX_AGE_YEARS + remaining * elderYearsPerDay));
 }
 
 export function advanceLifeAgeYears(ageYears, elapsedWorldTimeSeconds) {
@@ -382,7 +411,7 @@ function normalizeStage1Person(value, identity, recoveryTime) {
     id: identity.id,
     displayName: nonEmptyString(value.displayName) ? value.displayName.trim() : identity.displayName,
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
+    lifeStage: lifeStageForPersonAge(identity.id, ageYears),
     lifeStatus: normalizeLifeStatus(value.lifeStatus, ageYears),
     relationships: normalizeRelationshipList(value.relationships, fallback.relationships),
     needs: normalizePersonNeeds(value.needs, fallback.needs),
@@ -408,7 +437,7 @@ function normalizeGeneratedPerson(value, recoveryTime) {
     id,
     displayName: nonEmptyString(value.displayName) ? value.displayName.trim() : fallback.displayName,
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
+    lifeStage: lifeStageForPersonAge(id, ageYears),
     lifeStatus: normalizeLifeStatus(value.lifeStatus, ageYears),
     relationships: normalizeRelationshipList(value.relationships, []),
     needs: normalizePersonNeeds(value.needs, fallback.needs),
@@ -483,7 +512,7 @@ function normalizeEvaluationPerson(value) {
     id,
     displayName: value.displayName.trim(),
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
+    lifeStage: lifeStageForPersonAge(id, ageYears),
     lifeStatus: normalizeLifeStatus(value.lifeStatus, ageYears),
     relationships,
     needs: normalizePersonNeeds(value.needs, initialNeeds(id)),
@@ -543,11 +572,8 @@ function normalizeSpendingCapacity(value, fallback) {
   return SPENDING_CAPACITY_VALUES.includes(capacity) ? capacity : fallback;
 }
 
-function normalizeLifeStatus(value, ageYears) {
-  if (value === PERSON_LIFE_STATUSES.dead && lifeDaysForAgeYears(ageYears) >= PERSON_LIFE_TOTAL_DAYS) {
-    return PERSON_LIFE_STATUSES.dead;
-  }
-  return PERSON_LIFE_STATUSES.alive;
+function normalizeLifeStatus(value, _ageYears) {
+  return value === PERSON_LIFE_STATUSES.dead ? PERSON_LIFE_STATUSES.dead : PERSON_LIFE_STATUSES.alive;
 }
 
 function normalizeLifeAgeYears(value, fallback) {
