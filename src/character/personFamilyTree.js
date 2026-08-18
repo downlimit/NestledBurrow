@@ -1,44 +1,48 @@
+import { commonNameForKey, generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 import { PERSON_LIFE_STATUSES, PERSON_RELATIONSHIP_KINDS } from "./populationDomain.js";
-
-const FICTIONAL_ANCESTOR_NAMES = Object.freeze([
-  "Alma", "Ansel", "Bera", "Corin", "Della", "Eamon", "Elva", "Fenn",
-  "Gilda", "Hale", "Iona", "Joren", "Kelda", "Lorne", "Maren", "Nell",
-  "Orin", "Pella", "Runa", "Soren", "Tilda", "Ulric", "Vera", "Wynn",
-]);
 
 export function createDisplayFamilyTree(personSource, personId) {
   const getPerson = personGetter(personSource);
   const focusPerson = getPerson(personId);
   if (!focusPerson) return null;
 
-  const focus = realNode(focusPerson);
-  const parents = parentNodes(getPerson, focusPerson, `${focusPerson.id}:parents`);
+  const usedNames = new Set();
+  const focus = realNode(focusPerson, usedNames);
+  const parents = parentNodes(getPerson, focusPerson, `${focusPerson.id}:parents`, usedNames);
   const grandparents = parents.flatMap((parent, parentIndex) => {
     if (parent.fictional) {
-      return [
-        fictionalNode(`${parent.id}:parent:0`),
-        fictionalNode(`${parent.id}:parent:1`),
-      ];
+      return fictionalParentPair(`${focusPerson.id}:fictional-parent:${parentIndex}`, usedNames);
     }
     const person = getPerson(parent.id);
-    return parentNodes(getPerson, person, `${focusPerson.id}:grandparents:${parentIndex}`);
+    return parentNodes(getPerson, person, `${focusPerson.id}:grandparents:${parent.id}`, usedNames);
   });
 
   const partner = relationshipPeople(getPerson, focusPerson, PERSON_RELATIONSHIP_KINDS.partner)
-    .map(realNode)[0] ?? null;
+    .map((person) => realNode(person, usedNames))[0] ?? null;
   const children = relationshipPeople(getPerson, focusPerson, PERSON_RELATIONSHIP_KINDS.parent)
-    .map(realNode)
+    .map((person) => realNode(person, usedNames))
     .slice(0, 3);
 
   return { focus, parents, grandparents, partner, children };
 }
 
-function parentNodes(getPerson, person, fallbackKey) {
+function parentNodes(getPerson, person, fallbackKey, usedNames) {
   const actual = person
-    ? relationshipPeople(getPerson, person, PERSON_RELATIONSHIP_KINDS.child).map(realNode).slice(0, 2)
+    ? relationshipPeople(getPerson, person, PERSON_RELATIONSHIP_KINDS.child)
+      .map((relative) => realNode(relative, usedNames))
+      .slice(0, 2)
     : [];
-  while (actual.length < 2) actual.push(fictionalNode(`${fallbackKey}:${actual.length}`));
+  while (actual.length < 2) {
+    actual.push(fictionalNode(`${fallbackKey}:parent:${actual.length}`, usedNames));
+  }
   return actual;
+}
+
+function fictionalParentPair(key, usedNames) {
+  return [
+    fictionalNode(`${key}:0`, usedNames),
+    fictionalNode(`${key}:1`, usedNames),
+  ];
 }
 
 function relationshipPeople(getPerson, person, kind) {
@@ -49,20 +53,24 @@ function relationshipPeople(getPerson, person, kind) {
     .filter(Boolean);
 }
 
-function realNode(person) {
+function realNode(person, usedNames) {
+  if (isLegacyResidentName(person.displayName)) person.displayName = generatedPopulationName(person.id);
+  const displayName = String(person.displayName ?? generatedPopulationName(person.id));
+  usedNames.add(displayName.toLowerCase());
   return {
     id: person.id,
-    displayName: person.displayName,
+    displayName,
     fictional: false,
     lifeStatus: person.lifeStatus ?? PERSON_LIFE_STATUSES.alive,
   };
 }
 
-function fictionalNode(key) {
-  const index = Math.floor(stableUnit(key) * FICTIONAL_ANCESTOR_NAMES.length) % FICTIONAL_ANCESTOR_NAMES.length;
+function fictionalNode(key, usedNames) {
+  const displayName = commonNameForKey(`ancestor:${key}`, usedNames);
+  usedNames.add(displayName.toLowerCase());
   return {
     id: `fictional-${stableHash(key).toString(16)}`,
-    displayName: FICTIONAL_ANCESTOR_NAMES[index],
+    displayName,
     fictional: true,
     lifeStatus: PERSON_LIFE_STATUSES.dead,
   };
@@ -73,10 +81,6 @@ function personGetter(source) {
   const people = Array.isArray(source) ? source : [];
   const byId = new Map(people.filter((person) => person?.id).map((person) => [person.id, person]));
   return (id) => byId.get(id) ?? null;
-}
-
-function stableUnit(key) {
-  return stableHash(key) / 0xffffffff;
 }
 
 function stableHash(key) {
