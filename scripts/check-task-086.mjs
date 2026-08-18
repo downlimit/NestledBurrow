@@ -7,6 +7,7 @@ import {
   normalizePopulation,
   STAGE1_POPULATION_SIZE,
 } from "../src/character/populationDomain.js";
+import { MATURE_POPULATION_TARGET } from "../src/character/populationLifecycleDomain.js";
 import { NEED_IDS } from "../src/needs/needsDomain.js";
 import {
   createFreshGameSessionState,
@@ -23,9 +24,9 @@ function jsonClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function assertPopulation(population) {
-  assert.equal(population.length, STAGE1_POPULATION_SIZE);
-  assert.equal(new Set(population.map(({ id }) => id)).size, STAGE1_POPULATION_SIZE);
+function assertPopulation(population, expectedSize) {
+  assert.equal(population.length, expectedSize);
+  assert.equal(new Set(population.map(({ id }) => id)).size, expectedSize);
   for (const person of population) {
     assert.equal(typeof person.id, "string");
     assert(person.id.length > 0);
@@ -48,11 +49,11 @@ assert.equal(SAVE_SCHEMA_VERSION, 19);
 assert.deepEqual(NEED_IDS, ["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
 
 const fresh = createFreshGameSessionState();
-assertPopulation(fresh.gameplay.population);
+assertPopulation(fresh.gameplay.population, MATURE_POPULATION_TARGET);
 assert.equal(
   new Set(fresh.gameplay.population.map(({ displayName }) => displayName)).size,
-  STAGE1_POPULATION_SIZE,
-  "the test baseline remains recognizable during Stage 1",
+  MATURE_POPULATION_TARGET,
+  "the mature test population remains individually recognizable",
 );
 
 const first = fresh.gameplay.population[0];
@@ -95,7 +96,7 @@ const migrated = deserializeSessionEnvelope(JSON.stringify({ schemaVersion: 12, 
 assert.equal(migrated.status, "loaded");
 assert.equal(migrated.schemaVersion, 19);
 assert.equal(migrated.state.version, 19);
-assertPopulation(migrated.state.gameplay.population);
+assertPopulation(migrated.state.gameplay.population, MATURE_POPULATION_TARGET);
 assert(migrated.state.gameplay.population.every((person) => (
   person.lastEvaluatedWorldTimeSeconds === migrated.state.gameplay.worldTimeSeconds
 )));
@@ -113,7 +114,7 @@ corrupted.gameplay.population = [
   { id: "unknown-person", displayName: "Unknown", needs: {}, lastEvaluatedWorldTimeSeconds: 10 },
 ];
 const recovered = normalizeGameSessionState(corrupted);
-assertPopulation(recovered.gameplay.population);
+assertPopulation(recovered.gameplay.population, MATURE_POPULATION_TARGET);
 assert.equal(recovered.gameplay.population[0].displayName, "Mira");
 assert.equal(recovered.gameplay.population[0].needs.novelty, 0);
 assert.equal(recovered.gameplay.population[0].needs.energy, 100);
@@ -127,7 +128,7 @@ for (const person of [...longAbsencePopulation]) {
   const result = evaluatePopulationPerson(longAbsencePopulation, person.id, 365 * 24 * 60 * 60);
   assert.equal(result.status, "evaluated");
 }
-assertPopulation(normalizePopulation(longAbsencePopulation));
+assertPopulation(normalizePopulation(longAbsencePopulation), STAGE1_POPULATION_SIZE);
 assert(
   longAbsencePopulation.every((person) => NEED_IDS.some((needId) => person.needs[needId] > 0)),
   "a long absence never applies waking player drains until every need is zero",

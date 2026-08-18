@@ -1,0 +1,148 @@
+import assert from "node:assert/strict";
+import {
+  createGeneratedPopulationPerson,
+  createStage1Population,
+  FOOD_PREFERENCE_TAGS,
+  lifeDaysForAgeYears,
+  PERSON_GAME_DAY_SECONDS,
+  PERSON_LIFE_STATUSES,
+  PERSON_RELATIONSHIP_KINDS,
+  SPENDING_CAPACITY_VALUES,
+} from "../src/character/populationDomain.js";
+import {
+  advancePopulationLifecycle,
+  BIRTH_RATE_ANCHORS,
+  birthTargetRateForPopulation,
+  ensureMaturePopulation,
+  ensurePopulationPartners,
+  MATURE_POPULATION_TARGET,
+  MIN_BIRTH_SPACING_DAYS,
+} from "../src/character/populationLifecycleDomain.js";
+import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
+import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const inverseKind = {
+  [PERSON_RELATIONSHIP_KINDS.partner]: PERSON_RELATIONSHIP_KINDS.partner,
+  [PERSON_RELATIONSHIP_KINDS.parent]: PERSON_RELATIONSHIP_KINDS.child,
+  [PERSON_RELATIONSHIP_KINDS.child]: PERSON_RELATIONSHIP_KINDS.parent,
+  [PERSON_RELATIONSHIP_KINDS.sibling]: PERSON_RELATIONSHIP_KINDS.sibling,
+};
+
+assert.equal(MATURE_POPULATION_TARGET, 300);
+assert.equal(MIN_BIRTH_SPACING_DAYS, 6);
+assert.deepEqual(BIRTH_RATE_ANCHORS, [
+  { population: 240, birthsPerDay: 6 },
+  { population: 260, birthsPerDay: 5 },
+  { population: 280, birthsPerDay: 4 },
+  { population: 300, birthsPerDay: 3 },
+  { population: 320, birthsPerDay: 2 },
+  { population: 340, birthsPerDay: 1 },
+  { population: 360, birthsPerDay: 0 },
+]);
+assert.equal(birthTargetRateForPopulation(250), 5.5);
+assert.equal(birthTargetRateForPopulation(300), 3);
+assert.equal(birthTargetRateForPopulation(400), 0);
+assert.equal(SESSION_STATE_VERSION, 19);
+assert.equal(SAVE_SCHEMA_VERSION, 19, "Task #100 reuses the existing person record fields in v19");
+
+const population = ensureMaturePopulation(createStage1Population(0), 0);
+assert.equal(population.length, MATURE_POPULATION_TARGET);
+assert.equal(population.filter((person) => person.lifeStatus === PERSON_LIFE_STATUSES.alive).length, 300);
+assert.equal(new Set(population.map((person) => person.id)).size, population.length);
+for (const id of ["person-mira", "person-rowan", "person-ilya", "person-zoya"]) {
+  assert(population.some((person) => person.id === id), `named baseline resident survives mature seeding: ${id}`);
+}
+
+const byId = new Map(population.map((person) => [person.id, person]));
+for (const person of population) {
+  assert(Number.isFinite(person.ageYears));
+  assert(SPENDING_CAPACITY_VALUES.includes(person.spendingCapacity));
+  for (const relationship of person.relationships) {
+    const related = byId.get(relationship.personId);
+    assert(related, `${person.id} relationship target remains persistent`);
+    const reciprocal = related.relationships.find((candidate) => candidate.personId === person.id);
+    assert(reciprocal, `${person.id} relationship remains reciprocal`);
+    assert.equal(reciprocal.kind, inverseKind[relationship.kind]);
+  }
+  for (const partner of person.relationships.filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.partner)) {
+    assert(!person.relationships.some(({ personId, kind }) => personId === partner.personId
+      && [PERSON_RELATIONSHIP_KINDS.parent, PERSON_RELATIONSHIP_KINDS.child, PERSON_RELATIONSHIP_KINDS.sibling].includes(kind)));
+  }
+}
+assert(population.some((person) => person.id.startsWith("person-seed-")
+  && person.relationships.some(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)),
+"mature seed contains generated families, not 284 unrelated tavern profiles");
+
+const old = createGeneratedPopulationPerson({ id: "person-born-1-0-900", displayName: "Old", ageYears: 83, worldTimeSeconds: 0 });
+const oldLifeDays = lifeDaysForAgeYears(old.ageYears);
+assert(oldLifeDays < 100 && oldLifeDays > 98);
+const oldPopulation = [old];
+advancePopulationLifecycle(oldPopulation, 2 * PERSON_GAME_DAY_SECONDS);
+assert.equal(oldPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.dead, "natural death occurs at the end of the 100-day life");
+
+const protectedOld = createGeneratedPopulationPerson({ id: "person-born-1-0-901", displayName: "Guest", ageYears: 85, worldTimeSeconds: 0 });
+const protectedPopulation = [protectedOld];
+advancePopulationLifecycle(protectedPopulation, PERSON_GAME_DAY_SECONDS, { protectedPersonIds: [protectedOld.id] });
+assert.equal(protectedPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.alive, "a physical guest is never deleted mid-visit");
+advancePopulationLifecycle(protectedPopulation, 2 * PERSON_GAME_DAY_SECONDS);
+assert.equal(protectedPopulation[0].lifeStatus, PERSON_LIFE_STATUSES.dead);
+
+const activeRun = clone(population);
+const hundredDays = 100 * PERSON_GAME_DAY_SECONDS;
+const activeSummary = advancePopulationLifecycle(activeRun, hundredDays);
+assert(activeSummary.births > 0);
+assert(activeSummary.deaths > 0);
+assert(activeSummary.aliveCount >= 280 && activeSummary.aliveCount <= 320,
+  `steady population remains near 300, got ${activeSummary.aliveCount}`);
+const newborns = activeRun.filter((person) => person.id.startsWith("person-born-"));
+assert(newborns.length > 0);
+for (const child of newborns.slice(0, 25)) {
+  assert(!("skills" in child) && !("talents" in child) && !("aptitudes" in child), "Task #100 does not implement skills or talents");
+  assert(SPENDING_CAPACITY_VALUES.includes(child.spendingCapacity));
+  for (const [level, tags] of Object.entries(FOOD_PREFERENCE_TAGS)) {
+    for (const tag of tags) assert([-1, 0, 1].includes(child.foodPreferences[level][tag]));
+  }
+  assert.equal(child.relationships.filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child).length, 2);
+}
+
+const bornDaysByPair = new Map();
+const activeById = new Map(activeRun.map((person) => [person.id, person]));
+for (const child of newborns) {
+  const match = /^person-born-(\d+)-/.exec(child.id);
+  const parents = child.relationships
+    .filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)
+    .map(({ personId }) => personId)
+    .sort();
+  if (!match || parents.length !== 2 || !parents.every((id) => activeById.has(id))) continue;
+  const key = parents.join("|");
+  const days = bornDaysByPair.get(key) ?? [];
+  days.push(Number(match[1]));
+  bornDaysByPair.set(key, days);
+}
+for (const days of bornDaysByPair.values()) {
+  days.sort((a, b) => a - b);
+  for (let index = 1; index < days.length; index += 1) {
+    assert(days[index] - days[index - 1] >= MIN_BIRTH_SPACING_DAYS, "birth spacing is at least six game days per pair");
+  }
+}
+
+const lowRun = clone(population);
+for (const person of lowRun.slice(-60)) {
+  person.ageYears = 85;
+  person.lifeStage = "elder";
+  person.lifeStatus = PERSON_LIFE_STATUSES.dead;
+}
+ensurePopulationPartners(lowRun);
+const lowSummary = advancePopulationLifecycle(lowRun, 120 * PERSON_GAME_DAY_SECONDS);
+assert(lowSummary.births > lowSummary.deaths, "aggressive births repair a population deficit");
+assert(lowSummary.aliveCount >= 280 && lowSummary.aliveCount <= 325,
+  `240-person deficit returns to working range, got ${lowSummary.aliveCount}`);
+
+const fresh = createFreshGameSessionState();
+assert.equal(fresh.gameplay.population.filter((person) => person.lifeStatus === PERSON_LIFE_STATUSES.alive).length, 300);
+const roundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(fresh));
+assert.equal(roundTrip.status, "loaded");
+assert.deepEqual(roundTrip.state.gameplay.population, fresh.gameplay.population);
+
+console.log("Task #100 generational population contracts OK");
