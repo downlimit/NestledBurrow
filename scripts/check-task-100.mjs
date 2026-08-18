@@ -12,6 +12,7 @@ import {
 } from "../src/character/populationDomain.js";
 import {
   advancePopulationLifecycle,
+  assignGeneratedPopulationNames,
   BIRTH_RATE_ANCHORS,
   birthTargetRateForPopulation,
   ensureMaturePopulation,
@@ -20,6 +21,7 @@ import {
   MIN_BIRTH_SPACING_DAYS,
 } from "../src/character/populationLifecycleDomain.js";
 import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
+import { COMMON_PERSON_NAMES, generatedPopulationName } from "../src/character/personNames.js";
 import {
   getSimulationPopulationTestSnapshot,
   grantSimulationTestCoins,
@@ -39,6 +41,8 @@ const inverseKind = {
 
 assert.equal(MATURE_POPULATION_TARGET, 300);
 assert.equal(MIN_BIRTH_SPACING_DAYS, 6);
+assert.equal(COMMON_PERSON_NAMES.length, 1000);
+assert.equal(new Set(COMMON_PERSON_NAMES.map((name) => name.toLowerCase())).size, 1000);
 assert.deepEqual(BIRTH_RATE_ANCHORS, [
   { population: 240, birthsPerDay: 6 },
   { population: 260, birthsPerDay: 5 },
@@ -61,6 +65,18 @@ assert.equal(new Set(population.map((person) => person.id)).size, population.len
 for (const id of ["person-mira", "person-rowan", "person-ilya", "person-zoya"]) {
   assert(population.some((person) => person.id === id), `named baseline resident survives mature seeding: ${id}`);
 }
+const seededPeople = population.filter((person) => person.id.startsWith("person-seed-"));
+assert.equal(seededPeople.length, 284);
+assert(seededPeople.every((person) => !/^Resident(?:\s|$)/i.test(person.displayName)), "generated residents receive real names");
+assert.equal(new Set(seededPeople.map((person) => person.displayName.toLowerCase())).size, seededPeople.length,
+  "the initial mature population receives distinct names from the 1000-name pool");
+assert.equal(seededPeople[0].displayName, generatedPopulationName(seededPeople[0].id));
+const legacyNamed = clone(population.slice(0, 20));
+const legacyGenerated = legacyNamed.filter((person) => person.id.startsWith("person-seed-")).slice(0, 3);
+for (const person of legacyGenerated) person.displayName = `Resident ${person.id.slice(-3)}`;
+assert.equal(assignGeneratedPopulationNames(legacyNamed), legacyGenerated.length);
+assert(legacyGenerated.every((person) => !/^Resident(?:\s|$)/i.test(person.displayName)),
+  "old preview/save placeholders are deterministically renamed during normalization");
 
 const byId = new Map(population.map((person) => [person.id, person]));
 for (const person of population) {
@@ -90,6 +106,13 @@ assert.deepEqual(ilyaTree.parents.map(({ displayName, fictional }) => ({ display
 assert.equal(ilyaTree.grandparents.length, 4);
 assert(ilyaTree.grandparents.some(({ fictional }) => fictional), "missing history is visibly filled for the prototype");
 assert.deepEqual(createDisplayFamilyTree(population, "person-ilya"), ilyaTree, "fictional ancestors stay deterministic");
+const ilyaVisibleNodes = [...ilyaTree.grandparents, ...ilyaTree.parents, ilyaTree.focus];
+assert.equal(new Set(ilyaVisibleNodes.map(({ id }) => id)).size, ilyaVisibleNodes.length,
+  "each displayed family-tree box is a different person node");
+assert.equal(new Set(ilyaVisibleNodes.map(({ displayName }) => displayName.toLowerCase())).size, ilyaVisibleNodes.length,
+  "fictional ancestry never makes one apparent person fill multiple parent roles");
+assert.notEqual(ilyaTree.grandparents[0].id, ilyaTree.grandparents[1].id);
+assert.notEqual(ilyaTree.grandparents[2].id, ilyaTree.grandparents[3].id);
 for (const ancestor of ilyaTree.grandparents.filter(({ fictional }) => fictional)) {
   assert(!byId.has(ancestor.id), "fictional ancestors never become population entities");
 }
@@ -118,6 +141,7 @@ assert(activeSummary.aliveCount >= 280 && activeSummary.aliveCount <= 320,
 const newborns = activeRun.filter((person) => person.id.startsWith("person-born-"));
 assert(newborns.length > 0);
 for (const child of newborns.slice(0, 25)) {
+  assert(!/^Resident(?:\s|$)/i.test(child.displayName), "new generations also use the common-name pool");
   assert(!("skills" in child) && !("talents" in child) && !("aptitudes" in child), "Task #100 does not implement skills or talents");
   assert(SPENDING_CAPACITY_VALUES.includes(child.spendingCapacity));
   for (const [level, tags] of Object.entries(FOOD_PREFERENCE_TAGS)) {
@@ -164,6 +188,7 @@ assert(lowSummary.aliveCount >= 280 && lowSummary.aliveCount <= 325,
 
 const fresh = createFreshGameSessionState();
 assert.equal(fresh.gameplay.population.filter((person) => person.lifeStatus === PERSON_LIFE_STATUSES.alive).length, 300);
+assert(fresh.gameplay.population.filter((person) => person.id.startsWith("person-seed-")).every((person) => !/^Resident/.test(person.displayName)));
 const roundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(fresh));
 assert.equal(roundTrip.status, "loaded");
 assert.deepEqual(roundTrip.state.gameplay.population, fresh.gameplay.population);
@@ -220,4 +245,4 @@ for (const contract of [
   "common:familyTree",
 ]) assert(inspectionSource.includes(contract), `family inspection exposes ${contract}`);
 
-console.log("Task #100 generational population, proof sandbox and family tree contracts OK");
+console.log("Task #100 generational population, common names, proof sandbox and family tree contracts OK");
