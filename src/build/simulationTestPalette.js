@@ -212,17 +212,19 @@ function applyPopulationTestAction(gameplay, action) {
     const removeCount = Math.max(0, living.length - target);
     const candidates = living
       .filter((person) => person.id.startsWith("person-seed-") || person.id.startsWith("person-born-"))
-      .sort((a, b) => b.id.localeCompare(a.id));
-    for (const person of candidates.slice(0, removeCount)) person.lifeStatus = PERSON_LIFE_STATUSES.dead;
+      .sort((a, b) => (Number(a.ageYears) || 0) - (Number(b.ageYears) || 0) || a.id.localeCompare(b.id));
+    const removedPeople = evenlySpacedSample(candidates, Math.min(removeCount, candidates.length));
+    for (const person of removedPeople) person.lifeStatus = PERSON_LIFE_STATUSES.dead;
+    const removedCount = removedPeople.length;
     sandbox.lastRun = {
       days: 0,
       births: 0,
-      deaths: Math.min(removeCount, candidates.length),
+      deaths: removedCount,
       naturalDeaths: 0,
       accidentalDeaths: 0,
       stress: true,
     };
-    sandbox.events = [{ type: "stress", count: Math.min(removeCount, candidates.length) }];
+    sandbox.events = [{ type: "stress", count: removedCount }];
     const after = populationSnapshotFromSandbox(sandbox);
     return {
       status: "population-test-dropped",
@@ -288,6 +290,15 @@ function applyPopulationTestAction(gameplay, action) {
     aliveCount: summary.aliveCount,
     feedbackDeltas: populationFeedbackDeltas(before, after),
   };
+}
+
+function evenlySpacedSample(source, count) {
+  const wanted = Math.max(0, Math.min(source.length, Math.floor(Number(count) || 0)));
+  if (wanted === 0) return [];
+  if (wanted === source.length) return [...source];
+  return Array.from({ length: wanted }, (_value, index) => (
+    source[Math.min(source.length - 1, Math.floor(((index + 0.5) * source.length) / wanted))]
+  ));
 }
 
 function ensurePopulationSandbox(gameplay) {
