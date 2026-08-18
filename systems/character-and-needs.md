@@ -9,11 +9,11 @@ Persistent people share these needs. Player uses live runtime; offscreen people 
 ## Shared person need contract
 
 - Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
-- Stage 9 life stages total `100` game days: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10` — about `40` real hours at `1x`.
-- `ageYears` stores lifecycle progress; `lifeStage` derives from it. `lifeStatus` and reciprocal `partner`, `parent`, `child`, `sibling` links persist with each person.
-- Mature population is about `300`. Natural death occurs at life day `100`; dead residents stay in family history but cannot visit the tavern. Population balance never adds early deaths.
+- Stage 9 uses a nominal `100`-day life: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10` — about `40` real hours at `1x`. Each person's stage boundaries vary stably by up to about one day, so cohorts do not age in lockstep.
+- `ageYears` stores lifecycle progress; `lifeStage` derives from age plus stable individual timing. `lifeStatus` and reciprocal `partner`, `parent`, `child`, `sibling` links persist with each person.
+- Mature population is about `300`. Natural lifespan varies deterministically through roughly `98..102` game days. A rare age-weighted accident can kill at any stage, targeting only about `1..2%` lifetime risk. Dead residents stay in family history and cannot visit the tavern.
 - Generated residents use a deterministic pool of `1000` common given names. The initial 284 generated residents receive distinct names; legacy `Resident N` placeholders are renamed during population normalization, and later births use the same pool deterministically.
-- `youngAdult` and `adult` couples may have `1..3` children, at least `6` days apart. Birth targets/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:0`, interpolated.
+- `youngAdult` and `adult` couples may have `1..3` children, at least `6` days apart. Birth targets/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:0`, interpolated. This is a mean pressure: individual days vary around it instead of producing a fixed conveyor.
 - New children are persistent people. Inheritance covers spending, food preferences and visit periods with parental influence plus deterministic variation. Skills/talents are not implemented.
 - Existing mature residents are deterministically paired/seeded into prototype families; later unpartnered eligible adults may form an offscreen pair. Close relatives are excluded.
 - Lifecycle balance assumes no general time acceleration; sleep advances the same world time. Skills, when content exists, must fit the shorter life.
@@ -101,14 +101,14 @@ The target need is protected through exit; recovery is active-only. Normal cance
 - presentation never rewrites safe motor position;
 - approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
-- saves exclude debug presets and interaction timeline state; population age/status/family/needs persist;
+- saves exclude debug presets and interaction timeline state; population age/status/family/needs persist, including death at a young age;
 - dead people stay addressable by ID for family history and never enter ordinary visit candidate pools;
 - fictional ancestry is presentation-only and can never enter relationships, saves, births or tavern demand;
 - one family-tree box never aliases another displayed parent/grandparent identity.
 
 ## Current baseline
 
-`populationDomain` owns stable person data and the named 16-person compatibility baseline; `populationLifecycleDomain` expands a mature world to 300, assigns generated names, advances generations and balances births. `personNames` owns 1000 generated-name variants. `guestIntentDomain` advances live needs/lifecycle. `personInspectionRuntime` owns selection/need edits and two-stage family presentation; `personFamilyTree` fills only missing historical ancestry. Timeline owners remain separate.
+`populationDomain` owns stable person data and the named 16-person compatibility baseline; `populationLifecycleDomain` expands a mature world to 300, assigns generated names, advances varied generations and balances births. `personNames` owns 1000 generated-name variants. `guestIntentDomain` advances live needs/lifecycle. `personInspectionRuntime` owns selection/need edits and two-stage family presentation; `personFamilyTree` fills only missing historical ancestry. Timeline owners remain separate.
 
 ## Evidence
 
