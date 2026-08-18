@@ -5,6 +5,7 @@ import {
   createStage1Population,
   evaluatePersonOffscreen,
   lifeStageForAgeYears,
+  lifeStageForPersonAge,
   PERSON_LIFE_STAGES,
   PERSON_LIFE_STATUSES,
   PERSON_RELATIONSHIP_KINDS,
@@ -51,7 +52,7 @@ for (const person of population) {
   );
   assert.equal(person.lifeStatus, PERSON_LIFE_STATUSES.alive);
   assert(Number.isFinite(person.ageYears) && person.ageYears >= 0);
-  assert.equal(person.lifeStage, lifeStageForAgeYears(person.ageYears));
+  assert.equal(person.lifeStage, lifeStageForPersonAge(person.id, person.ageYears));
   assert.deepEqual(
     person.relatedPersonIds,
     person.relationships.map(({ personId }) => personId),
@@ -90,7 +91,7 @@ assert(lev.relationships.some(({ personId, kind }) => (
 const evaluated = evaluatePersonOffscreen(mira, mira.lastEvaluatedWorldTimeSeconds + 6 * 60 * 60);
 assert.deepEqual(evaluated.relationships, mira.relationships);
 assert(evaluated.ageYears > mira.ageYears);
-assert.equal(evaluated.lifeStage, mira.lifeStage);
+assert.equal(evaluated.lifeStage, lifeStageForPersonAge(evaluated.id, evaluated.ageYears));
 assert.equal(evaluated.lifeStatus, mira.lifeStatus);
 
 const forged = clone(population);
