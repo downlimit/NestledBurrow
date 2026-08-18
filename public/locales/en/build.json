@@ -23,9 +23,9 @@
   "test": {
     "population": {
       "group": "POPULATION",
-      "advance": "Advance",
-      "longRun": "Long run",
-      "drop": "Drop living",
+      "advance": "Advance by days",
+      "longRun": "Advance by 100 days",
+      "drop": "Reduce living to 240",
       "reset": "Reset sandbox"
     }
   }
