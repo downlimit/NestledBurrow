@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   createGeneratedPopulationPerson,
   createStage1Population,
@@ -18,6 +19,13 @@ import {
   MATURE_POPULATION_TARGET,
   MIN_BIRTH_SPACING_DAYS,
 } from "../src/character/populationLifecycleDomain.js";
+import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
+import {
+  getSimulationPopulationTestSnapshot,
+  grantSimulationTestCoins,
+  resetSimulationPopulationTest,
+  SIMULATION_TEST_GROUPS,
+} from "../src/build/simulationTestPalette.js";
 import { createFreshGameSessionState, SESSION_STATE_VERSION } from "../src/session/gameSessionState.js";
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
 
@@ -74,6 +82,18 @@ assert(population.some((person) => person.id.startsWith("person-seed-")
   && person.relationships.some(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)),
 "mature seed contains generated families, not 284 unrelated tavern profiles");
 
+const ilyaTree = createDisplayFamilyTree(population, "person-ilya");
+assert.deepEqual(ilyaTree.parents.map(({ displayName, fictional }) => ({ displayName, fictional })), [
+  { displayName: "Mira", fictional: false },
+  { displayName: "Rowan", fictional: false },
+]);
+assert.equal(ilyaTree.grandparents.length, 4);
+assert(ilyaTree.grandparents.some(({ fictional }) => fictional), "missing history is visibly filled for the prototype");
+assert.deepEqual(createDisplayFamilyTree(population, "person-ilya"), ilyaTree, "fictional ancestors stay deterministic");
+for (const ancestor of ilyaTree.grandparents.filter(({ fictional }) => fictional)) {
+  assert(!byId.has(ancestor.id), "fictional ancestors never become population entities");
+}
+
 const old = createGeneratedPopulationPerson({ id: "person-born-1-0-900", displayName: "Old", ageYears: 83, worldTimeSeconds: 0 });
 const oldLifeDays = lifeDaysForAgeYears(old.ageYears);
 assert(oldLifeDays < 100 && oldLifeDays > 98);
@@ -105,6 +125,9 @@ for (const child of newborns.slice(0, 25)) {
   }
   assert.equal(child.relationships.filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child).length, 2);
 }
+const bornTree = createDisplayFamilyTree(activeRun, newborns[0].id);
+assert.equal(bornTree.parents.length, 2);
+assert(bornTree.parents.every(({ fictional }) => !fictional), "real generated parents always replace presentation placeholders");
 
 const bornDaysByPair = new Map();
 const activeById = new Map(activeRun.map((person) => [person.id, person]));
@@ -145,4 +168,56 @@ const roundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(fresh));
 assert.equal(roundTrip.status, "loaded");
 assert.deepEqual(roundTrip.state.gameplay.population, fresh.gameplay.population);
 
-console.log("Task #100 generational population contracts OK");
+const populationTestGroup = SIMULATION_TEST_GROUPS.find(({ id }) => id === "population");
+assert(populationTestGroup, "TEST exposes population proof controls");
+const shortRunRow = populationTestGroup.items.find(({ labelKey }) => labelKey === "build:test.population.advance");
+const longRunRow = populationTestGroup.items.find(({ labelKey }) => labelKey === "build:test.population.longRun");
+const dropRow = populationTestGroup.items.find(({ labelKey }) => labelKey === "build:test.population.drop");
+const resetRow = populationTestGroup.items.find(({ labelKey }) => labelKey === "build:test.population.reset");
+assert(shortRunRow && longRunRow && dropRow && resetRow);
+const sourceBeforeSandbox = JSON.stringify({
+  worldTimeSeconds: fresh.gameplay.worldTimeSeconds,
+  population: fresh.gameplay.population,
+  coins: fresh.gameplay.coins,
+});
+assert.equal(getSimulationPopulationTestSnapshot(fresh.gameplay).aliveCount, 300);
+const hundredDayAction = longRunRow.quantities[0];
+const sandboxRun = grantSimulationTestCoins(fresh.gameplay, hundredDayAction);
+assert.equal(sandboxRun.status, "population-test-advanced");
+assert.equal(sandboxRun.mutated, false);
+let sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
+assert.equal(sandbox.elapsedDays, 100);
+assert(sandbox.lastRun.births > 0 && sandbox.lastRun.deaths > 0);
+assert.equal(JSON.stringify({
+  worldTimeSeconds: fresh.gameplay.worldTimeSeconds,
+  population: fresh.gameplay.population,
+  coins: fresh.gameplay.coins,
+}), sourceBeforeSandbox, "population proof sandbox never mutates gameplay/save state");
+
+grantSimulationTestCoins(fresh.gameplay, dropRow.quantities[0]);
+sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
+assert.equal(sandbox.aliveCount, 240, "stress control creates the agreed 240-person proof state");
+grantSimulationTestCoins(fresh.gameplay, hundredDayAction);
+grantSimulationTestCoins(fresh.gameplay, shortRunRow.quantities[1]);
+grantSimulationTestCoins(fresh.gameplay, shortRunRow.quantities[1]);
+sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
+assert(sandbox.aliveCount >= 280 && sandbox.aliveCount <= 325,
+  `TEST sandbox shows deficit recovery without waiting real hours, got ${sandbox.aliveCount}`);
+assert(sandbox.events.length > 0);
+grantSimulationTestCoins(fresh.gameplay, resetRow.quantities[0]);
+sandbox = getSimulationPopulationTestSnapshot(fresh.gameplay);
+assert.equal(sandbox.elapsedDays, 0);
+assert.equal(sandbox.aliveCount, 300);
+assert.equal(resetSimulationPopulationTest(fresh.gameplay).aliveCount, 300);
+
+const inspectionSource = readFileSync(new URL("../src/character/personInspectionRuntime.js", import.meta.url), "utf8");
+for (const contract of [
+  "NPC_HOVER_FAMILY_MS = NPC_HOVER_EXPAND_MS * 2",
+  "NPC_FAMILY_EXPAND_MS = 280",
+  "familyWidth: 196",
+  "createDisplayFamilyTree",
+  "familyProgress",
+  "common:familyTree",
+]) assert(inspectionSource.includes(contract), `family inspection exposes ${contract}`);
+
+console.log("Task #100 generational population, proof sandbox and family tree contracts OK");

@@ -20,7 +20,7 @@ Persistent people share these needs. Player uses live runtime; offscreen people 
 - Visit periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`.
 - A physical guest advances live needs/lifecycle and rebases evaluation time; death waits until that visit ends.
 - One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume it.
-- A live `personId` actor shows its name and expands NESTLD after `667 ms`; coarse pointers use tap/long-press. Bar edits mutate canonical needs and rebase evaluation time.
+- Hover shows NESTLD after `667 ms`; at `1334 ms` total the card expands right into a family tree. Real parent links win; missing ancestors are deterministic display-only placeholders, never population/save entities. Coarse pointers use long-press; bar edits persist needs.
 
 ## Time, energy and satiety
 
@@ -101,11 +101,12 @@ The target need is protected through exit; recovery is active-only. Normal cance
 - approach masks change automatic positioning, not timeline pose or effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
 - saves exclude debug presets and interaction timeline state; population age/status/family/needs persist;
-- dead people stay addressable by ID for family history and never enter ordinary visit candidate pools.
+- dead people stay addressable by ID for family history and never enter ordinary visit candidate pools;
+- fictional ancestry is presentation-only and can never enter relationships, saves, births or tavern demand.
 
 ## Current baseline
 
-`populationDomain` owns stable person data and the named 16-person compatibility baseline; `populationLifecycleDomain` expands a mature world to 300, advances generations and balances births. `guestIntentDomain` advances live needs/lifecycle. `personInspectionRuntime` owns selection/need edits; timeline owners remain separate.
+`populationDomain` owns stable person data and the named 16-person compatibility baseline; `populationLifecycleDomain` expands a mature world to 300, advances generations and balances births. `guestIntentDomain` advances live needs/lifecycle. `personInspectionRuntime` owns selection/need edits and two-stage family presentation; `personFamilyTree` fills only missing historical ancestry. Timeline owners remain separate.
 
 ## Evidence
 
