@@ -1,3 +1,4 @@
+import { localizePersonDisplayName } from "./personNameLocalization.js";
 import { commonNameForKey, generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 import { PERSON_LIFE_STATUSES, PERSON_RELATIONSHIP_KINDS } from "./populationDomain.js";
 
@@ -55,7 +56,8 @@ function relationshipPeople(getPerson, person, kind) {
 
 function realNode(person, usedNames) {
   if (isLegacyResidentName(person.displayName)) person.displayName = generatedPopulationName(person.id);
-  const displayName = String(person.displayName ?? generatedPopulationName(person.id));
+  const canonicalName = String(person.displayName ?? generatedPopulationName(person.id));
+  const displayName = localizePersonDisplayName(canonicalName);
   usedNames.add(displayName.toLowerCase());
   return {
     id: person.id,
@@ -66,7 +68,14 @@ function realNode(person, usedNames) {
 }
 
 function fictionalNode(key, usedNames) {
-  const displayName = commonNameForKey(`ancestor:${key}`, usedNames);
+  let attempt = 0;
+  let canonicalName = commonNameForKey(`ancestor:${key}`, []);
+  let displayName = localizePersonDisplayName(canonicalName);
+  while (usedNames.has(displayName.toLowerCase()) && attempt < 1000) {
+    attempt += 1;
+    canonicalName = commonNameForKey(`ancestor:${key}:${attempt}`, []);
+    displayName = localizePersonDisplayName(canonicalName);
+  }
   usedNames.add(displayName.toLowerCase());
   return {
     id: `fictional-${stableHash(key).toString(16)}`,
