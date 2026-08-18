@@ -9,7 +9,6 @@ import {
   PERSON_GAME_DAY_SECONDS,
   PERSON_LIFE_STAGES,
   PERSON_LIFE_STATUSES,
-  PERSON_LIFE_TOTAL_DAYS,
   PERSON_RELATIONSHIP_KINDS,
   SPENDING_CAPACITY_VALUES,
   STAGE1_POPULATION_SIZE,
@@ -19,6 +18,8 @@ import { generatedPopulationName, isLegacyResidentName } from "./personNames.js"
 
 export const MATURE_POPULATION_TARGET = 300;
 export const MIN_BIRTH_SPACING_DAYS = 6;
+export const NATURAL_LIFE_MIN_DAYS = 98;
+export const NATURAL_LIFE_MAX_DAYS = 102;
 export const BIRTH_RATE_ANCHORS = Object.freeze([
   Object.freeze({ population: 240, birthsPerDay: 6 }),
   Object.freeze({ population: 260, birthsPerDay: 5 }),
@@ -28,6 +29,16 @@ export const BIRTH_RATE_ANCHORS = Object.freeze([
   Object.freeze({ population: 340, birthsPerDay: 1 }),
   Object.freeze({ population: 360, birthsPerDay: 0 }),
 ]);
+export const ACCIDENT_RISK_PER_DAY = Object.freeze({
+  [PERSON_LIFE_STAGES.newborn]: 0.00005,
+  [PERSON_LIFE_STAGES.infant]: 0.00005,
+  [PERSON_LIFE_STAGES.toddler]: 0.00005,
+  [PERSON_LIFE_STAGES.child]: 0.00005,
+  [PERSON_LIFE_STAGES.teen]: 0.0001,
+  [PERSON_LIFE_STAGES.youngAdult]: 0.0002,
+  [PERSON_LIFE_STAGES.adult]: 0.0002,
+  [PERSON_LIFE_STAGES.elder]: 0.0003,
+});
 
 const SEED_COUNT = MATURE_POPULATION_TARGET - STAGE1_POPULATION_SIZE;
 const REPRODUCTIVE_STAGES = new Set([PERSON_LIFE_STAGES.youngAdult, PERSON_LIFE_STAGES.adult]);
@@ -40,8 +51,8 @@ export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
   }
   const evaluationTime = nonNegativeNumber(worldTimeSeconds, 0);
   for (let index = 1; index <= SEED_COUNT; index += 1) {
-    const lifeDays = ((index - 0.5) / SEED_COUNT) * PERSON_LIFE_TOTAL_DAYS;
     const id = `person-seed-${String(index).padStart(3, "0")}`;
+    const lifeDays = ((index - 0.5) / SEED_COUNT) * naturalLifeDaysForPerson(id);
     population.push(createGeneratedPopulationPerson({
       id,
       displayName: generatedPopulationName(id),
@@ -66,6 +77,17 @@ export function assignGeneratedPopulationNames(population) {
   return renamed;
 }
 
+export function naturalLifeDaysForPerson(personId) {
+  const id = String(personId ?? "").trim();
+  if (!id) return 100;
+  return round(NATURAL_LIFE_MIN_DAYS
+    + stableUnit(`${id}:natural-life-days`) * (NATURAL_LIFE_MAX_DAYS - NATURAL_LIFE_MIN_DAYS));
+}
+
+export function accidentRiskPerDayForStage(stage) {
+  return ACCIDENT_RISK_PER_DAY[stage] ?? ACCIDENT_RISK_PER_DAY[PERSON_LIFE_STAGES.adult];
+}
+
 export function advancePopulationLifecycle(population, targetWorldTimeSeconds, { protectedPersonIds = [] } = {}) {
   if (!Array.isArray(population)) return emptySummary();
   const targetTime = nonNegativeNumber(targetWorldTimeSeconds, 0);
@@ -79,14 +101,31 @@ export function advancePopulationLifecycle(population, targetWorldTimeSeconds, {
   let daysProcessed = 0;
   let births = 0;
   let deaths = 0;
+  let naturalDeaths = 0;
+  let accidentalDeaths = 0;
+  const naturalDeathIds = [];
+  const accidentalDeathIds = [];
   while (boundary <= targetTime) {
     const result = processPopulationDay(population, boundary, protectedIds);
     daysProcessed += 1;
     births += result.births;
     deaths += result.deaths;
+    naturalDeaths += result.naturalDeaths;
+    accidentalDeaths += result.accidentalDeaths;
+    naturalDeathIds.push(...result.naturalDeathIds);
+    accidentalDeathIds.push(...result.accidentalDeathIds);
     boundary += PERSON_GAME_DAY_SECONDS;
   }
-  return { daysProcessed, births, deaths, aliveCount: livingCount(population) };
+  return {
+    daysProcessed,
+    births,
+    deaths,
+    naturalDeaths,
+    accidentalDeaths,
+    naturalDeathIds,
+    accidentalDeathIds,
+    aliveCount: livingCount(population),
+  };
 }
 
 export function birthTargetRateForPopulation(populationCount) {
@@ -140,24 +179,44 @@ function processPopulationDay(population, boundaryTime, protectedIds) {
     population[index] = evaluatePersonOffscreen(population[index], boundaryTime);
   }
 
-  let deaths = 0;
+  const dayIndex = Math.floor(boundaryTime / PERSON_GAME_DAY_SECONDS);
+  let naturalDeaths = 0;
+  let accidentalDeaths = 0;
+  const naturalDeathIds = [];
+  const accidentalDeathIds = [];
   for (const person of population) {
     if (!isLivingPopulationPerson(person) || protectedIds.has(person.id)) continue;
-    if (lifeDaysForAgeYears(person.ageYears) < PERSON_LIFE_TOTAL_DAYS) continue;
-    person.lifeStatus = PERSON_LIFE_STATUSES.dead;
-    deaths += 1;
+    const lifeDays = lifeDaysForAgeYears(person.ageYears);
+    if (lifeDays >= naturalLifeDaysForPerson(person.id)) {
+      person.lifeStatus = PERSON_LIFE_STATUSES.dead;
+      naturalDeaths += 1;
+      naturalDeathIds.push(person.id);
+      continue;
+    }
+    if (stableUnit(`${person.id}:accident:${dayIndex}`) < accidentRiskPerDayForStage(person.lifeStage)) {
+      person.lifeStatus = PERSON_LIFE_STATUSES.dead;
+      accidentalDeaths += 1;
+      accidentalDeathIds.push(person.id);
+    }
   }
 
   ensurePopulationPartners(population);
   const aliveAfterDeaths = livingCount(population);
-  const requestedBirths = wholeBirthTarget(aliveAfterDeaths, Math.floor(boundaryTime / PERSON_GAME_DAY_SECONDS));
+  const requestedBirths = wholeBirthTarget(aliveAfterDeaths, dayIndex);
   const pairs = eligibleBirthPairs(population, boundaryTime);
   let births = 0;
   for (let slot = 0; slot < requestedBirths && slot < pairs.length; slot += 1) {
     createBirth(population, pairs[slot], boundaryTime, slot);
     births += 1;
   }
-  return { births, deaths };
+  return {
+    births,
+    deaths: naturalDeaths + accidentalDeaths,
+    naturalDeaths,
+    accidentalDeaths,
+    naturalDeathIds,
+    accidentalDeathIds,
+  };
 }
 
 function wholeBirthTarget(aliveCount, dayIndex) {
@@ -378,7 +437,18 @@ function addRelationship(person, relatedPersonId, kind) {
 }
 function pairKey(firstId, secondId) { return [firstId, secondId].sort().join("|"); }
 function livingCount(population) { return population.filter(isLivingPopulationPerson).length; }
-function emptySummary() { return { daysProcessed: 0, births: 0, deaths: 0, aliveCount: 0 }; }
+function emptySummary() {
+  return {
+    daysProcessed: 0,
+    births: 0,
+    deaths: 0,
+    naturalDeaths: 0,
+    accidentalDeaths: 0,
+    naturalDeathIds: [],
+    accidentalDeathIds: [],
+    aliveCount: 0,
+  };
+}
 function nonNegativeNumber(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
