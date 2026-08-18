@@ -12,6 +12,7 @@ Owns construction, placeable lifecycle and asset/layout editing.
 - valid TEST actions give a short effects-channel click. Changed numeric rows emit signed `+N/-N` feedback that moves right, holds briefly and fades;
 - population proof uses a transient clone: `+1/+10/+100` days, drop to `240`, reset, alive/dead/stage counts and recent births/deaths. It never changes real clock, gameplay or save;
 - library items expose names/previews; placement uses the `16 px` grid;
+- the cursor anchor is the midpoint between the current pivot and current effective collider centre;
 - preview and commit share position, pivot, visual offset and effective collider; construction is not gameplay-persisted.
 
 ## Universal placeable lifecycle
