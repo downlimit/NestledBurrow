@@ -2,23 +2,23 @@
 
 ## Purpose
 
-Owns movement, time, sleep, energy and canonical `0..100` needs. HUD order: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher values remove pressure.
+Owns movement, time, sleep, energy and canonical `0..100` needs. HUD: N novelty, E energy, S satiety, T toilet, L lustre, D dialogue. Higher is safer.
 
-Persistent people share these need dimensions. The player uses live runtime; offscreen people use coarse reconstruction.
+Persistent people share these needs. Player uses live runtime; offscreen people use coarse reconstruction.
 
 ## Shared person need contract
 
-- Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic JSON-safe `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
+- Persistent people share canonical `N E S T L D`. Stage 3 adds deterministic `spendingCapacity` and cuisine/dish/ingredient preferences; venue history stays external.
 - Stage 9 life stages total `100` game days: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10` — about `40` real hours at `1x`.
-- `ageYears` stores lifecycle progress; `lifeStage` is derived. `lifeStatus` and reciprocal `partner`, `parent`, `child`, `sibling` relationships remain canonical identity. Invalid age recovers from identity baseline.
-- Natural death comes at the elder-stage end, around life day `100`; population balance never kills early. Mature-world target is about `300`: births grow likelier below target, stay normal near it and are strongly suppressed above it.
-- `youngAdult` and `adult` couples may have children, normally `1..3` over the couple's life. Minimum spacing between births is still a tuning value.
+- `ageYears` stores lifecycle progress; `lifeStage` is derived. `lifeStatus` and reciprocal `partner`, `parent`, `child`, `sibling` links remain canonical identity. Invalid age recovers from identity baseline.
+- Natural death comes at elder-stage end around life day `100`; population balance never kills early. Mature-world target is about `300`.
+- `youngAdult` and `adult` couples may have `1..3` children, at least `6` days apart. Birth targets/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:~0`, interpolated; births, not extra deaths, restore population.
 - Each child is a distinct persistent person; future preferences, character, aptitudes and skill tendencies mix parental influence with variation.
 - Lifecycle balance assumes no general time acceleration; sleep may advance world time. Skill learning must fit the shorter life.
 - `populationDomain` derives links and preferred periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors are `1/0.2`.
-- Relevance reconstructs offscreen needs/lifecycle once from stored state plus elapsed world time. A physical guest advances both and rebases evaluation time; no guest-local copy exists.
+- Relevance reconstructs offscreen needs/lifecycle from stored state plus elapsed world time. A physical guest advances both and rebases evaluation time; no guest-local copy exists.
 - One hysteretic N/E/S/T/L/D intent guides a live guest. Critical non-food pressure may interrupt accepted-order waiting and later resume it.
-- A live `personId` actor shows its name and expands the NESTLD panel after `667 ms`; coarse pointers use tap/long-press. Bar edits mutate canonical needs and rebase evaluation time.
+- A live `personId` actor shows its name and expands NESTLD after `667 ms`; coarse pointers use tap/long-press. Bar edits mutate canonical needs and rebase evaluation time.
 
 ## Time, energy and satiety
 
