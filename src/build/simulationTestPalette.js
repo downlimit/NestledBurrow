@@ -10,6 +10,7 @@ import {
   PERSON_LIFE_STATUSES,
   PERSON_RELATIONSHIP_KINDS,
 } from "../character/populationDomain.js";
+import { localizePersonDisplayName } from "../character/personNameLocalization.js";
 import {
   advancePopulationLifecycle,
   ensureMaturePopulation,
@@ -29,17 +30,18 @@ const POPULATION_STAGE_ORDER = Object.freeze([
 ]);
 
 const POPULATION_ACTIONS = Object.freeze({
-  day1: populationActionQuantity("advance", 1, "1d"),
-  day10: populationActionQuantity("advance", 10, "10d"),
-  day100: populationActionQuantity("advance", 100, "100d"),
+  day1: populationActionQuantity("advance", 1, "1"),
+  day10: populationActionQuantity("advance", 10, "10"),
+  day100: populationActionQuantity("advance", 100, "100"),
   drop240: populationActionQuantity("drop", 240, "240"),
-  reset: populationActionQuantity("reset", 0, "↺"),
+  reset: populationActionQuantity("reset", 0, "R"),
 });
 
 const POPULATION_TEST_ITEMS = Object.freeze([
-  populationReadoutItem("population-summary", () => populationSummaryLabel()),
-  populationReadoutItem("population-stages-young", () => populationStageLabel(0)),
-  populationReadoutItem("population-stages-adult", () => populationStageLabel(1)),
+  populationReadoutItem("population-alive", () => populationAliveLabel()),
+  populationReadoutItem("population-dead", () => populationDeadLabel()),
+  populationReadoutItem("population-last-run", () => populationLastRunLabel()),
+  ...POPULATION_STAGE_ORDER.map((stage) => populationReadoutItem(`population-stage-${stage}`, () => populationStageLabel(stage))),
   Object.freeze({
     id: "coins",
     labelKey: "build:test.population.advance",
@@ -64,8 +66,10 @@ const POPULATION_TEST_ITEMS = Object.freeze([
     quantities: Object.freeze([POPULATION_ACTIONS.reset]),
     populationTest: true,
   }),
+  populationReadoutItem("population-events-title", () => populationEventsTitle()),
   populationReadoutItem("population-event-0", () => populationEventLabel(0)),
   populationReadoutItem("population-event-1", () => populationEventLabel(1)),
+  populationReadoutItem("population-event-2", () => populationEventLabel(2)),
 ]);
 
 export const SIMULATION_TEST_GROUPS = Object.freeze([
@@ -277,45 +281,85 @@ function activePopulationSnapshot() {
   return getSimulationPopulationTestSnapshot(getCurrentWorldScene()?.sessionState?.gameplay);
 }
 
-function populationSummaryLabel() {
-  const snapshot = activePopulationSnapshot();
-  if (!snapshot) return "POPULATION unavailable";
-  const ru = getCurrentWorldScene()?.localization?.getLanguage?.() === "ru";
-  const run = snapshot.lastRun;
-  return ru
-    ? `ЖИВ ${snapshot.aliveCount} · УМ ${snapshot.deadCount} · Р/С ${run.births}/${run.deaths}`
-    : `LIVE ${snapshot.aliveCount} · DEAD ${snapshot.deadCount} · B/D ${run.births}/${run.deaths}`;
+function isRussian() {
+  return getCurrentWorldScene()?.localization?.getLanguage?.() === "ru";
 }
 
-function populationStageLabel(row) {
+function populationAliveLabel() {
   const snapshot = activePopulationSnapshot();
-  if (!snapshot) return "—";
-  const c = snapshot.stageCounts;
-  const ru = getCurrentWorldScene()?.localization?.getLanguage?.() === "ru";
-  if (row === 0) {
-    return ru
-      ? `0–17 · Н ${c.newborn} Мл ${c.infant} М ${c.toddler} Р ${c.child} П ${c.teen}`
-      : `0–17 · N ${c.newborn} I ${c.infant} T ${c.toddler} C ${c.child} Teen ${c.teen}`;
+  if (!snapshot) return isRussian() ? "Живые: нет данных" : "Living: unavailable";
+  return isRussian() ? `Живые: ${snapshot.aliveCount}` : `Living: ${snapshot.aliveCount}`;
+}
+
+function populationDeadLabel() {
+  const snapshot = activePopulationSnapshot();
+  if (!snapshot) return isRussian() ? "Умершие: нет данных" : "Dead: unavailable";
+  return isRussian() ? `Умершие в истории: ${snapshot.deadCount}` : `Dead in history: ${snapshot.deadCount}`;
+}
+
+function populationLastRunLabel() {
+  const snapshot = activePopulationSnapshot();
+  if (!snapshot) return "-";
+  const run = snapshot.lastRun;
+  if (isRussian()) {
+    if (run.stress) return `Последний тест: убрано ${run.deaths} живых`;
+    if (!run.days) return "Последний прогон: еще не запускался";
+    return `За ${run.days} дн.: родилось ${run.births}, умерло ${run.deaths}`;
   }
-  return ru
-    ? `18+ · МВ ${c.youngAdult} В ${c.adult} Пож ${c.elder}`
-    : `18+ · YA ${c.youngAdult} A ${c.adult} E ${c.elder}`;
+  if (run.stress) return `Last test: removed ${run.deaths} living`;
+  if (!run.days) return "Last run: not started yet";
+  return `${run.days} days: ${run.births} births, ${run.deaths} deaths`;
+}
+
+function populationStageLabel(stage) {
+  const snapshot = activePopulationSnapshot();
+  const count = snapshot?.stageCounts?.[stage] ?? 0;
+  const ruLabels = {
+    newborn: "Новорожденные",
+    infant: "Младенцы",
+    toddler: "Малыши",
+    child: "Дети",
+    teen: "Подростки",
+    youngAdult: "Молодые взрослые",
+    adult: "Взрослые",
+    elder: "Пожилые",
+  };
+  const enLabels = {
+    newborn: "Newborns",
+    infant: "Infants",
+    toddler: "Toddlers",
+    child: "Children",
+    teen: "Teens",
+    youngAdult: "Young adults",
+    adult: "Adults",
+    elder: "Elders",
+  };
+  const label = (isRussian() ? ruLabels : enLabels)[stage] ?? stage;
+  return `${label}: ${count}`;
+}
+
+function populationEventsTitle() {
+  return isRussian() ? "Последние события:" : "Recent events:";
 }
 
 function populationEventLabel(index) {
   const snapshot = activePopulationSnapshot();
   const event = snapshot?.events?.[index];
-  const ru = getCurrentWorldScene()?.localization?.getLanguage?.() === "ru";
-  if (!event) return ru ? "СОБЫТИЕ · —" : "EVENT · —";
+  if (!event) return isRussian() ? "Нет события" : "No event";
+  const language = isRussian() ? "ru" : "en";
+  const name = shortName(localizePersonDisplayName(event.displayName, language));
   if (event.type === "birth") {
-    const parents = event.parentNames.map(shortName).join("+");
-    return `${ru ? "Р" : "B"} · ${shortName(event.displayName)}${parents ? ` ← ${parents}` : ""}`;
+    const parents = event.parentNames
+      .map((parentName) => shortName(localizePersonDisplayName(parentName, language)))
+      .join(", ");
+    if (isRussian()) return `Рождение: ${name}${parents ? `; родители: ${parents}` : ""}`;
+    return `Birth: ${name}${parents ? `; parents: ${parents}` : ""}`;
   }
-  if (event.type === "death") return `${ru ? "С" : "D"} · †${shortName(event.displayName)}`;
-  return `${ru ? "ТЕСТ" : "TEST"} · -${event.count}`;
+  if (event.type === "death") return isRussian() ? `Смерть: ${name}` : `Death: ${name}`;
+  return isRussian() ? `Тест: убрано ${event.count}` : `Test: removed ${event.count}`;
 }
 
 function shortName(value) {
-  const text = String(value ?? "?");
-  return text.length <= 14 ? text : `${text.slice(0, 12)}…`;
+  const text = String(value ?? "-");
+  return text.length <= 18 ? text : `${text.slice(0, 15)}...`;
 }
