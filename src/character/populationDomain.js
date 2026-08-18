@@ -14,10 +14,7 @@ export const VISIT_TIME_PERIODS = Object.freeze({
   day: "day",
   evening: "evening",
 });
-export const VISIT_TIME_BALANCE = Object.freeze({
-  preferredCandidateWeight: 1,
-  offScheduleCandidateWeight: 0.2,
-});
+export const VISIT_TIME_BALANCE = Object.freeze({ preferredCandidateWeight: 1, offScheduleCandidateWeight: 0.2 });
 
 export const PERSON_LIFE_STAGES = Object.freeze({
   newborn: "newborn",
@@ -40,14 +37,11 @@ export const PERSON_LIFE_STAGE_DURATIONS_DAYS = Object.freeze({
   [PERSON_LIFE_STAGES.adult]: 32,
   [PERSON_LIFE_STAGES.elder]: 10,
 });
-
 export const PERSON_LIFE_TOTAL_DAYS = Object.values(PERSON_LIFE_STAGE_DURATIONS_DAYS)
   .reduce((total, days) => total + days, 0);
+export const PERSON_GAME_DAY_SECONDS = 24 * 60 * 60;
 
-export const PERSON_LIFE_STATUSES = Object.freeze({
-  alive: "alive",
-});
-
+export const PERSON_LIFE_STATUSES = Object.freeze({ alive: "alive", dead: "dead" });
 export const PERSON_RELATIONSHIP_KINDS = Object.freeze({
   partner: "partner",
   parent: "parent",
@@ -55,9 +49,9 @@ export const PERSON_RELATIONSHIP_KINDS = Object.freeze({
   sibling: "sibling",
 });
 
-const GAME_DAY_SECONDS = 24 * 60 * 60;
-const PERSON_LIFE_MAX_AGE_YEARS = 85;
-
+const PERSON_LIFE_NOMINAL_MAX_AGE_YEARS = 85;
+const PERSON_LIFE_MAX_AGE_YEARS = 89;
+const PERSON_LIFE_MAX_DAYS = 102;
 const LIFE_STAGE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: PERSON_LIFE_STAGES.newborn, startAgeYears: 0, endAgeYears: 0.25 }),
   Object.freeze({ id: PERSON_LIFE_STAGES.infant, startAgeYears: 0.25, endAgeYears: 1 }),
@@ -66,8 +60,19 @@ const LIFE_STAGE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: PERSON_LIFE_STAGES.teen, startAgeYears: 13, endAgeYears: 18 }),
   Object.freeze({ id: PERSON_LIFE_STAGES.youngAdult, startAgeYears: 18, endAgeYears: 35 }),
   Object.freeze({ id: PERSON_LIFE_STAGES.adult, startAgeYears: 35, endAgeYears: 65 }),
-  Object.freeze({ id: PERSON_LIFE_STAGES.elder, startAgeYears: 65, endAgeYears: PERSON_LIFE_MAX_AGE_YEARS }),
+  Object.freeze({ id: PERSON_LIFE_STAGES.elder, startAgeYears: 65, endAgeYears: PERSON_LIFE_NOMINAL_MAX_AGE_YEARS }),
 ]);
+const PERSONAL_STAGE_ORDER = Object.freeze([
+  PERSON_LIFE_STAGES.newborn,
+  PERSON_LIFE_STAGES.infant,
+  PERSON_LIFE_STAGES.toddler,
+  PERSON_LIFE_STAGES.child,
+  PERSON_LIFE_STAGES.teen,
+  PERSON_LIFE_STAGES.youngAdult,
+  PERSON_LIFE_STAGES.adult,
+  PERSON_LIFE_STAGES.elder,
+]);
+const PERSONAL_STAGE_BOUNDARY_DAYS = Object.freeze([1, 5, 10, 21, 37, 58, 90]);
 
 const STAGE1_IDENTITIES = Object.freeze([
   Object.freeze({ id: "person-mira", displayName: "Mira" }),
@@ -87,24 +92,14 @@ const STAGE1_IDENTITIES = Object.freeze([
   Object.freeze({ id: "person-lev", displayName: "Lev" }),
   Object.freeze({ id: "person-zoya", displayName: "Zoya" }),
 ]);
+const STAGE1_ID_SET = new Set(STAGE1_IDENTITIES.map(({ id }) => id));
 
 const STAGE9_AGE_YEARS = Object.freeze({
-  "person-mira": 36,
-  "person-rowan": 38,
-  "person-ilya": 15,
-  "person-anya": 31,
-  "person-tomas": 33,
-  "person-lida": 11,
-  "person-pavel": 48,
-  "person-vera": 46,
-  "person-niko": 21,
-  "person-sonya": 29,
-  "person-emil": 30,
-  "person-daria": 8,
-  "person-mark": 70,
-  "person-nina": 68,
-  "person-lev": 24,
-  "person-zoya": 22,
+  "person-mira": 36, "person-rowan": 38, "person-ilya": 15,
+  "person-anya": 31, "person-tomas": 33, "person-lida": 11,
+  "person-pavel": 48, "person-vera": 46, "person-niko": 21,
+  "person-sonya": 29, "person-emil": 30, "person-daria": 8,
+  "person-mark": 70, "person-nina": 68, "person-lev": 24, "person-zoya": 22,
 });
 
 const STAGE9_RELATIONSHIP_EDGES = Object.freeze([
@@ -153,18 +148,59 @@ export function normalizePopulation(value, { worldTimeSeconds = 0 } = {}) {
   const storedPeople = Array.isArray(value) ? value : [];
   const storedById = new Map();
   for (const person of storedPeople) {
-    if (!isPlainRecord(person) || typeof person.id !== "string" || storedById.has(person.id)) continue;
-    storedById.set(person.id, person);
+    if (!isPlainRecord(person) || !nonEmptyString(person.id) || storedById.has(person.id.trim())) continue;
+    const id = person.id.trim();
+    if (!STAGE1_ID_SET.has(id) && !isGeneratedPersonId(id)) continue;
+    storedById.set(id, person);
   }
-  return STAGE1_IDENTITIES.map((identity) => normalizeStage1Person(
-    storedById.get(identity.id),
-    identity,
-    recoveryTime,
+  const people = STAGE1_IDENTITIES.map((identity) => normalizeStage1Person(
+    storedById.get(identity.id), identity, recoveryTime,
   ));
+  for (const [id, person] of storedById) {
+    if (STAGE1_ID_SET.has(id)) continue;
+    people.push(normalizeGeneratedPerson(person, recoveryTime));
+  }
+  normalizePopulationRelationships(people);
+  return people;
+}
+
+export function createGeneratedPopulationPerson({
+  id,
+  displayName,
+  ageYears = 0,
+  worldTimeSeconds = 0,
+  lifeStatus = PERSON_LIFE_STATUSES.alive,
+  relationships = [],
+  needs = null,
+  spendingCapacity = null,
+  foodPreferences = null,
+  preferredVisitPeriods = null,
+} = {}) {
+  const personId = String(id ?? "").trim();
+  if (!isGeneratedPersonId(personId)) throw new Error(`Invalid generated person id: ${personId}`);
+  const demand = createPersonDemandProfile(personId);
+  const social = createPersonSocialProfile(personId);
+  const safeAge = normalizeLifeAgeYears(ageYears, generatedFallbackAgeYears(personId));
+  const safeRelationships = normalizeRelationshipList(relationships, []);
+  return {
+    id: personId,
+    displayName: nonEmptyString(displayName) ? displayName.trim() : generatedFallbackDisplayName(personId),
+    ageYears: safeAge,
+    lifeStage: lifeStageForPersonAge(personId, safeAge),
+    lifeStatus: normalizeLifeStatus(lifeStatus, safeAge),
+    relationships: safeRelationships,
+    needs: normalizePersonNeeds(needs, initialNeeds(personId)),
+    spendingCapacity: normalizeSpendingCapacity(spendingCapacity, demand.spendingCapacity),
+    foodPreferences: normalizeFoodPreferences(foodPreferences, demand.foodPreferences),
+    relatedPersonIds: safeRelationships.map(({ personId: relatedId }) => relatedId),
+    preferredVisitPeriods: normalizePreferredVisitPeriods(preferredVisitPeriods, social.preferredVisitPeriods),
+    lastEvaluatedWorldTimeSeconds: normalizeWorldTime(worldTimeSeconds, 0),
+  };
 }
 
 export function evaluatePersonOffscreen(person, targetWorldTimeSeconds) {
   const baseline = normalizeEvaluationPerson(person);
+  if (!isLivingPopulationPerson(baseline)) return baseline;
   const targetTime = normalizeWorldTime(targetWorldTimeSeconds, baseline.lastEvaluatedWorldTimeSeconds);
   const elapsed = Math.max(0, targetTime - baseline.lastEvaluatedWorldTimeSeconds);
   if (elapsed === 0) return baseline;
@@ -181,21 +217,7 @@ export function evaluatePersonOffscreen(person, targetWorldTimeSeconds) {
     return [needId, roundNeed(normalizeNeedValue(reconstructed))];
   }));
   const ageYears = advanceLifeAgeYears(baseline.ageYears, elapsed);
-
-  return {
-    id: baseline.id,
-    displayName: baseline.displayName,
-    ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
-    lifeStatus: baseline.lifeStatus,
-    relationships: baseline.relationships,
-    needs,
-    spendingCapacity: baseline.spendingCapacity,
-    foodPreferences: baseline.foodPreferences,
-    relatedPersonIds: baseline.relatedPersonIds,
-    preferredVisitPeriods: baseline.preferredVisitPeriods,
-    lastEvaluatedWorldTimeSeconds: targetTime,
-  };
+  return { ...baseline, ageYears, lifeStage: lifeStageForPersonAge(baseline.id, ageYears), needs, lastEvaluatedWorldTimeSeconds: targetTime };
 }
 
 export function evaluatePopulationPerson(population, personId, targetWorldTimeSeconds) {
@@ -205,14 +227,14 @@ export function evaluatePopulationPerson(population, personId, targetWorldTimeSe
   const previous = population[index];
   const person = evaluatePersonOffscreen(previous, targetWorldTimeSeconds);
   const mutated = person.lastEvaluatedWorldTimeSeconds !== previous.lastEvaluatedWorldTimeSeconds
-    || person.ageYears !== previous.ageYears
-    || person.lifeStage !== previous.lifeStage;
+    || person.ageYears !== previous.ageYears || person.lifeStage !== previous.lifeStage;
   if (mutated) population[index] = person;
   return { status: mutated ? "evaluated" : "unchanged", mutated, person };
 }
 
 export function advancePersonLifecycle(person, targetWorldTimeSeconds) {
   if (!isPlainRecord(person)) return { status: "invalid-person", mutated: false, person: null };
+  if (!isLivingPopulationPerson(person)) return { status: "unchanged", mutated: false, person };
   const targetTime = normalizeWorldTime(targetWorldTimeSeconds, person.lastEvaluatedWorldTimeSeconds ?? 0);
   const previousTime = normalizeWorldTime(person.lastEvaluatedWorldTimeSeconds, targetTime);
   const elapsed = Math.max(0, targetTime - previousTime);
@@ -220,12 +242,9 @@ export function advancePersonLifecycle(person, targetWorldTimeSeconds) {
   const fallbackProfile = createPersonLifeProfile(person.id);
   const previousAge = normalizeLifeAgeYears(person.ageYears, fallbackProfile.ageYears);
   const nextAge = advanceLifeAgeYears(previousAge, elapsed);
-  const nextStage = lifeStageForAgeYears(nextAge);
+  const nextStage = lifeStageForPersonAge(person.id, nextAge);
   const mutated = nextAge !== previousAge || person.lifeStage !== nextStage;
-  if (mutated) {
-    person.ageYears = nextAge;
-    person.lifeStage = nextStage;
-  }
+  if (mutated) { person.ageYears = nextAge; person.lifeStage = nextStage; }
   return { status: mutated ? "advanced" : "unchanged", mutated, person };
 }
 
@@ -237,21 +256,15 @@ export function setPopulationPersonNeed(population, personId, needId, value, wor
   const numericValue = Number(value);
   const evaluationTime = Number(worldTimeSeconds);
   if (!Number.isFinite(numericValue)) return { status: "invalid-value", mutated: false, person: null };
-  if (!Number.isFinite(evaluationTime) || evaluationTime < 0) {
-    return { status: "invalid-world-time", mutated: false, person: null };
-  }
+  if (!Number.isFinite(evaluationTime) || evaluationTime < 0) return { status: "invalid-world-time", mutated: false, person: null };
   const previous = population[index];
+  if (!isLivingPopulationPerson(previous)) return { status: "not-alive", mutated: false, person: previous };
   const lifecycle = advancePersonLifecycle(previous, evaluationTime);
   const nextValue = roundNeed(normalizeNeedValue(numericValue));
   const mutated = previous.needs[needId] !== nextValue
-    || previous.lastEvaluatedWorldTimeSeconds !== evaluationTime
-    || lifecycle.mutated;
+    || previous.lastEvaluatedWorldTimeSeconds !== evaluationTime || lifecycle.mutated;
   if (!mutated) return { status: "unchanged", mutated: false, person: previous };
-  const person = {
-    ...previous,
-    needs: { ...previous.needs, [needId]: nextValue },
-    lastEvaluatedWorldTimeSeconds: evaluationTime,
-  };
+  const person = { ...previous, needs: { ...previous.needs, [needId]: nextValue }, lastEvaluatedWorldTimeSeconds: evaluationTime };
   population[index] = person;
   return { status: "need-set", mutated: true, person };
 }
@@ -261,30 +274,22 @@ function createStage1Person(identity, evaluationTime) {
   const socialProfile = createPersonSocialProfile(identity.id);
   const lifeProfile = createPersonLifeProfile(identity.id);
   return {
-    id: identity.id,
-    displayName: identity.displayName,
-    ...lifeProfile,
-    needs: initialNeeds(identity.id),
-    spendingCapacity: demandProfile.spendingCapacity,
-    foodPreferences: demandProfile.foodPreferences,
-    relatedPersonIds: socialProfile.relatedPersonIds,
-    preferredVisitPeriods: socialProfile.preferredVisitPeriods,
-    lastEvaluatedWorldTimeSeconds: evaluationTime,
+    id: identity.id, displayName: identity.displayName, ...lifeProfile,
+    needs: initialNeeds(identity.id), spendingCapacity: demandProfile.spendingCapacity,
+    foodPreferences: demandProfile.foodPreferences, relatedPersonIds: socialProfile.relatedPersonIds,
+    preferredVisitPeriods: socialProfile.preferredVisitPeriods, lastEvaluatedWorldTimeSeconds: evaluationTime,
   };
 }
 
 export function createPersonDemandProfile(personId) {
   const id = String(personId ?? "").trim();
   if (!id) throw new Error("Person demand profile requires a stable id");
-  const spendingIndex = Math.min(
-    SPENDING_CAPACITY_VALUES.length - 1,
-    Math.floor(stableUnit(`${id}:spending-capacity`) * SPENDING_CAPACITY_VALUES.length),
-  );
+  const spendingIndex = Math.min(SPENDING_CAPACITY_VALUES.length - 1,
+    Math.floor(stableUnit(`${id}:spending-capacity`) * SPENDING_CAPACITY_VALUES.length));
   return {
     spendingCapacity: SPENDING_CAPACITY_VALUES[spendingIndex],
     foodPreferences: Object.fromEntries(Object.entries(FOOD_PREFERENCE_TAGS).map(([level, tags]) => [
-      level,
-      Object.fromEntries(tags.map((tag) => [tag, stablePreference(`${id}:${level}:${tag}`)])),
+      level, Object.fromEntries(tags.map((tag) => [tag, stablePreference(`${id}:${level}:${tag}`)])),
     ])),
   };
 }
@@ -296,13 +301,9 @@ export function createPersonLifeProfile(personId) {
   const ageYears = STAGE9_AGE_YEARS[id] ?? fallbackAge;
   return {
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
+    lifeStage: lifeStageForPersonAge(id, ageYears),
     lifeStatus: PERSON_LIFE_STATUSES.alive,
-    relationships: STAGE9_RELATIONSHIP_EDGES.flatMap((edge) => {
-      if (edge.first === id) return [{ personId: edge.second, kind: edge.firstKind }];
-      if (edge.second === id) return [{ personId: edge.first, kind: edge.secondKind }];
-      return [];
-    }),
+    relationships: canonicalRelationshipsForId(id),
   };
 }
 
@@ -319,39 +320,58 @@ export function lifeStageForAgeYears(ageYears) {
   return PERSON_LIFE_STAGES.elder;
 }
 
-export function advanceLifeAgeYears(ageYears, elapsedWorldTimeSeconds) {
-  let age = normalizeLifeAgeYears(ageYears, 0);
-  let remainingDays = Math.max(0, Number(elapsedWorldTimeSeconds) || 0) / GAME_DAY_SECONDS;
-  let guard = 0;
-  while (remainingDays > 0 && guard < LIFE_STAGE_DEFINITIONS.length + 1) {
-    guard += 1;
-    const definition = lifeStageDefinition(age);
-    const durationDays = PERSON_LIFE_STAGE_DURATIONS_DAYS[definition.id];
-    const ageSpan = definition.endAgeYears - definition.startAgeYears;
-    if (definition.id === PERSON_LIFE_STAGES.elder && age >= definition.endAgeYears) return definition.endAgeYears;
-    const progress = ageSpan > 0
-      ? clamp((age - definition.startAgeYears) / ageSpan, 0, 1)
-      : 1;
-    const remainingStageDays = durationDays * (1 - progress);
-    if (remainingDays < remainingStageDays) {
-      return roundAge(age + ageSpan * (remainingDays / durationDays));
-    }
-    age = definition.endAgeYears;
-    remainingDays -= remainingStageDays;
-    if (definition.id === PERSON_LIFE_STAGES.elder) return roundAge(age);
+export function lifeStageForPersonAge(personId, ageYears) {
+  const id = String(personId ?? "").trim();
+  if (!id) return lifeStageForAgeYears(ageYears);
+  const lifeDays = lifeDaysForAgeYears(ageYears);
+  for (let index = 0; index < PERSONAL_STAGE_BOUNDARY_DAYS.length; index += 1) {
+    const amplitude = index === 0 ? 0.5 : 1;
+    const shift = (stableUnit(`${id}:life-stage-boundary:${index}`) * 2 - 1) * amplitude;
+    if (lifeDays < PERSONAL_STAGE_BOUNDARY_DAYS[index] + shift) return PERSONAL_STAGE_ORDER[index];
   }
-  return roundAge(Math.min(PERSON_LIFE_MAX_AGE_YEARS, age));
+  return PERSON_LIFE_STAGES.elder;
+}
+
+export function lifeDaysForAgeYears(ageYears) {
+  const age = normalizeLifeAgeYears(ageYears, 0);
+  let elapsedDays = 0;
+  for (const definition of LIFE_STAGE_DEFINITIONS) {
+    const durationDays = PERSON_LIFE_STAGE_DURATIONS_DAYS[definition.id];
+    if (age >= definition.endAgeYears) { elapsedDays += durationDays; continue; }
+    const span = definition.endAgeYears - definition.startAgeYears;
+    const progress = span > 0 ? clamp((age - definition.startAgeYears) / span, 0, 1) : 1;
+    return roundAge(elapsedDays + durationDays * progress);
+  }
+  const elderYearsPerDay = (PERSON_LIFE_NOMINAL_MAX_AGE_YEARS - 65) / PERSON_LIFE_STAGE_DURATIONS_DAYS[PERSON_LIFE_STAGES.elder];
+  return roundAge(Math.min(PERSON_LIFE_MAX_DAYS,
+    PERSON_LIFE_TOTAL_DAYS + Math.max(0, age - PERSON_LIFE_NOMINAL_MAX_AGE_YEARS) / elderYearsPerDay));
+}
+
+export function ageYearsForLifeDays(lifeDays) {
+  let remaining = clamp(Number(lifeDays) || 0, 0, PERSON_LIFE_MAX_DAYS);
+  for (const definition of LIFE_STAGE_DEFINITIONS) {
+    const durationDays = PERSON_LIFE_STAGE_DURATIONS_DAYS[definition.id];
+    const span = definition.endAgeYears - definition.startAgeYears;
+    if (remaining < durationDays) return roundAge(definition.startAgeYears + span * (remaining / durationDays));
+    remaining -= durationDays;
+  }
+  const elderYearsPerDay = (PERSON_LIFE_NOMINAL_MAX_AGE_YEARS - 65) / PERSON_LIFE_STAGE_DURATIONS_DAYS[PERSON_LIFE_STAGES.elder];
+  return roundAge(Math.min(PERSON_LIFE_MAX_AGE_YEARS,
+    PERSON_LIFE_NOMINAL_MAX_AGE_YEARS + remaining * elderYearsPerDay));
+}
+
+export function advanceLifeAgeYears(ageYears, elapsedWorldTimeSeconds) {
+  const elapsedDays = Math.max(0, Number(elapsedWorldTimeSeconds) || 0) / PERSON_GAME_DAY_SECONDS;
+  return ageYearsForLifeDays(lifeDaysForAgeYears(ageYears) + elapsedDays);
 }
 
 export function createPersonSocialProfile(personId) {
   const id = String(personId ?? "").trim();
   if (!id) throw new Error("Person social profile requires a stable id");
   const lifeProfile = createPersonLifeProfile(id);
-  const fallbackPeriods = Object.values(VISIT_TIME_PERIODS);
-  const fallbackPeriod = fallbackPeriods[Math.min(
-    fallbackPeriods.length - 1,
-    Math.floor(stableUnit(`${id}:preferred-visit-period`) * fallbackPeriods.length),
-  )];
+  const periods = Object.values(VISIT_TIME_PERIODS);
+  const fallbackPeriod = periods[Math.min(periods.length - 1,
+    Math.floor(stableUnit(`${id}:preferred-visit-period`) * periods.length))];
   return {
     relatedPersonIds: lifeProfile.relationships.map(({ personId: relatedPersonId }) => relatedPersonId),
     preferredVisitPeriods: [...(STAGE1_PREFERRED_VISIT_PERIODS[id] ?? [fallbackPeriod])],
@@ -368,15 +388,19 @@ export function visitTimePeriod(worldTimeSeconds) {
 
 export function visitTimeFactorForPerson(person, worldTimeSeconds) {
   const period = visitTimePeriod(worldTimeSeconds);
-  const preferred = Array.isArray(person?.preferredVisitPeriods)
-    && person.preferredVisitPeriods.includes(period);
-  return {
-    period,
-    preferred,
-    timeFactor: preferred
-      ? VISIT_TIME_BALANCE.preferredCandidateWeight
-      : VISIT_TIME_BALANCE.offScheduleCandidateWeight,
-  };
+  const alive = isLivingPopulationPerson(person);
+  const preferred = alive && Array.isArray(person?.preferredVisitPeriods) && person.preferredVisitPeriods.includes(period);
+  return { period, preferred, timeFactor: alive ? (preferred
+    ? VISIT_TIME_BALANCE.preferredCandidateWeight : VISIT_TIME_BALANCE.offScheduleCandidateWeight) : 0 };
+}
+
+export function isLivingPopulationPerson(person) {
+  return person?.lifeStatus === PERSON_LIFE_STATUSES.alive;
+}
+
+export function isGeneratedPersonId(personId) {
+  return typeof personId === "string"
+    && (/^person-seed-\d{3}$/.test(personId) || /^person-born-\d+-\d+-\d+$/.test(personId));
 }
 
 function normalizeStage1Person(value, identity, recoveryTime) {
@@ -387,19 +411,90 @@ function normalizeStage1Person(value, identity, recoveryTime) {
     id: identity.id,
     displayName: nonEmptyString(value.displayName) ? value.displayName.trim() : identity.displayName,
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
-    lifeStatus: fallback.lifeStatus,
-    relationships: fallback.relationships,
+    lifeStage: lifeStageForPersonAge(identity.id, ageYears),
+    lifeStatus: normalizeLifeStatus(value.lifeStatus, ageYears),
+    relationships: normalizeRelationshipList(value.relationships, fallback.relationships),
     needs: normalizePersonNeeds(value.needs, fallback.needs),
     spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, fallback.spendingCapacity),
     foodPreferences: normalizeFoodPreferences(value.foodPreferences, fallback.foodPreferences),
-    relatedPersonIds: fallback.relatedPersonIds,
-    preferredVisitPeriods: fallback.preferredVisitPeriods,
-    lastEvaluatedWorldTimeSeconds: Math.min(
-      recoveryTime,
-      normalizeWorldTime(value.lastEvaluatedWorldTimeSeconds, recoveryTime),
-    ),
+    relatedPersonIds: [],
+    preferredVisitPeriods: normalizePreferredVisitPeriods(value.preferredVisitPeriods, fallback.preferredVisitPeriods),
+    lastEvaluatedWorldTimeSeconds: Math.min(recoveryTime,
+      normalizeWorldTime(value.lastEvaluatedWorldTimeSeconds, recoveryTime)),
   };
+}
+
+function normalizeGeneratedPerson(value, recoveryTime) {
+  const id = value.id.trim();
+  const fallback = createGeneratedPopulationPerson({
+    id,
+    displayName: generatedFallbackDisplayName(id),
+    ageYears: generatedFallbackAgeYears(id),
+    worldTimeSeconds: recoveryTime,
+  });
+  const ageYears = normalizeLifeAgeYears(value.ageYears, fallback.ageYears);
+  return {
+    id,
+    displayName: nonEmptyString(value.displayName) ? value.displayName.trim() : fallback.displayName,
+    ageYears,
+    lifeStage: lifeStageForPersonAge(id, ageYears),
+    lifeStatus: normalizeLifeStatus(value.lifeStatus, ageYears),
+    relationships: normalizeRelationshipList(value.relationships, []),
+    needs: normalizePersonNeeds(value.needs, fallback.needs),
+    spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, fallback.spendingCapacity),
+    foodPreferences: normalizeFoodPreferences(value.foodPreferences, fallback.foodPreferences),
+    relatedPersonIds: [],
+    preferredVisitPeriods: normalizePreferredVisitPeriods(value.preferredVisitPeriods, fallback.preferredVisitPeriods),
+    lastEvaluatedWorldTimeSeconds: Math.min(recoveryTime,
+      normalizeWorldTime(value.lastEvaluatedWorldTimeSeconds, recoveryTime)),
+  };
+}
+
+function normalizePopulationRelationships(people) {
+  const byId = new Map(people.map((person) => [person.id, person]));
+  const rawById = new Map(people.map((person) => [person.id, normalizeRelationshipList(person.relationships, [])]));
+  for (const person of people) person.relationships = canonicalRelationshipsForId(person.id);
+  for (const [personId, relationships] of rawById) {
+    for (const relationship of relationships) {
+      const target = byId.get(relationship.personId);
+      if (!target || target.id === personId) continue;
+      if (STAGE1_ID_SET.has(personId) && STAGE1_ID_SET.has(target.id)
+        && !isCanonicalRelationship(personId, target.id, relationship.kind)) continue;
+      const inverse = inverseRelationshipKind(relationship.kind);
+      const reciprocal = rawById.get(target.id)?.some((candidate) => (
+        candidate.personId === personId && candidate.kind === inverse
+      ));
+      if (!reciprocal) continue;
+      addUniqueRelationship(byId.get(personId).relationships, relationship);
+    }
+  }
+  for (const person of people) person.relatedPersonIds = person.relationships.map(({ personId }) => personId);
+}
+
+function canonicalRelationshipsForId(id) {
+  return STAGE9_RELATIONSHIP_EDGES.flatMap((edge) => {
+    if (edge.first === id) return [{ personId: edge.second, kind: edge.firstKind }];
+    if (edge.second === id) return [{ personId: edge.first, kind: edge.secondKind }];
+    return [];
+  });
+}
+
+function isCanonicalRelationship(firstId, secondId, kind) {
+  return canonicalRelationshipsForId(firstId).some((relationship) => (
+    relationship.personId === secondId && relationship.kind === kind
+  ));
+}
+
+function inverseRelationshipKind(kind) {
+  if (kind === PERSON_RELATIONSHIP_KINDS.parent) return PERSON_RELATIONSHIP_KINDS.child;
+  if (kind === PERSON_RELATIONSHIP_KINDS.child) return PERSON_RELATIONSHIP_KINDS.parent;
+  return kind;
+}
+
+function addUniqueRelationship(relationships, relationship) {
+  if (!relationships.some((candidate) => (
+    candidate.personId === relationship.personId && candidate.kind === relationship.kind
+  ))) relationships.push({ personId: relationship.personId, kind: relationship.kind });
 }
 
 function normalizeEvaluationPerson(value) {
@@ -410,19 +505,21 @@ function normalizeEvaluationPerson(value) {
   const demandProfile = createPersonDemandProfile(id);
   const socialProfile = createPersonSocialProfile(id);
   const lifeProfile = createPersonLifeProfile(id);
-  const ageYears = normalizeLifeAgeYears(value.ageYears, lifeProfile.ageYears);
+  const fallbackAge = isGeneratedPersonId(id) ? generatedFallbackAgeYears(id) : lifeProfile.ageYears;
+  const ageYears = normalizeLifeAgeYears(value.ageYears, fallbackAge);
+  const relationships = normalizeRelationshipList(value.relationships, lifeProfile.relationships);
   return {
     id,
     displayName: value.displayName.trim(),
     ageYears,
-    lifeStage: lifeStageForAgeYears(ageYears),
-    lifeStatus: lifeProfile.lifeStatus,
-    relationships: lifeProfile.relationships,
+    lifeStage: lifeStageForPersonAge(id, ageYears),
+    lifeStatus: normalizeLifeStatus(value.lifeStatus, ageYears),
+    relationships,
     needs: normalizePersonNeeds(value.needs, initialNeeds(id)),
     spendingCapacity: normalizeSpendingCapacity(value.spendingCapacity, demandProfile.spendingCapacity),
     foodPreferences: normalizeFoodPreferences(value.foodPreferences, demandProfile.foodPreferences),
-    relatedPersonIds: socialProfile.relatedPersonIds,
-    preferredVisitPeriods: socialProfile.preferredVisitPeriods,
+    relatedPersonIds: relationships.map(({ personId }) => personId),
+    preferredVisitPeriods: normalizePreferredVisitPeriods(value.preferredVisitPeriods, socialProfile.preferredVisitPeriods),
     lastEvaluatedWorldTimeSeconds: evaluationTime,
   };
 }
@@ -439,20 +536,35 @@ export function normalizeFoodPreferences(value, fallback = null) {
   }));
 }
 
+function normalizeRelationshipList(value, fallback) {
+  const source = Array.isArray(value) ? value : fallback;
+  const seen = new Set();
+  return source.flatMap((relationship) => {
+    const personId = nonEmptyString(relationship?.personId) ? relationship.personId.trim() : "";
+    const kind = relationship?.kind;
+    const key = `${personId}:${kind}`;
+    if (!personId || !Object.values(PERSON_RELATIONSHIP_KINDS).includes(kind) || seen.has(key)) return [];
+    seen.add(key);
+    return [{ personId, kind }];
+  });
+}
+
+function normalizePreferredVisitPeriods(value, fallback) {
+  const valid = new Set(Object.values(VISIT_TIME_PERIODS));
+  const periods = [...new Set((Array.isArray(value) ? value : []).filter((period) => valid.has(period)))];
+  return periods.length > 0 ? periods : [...fallback];
+}
+
 function normalizePersonNeeds(value, fallback) {
   const source = isPlainRecord(value) ? value : {};
-  return Object.fromEntries(NEED_IDS.map((needId) => [
-    needId,
-    roundNeed(normalizeNeedValue(source[needId], fallback[needId])),
-  ]));
+  return Object.fromEntries(NEED_IDS.map((needId) => [needId,
+    roundNeed(normalizeNeedValue(source[needId], fallback[needId]))]));
 }
 
 function initialNeeds(personId) {
-  return Object.fromEntries(NEED_IDS.map((needId) => [
-    needId,
+  return Object.fromEntries(NEED_IDS.map((needId) => [needId,
     roundNeed((needId === "satiety" ? 18 : 55)
-      + stableUnit(`${personId}:${needId}:initial`) * (needId === "satiety" ? 65 : 35)),
-  ]));
+      + stableUnit(`${personId}:${needId}:initial`) * (needId === "satiety" ? 65 : 35))]));
 }
 
 function normalizeSpendingCapacity(value, fallback) {
@@ -460,27 +572,36 @@ function normalizeSpendingCapacity(value, fallback) {
   return SPENDING_CAPACITY_VALUES.includes(capacity) ? capacity : fallback;
 }
 
+function normalizeLifeStatus(value, _ageYears) {
+  return value === PERSON_LIFE_STATUSES.dead ? PERSON_LIFE_STATUSES.dead : PERSON_LIFE_STATUSES.alive;
+}
+
 function normalizeLifeAgeYears(value, fallback) {
   const age = Number(value);
-  if (!Number.isFinite(age) || age < 0 || age > PERSON_LIFE_MAX_AGE_YEARS) return fallback;
+  if (!Number.isFinite(age) || age < 0 || age > PERSON_LIFE_MAX_AGE_YEARS) return roundAge(fallback);
   return roundAge(age);
 }
 
-function lifeStageDefinition(ageYears) {
-  const age = Math.min(PERSON_LIFE_MAX_AGE_YEARS, Math.max(0, Number(ageYears) || 0));
-  return LIFE_STAGE_DEFINITIONS.find((definition) => age < definition.endAgeYears)
-    ?? LIFE_STAGE_DEFINITIONS[LIFE_STAGE_DEFINITIONS.length - 1];
+function generatedFallbackAgeYears(id) {
+  const seed = /^person-seed-(\d{3})$/.exec(id);
+  if (seed) {
+    const index = Math.max(1, Number(seed[1]));
+    return ageYearsForLifeDays(((index - 0.5) / 284) * PERSON_LIFE_TOTAL_DAYS);
+  }
+  return 0;
 }
 
-function stablePreference(key) {
-  return Math.min(1, Math.floor(stableUnit(key) * 3) - 1);
+function generatedFallbackDisplayName(id) {
+  const seed = /^person-seed-(\d{3})$/.exec(id);
+  if (seed) return `Resident ${String(STAGE1_POPULATION_SIZE + Number(seed[1])).padStart(3, "0")}`;
+  return `Resident ${id.slice(-8)}`;
 }
 
+function stablePreference(key) { return Math.min(1, Math.floor(stableUnit(key) * 3) - 1); }
 function normalizeWorldTime(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
 }
-
 function stableUnit(key) {
   let hash = 2166136261;
   for (let index = 0; index < key.length; index += 1) {
@@ -489,23 +610,10 @@ function stableUnit(key) {
   }
   return (hash >>> 0) / 0xffffffff;
 }
-
-function roundAge(value) {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
-
-function roundNeed(value) {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
-
-function clamp(value, minimum, maximum) {
-  return Math.max(minimum, Math.min(maximum, value));
-}
-
-function nonEmptyString(value) {
-  return typeof value === "string" && value.trim() !== "";
-}
-
+function roundAge(value) { return Math.round(value * 1_000_000) / 1_000_000; }
+function roundNeed(value) { return Math.round(value * 1_000_000) / 1_000_000; }
+function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, value)); }
+function nonEmptyString(value) { return typeof value === "string" && value.trim() !== ""; }
 function isPlainRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);

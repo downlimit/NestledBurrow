@@ -3,6 +3,7 @@ import { applyResourceWork, getResourceProfile } from "../resources/resourceDoma
 import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, advanceWorldTimeSeconds } from "./gameClock.js";
 import { DEFAULT_NEEDS, normalizeNeeds } from "../needs/needsDomain.js";
 import { normalizePopulation } from "../character/populationDomain.js";
+import { advancePopulationLifecycle, ensureMaturePopulation } from "../character/populationLifecycleDomain.js";
 import { normalizeKitchenState } from "../tavern/cookingDomain.js";
 import { createFreshFarmState, normalizeFarmState } from "../resources/farmingDomain.js";
 import { normalizeTavernServiceState } from "../tavern/tavernServiceDomain.js";
@@ -161,7 +162,10 @@ function normalizeGameplayState(value = {}) {
     reservedToolIds: inventory.slots.filter((item) => item?.kind === "tool").map((item) => item.id),
   });
   const kitchen = normalizeKitchenState(value.kitchen ?? {});
-  const population = normalizePopulation(value.population, { worldTimeSeconds });
+  const population = ensureMaturePopulation(
+    normalizePopulation(value.population, { worldTimeSeconds }),
+    worldTimeSeconds,
+  );
   const tavernService = normalizeTavernServiceState(value.tavernService ?? {}, { population });
   const tavernFeedback = normalizeTavernFeedbackState(value.tavernFeedback ?? {}, { population, worldTimeSeconds });
   const resumableReservations = new Map(tavernService.guests
@@ -278,7 +282,7 @@ export function setEntityFlag(state, entityId, flagId, value) {
 }
 
 export function getEntityFlag(state, entityId, flagId) {
-  assertNonEmptyString(flagId, "Flag ID");
+  assertNonEmptyString(flagId, "Session flag ID");
   const entity = getSessionEntity(state, entityId);
   return entity && hasOwn(entity.flags, flagId) ? entity.flags[flagId] : false;
 }
@@ -396,5 +400,13 @@ export function advanceGameTime(state, realDeltaSeconds, timeScale = 1) {
   const delta = normalizeNonNegativeNumber(realDeltaSeconds, 0, "Real delta seconds");
   const scale = normalizeNonNegativeNumber(timeScale, 1, "Time scale");
   state.gameplay.worldTimeSeconds = advanceWorldTimeSeconds(state.gameplay.worldTimeSeconds, delta, scale);
-  return { worldTimeSeconds: state.gameplay.worldTimeSeconds, timeScale: scale };
+  const protectedPersonIds = state.gameplay.tavernService?.guests
+    ?.map((guest) => guest?.personId)
+    .filter(Boolean) ?? [];
+  const populationLifecycle = advancePopulationLifecycle(
+    state.gameplay.population,
+    state.gameplay.worldTimeSeconds,
+    { protectedPersonIds },
+  );
+  return { worldTimeSeconds: state.gameplay.worldTimeSeconds, timeScale: scale, populationLifecycle };
 }

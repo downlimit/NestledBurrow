@@ -19,7 +19,13 @@ const expectedItemIds = [
 
 assert.deepEqual(getSimulationTestItemIds(), expectedItemIds);
 assert(expectedItemIds.every((itemId) => INVENTORY_ITEM_IDS.includes(itemId)));
-assert.equal(SIMULATION_TEST_GROUPS.flatMap((group) => group.items).filter((item) => item.id === "coins").length, 1);
+assert.equal(
+  SIMULATION_TEST_GROUPS.flatMap((group) => group.items)
+    .filter((item) => item.id === "coins" && !item.populationTest).length,
+  1,
+  "the original canonical +100 coin grant remains unique",
+);
+assert(SIMULATION_TEST_GROUPS.some((group) => group.id === "population"), "TEST may extend with non-persistent proof tooling");
 
 const gameplay = { inventory: createFreshInventory(), coins: 7 };
 assert.equal(grantSimulationTestItem(gameplay, "lemonade", 1).accepted, 1);

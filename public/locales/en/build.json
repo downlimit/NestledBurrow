@@ -19,5 +19,14 @@
     "smallStone": "Small stone",
     "largeStone": "Large stone",
     "rubyNode": "Ruby vein"
+  },
+  "test": {
+    "population": {
+      "group": "POPULATION",
+      "advance": "Advance by days",
+      "longRun": "Advance by 100 days",
+      "drop": "Reduce living to 240",
+      "reset": "Reset sandbox"
+    }
   }
 }

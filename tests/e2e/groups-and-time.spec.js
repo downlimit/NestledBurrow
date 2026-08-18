@@ -9,6 +9,14 @@ async function bridge(page, method, argument) {
   );
 }
 
+async function setPopulationSatiety(page, personIds, satiety) {
+  return page.evaluate(({ personIds, satiety }) => {
+    const e2e = window.__NESTLED_BURROW_E2E__;
+    for (const personId of personIds) e2e.setPopulationPersonDemand({ personId, satiety });
+    return true;
+  }, { personIds, satiety });
+}
+
 async function bootFresh(page) {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("./?movementDebug=1");
@@ -53,13 +61,12 @@ test("same random input exposes time-sensitive candidate weights and stable save
   await bootFresh(page);
   await bridge(page, "setWorldTimeSeconds", 8 * 60 * 60);
   const population = await bridge(page, "getPopulation");
+  const populationIds = population.map(({ id }) => id);
   const socialProfiles = Object.fromEntries(population.map((person) => [person.id, {
     relatedPersonIds: person.relatedPersonIds,
     preferredVisitPeriods: person.preferredVisitPeriods,
   }]));
-  for (const person of population) {
-    await bridge(page, "setPopulationPersonDemand", { personId: person.id, satiety: 100 });
-  }
+  await setPopulationSatiety(page, populationIds, 100);
   await openTavern(page);
   await bridge(page, "setGuestRandomValue", 0.35);
   await bridge(page, "forceVisitOpportunity");
@@ -72,9 +79,7 @@ test("same random input exposes time-sensitive candidate weights and stable save
   });
 
   await bridge(page, "setWorldTimeSeconds", 20 * 60 * 60);
-  for (const person of population) {
-    await bridge(page, "setPopulationPersonDemand", { personId: person.id, satiety: 100 });
-  }
+  await setPopulationSatiety(page, populationIds, 100);
   await bridge(page, "setGuestRandomValue", 0.35);
   await bridge(page, "forceVisitOpportunity");
   const evening = await bridge(page, "getLastVisitGroup");

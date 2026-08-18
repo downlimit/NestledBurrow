@@ -94,7 +94,7 @@ test("BUILD/TEST grants and persistent person inspection share canonical gamepla
   }, personId);
   const { inspection, persistentPerson: persistentBefore } = personSnapshot;
   const orderBefore = await bridge(page, "getGuestOrder", guestId);
-  expect(inspection).toMatchObject({ personId, displayName: "Mira", expanded: true, expandProgress: 1 });
+  expect(inspection).toMatchObject({ personId, displayName: "Мира", expanded: true, expandProgress: 1 });
   expect(inspection.needs.map(({ id }) => id)).toEqual(["novelty", "energy", "satiety", "toilet", "lustre", "dialogue"]);
   const persistentNeedValues = [
     persistentBefore.needs.novelty,

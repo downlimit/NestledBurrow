@@ -182,7 +182,12 @@ assert.equal(migrated.status, "loaded");
 assert.equal(migrated.schemaVersion, 19);
 assert.equal(migrated.state.version, 19);
 for (const person of migrated.state.gameplay.population) {
-  assert.deepEqual(person.relatedPersonIds, createPersonSocialProfile(person.id).relatedPersonIds);
+  assert(!person.relatedPersonIds.includes("person-forged"), "legacy relatedPersonIds cannot forge a family link");
+  assert.deepEqual(
+    person.relatedPersonIds,
+    person.relationships.map(({ personId }) => personId),
+    "compatibility relatedPersonIds follows the persistent typed relationship graph",
+  );
   assert.deepEqual(person.preferredVisitPeriods, createPersonSocialProfile(person.id).preferredVisitPeriods);
 }
 

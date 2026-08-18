@@ -23,7 +23,7 @@ async function bootFresh(page) {
 test("persistent people survive reload and evaluate at current world time", async ({ page }) => {
   await bootFresh(page);
   const population = await bridge(page, "getPopulation");
-  expect(population).toHaveLength(16);
+  expect(population).toHaveLength(300);
   const person = population[0];
   expect(await bridge(page, "getPopulationPerson", person.id)).toEqual(person);
 

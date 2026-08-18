@@ -3,6 +3,80 @@ import {
   createInventoryItem,
   INVENTORY_ITEM_IDS,
 } from "../inventory/inventoryDomain.js";
+import {
+  isLivingPopulationPerson,
+  lifeStageForPersonAge,
+  PERSON_GAME_DAY_SECONDS,
+  PERSON_LIFE_STAGES,
+  PERSON_LIFE_STATUSES,
+  PERSON_RELATIONSHIP_KINDS,
+} from "../character/populationDomain.js";
+import { localizePersonDisplayName } from "../character/personNameLocalization.js";
+import {
+  advancePopulationLifecycle,
+  ensureMaturePopulation,
+} from "../character/populationLifecycleDomain.js";
+import { emitSimulationTestActionFeedback } from "./simulationTestFeedback.js";
+import { getCurrentWorldScene } from "./worldSceneRegistry.js";
+
+const POPULATION_TEST_SANDBOXES = new WeakMap();
+const POPULATION_STAGE_ORDER = Object.freeze([
+  PERSON_LIFE_STAGES.newborn,
+  PERSON_LIFE_STAGES.infant,
+  PERSON_LIFE_STAGES.toddler,
+  PERSON_LIFE_STAGES.child,
+  PERSON_LIFE_STAGES.teen,
+  PERSON_LIFE_STAGES.youngAdult,
+  PERSON_LIFE_STAGES.adult,
+  PERSON_LIFE_STAGES.elder,
+]);
+
+const POPULATION_ACTIONS = Object.freeze({
+  day1: populationActionQuantity("advance", 1, "1"),
+  day10: populationActionQuantity("advance", 10, "10"),
+  day100: populationActionQuantity("advance", 100, "100"),
+  drop240: populationActionQuantity("drop", 240, "240"),
+  reset: populationActionQuantity("reset", 0, "R"),
+});
+
+const POPULATION_TEST_ITEMS = Object.freeze([
+  populationReadoutItem("population-alive", () => populationAliveLabel()),
+  populationReadoutItem("population-dead", () => populationDeadLabel()),
+  populationReadoutItem("population-run-days", () => populationRunDaysLabel()),
+  populationReadoutItem("population-run-births", () => populationRunBirthsLabel()),
+  populationReadoutItem("population-run-deaths", () => populationRunDeathsLabel()),
+  populationReadoutItem("population-run-accidents", () => populationRunAccidentsLabel()),
+  ...POPULATION_STAGE_ORDER.map((stage) => populationReadoutItem(`population-stage-${stage}`, () => populationStageLabel(stage))),
+  populationReadoutItem("population-sandbox-hint", () => populationSandboxHint()),
+  Object.freeze({
+    id: "coins",
+    labelKey: "build:test.population.advance",
+    quantities: Object.freeze([POPULATION_ACTIONS.day1, POPULATION_ACTIONS.day10]),
+    populationTest: true,
+  }),
+  Object.freeze({
+    id: "coins",
+    labelKey: "build:test.population.longRun",
+    quantities: Object.freeze([POPULATION_ACTIONS.day100]),
+    populationTest: true,
+  }),
+  Object.freeze({
+    id: "coins",
+    labelKey: "build:test.population.drop",
+    quantities: Object.freeze([POPULATION_ACTIONS.drop240]),
+    populationTest: true,
+  }),
+  Object.freeze({
+    id: "coins",
+    labelKey: "build:test.population.reset",
+    quantities: Object.freeze([POPULATION_ACTIONS.reset]),
+    populationTest: true,
+  }),
+  populationReadoutItem("population-events-title", () => populationEventsTitle()),
+  populationReadoutItem("population-event-0", () => populationEventLabel(0)),
+  populationReadoutItem("population-event-1", () => populationEventLabel(1)),
+  populationReadoutItem("population-event-2", () => populationEventLabel(2)),
+]);
 
 export const SIMULATION_TEST_GROUPS = Object.freeze([
   Object.freeze({
@@ -46,10 +120,16 @@ export const SIMULATION_TEST_GROUPS = Object.freeze([
       Object.freeze({ id: "coins", labelKey: "hud:buildMode.test.items.coins", quantities: Object.freeze([100]) }),
     ]),
   }),
+  Object.freeze({
+    id: "population",
+    labelKey: "build:test.population.group",
+    items: POPULATION_TEST_ITEMS,
+  }),
 ]);
 
 const PALETTE_ITEM_IDS = Object.freeze(SIMULATION_TEST_GROUPS
   .flatMap((group) => group.items)
+  .filter((item) => !item.populationTest)
   .map((item) => item.id)
   .filter((itemId) => itemId !== "coins"));
 
@@ -65,10 +145,24 @@ export function grantSimulationTestItem(gameplay, itemId, quantity) {
   if (!Number.isSafeInteger(requested) || requested <= 0) {
     return { status: "invalid-quantity", mutated: false, accepted: 0, remaining: 0 };
   }
-  return addInventoryItemUpTo(gameplay.inventory, createInventoryItem(itemId, requested));
+  const result = addInventoryItemUpTo(gameplay.inventory, createInventoryItem(itemId, requested));
+  emitSimulationTestActionFeedback({
+    scene: getCurrentWorldScene(),
+    itemId,
+    delta: result.accepted ?? 0,
+  });
+  return result;
 }
 
 export function grantSimulationTestCoins(gameplay, amount = 100) {
+  if (amount?.populationAction) {
+    const result = applyPopulationTestAction(gameplay, amount.populationAction);
+    emitSimulationTestActionFeedback({
+      scene: getCurrentWorldScene(),
+      deltas: result.feedbackDeltas,
+    });
+    return result;
+  }
   const requested = Number(amount);
   const current = Number(gameplay?.coins);
   if (!gameplay || !Number.isSafeInteger(requested) || requested <= 0 || !Number.isSafeInteger(current) || current < 0) {
@@ -76,9 +170,317 @@ export function grantSimulationTestCoins(gameplay, amount = 100) {
   }
   if (!Number.isSafeInteger(current + requested)) return { status: "coin-limit", mutated: false, value: 0 };
   gameplay.coins = current + requested;
-  return { status: "coins-granted", mutated: true, value: requested, coins: gameplay.coins };
+  const result = { status: "coins-granted", mutated: true, value: requested, coins: gameplay.coins };
+  emitSimulationTestActionFeedback({ scene: getCurrentWorldScene(), itemId: "coins", delta: requested });
+  return result;
 }
 
 export function getSimulationTestItemIds() {
   return [...PALETTE_ITEM_IDS];
+}
+
+export function getSimulationPopulationTestSnapshot(gameplay) {
+  const sandbox = ensurePopulationSandbox(gameplay);
+  return sandbox ? populationSnapshotFromSandbox(sandbox) : null;
+}
+
+export function resetSimulationPopulationTest(gameplay) {
+  if (!gameplay || typeof gameplay !== "object") return null;
+  POPULATION_TEST_SANDBOXES.delete(gameplay);
+  return getSimulationPopulationTestSnapshot(gameplay);
+}
+
+function applyPopulationTestAction(gameplay, action) {
+  const sandbox = ensurePopulationSandbox(gameplay);
+  if (!sandbox) return { status: "population-test-unavailable", mutated: false, value: 0, feedbackDeltas: [] };
+  const before = populationSnapshotFromSandbox(sandbox);
+  if (action.kind === "reset") {
+    POPULATION_TEST_SANDBOXES.delete(gameplay);
+    const nextSandbox = ensurePopulationSandbox(gameplay);
+    const after = populationSnapshotFromSandbox(nextSandbox);
+    return {
+      status: "population-test-reset",
+      mutated: false,
+      value: 0,
+      populationTest: true,
+      feedbackDeltas: populationFeedbackDeltas(before, after),
+    };
+  }
+  if (action.kind === "drop") {
+    const target = Math.max(0, Math.floor(Number(action.value) || 0));
+    const living = sandbox.population.filter(isLivingPopulationPerson);
+    const removeCount = Math.max(0, living.length - target);
+    const candidates = living
+      .filter((person) => person.id.startsWith("person-seed-") || person.id.startsWith("person-born-"))
+      .sort((a, b) => (Number(a.ageYears) || 0) - (Number(b.ageYears) || 0) || a.id.localeCompare(b.id));
+    const removedPeople = evenlySpacedSample(candidates, Math.min(removeCount, candidates.length));
+    for (const person of removedPeople) person.lifeStatus = PERSON_LIFE_STATUSES.dead;
+    const removedCount = removedPeople.length;
+    sandbox.lastRun = {
+      days: 0,
+      births: 0,
+      deaths: removedCount,
+      naturalDeaths: 0,
+      accidentalDeaths: 0,
+      stress: true,
+    };
+    sandbox.events = [{ type: "stress", count: removedCount }];
+    const after = populationSnapshotFromSandbox(sandbox);
+    return {
+      status: "population-test-dropped",
+      mutated: false,
+      value: 0,
+      populationTest: true,
+      feedbackDeltas: populationFeedbackDeltas(before, after),
+    };
+  }
+  if (action.kind !== "advance") {
+    return { status: "population-test-invalid-action", mutated: false, value: 0, feedbackDeltas: [] };
+  }
+
+  const days = Math.max(0, Math.floor(Number(action.value) || 0));
+  if (days <= 0) return { status: "population-test-invalid-days", mutated: false, value: 0, feedbackDeltas: [] };
+  const beforeLiving = new Map(sandbox.population.filter(isLivingPopulationPerson).map((person) => [person.id, person.displayName]));
+  const beforeLength = sandbox.population.length;
+  const targetTime = sandbox.worldTimeSeconds + days * PERSON_GAME_DAY_SECONDS;
+  const summary = advancePopulationLifecycle(sandbox.population, targetTime);
+  sandbox.worldTimeSeconds = targetTime;
+  sandbox.elapsedDays += days;
+  sandbox.lastRun = {
+    days,
+    births: summary.births,
+    deaths: summary.deaths,
+    naturalDeaths: summary.naturalDeaths,
+    accidentalDeaths: summary.accidentalDeaths,
+    stress: false,
+  };
+
+  const births = sandbox.population.slice(beforeLength).map((person) => ({
+    type: "birth",
+    personId: person.id,
+    displayName: person.displayName,
+    parentNames: person.relationships
+      .filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)
+      .map(({ personId }) => sandbox.population.find((candidate) => candidate.id === personId)?.displayName)
+      .filter(Boolean)
+      .slice(0, 2),
+  }));
+  const accidentalIds = new Set(summary.accidentalDeathIds ?? []);
+  const deaths = [...beforeLiving.entries()]
+    .filter(([personId]) => sandbox.population.find((person) => person.id === personId)?.lifeStatus === PERSON_LIFE_STATUSES.dead)
+    .map(([personId, displayName]) => ({
+      type: "death",
+      cause: accidentalIds.has(personId) ? "accident" : "natural",
+      personId,
+      displayName,
+      parentNames: [],
+    }));
+  sandbox.events = [...births, ...deaths].slice(-6).reverse();
+  const after = populationSnapshotFromSandbox(sandbox);
+  return {
+    status: "population-test-advanced",
+    mutated: false,
+    value: 0,
+    populationTest: true,
+    days,
+    births: summary.births,
+    deaths: summary.deaths,
+    naturalDeaths: summary.naturalDeaths,
+    accidentalDeaths: summary.accidentalDeaths,
+    aliveCount: summary.aliveCount,
+    feedbackDeltas: populationFeedbackDeltas(before, after),
+  };
+}
+
+function evenlySpacedSample(source, count) {
+  const wanted = Math.max(0, Math.min(source.length, Math.floor(Number(count) || 0)));
+  if (wanted === 0) return [];
+  if (wanted === source.length) return [...source];
+  return Array.from({ length: wanted }, (_value, index) => (
+    source[Math.min(source.length - 1, Math.floor(((index + 0.5) * source.length) / wanted))]
+  ));
+}
+
+function ensurePopulationSandbox(gameplay) {
+  if (!gameplay || typeof gameplay !== "object" || !Array.isArray(gameplay.population)) return null;
+  let sandbox = POPULATION_TEST_SANDBOXES.get(gameplay);
+  if (sandbox) return sandbox;
+  const population = JSON.parse(JSON.stringify(gameplay.population));
+  const worldTimeSeconds = Math.max(0, Number(gameplay.worldTimeSeconds) || 0);
+  ensureMaturePopulation(population, worldTimeSeconds);
+  sandbox = {
+    population,
+    worldTimeSeconds,
+    elapsedDays: 0,
+    lastRun: { days: 0, births: 0, deaths: 0, naturalDeaths: 0, accidentalDeaths: 0, stress: false },
+    events: [],
+  };
+  POPULATION_TEST_SANDBOXES.set(gameplay, sandbox);
+  return sandbox;
+}
+
+function populationSnapshotFromSandbox(sandbox) {
+  const alive = sandbox.population.filter(isLivingPopulationPerson);
+  const stageCounts = Object.fromEntries(POPULATION_STAGE_ORDER.map((stage) => [stage, 0]));
+  for (const person of alive) {
+    const stage = lifeStageForPersonAge(person.id, person.ageYears);
+    stageCounts[stage] += 1;
+  }
+  return {
+    worldTimeSeconds: sandbox.worldTimeSeconds,
+    elapsedDays: sandbox.elapsedDays,
+    aliveCount: alive.length,
+    deadCount: sandbox.population.length - alive.length,
+    totalCount: sandbox.population.length,
+    stageCounts,
+    lastRun: { ...sandbox.lastRun },
+    events: sandbox.events.map((event) => ({ ...event, parentNames: [...(event.parentNames ?? [])] })),
+  };
+}
+
+function populationFeedbackDeltas(before, after) {
+  const deltas = [];
+  pushFeedbackDelta(deltas, "population-alive", after.aliveCount - before.aliveCount);
+  pushFeedbackDelta(deltas, "population-dead", after.deadCount - before.deadCount);
+  for (const stage of POPULATION_STAGE_ORDER) {
+    pushFeedbackDelta(
+      deltas,
+      `population-stage-${stage}`,
+      Number(after.stageCounts?.[stage] ?? 0) - Number(before.stageCounts?.[stage] ?? 0),
+    );
+  }
+  return deltas;
+}
+
+function pushFeedbackDelta(target, debugId, delta) {
+  const value = Number(delta);
+  if (Number.isFinite(value) && value !== 0) target.push({ debugId, delta: value });
+}
+
+function populationReadoutItem(id, labelFactory) {
+  return Object.freeze({
+    id: "coins",
+    populationTest: true,
+    quantities: Object.freeze([]),
+    get labelKey() { return labelFactory(); },
+    debugId: id,
+  });
+}
+
+function populationActionQuantity(kind, value, label) {
+  return Object.freeze({
+    populationAction: Object.freeze({ kind, value }),
+    valueOf() { return Number(value) || 0; },
+    toString() { return label; },
+  });
+}
+
+function activePopulationSnapshot() {
+  return getSimulationPopulationTestSnapshot(getCurrentWorldScene()?.sessionState?.gameplay);
+}
+
+function isRussian() {
+  return getCurrentWorldScene()?.localization?.getLanguage?.() === "ru";
+}
+
+function populationAliveLabel() {
+  const snapshot = activePopulationSnapshot();
+  if (!snapshot) return isRussian() ? "Живые: нет данных" : "Living: unavailable";
+  return isRussian() ? `Живые: ${snapshot.aliveCount}` : `Living: ${snapshot.aliveCount}`;
+}
+
+function populationDeadLabel() {
+  const snapshot = activePopulationSnapshot();
+  if (!snapshot) return isRussian() ? "Умершие: нет данных" : "Dead: unavailable";
+  return isRussian() ? `Умершие в истории: ${snapshot.deadCount}` : `Dead in history: ${snapshot.deadCount}`;
+}
+
+function populationRunDaysLabel() {
+  const snapshot = activePopulationSnapshot();
+  if (!snapshot) return "-";
+  const run = snapshot.lastRun;
+  if (run.stress) return isRussian()
+    ? `Песочница: день ${snapshot.elapsedDays}; снижено до 240`
+    : `Sandbox day ${snapshot.elapsedDays}; reduced to 240`;
+  if (!run.days) return isRussian()
+    ? `Песочница: день ${snapshot.elapsedDays}; прогон не запускался`
+    : `Sandbox day ${snapshot.elapsedDays}; run not started`;
+  return isRussian()
+    ? `Песочница: день ${snapshot.elapsedDays}; прогон ${run.days} дней`
+    : `Sandbox day ${snapshot.elapsedDays}; run ${run.days} days`;
+}
+
+function populationRunBirthsLabel() {
+  const snapshot = activePopulationSnapshot();
+  const run = snapshot?.lastRun;
+  const count = run?.stress ? 0 : run?.births ?? 0;
+  return isRussian() ? `Родилось за прогон: ${count}` : `Born during run: ${count}`;
+}
+
+function populationRunDeathsLabel() {
+  const snapshot = activePopulationSnapshot();
+  const run = snapshot?.lastRun;
+  const count = run?.deaths ?? 0;
+  return isRussian() ? `Умерло за прогон: ${count}` : `Died during run: ${count}`;
+}
+
+function populationRunAccidentsLabel() {
+  const snapshot = activePopulationSnapshot();
+  const run = snapshot?.lastRun;
+  const count = run?.stress ? 0 : run?.accidentalDeaths ?? 0;
+  return isRussian() ? `Из них несчастные случаи: ${count}` : `Accidental deaths: ${count}`;
+}
+
+function populationStageLabel(stage) {
+  const snapshot = activePopulationSnapshot();
+  const count = snapshot?.stageCounts?.[stage] ?? 0;
+  const ruLabels = {
+    newborn: "Новорожденные",
+    infant: "Младенцы",
+    toddler: "Малыши",
+    child: "Дети",
+    teen: "Подростки",
+    youngAdult: "Молодые взрослые",
+    adult: "Взрослые",
+    elder: "Пожилые",
+  };
+  const enLabels = {
+    newborn: "Newborns",
+    infant: "Infants",
+    toddler: "Toddlers",
+    child: "Children",
+    teen: "Teens",
+    youngAdult: "Young adults",
+    adult: "Adults",
+    elder: "Elders",
+  };
+  const label = (isRussian() ? ruLabels : enLabels)[stage] ?? stage;
+  return `${label}: ${count}`;
+}
+
+function populationSandboxHint() {
+  return isRussian() ? "Песочница не меняет сохранение" : "Sandbox does not change the save";
+}
+
+function populationEventsTitle() {
+  return isRussian() ? "Последние события:" : "Recent events:";
+}
+
+function populationEventLabel(index) {
+  const snapshot = activePopulationSnapshot();
+  const event = snapshot?.events?.[index];
+  if (!event) return isRussian() ? "Нет события" : "No event";
+  const language = isRussian() ? "ru" : "en";
+  const name = shortName(localizePersonDisplayName(event.displayName, language));
+  if (event.type === "birth") return isRussian() ? `Рождение: ${name}` : `Birth: ${name}`;
+  if (event.type === "death" && event.cause === "accident") {
+    return isRussian() ? `Несчастный случай: ${name}` : `Accident: ${name}`;
+  }
+  if (event.type === "death") return isRussian() ? `Смерть: ${name}` : `Death: ${name}`;
+  return isRussian() ? `Тест: убрано ${event.count}` : `Test: removed ${event.count}`;
+}
+
+function shortName(value) {
+  const text = String(value ?? "-");
+  return text.length <= 18 ? text : `${text.slice(0, 15)}...`;
 }
