@@ -5,6 +5,7 @@ import {
 } from "../inventory/inventoryDomain.js";
 import {
   isLivingPopulationPerson,
+  lifeStageForPersonAge,
   PERSON_GAME_DAY_SECONDS,
   PERSON_LIFE_STAGES,
   PERSON_LIFE_STATUSES,
@@ -43,6 +44,7 @@ const POPULATION_TEST_ITEMS = Object.freeze([
   populationReadoutItem("population-run-days", () => populationRunDaysLabel()),
   populationReadoutItem("population-run-births", () => populationRunBirthsLabel()),
   populationReadoutItem("population-run-deaths", () => populationRunDeathsLabel()),
+  populationReadoutItem("population-run-accidents", () => populationRunAccidentsLabel()),
   ...POPULATION_STAGE_ORDER.map((stage) => populationReadoutItem(`population-stage-${stage}`, () => populationStageLabel(stage))),
   populationReadoutItem("population-sandbox-hint", () => populationSandboxHint()),
   Object.freeze({
@@ -165,10 +167,11 @@ export function getSimulationPopulationTestSnapshot(gameplay) {
   const sandbox = ensurePopulationSandbox(gameplay);
   if (!sandbox) return null;
   const alive = sandbox.population.filter(isLivingPopulationPerson);
-  const stageCounts = Object.fromEntries(POPULATION_STAGE_ORDER.map((stage) => [
-    stage,
-    alive.filter((person) => person.lifeStage === stage).length,
-  ]));
+  const stageCounts = Object.fromEntries(POPULATION_STAGE_ORDER.map((stage) => [stage, 0]));
+  for (const person of alive) {
+    const stage = lifeStageForPersonAge(person.id, person.ageYears);
+    stageCounts[stage] += 1;
+  }
   return {
     worldTimeSeconds: sandbox.worldTimeSeconds,
     elapsedDays: sandbox.elapsedDays,
@@ -202,7 +205,14 @@ function applyPopulationTestAction(gameplay, action) {
       .filter((person) => person.id.startsWith("person-seed-") || person.id.startsWith("person-born-"))
       .sort((a, b) => b.id.localeCompare(a.id));
     for (const person of candidates.slice(0, removeCount)) person.lifeStatus = PERSON_LIFE_STATUSES.dead;
-    sandbox.lastRun = { days: 0, births: 0, deaths: Math.min(removeCount, candidates.length), stress: true };
+    sandbox.lastRun = {
+      days: 0,
+      births: 0,
+      deaths: Math.min(removeCount, candidates.length),
+      naturalDeaths: 0,
+      accidentalDeaths: 0,
+      stress: true,
+    };
     sandbox.events = [{ type: "stress", count: Math.min(removeCount, candidates.length) }];
     return { status: "population-test-dropped", mutated: false, value: 0, populationTest: true };
   }
@@ -216,7 +226,14 @@ function applyPopulationTestAction(gameplay, action) {
   const summary = advancePopulationLifecycle(sandbox.population, targetTime);
   sandbox.worldTimeSeconds = targetTime;
   sandbox.elapsedDays += days;
-  sandbox.lastRun = { days, births: summary.births, deaths: summary.deaths, stress: false };
+  sandbox.lastRun = {
+    days,
+    births: summary.births,
+    deaths: summary.deaths,
+    naturalDeaths: summary.naturalDeaths,
+    accidentalDeaths: summary.accidentalDeaths,
+    stress: false,
+  };
 
   const births = sandbox.population.slice(beforeLength).map((person) => ({
     type: "birth",
@@ -228,9 +245,16 @@ function applyPopulationTestAction(gameplay, action) {
       .filter(Boolean)
       .slice(0, 2),
   }));
+  const accidentalIds = new Set(summary.accidentalDeathIds ?? []);
   const deaths = [...beforeLiving.entries()]
     .filter(([personId]) => sandbox.population.find((person) => person.id === personId)?.lifeStatus === PERSON_LIFE_STATUSES.dead)
-    .map(([personId, displayName]) => ({ type: "death", personId, displayName, parentNames: [] }));
+    .map(([personId, displayName]) => ({
+      type: "death",
+      cause: accidentalIds.has(personId) ? "accident" : "natural",
+      personId,
+      displayName,
+      parentNames: [],
+    }));
   sandbox.events = [...births, ...deaths].slice(-6).reverse();
   return {
     status: "population-test-advanced",
@@ -240,6 +264,8 @@ function applyPopulationTestAction(gameplay, action) {
     days,
     births: summary.births,
     deaths: summary.deaths,
+    naturalDeaths: summary.naturalDeaths,
+    accidentalDeaths: summary.accidentalDeaths,
     aliveCount: summary.aliveCount,
   };
 }
@@ -255,7 +281,7 @@ function ensurePopulationSandbox(gameplay) {
     population,
     worldTimeSeconds,
     elapsedDays: 0,
-    lastRun: { days: 0, births: 0, deaths: 0, stress: false },
+    lastRun: { days: 0, births: 0, deaths: 0, naturalDeaths: 0, accidentalDeaths: 0, stress: false },
     events: [],
   };
   POPULATION_TEST_SANDBOXES.set(gameplay, sandbox);
@@ -304,9 +330,15 @@ function populationRunDaysLabel() {
   const snapshot = activePopulationSnapshot();
   if (!snapshot) return "-";
   const run = snapshot.lastRun;
-  if (run.stress) return isRussian() ? "Последний тест: снижение до 240" : "Last test: reduced to 240";
-  if (!run.days) return isRussian() ? "Последний прогон: еще не запускался" : "Last run: not started yet";
-  return isRussian() ? `Последний прогон: ${run.days} игровых дней` : `Last run: ${run.days} game days`;
+  if (run.stress) return isRussian()
+    ? `Песочница: день ${snapshot.elapsedDays}; снижено до 240`
+    : `Sandbox day ${snapshot.elapsedDays}; reduced to 240`;
+  if (!run.days) return isRussian()
+    ? `Песочница: день ${snapshot.elapsedDays}; прогон не запускался`
+    : `Sandbox day ${snapshot.elapsedDays}; run not started`;
+  return isRussian()
+    ? `Песочница: день ${snapshot.elapsedDays}; прогон ${run.days} дней`
+    : `Sandbox day ${snapshot.elapsedDays}; run ${run.days} days`;
 }
 
 function populationRunBirthsLabel() {
@@ -321,6 +353,13 @@ function populationRunDeathsLabel() {
   const run = snapshot?.lastRun;
   const count = run?.deaths ?? 0;
   return isRussian() ? `Умерло за прогон: ${count}` : `Died during run: ${count}`;
+}
+
+function populationRunAccidentsLabel() {
+  const snapshot = activePopulationSnapshot();
+  const run = snapshot?.lastRun;
+  const count = run?.stress ? 0 : run?.accidentalDeaths ?? 0;
+  return isRussian() ? `Из них несчастные случаи: ${count}` : `Accidental deaths: ${count}`;
 }
 
 function populationStageLabel(stage) {
@@ -365,6 +404,9 @@ function populationEventLabel(index) {
   const language = isRussian() ? "ru" : "en";
   const name = shortName(localizePersonDisplayName(event.displayName, language));
   if (event.type === "birth") return isRussian() ? `Рождение: ${name}` : `Birth: ${name}`;
+  if (event.type === "death" && event.cause === "accident") {
+    return isRussian() ? `Несчастный случай: ${name}` : `Accident: ${name}`;
+  }
   if (event.type === "death") return isRussian() ? `Смерть: ${name}` : `Death: ${name}`;
   return isRussian() ? `Тест: убрано ${event.count}` : `Test: removed ${event.count}`;
 }
