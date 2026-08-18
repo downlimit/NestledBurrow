@@ -40,8 +40,11 @@ const POPULATION_ACTIONS = Object.freeze({
 const POPULATION_TEST_ITEMS = Object.freeze([
   populationReadoutItem("population-alive", () => populationAliveLabel()),
   populationReadoutItem("population-dead", () => populationDeadLabel()),
-  populationReadoutItem("population-last-run", () => populationLastRunLabel()),
+  populationReadoutItem("population-run-days", () => populationRunDaysLabel()),
+  populationReadoutItem("population-run-births", () => populationRunBirthsLabel()),
+  populationReadoutItem("population-run-deaths", () => populationRunDeathsLabel()),
   ...POPULATION_STAGE_ORDER.map((stage) => populationReadoutItem(`population-stage-${stage}`, () => populationStageLabel(stage))),
+  populationReadoutItem("population-sandbox-hint", () => populationSandboxHint()),
   Object.freeze({
     id: "coins",
     labelKey: "build:test.population.advance",
@@ -297,18 +300,27 @@ function populationDeadLabel() {
   return isRussian() ? `Умершие в истории: ${snapshot.deadCount}` : `Dead in history: ${snapshot.deadCount}`;
 }
 
-function populationLastRunLabel() {
+function populationRunDaysLabel() {
   const snapshot = activePopulationSnapshot();
   if (!snapshot) return "-";
   const run = snapshot.lastRun;
-  if (isRussian()) {
-    if (run.stress) return `Последний тест: убрано ${run.deaths} живых`;
-    if (!run.days) return "Последний прогон: еще не запускался";
-    return `За ${run.days} дн.: родилось ${run.births}, умерло ${run.deaths}`;
-  }
-  if (run.stress) return `Last test: removed ${run.deaths} living`;
-  if (!run.days) return "Last run: not started yet";
-  return `${run.days} days: ${run.births} births, ${run.deaths} deaths`;
+  if (run.stress) return isRussian() ? "Последний тест: снижение до 240" : "Last test: reduced to 240";
+  if (!run.days) return isRussian() ? "Последний прогон: еще не запускался" : "Last run: not started yet";
+  return isRussian() ? `Последний прогон: ${run.days} игровых дней` : `Last run: ${run.days} game days`;
+}
+
+function populationRunBirthsLabel() {
+  const snapshot = activePopulationSnapshot();
+  const run = snapshot?.lastRun;
+  const count = run?.stress ? 0 : run?.births ?? 0;
+  return isRussian() ? `Родилось за прогон: ${count}` : `Born during run: ${count}`;
+}
+
+function populationRunDeathsLabel() {
+  const snapshot = activePopulationSnapshot();
+  const run = snapshot?.lastRun;
+  const count = run?.deaths ?? 0;
+  return isRussian() ? `Умерло за прогон: ${count}` : `Died during run: ${count}`;
 }
 
 function populationStageLabel(stage) {
@@ -338,6 +350,10 @@ function populationStageLabel(stage) {
   return `${label}: ${count}`;
 }
 
+function populationSandboxHint() {
+  return isRussian() ? "Песочница не меняет сохранение" : "Sandbox does not change the save";
+}
+
 function populationEventsTitle() {
   return isRussian() ? "Последние события:" : "Recent events:";
 }
@@ -348,13 +364,7 @@ function populationEventLabel(index) {
   if (!event) return isRussian() ? "Нет события" : "No event";
   const language = isRussian() ? "ru" : "en";
   const name = shortName(localizePersonDisplayName(event.displayName, language));
-  if (event.type === "birth") {
-    const parents = event.parentNames
-      .map((parentName) => shortName(localizePersonDisplayName(parentName, language)))
-      .join(", ");
-    if (isRussian()) return `Рождение: ${name}${parents ? `; родители: ${parents}` : ""}`;
-    return `Birth: ${name}${parents ? `; parents: ${parents}` : ""}`;
-  }
+  if (event.type === "birth") return isRussian() ? `Рождение: ${name}` : `Birth: ${name}`;
   if (event.type === "death") return isRussian() ? `Смерть: ${name}` : `Death: ${name}`;
   return isRussian() ? `Тест: убрано ${event.count}` : `Test: removed ${event.count}`;
 }
