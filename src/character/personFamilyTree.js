@@ -1,5 +1,6 @@
 import { localizePersonDisplayName } from "./personNameLocalization.js";
-import { personGivenName, personSurname } from "./personFamilyNames.js";
+import { generatedBaseSurname, personGivenName } from "./personFamilyNames.js";
+import { localizePersonFullName, localizePersonSurname } from "./personFullNameLocalization.js";
 import { commonNameForKey, generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 import { PERSON_LIFE_STATUSES, PERSON_RELATIONSHIP_KINDS } from "./populationDomain.js";
 
@@ -59,8 +60,7 @@ function realNode(person, usedNames) {
   if (isLegacyResidentName(person.displayName)) person.displayName = generatedPopulationName(person.id);
   const canonicalGivenName = personGivenName(person) || generatedPopulationName(person.id);
   const displayName = localizePersonDisplayName(canonicalGivenName);
-  const localizedSurname = localizePersonDisplayName(personSurname(person));
-  const fullDisplayName = [displayName, localizedSurname].filter(Boolean).join(" ");
+  const fullDisplayName = localizePersonFullName(person);
   usedNames.add(displayName.toLowerCase());
   return {
     id: person.id,
@@ -81,10 +81,12 @@ function fictionalNode(key, usedNames) {
     displayName = localizePersonDisplayName(canonicalName);
   }
   usedNames.add(displayName.toLowerCase());
+  const id = `fictional-${stableHash(key).toString(16)}`;
+  const surname = localizePersonSurname(generatedBaseSurname(id));
   return {
-    id: `fictional-${stableHash(key).toString(16)}`,
+    id,
     displayName,
-    fullDisplayName: displayName,
+    fullDisplayName: [displayName, surname].filter(Boolean).join(" "),
     fictional: true,
     lifeStatus: PERSON_LIFE_STATUSES.dead,
   };
