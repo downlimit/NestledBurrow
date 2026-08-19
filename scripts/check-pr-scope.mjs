@@ -5,10 +5,6 @@ import {
   parseDeliveryMetadata,
   requiresBrowser,
 } from "./classify-pr-scope.mjs";
-import { createStage1Population, isLivingPopulationPerson, PERSON_GAME_DAY_SECONDS } from "../src/character/populationDomain.js";
-import { advancePopulationLifecycle, ensureMaturePopulation } from "../src/character/populationLifecycleDomain.js";
-import { livingSurnameDiversity } from "../src/character/populationLineageBalance.js";
-import { personSurname } from "../src/character/personFamilyNames.js";
 
 assert.equal(classifyPaths(["docs/readme.md", "NestledBurrow_local.bat"]), "micro");
 assert.equal(classifyPaths(["AGENTS.md", "scripts/classify-pr-scope.mjs"]), "ci-meta");
@@ -65,34 +61,3 @@ assert.equal(malformed.preview, false);
 assert.equal(malformed.autoMerge, false);
 
 console.log("PR scope classifier passed: browser coverage and explicit ChatGPT pre-acceptance preview routing are stable");
-
-const simPopulation = ensureMaturePopulation(createStage1Population(0), 0);
-const snapshots = [];
-let currentDay = 0;
-let cumulativeArrivals = 0;
-for (const targetDay of [0, 100, 300, 500, 1000]) {
-  if (targetDay > currentDay) {
-    const summary = advancePopulationLifecycle(simPopulation, targetDay * PERSON_GAME_DAY_SECONDS);
-    cumulativeArrivals += summary.arrivals ?? 0;
-    currentDay = targetDay;
-  }
-  const living = simPopulation.filter(isLivingPopulationPerson);
-  const stats = livingSurnameDiversity(simPopulation);
-  const counts = new Map();
-  for (const person of living) {
-    const surname = personSurname(person);
-    counts.set(surname, (counts.get(surname) ?? 0) + 1);
-  }
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  snapshots.push({
-    day: targetDay,
-    living: living.length,
-    uniqueSurnames: stats.surnameCount,
-    surnameRoots: stats.rootCount,
-    largestSurname: top[0]?.[0] ?? "",
-    largestSurnameCount: top[0]?.[1] ?? 0,
-    largestSurnameShare: Number((stats.largestSurnameShare || 0).toFixed(4)),
-    cumulativeArrivals,
-  });
-}
-console.log(`SURNAME_TARGET90_SIMULATION_JSON=${JSON.stringify(snapshots)}`);
