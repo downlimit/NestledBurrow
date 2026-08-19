@@ -13,9 +13,10 @@ export const BLOODLINE_ANCESTOR_DEPTH = 3;
 export const BLOODLINE_DESCENDANT_DEPTH = 3;
 export const BLOODLINE_CHILD_CAP_TWO_AT = 18;
 export const BLOODLINE_CHILD_CAP_ONE_AT = 30;
+export const SURNAME_DIVERSITY_INTERVENTION_START = 105;
 export const SURNAME_DIVERSITY_SOFT_TARGET = 90;
-export const SURNAME_DIVERSITY_HARD_FLOOR = 50;
-export const IMMIGRANT_EXTINCT_SURNAME_CHANCE = 0.8;
+export const SURNAME_DIVERSITY_HARD_FLOOR = 75;
+export const IMMIGRANT_EXTINCT_SURNAME_CHANCE = 0.9;
 export const IMMIGRANT_MAX_PER_DAY = 2;
 export const DOMINANT_SURNAME_SHARE_START = 0.07;
 export const DOMINANT_SURNAME_SHARE_FULL = 0.18;
@@ -75,12 +76,7 @@ export function plannedImmigrantCount(population, requestedAdditions, dayIndex) 
   const slots = Math.max(0, Math.floor(Number(requestedAdditions) || 0));
   if (slots <= 0) return 0;
   const stats = livingSurnameDiversity(population);
-  const diversityPressure = clamp(
-    (SURNAME_DIVERSITY_SOFT_TARGET - stats.rootCount)
-      / (SURNAME_DIVERSITY_SOFT_TARGET - SURNAME_DIVERSITY_HARD_FLOOR),
-    0,
-    1,
-  );
+  const diversityPressure = surnameDiversityPressure(stats.rootCount);
   const dominancePressure = clamp(
     (stats.largestSurnameShare - DOMINANT_SURNAME_SHARE_START)
       / (DOMINANT_SURNAME_SHARE_FULL - DOMINANT_SURNAME_SHARE_START),
@@ -89,7 +85,7 @@ export function plannedImmigrantCount(population, requestedAdditions, dayIndex) 
   );
   const pressure = Math.max(diversityPressure, dominancePressure);
   if (pressure <= 0) return 0;
-  const expected = 0.15 + pressure * 1.2;
+  const expected = 0.4 + pressure * 1.6;
   let count = Math.floor(expected);
   if (stableUnit(`immigration-count:${dayIndex}`) < expected - count) count += 1;
   return Math.min(slots, IMMIGRANT_MAX_PER_DAY, count);
@@ -127,6 +123,21 @@ export function extinctSurnameRoots(population) {
     .filter(([key]) => !living.has(key))
     .map(([, surname]) => surname)
     .sort((a, b) => a.localeCompare(b));
+}
+
+function surnameDiversityPressure(rootCount) {
+  const roots = Math.max(0, Number(rootCount) || 0);
+  if (roots >= SURNAME_DIVERSITY_INTERVENTION_START) return 0;
+  if (roots >= SURNAME_DIVERSITY_SOFT_TARGET) {
+    return 0.65 * (SURNAME_DIVERSITY_INTERVENTION_START - roots)
+      / (SURNAME_DIVERSITY_INTERVENTION_START - SURNAME_DIVERSITY_SOFT_TARGET);
+  }
+  return clamp(
+    0.65 + 0.35 * (SURNAME_DIVERSITY_SOFT_TARGET - roots)
+      / (SURNAME_DIVERSITY_SOFT_TARGET - SURNAME_DIVERSITY_HARD_FLOOR),
+    0.65,
+    1,
+  );
 }
 
 function immigrantSurname(population, id) {
