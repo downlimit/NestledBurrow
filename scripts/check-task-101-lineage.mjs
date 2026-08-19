@@ -80,7 +80,10 @@ const moderate = makeDenseFamily(BLOODLINE_CHILD_CAP_TWO_AT + 2);
 const moderateIndex = createBloodlinePressureIndex(moderate);
 assert(bloodlineChildCapForPair(moderate[0], moderate[1], moderateIndex) <= 2);
 
-const sparse = [makePerson("sparse-a", "Aster Alpha"), makePerson("sparse-b", "Bryn Beta")];
+const sparse = [
+  makePerson("sparse-a", "Aster Alpha", "alive", PERSON_SEXES.male),
+  makePerson("sparse-b", "Bryn Beta", "alive", PERSON_SEXES.female),
+];
 const sparseIndex = createBloodlinePressureIndex(sparse);
 assert.equal(bloodlineChildCapForPair(sparse[0], sparse[1], sparseIndex), 3);
 assert(bloodlineBirthWeightForPair(sparse[0], sparse[1], sparseIndex) > bloodlineBirthWeightForPair(first, second, index));
