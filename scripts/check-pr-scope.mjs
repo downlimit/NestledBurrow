@@ -111,6 +111,9 @@ console.log(`SEX_PAIRING_1000_DAY_JSON=${JSON.stringify({
   largestSurnameShare: Number(surnameStats.largestSurnameShare.toFixed(4)),
 })}`);
 
+await import("./check-task-101-lineage.mjs");
+await import("./check-task-101.mjs");
+
 function sexCounts(people) {
   const result = { male: 0, female: 0 };
   for (const person of people) result[personSex(person)] += 1;
