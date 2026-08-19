@@ -55,6 +55,7 @@ export function createPersonInspectionRuntime(scene, {
     hovered: false,
     scrollable: false,
     elapsedMs: 0,
+    scrollDurationMs: 0,
     cycleMs: 0,
   }));
   const cardHit = scene.add.zone(0, 0, CARD.width + CARD.familyWidth, CARD.expandedHeight)
@@ -202,11 +203,13 @@ export function createPersonInspectionRuntime(scene, {
       }
       if (!state.running) return;
       state.elapsedMs += deltaMs;
-      if (state.cycleMs <= 0 || state.elapsedMs < state.cycleMs) return;
-      if (hovered) state.elapsedMs %= state.cycleMs;
-      else {
+      if (!hovered && state.scrollDurationMs > 0 && state.elapsedMs >= state.scrollDurationMs) {
         state.running = false;
         state.elapsedMs = 0;
+        return;
+      }
+      if (hovered && state.cycleMs > 0 && state.elapsedMs >= state.cycleMs) {
+        state.elapsedMs %= state.cycleMs;
       }
     });
   }
@@ -218,6 +221,7 @@ export function createPersonInspectionRuntime(scene, {
       state.hovered = false;
       state.scrollable = false;
       state.elapsedMs = 0;
+      state.scrollDurationMs = 0;
       state.cycleMs = 0;
     }
   }
@@ -387,6 +391,7 @@ export function createPersonInspectionRuntime(scene, {
     if (!state.scrollable) {
       state.running = false;
       state.elapsedMs = 0;
+      state.scrollDurationMs = 0;
       state.cycleMs = 0;
       text.setPosition(rect.x + 3, rect.y + 4).setAlpha(alpha).setVisible(true);
       return;
@@ -395,12 +400,12 @@ export function createPersonInspectionRuntime(scene, {
     const loopPrefix = `${fullName}${FAMILY_MARQUEE_GAP}`;
     text.setText(loopPrefix);
     const cycleDistance = Math.max(1, text.width);
-    const scrollDurationMs = cycleDistance / FAMILY_MARQUEE_SPEED_PX_PER_SECOND * 1000;
-    state.cycleMs = FAMILY_MARQUEE_HOLD_MS + scrollDurationMs;
+    state.scrollDurationMs = cycleDistance / FAMILY_MARQUEE_SPEED_PX_PER_SECOND * 1000;
+    state.cycleMs = state.scrollDurationMs + FAMILY_MARQUEE_HOLD_MS;
     const phaseMs = state.running ? Math.min(state.elapsedMs, state.cycleMs) : 0;
-    const offset = phaseMs <= FAMILY_MARQUEE_HOLD_MS
-      ? 0
-      : Math.min(cycleDistance, (phaseMs - FAMILY_MARQUEE_HOLD_MS) * FAMILY_MARQUEE_SPEED_PX_PER_SECOND / 1000);
+    const offset = phaseMs < state.scrollDurationMs
+      ? Math.min(cycleDistance, phaseMs * FAMILY_MARQUEE_SPEED_PX_PER_SECOND / 1000)
+      : 0;
     const visibleText = familyMarqueeWindow(`${loopPrefix}${fullName}`, offset, availableWidth);
     text.setText(visibleText)
       .setPosition(rect.x + 3, rect.y + 4)
