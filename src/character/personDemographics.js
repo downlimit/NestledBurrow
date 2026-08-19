@@ -1,4 +1,3 @@
-import { personGivenName } from "./personFamilyNames.js";
 import { PERSON_LIFE_STAGES } from "./populationDomain.js";
 
 export const PERSON_SEXES = Object.freeze({ male: "male", female: "female" });
@@ -60,17 +59,45 @@ const EN_STAGE_LABELS = Object.freeze({
   [PERSON_LIFE_STAGES.elder]: "Elder",
 });
 
-export function personSex(person) {
-  if (person?.sex === PERSON_SEXES.male || person?.sex === PERSON_SEXES.female) return person.sex;
-  const explicit = STAGE1_SEX_BY_ID[String(person?.id ?? "")];
+export function assignedPersonSex(personId) {
+  const id = String(personId ?? "").trim();
+  const explicit = STAGE1_SEX_BY_ID[id];
   if (explicit) return explicit;
-  const name = personGivenName(person).toLowerCase();
+  return stableUnit(`person-sex:${id || "generated-person"}`) < 0.5
+    ? PERSON_SEXES.female
+    : PERSON_SEXES.male;
+}
+
+export function givenNameSex(value) {
+  const name = givenName(value).toLowerCase();
+  if (!name) return null;
   if (MALE_NAME_EXCEPTIONS.has(name)) return PERSON_SEXES.male;
   if (FEMALE_NAME_EXCEPTIONS.has(name)) return PERSON_SEXES.female;
   if (name.endsWith("a") || name.endsWith("ia") || name.endsWith("ina") || name.endsWith("ella")) {
     return PERSON_SEXES.female;
   }
-  return stableUnit(`person-sex:${person?.id ?? name}`) < 0.18 ? PERSON_SEXES.female : PERSON_SEXES.male;
+  return PERSON_SEXES.male;
+}
+
+export function personSex(person) {
+  if (person?.sex === PERSON_SEXES.male || person?.sex === PERSON_SEXES.female) return person.sex;
+  const id = String(person?.id ?? "").trim();
+  const explicit = STAGE1_SEX_BY_ID[id];
+  if (explicit) return explicit;
+  if (/^person-(?:seed-\d{3}|born-\d+-\d+-\d+)$/u.test(id)) return assignedPersonSex(id);
+  return givenNameSex(person?.displayName) ?? assignedPersonSex(id || givenName(person?.displayName));
+}
+
+export function oppositePersonSex(sex) {
+  if (sex === PERSON_SEXES.male) return PERSON_SEXES.female;
+  if (sex === PERSON_SEXES.female) return PERSON_SEXES.male;
+  return null;
+}
+
+export function areOppositePersonSexes(first, second) {
+  const firstSex = personSex(first);
+  const secondSex = personSex(second);
+  return Boolean(firstSex && secondSex && firstSex !== secondSex);
 }
 
 export function localizedPersonLifeStageLabel(person, language = "en") {
@@ -81,6 +108,11 @@ export function localizedPersonLifeStageLabel(person, language = "en") {
     return labels?.[personSex(person)] ?? "";
   }
   return EN_STAGE_LABELS[stage] ?? "";
+}
+
+function givenName(value) {
+  const displayName = typeof value === "object" ? value?.displayName : value;
+  return String(displayName ?? "").trim().split(/\s+/u)[0] ?? "";
 }
 
 function stableUnit(key) {
