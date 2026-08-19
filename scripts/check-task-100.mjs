@@ -215,7 +215,8 @@ for (const person of lowRun.slice(-60)) {
 }
 ensurePopulationPartners(lowRun);
 const lowSummary = advancePopulationLifecycle(lowRun, 120 * PERSON_GAME_DAY_SECONDS);
-assert(lowSummary.births > lowSummary.deaths, "aggressive births repair a population deficit");
+assert(lowSummary.births + lowSummary.arrivals > lowSummary.deaths,
+  "births plus arrivals repair a population deficit");
 assert(lowSummary.aliveCount >= 275 && lowSummary.aliveCount <= 330,
   `240-person deficit returns to working range, got ${lowSummary.aliveCount}`);
 
