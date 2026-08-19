@@ -102,7 +102,6 @@ function canonicalPopulation() {
 }
 
 function remapPopulationIds(population, variant) {
-  if (!variant) return population;
   const mapping = new Map(population.map((person) => [person.id, `${person.id}-v${variant}`]));
   for (const person of population) {
     person.id = mapping.get(person.id);
@@ -115,17 +114,13 @@ function remapPopulationIds(population, variant) {
   return population;
 }
 
-function runSurnameSimulation(variant = 0) {
+function runSurnameSimulation(variant) {
   const population = remapPopulationIds(canonicalPopulation(), variant);
-  const checkpoints = [0, 100, 300, 500, 1000];
-  const snapshots = [surnameSnapshot(population, 0)];
-  for (const day of checkpoints.slice(1)) {
-    const target = day * PERSON_GAME_DAY_SECONDS;
-    advancePopulationLifecycle(population, target);
-    snapshots.push(surnameSnapshot(population, day));
-  }
-  return { variant, snapshots };
+  const start = surnameSnapshot(population, 0);
+  advancePopulationLifecycle(population, 1000 * PERSON_GAME_DAY_SECONDS);
+  return { variant, snapshots: [start, surnameSnapshot(population, 1000)] };
 }
 
-const surnameRuns = [runSurnameSimulation(0)];
-console.log("SURNAME_SIMULATION_JSON=" + JSON.stringify(surnameRuns));
+for (const variant of [1, 2]) {
+  console.log("SURNAME_STRESS_JSON=" + JSON.stringify(runSurnameSimulation(variant)));
+}
