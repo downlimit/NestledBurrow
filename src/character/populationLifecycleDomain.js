@@ -22,6 +22,13 @@ import {
   visualSurnamePairPenaltyDays,
   withPersonSurname,
 } from "./personFamilyNames.js";
+import {
+  bloodlineBirthWeightForPair,
+  bloodlineChildCapForPair,
+  createBloodlinePressureIndex,
+  createPopulationImmigrant,
+  plannedImmigrantCount,
+} from "./populationLineageBalance.js";
 import { generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 
 export const MATURE_POPULATION_TARGET = 300;
@@ -110,18 +117,22 @@ export function advancePopulationLifecycle(population, targetWorldTimeSeconds, {
   let boundary = (Math.floor(cursor / PERSON_GAME_DAY_SECONDS) + 1) * PERSON_GAME_DAY_SECONDS;
   let daysProcessed = 0;
   let births = 0;
+  let arrivals = 0;
   let deaths = 0;
   let naturalDeaths = 0;
   let accidentalDeaths = 0;
+  const arrivalIds = [];
   const naturalDeathIds = [];
   const accidentalDeathIds = [];
   while (boundary <= targetTime) {
     const result = processPopulationDay(population, boundary, protectedIds);
     daysProcessed += 1;
     births += result.births;
+    arrivals += result.arrivals;
     deaths += result.deaths;
     naturalDeaths += result.naturalDeaths;
     accidentalDeaths += result.accidentalDeaths;
+    arrivalIds.push(...result.arrivalIds);
     naturalDeathIds.push(...result.naturalDeathIds);
     accidentalDeathIds.push(...result.accidentalDeathIds);
     boundary += PERSON_GAME_DAY_SECONDS;
@@ -129,9 +140,11 @@ export function advancePopulationLifecycle(population, targetWorldTimeSeconds, {
   return {
     daysProcessed,
     births,
+    arrivals,
     deaths,
     naturalDeaths,
     accidentalDeaths,
+    arrivalIds,
     naturalDeathIds,
     accidentalDeathIds,
     aliveCount: livingCount(population),
@@ -213,7 +226,14 @@ function processPopulationDay(population, boundaryTime, protectedIds) {
 
   ensurePopulationPartners(population);
   const aliveAfterDeaths = livingCount(population);
-  const requestedBirths = wholeBirthTarget(aliveAfterDeaths, dayIndex);
+  const requestedAdditions = wholeBirthTarget(aliveAfterDeaths, dayIndex);
+  const plannedArrivals = plannedImmigrantCount(population, requestedAdditions, dayIndex);
+  const arrivalIds = [];
+  for (let slot = 0; slot < plannedArrivals; slot += 1) {
+    const immigrant = createPopulationImmigrant(population, boundaryTime, slot);
+    if (immigrant) arrivalIds.push(immigrant.id);
+  }
+  const requestedBirths = Math.max(0, requestedAdditions - arrivalIds.length);
   const pairs = eligibleBirthPairs(population, boundaryTime);
   let births = 0;
   for (let slot = 0; slot < requestedBirths && slot < pairs.length; slot += 1) {
@@ -222,6 +242,8 @@ function processPopulationDay(population, boundaryTime, protectedIds) {
   }
   return {
     births,
+    arrivals: arrivalIds.length,
+    arrivalIds,
     deaths: naturalDeaths + accidentalDeaths,
     naturalDeaths,
     accidentalDeaths,
@@ -252,6 +274,7 @@ function mixedDayUnit(dayIndex) {
 
 function eligibleBirthPairs(population, boundaryTime) {
   const byId = new Map(population.map((person) => [person.id, person]));
+  const bloodlineIndex = createBloodlinePressureIndex(population);
   const seen = new Set();
   const pairs = [];
   for (const first of population) {
@@ -263,20 +286,27 @@ function eligibleBirthPairs(population, boundaryTime) {
     if (seen.has(key)) continue;
     seen.add(key);
     const children = sharedChildren(first, second, byId);
-    if (children.length >= familyChildTarget(first.id, second.id)) continue;
+    const childTarget = Math.min(
+      familyChildTarget(first.id, second.id),
+      bloodlineChildCapForPair(first, second, bloodlineIndex),
+    );
+    if (children.length >= childTarget) continue;
     if (children.some((child) => lifeDaysForAgeYears(child.ageYears) < MIN_BIRTH_SPACING_DAYS)) continue;
     pairs.push([first, second]);
   }
   const dayIndex = Math.floor(boundaryTime / PERSON_GAME_DAY_SECONDS);
-  return pairs.sort((left, right) => {
-    const leftKey = pairKey(left[0].id, left[1].id);
-    const rightKey = pairKey(right[0].id, right[1].id);
-    const leftPriority = stableUnit(`birth-order:${dayIndex}:${leftKey}`)
-      / familyLineBirthWeight(left[0], left[1], population);
-    const rightPriority = stableUnit(`birth-order:${dayIndex}:${rightKey}`)
-      / familyLineBirthWeight(right[0], right[1], population);
+  const weightedPairs = pairs.map((pair) => ({
+    pair,
+    weight: familyLineBirthWeight(pair[0], pair[1], population)
+      * bloodlineBirthWeightForPair(pair[0], pair[1], bloodlineIndex),
+  }));
+  return weightedPairs.sort((left, right) => {
+    const leftKey = pairKey(left.pair[0].id, left.pair[1].id);
+    const rightKey = pairKey(right.pair[0].id, right.pair[1].id);
+    const leftPriority = stableUnit(`birth-order:${dayIndex}:${leftKey}`) / left.weight;
+    const rightPriority = stableUnit(`birth-order:${dayIndex}:${rightKey}`) / right.weight;
     return leftPriority - rightPriority || leftKey.localeCompare(rightKey);
-  });
+  }).map(({ pair }) => pair);
 }
 
 function createBirth(population, [first, second], boundaryTime, slot) {
@@ -479,9 +509,11 @@ function emptySummary() {
   return {
     daysProcessed: 0,
     births: 0,
+    arrivals: 0,
     deaths: 0,
     naturalDeaths: 0,
     accidentalDeaths: 0,
+    arrivalIds: [],
     naturalDeathIds: [],
     accidentalDeathIds: [],
     aliveCount: 0,
