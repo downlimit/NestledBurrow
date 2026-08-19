@@ -256,16 +256,19 @@ function applyPopulationTestAction(gameplay, action) {
     stress: false,
   };
 
-  const births = sandbox.population.slice(beforeLength).map((person) => ({
-    type: "birth",
-    personId: person.id,
-    displayName: person.displayName,
-    parentNames: person.relationships
-      .filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)
-      .map(({ personId }) => sandbox.population.find((candidate) => candidate.id === personId)?.displayName)
-      .filter(Boolean)
-      .slice(0, 2),
-  })).reverse();
+  const arrivalIds = new Set(summary.arrivalIds ?? []);
+  const births = sandbox.population.slice(beforeLength)
+    .filter((person) => !arrivalIds.has(person.id))
+    .map((person) => ({
+      type: "birth",
+      personId: person.id,
+      displayName: person.displayName,
+      parentNames: person.relationships
+        .filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)
+        .map(({ personId }) => sandbox.population.find((candidate) => candidate.id === personId)?.displayName)
+        .filter(Boolean)
+        .slice(0, 2),
+    })).reverse();
   const naturalDeaths = populationDeathEvents(summary.naturalDeathIds, "natural", sandbox.population, beforeLiving);
   const accidents = populationDeathEvents(summary.accidentalDeathIds, "accident", sandbox.population, beforeLiving);
   const recentEvents = diversePopulationEvents(births, naturalDeaths, accidents);
