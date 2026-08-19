@@ -1,3 +1,4 @@
+import { givenNameSex, oppositePersonSex, personSex, PERSON_SEXES } from "./personDemographics.js";
 import { localizePersonDisplayName } from "./personNameLocalization.js";
 import { generatedBaseSurname, personGivenName, personSurname } from "./personFamilyNames.js";
 import { localizePersonFullName, localizePersonSurname } from "./personFullNameLocalization.js";
@@ -25,6 +26,7 @@ export function createDisplayFamilyTree(personSource, personId) {
   });
 
   const partner = relationshipPeople(getPerson, focusPerson, PERSON_RELATIONSHIP_KINDS.partner)
+    .filter((person) => personSex(person) !== personSex(focusPerson))
     .map((person) => realNode(person, usedNames))[0] ?? null;
   const children = relationshipPeople(getPerson, focusPerson, PERSON_RELATIONSHIP_KINDS.parent)
     .map((person) => realNode(person, usedNames))
@@ -34,9 +36,12 @@ export function createDisplayFamilyTree(personSource, personId) {
 }
 
 function parentNodes(getPerson, person, fallbackKey, usedNames) {
-  const actualPeople = person
+  const rawActualPeople = person
     ? relationshipPeople(getPerson, person, PERSON_RELATIONSHIP_KINDS.child).slice(0, 2)
     : [];
+  const actualPeople = rawActualPeople.length >= 2 && personSex(rawActualPeople[0]) === personSex(rawActualPeople[1])
+    ? [rawActualPeople[0]]
+    : rawActualPeople;
   const actual = actualPeople.map((relative) => realNode(relative, usedNames));
   if (actual.length >= 2) return actual;
 
@@ -44,7 +49,12 @@ function parentNodes(getPerson, person, fallbackKey, usedNames) {
   if (actual.length === 0) return fictionalParentPair(fallbackKey, childSurname, usedNames);
 
   const actualSurname = personSurname(actualPeople[0]) || childSurname;
-  actual.push(fictionalSpouseNode(`${fallbackKey}:missing-spouse`, actualSurname, usedNames));
+  actual.push(fictionalSpouseNode(
+    `${fallbackKey}:missing-spouse`,
+    actualSurname,
+    usedNames,
+    personSex(actualPeople[0]),
+  ));
   return actual;
 }
 
@@ -54,12 +64,10 @@ function fictionalParentPair(key, childSurname, usedNames) {
   const firstAncestry = childParts[0] ?? normalizedChildSurname;
   const secondAncestry = childParts[1] ?? distinctGeneratedSurname(`${key}:second-line`, [firstAncestry]);
 
-  // A child with a double surname most plausibly retained the parents' combined surname;
-  // grandparents still expose the two separate birth lines instead of growing A-B-C chains.
   if (childParts.length >= 2) {
     return orderedFictionalPair(key, usedNames, [
-      { surname: normalizedChildSurname, ancestrySurname: firstAncestry },
-      { surname: normalizedChildSurname, ancestrySurname: secondAncestry },
+      { surname: normalizedChildSurname, ancestrySurname: firstAncestry, sex: PERSON_SEXES.male },
+      { surname: normalizedChildSurname, ancestrySurname: secondAncestry, sex: PERSON_SEXES.female },
     ]);
   }
 
@@ -67,26 +75,24 @@ function fictionalParentPair(key, childSurname, usedNames) {
   let surnames;
   if (unit < 0.85) {
     surnames = [
-      { surname: normalizedChildSurname, ancestrySurname: normalizedChildSurname },
-      { surname: normalizedChildSurname, ancestrySurname: secondAncestry },
+      { surname: normalizedChildSurname, ancestrySurname: normalizedChildSurname, sex: PERSON_SEXES.male },
+      { surname: normalizedChildSurname, ancestrySurname: secondAncestry, sex: PERSON_SEXES.female },
     ];
   } else if (unit < 0.90) {
     surnames = [
-      { surname: normalizedChildSurname, ancestrySurname: normalizedChildSurname },
-      { surname: secondAncestry, ancestrySurname: secondAncestry },
+      { surname: normalizedChildSurname, ancestrySurname: normalizedChildSurname, sex: PERSON_SEXES.male },
+      { surname: secondAncestry, ancestrySurname: secondAncestry, sex: PERSON_SEXES.female },
     ];
   } else if (unit < 0.95) {
-    // Reverse surname-taking is visually the same shared-family-name result; the hidden
-    // ancestry line preserves which grandparent branch the spouse came from.
     surnames = [
-      { surname: normalizedChildSurname, ancestrySurname: secondAncestry },
-      { surname: normalizedChildSurname, ancestrySurname: normalizedChildSurname },
+      { surname: normalizedChildSurname, ancestrySurname: secondAncestry, sex: PERSON_SEXES.male },
+      { surname: normalizedChildSurname, ancestrySurname: normalizedChildSurname, sex: PERSON_SEXES.female },
     ];
   } else {
     const combined = combineSurnameComponents(normalizedChildSurname, secondAncestry);
     surnames = [
-      { surname: combined, ancestrySurname: normalizedChildSurname },
-      { surname: combined, ancestrySurname: secondAncestry },
+      { surname: combined, ancestrySurname: normalizedChildSurname, sex: PERSON_SEXES.male },
+      { surname: combined, ancestrySurname: secondAncestry, sex: PERSON_SEXES.female },
     ];
   }
   return orderedFictionalPair(key, usedNames, surnames);
@@ -102,13 +108,16 @@ function orderedFictionalPair(key, usedNames, definitions) {
   ));
 }
 
-function fictionalSpouseNode(key, familySurname, usedNames) {
+function fictionalSpouseNode(key, familySurname, usedNames, actualSex) {
   const normalizedFamilySurname = canonicalSurname(familySurname) || generatedBaseSurname(`fictional-family:${key}`);
   const ownLine = distinctGeneratedSurname(`${key}:own-line`, normalizedFamilySurname.split("-"));
   const keepsOwn = stableUnit(`fictional-spouse-keeps:${key}`) < 0.05;
+  const sex = oppositePersonSex(actualSex)
+    ?? (stableUnit(`fictional-spouse-sex:${key}`) < 0.5 ? PERSON_SEXES.female : PERSON_SEXES.male);
   return fictionalNode(key, usedNames, {
     surname: keepsOwn ? ownLine : normalizedFamilySurname,
     ancestrySurname: ownLine,
+    sex,
   });
 }
 
@@ -132,18 +141,22 @@ function realNode(person, usedNames) {
     fullDisplayName,
     canonicalSurname: personSurname(person),
     ancestrySurname: personSurname(person),
+    sex: personSex(person),
     fictional: false,
     lifeStatus: person.lifeStatus ?? PERSON_LIFE_STATUSES.alive,
   };
 }
 
-function fictionalNode(key, usedNames, { surname = null, ancestrySurname = null } = {}) {
+function fictionalNode(key, usedNames, { surname = null, ancestrySurname = null, sex = null } = {}) {
+  const safeSex = sex === PERSON_SEXES.female || sex === PERSON_SEXES.male
+    ? sex
+    : (stableUnit(`fictional-sex:${key}`) < 0.5 ? PERSON_SEXES.female : PERSON_SEXES.male);
   let attempt = 0;
-  let canonicalName = commonNameForKey(`ancestor:${key}`, []);
+  let canonicalName = commonNameForSexKey(`ancestor:${key}`, safeSex, attempt);
   let displayName = localizePersonDisplayName(canonicalName);
   while (usedNames.has(displayName.toLowerCase()) && attempt < 1000) {
     attempt += 1;
-    canonicalName = commonNameForKey(`ancestor:${key}:${attempt}`, []);
+    canonicalName = commonNameForSexKey(`ancestor:${key}`, safeSex, attempt);
     displayName = localizePersonDisplayName(canonicalName);
   }
   usedNames.add(displayName.toLowerCase());
@@ -157,9 +170,18 @@ function fictionalNode(key, usedNames, { surname = null, ancestrySurname = null 
     fullDisplayName: [displayName, localizedSurname].filter(Boolean).join(" "),
     canonicalSurname: canonicalDisplaySurname,
     ancestrySurname: canonicalAncestrySurname,
+    sex: safeSex,
     fictional: true,
     lifeStatus: PERSON_LIFE_STATUSES.dead,
   };
+}
+
+function commonNameForSexKey(key, sex, attemptOffset = 0) {
+  for (let offset = 0; offset < 1000; offset += 1) {
+    const candidate = commonNameForKey(`${key}:${attemptOffset + offset}`, []);
+    if (givenNameSex(candidate) === sex) return candidate;
+  }
+  return commonNameForKey(`${key}:fallback:${sex}`, []);
 }
 
 function distinctGeneratedSurname(key, avoided = []) {
