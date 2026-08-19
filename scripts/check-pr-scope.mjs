@@ -119,16 +119,13 @@ function runSurnameSimulation(variant = 0) {
   const population = remapPopulationIds(canonicalPopulation(), variant);
   const checkpoints = [0, 100, 300, 500, 1000];
   const snapshots = [surnameSnapshot(population, 0)];
-  let previousDay = 0;
   for (const day of checkpoints.slice(1)) {
     const target = day * PERSON_GAME_DAY_SECONDS;
     advancePopulationLifecycle(population, target);
     snapshots.push(surnameSnapshot(population, day));
-    previousDay = day;
   }
   return { variant, snapshots };
 }
 
-const surnameRuns = [];
-for (let variant = 0; variant <= 5; variant += 1) surnameRuns.push(runSurnameSimulation(variant));
+const surnameRuns = [runSurnameSimulation(0)];
 console.log("SURNAME_SIMULATION_JSON=" + JSON.stringify(surnameRuns));
