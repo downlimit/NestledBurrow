@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   BLOODLINE_CHILD_CAP_ONE_AT,
   BLOODLINE_CHILD_CAP_TWO_AT,
@@ -77,6 +78,11 @@ assert.equal(renewalPopulation.length, before + 1);
 assert(newcomer.ageYears >= 18 && newcomer.ageYears <= 50);
 assert.deepEqual(newcomer.relationships, [], "newcomers do not invent persistent parents or grandparents");
 assert(personSurname(newcomer), "newcomers always arrive with a stable surname");
+
+const populationTestSource = readFileSync(new URL("../src/build/simulationTestPalette.js", import.meta.url), "utf8");
+assert(populationTestSource.includes("const arrivalIds = new Set(summary.arrivalIds ?? []);"));
+assert(populationTestSource.includes(".filter((person) => !arrivalIds.has(person.id))"),
+  "adult arrivals must not be mislabeled as births in the recent-event feed");
 
 console.log("Task #101 long-run bloodline pressure and surname renewal contract OK");
 
