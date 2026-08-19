@@ -18,7 +18,7 @@ export const NPC_CARD_EXPAND_MS = 220;
 export const NPC_FAMILY_EXPAND_MS = 280;
 export const NPC_CARD_LEAVE_GRACE_MS = 660;
 
-const CARD = Object.freeze({ width: 84, familyWidth: 196, compactHeight: 14, expandedHeight: 82, margin: 4 });
+const CARD = Object.freeze({ width: 84, familyWidth: 196, compactHeight: 14, expandedHeight: 92, margin: 4 });
 const NEEDS_PANEL_OFFSET = Object.freeze({ x: Math.round((CARD.width - NEED_PANEL_SIZE.width) / 2), y: CARD.compactHeight });
 const ACTOR_HIT = Object.freeze({ halfWidth: 10, top: -28, bottom: 3 });
 const ACTOR_VISUAL_WORLD_HEIGHT = 16;
@@ -334,21 +334,21 @@ export function createPersonInspectionRuntime(scene, {
     const title = scene.localization?.t?.("common:familyTree") ?? "FAMILY";
     familyTitleText.setText(title);
     familyTitleText
-      .setPosition(panelX + Math.round((CARD.familyWidth - familyTitleText.width) / 2), rect.y + 3)
+      .setPosition(panelX + Math.round((CARD.familyWidth - familyTitleText.width) / 2), rect.y + 14)
       .setAlpha(alpha)
       .setVisible(true);
 
     const grandparentRects = Array.from({ length: 4 }, (_value, index) => ({
       x: panelX + 5 + index * 46,
-      y: rect.y + 13,
+      y: rect.y + 24,
       width: 41,
       height: 13,
     }));
     const parentRects = [
-      { x: panelX + 18, y: rect.y + 39, width: 66, height: 14 },
-      { x: panelX + 112, y: rect.y + 39, width: 66, height: 14 },
+      { x: panelX + 18, y: rect.y + 50, width: 66, height: 14 },
+      { x: panelX + 112, y: rect.y + 50, width: 66, height: 14 },
     ];
-    const focusRect = { x: panelX + 61, y: rect.y + 64, width: 74, height: 14 };
+    const focusRect = { x: panelX + 61, y: rect.y + 75, width: 74, height: 14 };
 
     graphics.lineStyle(1, 0x7e725f, 0.6 * alpha);
     drawPairConnector(graphics, grandparentRects[0], grandparentRects[1], parentRects[0]);
