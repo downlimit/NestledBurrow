@@ -85,7 +85,7 @@ export function plannedImmigrantCount(population, requestedAdditions, dayIndex) 
   );
   const pressure = Math.max(diversityPressure, dominancePressure);
   if (pressure <= 0) return 0;
-  const expected = 0.4 + pressure * 1.6;
+  const expected = 0.1 + pressure * 1.7;
   let count = Math.floor(expected);
   if (stableUnit(`immigration-count:${dayIndex}`) < expected - count) count += 1;
   return Math.min(slots, IMMIGRANT_MAX_PER_DAY, count);
