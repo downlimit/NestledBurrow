@@ -11,7 +11,7 @@ assert.equal(classifyPaths(["AGENTS.md", "scripts/classify-pr-scope.mjs"]), "ci-
 assert.equal(classifyPaths(["scripts/manage-task-preview.mjs"]), "ci-meta");
 assert.equal(classifyPaths(["src/main.js", "docs/runtime-note.md"]), "runtime");
 assert.equal(classifyPaths([".github/workflows/pr-check.yml"]), "strict");
-assert.equal(classifyPaths(["playwright.config.js"]), true);
+assert.equal(classifyPaths(["playwright.config.js"]), "strict");
 assert.equal(classifyPaths(["src/main.js", "package-lock.json"]), "strict");
 
 assert.equal(requiresBrowser([".github/workflows/pr-check.yml"]), true);
