@@ -6,7 +6,8 @@ import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js"
 import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 import { createDisplayFamilyTree } from "./personFamilyTree.js";
-import { personGivenName, personSurname } from "./personFamilyNames.js";
+import { personGivenName } from "./personFamilyNames.js";
+import { localizePersonFullName } from "./personFullNameLocalization.js";
 import { localizePersonDisplayName } from "./personNameLocalization.js";
 import { PERSON_LIFE_STATUSES } from "./populationDomain.js";
 
@@ -22,6 +23,9 @@ const ACTOR_HIT = Object.freeze({ halfWidth: 10, top: -28, bottom: 3 });
 const ACTOR_VISUAL_WORLD_HEIGHT = 16;
 const TOUCH_MOVE_CANCEL_PX = 7;
 const FAMILY_NODE_COUNT = 7;
+const FAMILY_MARQUEE_HOLD_MS = 1000;
+const FAMILY_MARQUEE_SPEED_PX_PER_SECOND = 14;
+const FAMILY_MARQUEE_GAP = "   ";
 
 export function createPersonInspectionRuntime(scene, {
   getActivePersonBindings = () => [],
@@ -43,6 +47,18 @@ export function createPersonInspectionRuntime(scene, {
     fontSize: "5px",
     color: "#f2eadc",
   }).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setVisible(false));
+  const familyNodeMaskShapes = Array.from({ length: FAMILY_NODE_COUNT }, () => (
+    scene.make.graphics({ x: 0, y: 0, add: false }).setScrollFactor(0)
+  ));
+  const familyNodeMasks = familyNodeMaskShapes.map((shape) => shape.createGeometryMask());
+  familyNodeTexts.forEach((text, index) => text.setMask(familyNodeMasks[index]));
+  const familyMarqueeStates = Array.from({ length: FAMILY_NODE_COUNT }, () => ({
+    running: false,
+    hovered: false,
+    scrollable: false,
+    elapsedMs: 0,
+    cycleMs: 0,
+  }));
   const cardHit = scene.add.zone(0, 0, CARD.width + CARD.familyWidth, CARD.expandedHeight)
     .setOrigin(0)
     .setDepth(HUD_DEPTH + 15)
@@ -62,6 +78,7 @@ export function createPersonInspectionRuntime(scene, {
   let cardRect = null;
   let needRows = [];
   let familyTree = null;
+  let familyNodeRects = [];
 
   cardHit.on("pointerdown", (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -131,6 +148,7 @@ export function createPersonInspectionRuntime(scene, {
     familyProgress = familyTarget
       ? Math.min(1, familyProgress + familyStep)
       : Math.max(0, familyProgress - familyStep);
+    updateFamilyMarqueeStates(delta);
     if (!personId && expandProgress === 0 && familyProgress === 0) hide();
     else render();
   }
@@ -173,6 +191,39 @@ export function createPersonInspectionRuntime(scene, {
     }
   }
 
+  function updateFamilyMarqueeStates(deltaMs) {
+    const pointer = !isCoarsePointer() && familyExpanded && familyProgress >= 0.95
+      ? pointerScreenPoint(scene.input.activePointer)
+      : null;
+    familyMarqueeStates.forEach((state, index) => {
+      const hovered = Boolean(pointer && state.scrollable && familyNodeRects[index] && pointInRect(pointer, familyNodeRects[index]));
+      state.hovered = hovered;
+      if (hovered && !state.running) {
+        state.running = true;
+        state.elapsedMs = 0;
+      }
+      if (!state.running) return;
+      state.elapsedMs += deltaMs;
+      if (state.cycleMs <= 0 || state.elapsedMs < state.cycleMs) return;
+      if (hovered) state.elapsedMs %= state.cycleMs;
+      else {
+        state.running = false;
+        state.elapsedMs = 0;
+      }
+    });
+  }
+
+  function resetFamilyMarquees() {
+    familyNodeRects = [];
+    for (const state of familyMarqueeStates) {
+      state.running = false;
+      state.hovered = false;
+      state.scrollable = false;
+      state.elapsedMs = 0;
+      state.cycleMs = 0;
+    }
+  }
+
   function selectPerson(nextPersonId, { pinExpanded = false } = {}) {
     if (!nextPersonId) {
       clearInspection();
@@ -186,6 +237,7 @@ export function createPersonInspectionRuntime(scene, {
     if (personId !== nextPersonId) {
       expandProgress = 0;
       familyProgress = 0;
+      resetFamilyMarquees();
     }
     personId = nextPersonId;
     pinned = pinExpanded;
@@ -206,6 +258,7 @@ export function createPersonInspectionRuntime(scene, {
     pinned = false;
     touchPress = null;
     familyTree = null;
+    resetFamilyMarquees();
     if (expandProgress === 0 && familyProgress === 0) hide();
   }
 
@@ -241,7 +294,7 @@ export function createPersonInspectionRuntime(scene, {
     graphics.clear().setVisible(true);
     graphics.fillStyle(0x171724, 0.96).fillRoundedRect(cardRect.x, cardRect.y, cardRect.width, cardRect.height, 2);
     graphics.lineStyle(1, 0xb39a6a, 0.95).strokeRoundedRect(cardRect.x + 0.5, cardRect.y + 0.5, cardRect.width - 1, cardRect.height - 1, 2);
-    const localizedName = localizedFullPersonName(person, scene.localization?.getLanguage?.());
+    const localizedName = localizePersonFullName(person, scene.localization?.getLanguage?.());
     setManagedTextStyle(nameText, scene, { fontSize: "7px", color: "#fff2c1" })
       .setText(localizedName)
       .setPosition(cardRect.x + 5, cardRect.y + 3)
@@ -303,21 +356,56 @@ export function createPersonInspectionRuntime(scene, {
 
     const nodes = [...tree.grandparents, ...tree.parents, tree.focus];
     const rects = [...grandparentRects, ...parentRects, focusRect];
-    nodes.forEach((node, index) => drawFamilyNode(node, rects[index], familyNodeTexts[index], alpha, index === nodes.length - 1));
+    familyNodeRects = rects.map((nodeRect) => ({ ...nodeRect }));
+    nodes.forEach((node, index) => drawFamilyNode(
+      node,
+      rects[index],
+      familyNodeTexts[index],
+      familyNodeMaskShapes[index],
+      familyMarqueeStates[index],
+      alpha,
+      index === nodes.length - 1,
+    ));
   }
 
-  function drawFamilyNode(node, rect, text, alpha, focus = false) {
+  function drawFamilyNode(node, rect, text, maskShape, marqueeState, alpha, focus = false) {
     const fictional = Boolean(node?.fictional);
     const fillAlpha = (fictional ? 0.36 : focus ? 0.9 : 0.66) * alpha;
     graphics.fillStyle(focus ? 0x3a3328 : 0x242433, fillAlpha).fillRoundedRect(rect.x, rect.y, rect.width, rect.height, 2);
     graphics.lineStyle(1, focus ? 0xb39a6a : 0x766f66, (fictional ? 0.45 : 0.8) * alpha)
       .strokeRoundedRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1, 2);
+    maskShape.clear().fillStyle(0xffffff, 1).fillRect(rect.x + 2, rect.y + 2, Math.max(1, rect.width - 4), Math.max(1, rect.height - 4));
     const color = fictional ? "#9e978c" : node?.lifeStatus === PERSON_LIFE_STATUSES.dead ? "#c9b7a0" : "#f2eadc";
-    setManagedTextStyle(text, scene, { fontSize: "5px", color })
-      .setText(compactFamilyName(node?.fullDisplayName ?? node?.displayName))
-      .setPosition(rect.x + 3, rect.y + 4)
-      .setAlpha(alpha)
-      .setVisible(true);
+    setManagedTextStyle(text, scene, { fontSize: "5px", color });
+    setFamilyNodeMarquee(text, node?.fullDisplayName ?? node?.displayName, rect, marqueeState, alpha);
+  }
+
+  function setFamilyNodeMarquee(text, value, rect, state, alpha) {
+    const fullName = String(value ?? "-").trim() || "-";
+    const availableWidth = Math.max(1, rect.width - 6);
+    text.setText(fullName);
+    state.scrollable = text.width > availableWidth;
+    if (!state.scrollable) {
+      state.running = false;
+      state.elapsedMs = 0;
+      state.cycleMs = 0;
+      text.setPosition(rect.x + 3, rect.y + 4).setAlpha(alpha).setVisible(true);
+      return;
+    }
+    if (!state.running) {
+      text.setPosition(rect.x + 3, rect.y + 4).setAlpha(alpha).setVisible(true);
+      return;
+    }
+    text.setText(`${fullName}${FAMILY_MARQUEE_GAP}`);
+    const cycleDistance = Math.max(1, text.width);
+    text.setText(`${fullName}${FAMILY_MARQUEE_GAP}${fullName}`);
+    const scrollDurationMs = cycleDistance / FAMILY_MARQUEE_SPEED_PX_PER_SECOND * 1000;
+    state.cycleMs = FAMILY_MARQUEE_HOLD_MS + scrollDurationMs;
+    const phaseMs = Math.min(state.elapsedMs, state.cycleMs);
+    const offset = phaseMs <= FAMILY_MARQUEE_HOLD_MS
+      ? 0
+      : Math.min(cycleDistance, (phaseMs - FAMILY_MARQUEE_HOLD_MS) * FAMILY_MARQUEE_SPEED_PX_PER_SECOND / 1000);
+    text.setPosition(Math.round(rect.x + 3 - offset), rect.y + 4).setAlpha(alpha).setVisible(true);
   }
 
   function hideFamilyTexts() {
@@ -329,6 +417,7 @@ export function createPersonInspectionRuntime(scene, {
     cardRect = null;
     needRows = [];
     familyTree = null;
+    familyNodeRects = [];
     graphics.clear().setVisible(false);
     nameText.setVisible(false);
     hideFamilyTexts();
@@ -373,7 +462,7 @@ export function createPersonInspectionRuntime(scene, {
       return {
         personId,
         displayName: person ? localizePersonDisplayName(personGivenName(person), language) || null : null,
-        fullDisplayName: person ? localizedFullPersonName(person, language) || null : null,
+        fullDisplayName: person ? localizePersonFullName(person, language) || null : null,
         expanded,
         familyExpanded,
         pinned,
@@ -402,6 +491,8 @@ export function createPersonInspectionRuntime(scene, {
       nameText.destroy();
       familyTitleText.destroy();
       for (const text of familyNodeTexts) text.destroy();
+      for (const mask of familyNodeMasks) mask.destroy();
+      for (const shape of familyNodeMaskShapes) shape.destroy();
       cardHit.destroy();
     },
   };
@@ -420,11 +511,6 @@ function drawPairConnector(graphics, left, right, child) {
   graphics.lineBetween(childX, midY, childX, childTop);
 }
 
-function compactFamilyName(value) {
-  const text = String(value ?? "-").trim() || "-";
-  return text.length <= 18 ? text : `${text.slice(0, 15)}...`;
-}
-
 function cloneFamilyTree(tree) {
   return {
     focus: { ...tree.focus },
@@ -433,12 +519,6 @@ function cloneFamilyTree(tree) {
     partner: tree.partner ? { ...tree.partner } : null,
     children: tree.children.map((node) => ({ ...node })),
   };
-}
-
-function localizedFullPersonName(person, language) {
-  const givenName = localizePersonDisplayName(personGivenName(person), language);
-  const surname = localizePersonDisplayName(personSurname(person), language);
-  return [givenName, surname].filter(Boolean).join(" ");
 }
 
 function pointerWorldPoint(pointer, camera) {
