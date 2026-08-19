@@ -5,6 +5,7 @@ import { createNeedsPanelGeometry, drawNeedsPanel, NEED_PANEL_SIZE } from "../ui
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
+import { localizedPersonLifeStageLabel } from "./personDemographics.js";
 import { createDisplayFamilyTree } from "./personFamilyTree.js";
 import { personGivenName } from "./personFamilyNames.js";
 import { localizePersonFullName } from "./personFullNameLocalization.js";
@@ -26,6 +27,8 @@ const FAMILY_NODE_COUNT = 7;
 const FAMILY_MARQUEE_HOLD_MS = 1000;
 const FAMILY_MARQUEE_SPEED_PX_PER_SECOND = 14;
 const FAMILY_MARQUEE_GAP = "   ";
+const FAMILY_TEXT_GLYPH_ADVANCE = 6;
+const FAMILY_TEXT_SPACE_ADVANCE = 4;
 
 export function createPersonInspectionRuntime(scene, {
   getActivePersonBindings = () => [],
@@ -47,11 +50,6 @@ export function createPersonInspectionRuntime(scene, {
     fontSize: "5px",
     color: "#f2eadc",
   }).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setVisible(false));
-  const familyNodeMaskShapes = Array.from({ length: FAMILY_NODE_COUNT }, () => (
-    scene.make.graphics({ x: 0, y: 0, add: false }).setScrollFactor(0)
-  ));
-  const familyNodeMasks = familyNodeMaskShapes.map((shape) => shape.createGeometryMask());
-  familyNodeTexts.forEach((text, index) => text.setMask(familyNodeMasks[index]));
   const familyMarqueeStates = Array.from({ length: FAMILY_NODE_COUNT }, () => ({
     running: false,
     hovered: false,
@@ -294,9 +292,12 @@ export function createPersonInspectionRuntime(scene, {
     graphics.clear().setVisible(true);
     graphics.fillStyle(0x171724, 0.96).fillRoundedRect(cardRect.x, cardRect.y, cardRect.width, cardRect.height, 2);
     graphics.lineStyle(1, 0xb39a6a, 0.95).strokeRoundedRect(cardRect.x + 0.5, cardRect.y + 0.5, cardRect.width - 1, cardRect.height - 1, 2);
-    const localizedName = localizePersonFullName(person, scene.localization?.getLanguage?.());
+    const language = scene.localization?.getLanguage?.();
+    const localizedName = localizePersonFullName(person, language);
+    const stageLabel = familyProgress >= 0.95 ? localizedPersonLifeStageLabel(person, language) : "";
+    const header = stageLabel ? `${localizedName} (${stageLabel})` : localizedName;
     setManagedTextStyle(nameText, scene, { fontSize: "7px", color: "#fff2c1" })
-      .setText(localizedName)
+      .setText(header)
       .setPosition(cardRect.x + 5, cardRect.y + 3)
       .setVisible(true);
     const rowsAlpha = Math.max(0, Math.min(1, (expandProgress - 0.8) / 0.2));
@@ -331,9 +332,9 @@ export function createPersonInspectionRuntime(scene, {
   function drawFamilyTree(tree, rect, alpha) {
     const panelX = rect.x + CARD.width;
     const title = scene.localization?.t?.("common:familyTree") ?? "FAMILY";
+    familyTitleText.setText(title);
     familyTitleText
-      .setText(title)
-      .setPosition(panelX + 5, rect.y + 3)
+      .setPosition(panelX + Math.round((CARD.familyWidth - familyTitleText.width) / 2), rect.y + 3)
       .setAlpha(alpha)
       .setVisible(true);
 
@@ -361,20 +362,18 @@ export function createPersonInspectionRuntime(scene, {
       node,
       rects[index],
       familyNodeTexts[index],
-      familyNodeMaskShapes[index],
       familyMarqueeStates[index],
       alpha,
       index === nodes.length - 1,
     ));
   }
 
-  function drawFamilyNode(node, rect, text, maskShape, marqueeState, alpha, focus = false) {
+  function drawFamilyNode(node, rect, text, marqueeState, alpha, focus = false) {
     const fictional = Boolean(node?.fictional);
     const fillAlpha = (fictional ? 0.36 : focus ? 0.9 : 0.66) * alpha;
     graphics.fillStyle(focus ? 0x3a3328 : 0x242433, fillAlpha).fillRoundedRect(rect.x, rect.y, rect.width, rect.height, 2);
     graphics.lineStyle(1, focus ? 0xb39a6a : 0x766f66, (fictional ? 0.45 : 0.8) * alpha)
       .strokeRoundedRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1, 2);
-    maskShape.clear().fillStyle(0xffffff, 1).fillRect(rect.x + 2, rect.y + 2, Math.max(1, rect.width - 4), Math.max(1, rect.height - 4));
     const color = fictional ? "#9e978c" : node?.lifeStatus === PERSON_LIFE_STATUSES.dead ? "#c9b7a0" : "#f2eadc";
     setManagedTextStyle(text, scene, { fontSize: "5px", color });
     setFamilyNodeMarquee(text, node?.fullDisplayName ?? node?.displayName, rect, marqueeState, alpha);
@@ -392,20 +391,21 @@ export function createPersonInspectionRuntime(scene, {
       text.setPosition(rect.x + 3, rect.y + 4).setAlpha(alpha).setVisible(true);
       return;
     }
-    if (!state.running) {
-      text.setPosition(rect.x + 3, rect.y + 4).setAlpha(alpha).setVisible(true);
-      return;
-    }
-    text.setText(`${fullName}${FAMILY_MARQUEE_GAP}`);
+
+    const loopPrefix = `${fullName}${FAMILY_MARQUEE_GAP}`;
+    text.setText(loopPrefix);
     const cycleDistance = Math.max(1, text.width);
-    text.setText(`${fullName}${FAMILY_MARQUEE_GAP}${fullName}`);
     const scrollDurationMs = cycleDistance / FAMILY_MARQUEE_SPEED_PX_PER_SECOND * 1000;
     state.cycleMs = FAMILY_MARQUEE_HOLD_MS + scrollDurationMs;
-    const phaseMs = Math.min(state.elapsedMs, state.cycleMs);
+    const phaseMs = state.running ? Math.min(state.elapsedMs, state.cycleMs) : 0;
     const offset = phaseMs <= FAMILY_MARQUEE_HOLD_MS
       ? 0
       : Math.min(cycleDistance, (phaseMs - FAMILY_MARQUEE_HOLD_MS) * FAMILY_MARQUEE_SPEED_PX_PER_SECOND / 1000);
-    text.setPosition(Math.round(rect.x + 3 - offset), rect.y + 4).setAlpha(alpha).setVisible(true);
+    const visibleText = familyMarqueeWindow(`${loopPrefix}${fullName}`, offset, availableWidth);
+    text.setText(visibleText)
+      .setPosition(rect.x + 3, rect.y + 4)
+      .setAlpha(alpha)
+      .setVisible(true);
   }
 
   function hideFamilyTexts() {
@@ -463,6 +463,7 @@ export function createPersonInspectionRuntime(scene, {
         personId,
         displayName: person ? localizePersonDisplayName(personGivenName(person), language) || null : null,
         fullDisplayName: person ? localizePersonFullName(person, language) || null : null,
+        lifeStageLabel: person ? localizedPersonLifeStageLabel(person, language) || null : null,
         expanded,
         familyExpanded,
         pinned,
@@ -491,11 +492,36 @@ export function createPersonInspectionRuntime(scene, {
       nameText.destroy();
       familyTitleText.destroy();
       for (const text of familyNodeTexts) text.destroy();
-      for (const mask of familyNodeMasks) mask.destroy();
-      for (const shape of familyNodeMaskShapes) shape.destroy();
       cardHit.destroy();
     },
   };
+}
+
+function familyMarqueeWindow(value, offsetPx, maxWidth) {
+  const source = String(value ?? "");
+  if (!source) return "";
+  const safeOffset = Math.max(0, Number(offsetPx) || 0);
+  let startIndex = 0;
+  let consumed = 0;
+  while (startIndex < source.length) {
+    const advance = familyCharacterAdvance(source[startIndex]);
+    if (consumed + advance > safeOffset) break;
+    consumed += advance;
+    startIndex += 1;
+  }
+  let visible = "";
+  let width = 0;
+  for (let index = startIndex; index < source.length; index += 1) {
+    const advance = familyCharacterAdvance(source[index]);
+    if (width + advance > maxWidth) break;
+    visible += source[index];
+    width += advance;
+  }
+  return visible || source[startIndex] || source[0];
+}
+
+function familyCharacterAdvance(character) {
+  return character === " " ? FAMILY_TEXT_SPACE_ADVANCE : FAMILY_TEXT_GLYPH_ADVANCE;
 }
 
 function drawPairConnector(graphics, left, right, child) {
