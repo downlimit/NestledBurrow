@@ -1,8 +1,8 @@
 export const MARRIAGE_SURNAME_CHANCES = Object.freeze({
-  wifeTakesHusband: 0.89,
+  wifeTakesHusband: 0.85,
   keepBoth: 0.05,
   husbandTakesWife: 0.05,
-  combineBoth: 0.01,
+  combineBoth: 0.05,
 });
 export const CHILD_PATERNAL_SURNAME_CHANCE = 0.9;
 export const COMPOUND_SURNAME_CHILD_RETENTION_CHANCE = 0.2;
