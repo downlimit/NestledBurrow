@@ -115,7 +115,8 @@ corrupted.gameplay.population = [
 ];
 const recovered = normalizeGameSessionState(corrupted);
 assertPopulation(recovered.gameplay.population, MATURE_POPULATION_TARGET);
-assert.equal(recovered.gameplay.population[0].displayName, "Mira");
+assert.match(recovered.gameplay.population[0].displayName, /^Mira(?:\s|$)/u,
+  "corrupted recovery preserves Mira identity while allowing the later surname contract");
 assert.equal(recovered.gameplay.population[0].needs.novelty, 0);
 assert.equal(recovered.gameplay.population[0].needs.energy, 100);
 assert.equal(
