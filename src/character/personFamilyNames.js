@@ -1,3 +1,5 @@
+import { areOppositePersonSexes, personSex, PERSON_SEXES } from "./personDemographics.js";
+
 export const MARRIAGE_SURNAME_CHANCES = Object.freeze({
   wifeTakesHusband: 0.85,
   keepBoth: 0.05,
@@ -88,16 +90,24 @@ export function marriageSurnameOutcomeForPair(firstId, secondId) {
 }
 
 export function surnameSidesForPair(first, second) {
-  const key = pairKey(first?.id, second?.id);
-  const firstIsHusbandSide = stableUnit(`marriage-husband-side:${key}`) < 0.5;
-  return firstIsHusbandSide
-    ? { husband: first, wife: second }
-    : { husband: second, wife: first };
+  const firstSex = personSex(first);
+  const secondSex = personSex(second);
+  if (firstSex === PERSON_SEXES.male && secondSex === PERSON_SEXES.female) {
+    return { husband: first, wife: second };
+  }
+  if (firstSex === PERSON_SEXES.female && secondSex === PERSON_SEXES.male) {
+    return { husband: second, wife: first };
+  }
+  return { husband: null, wife: null };
 }
 
 export function applyMarriageFamilyNames(first, second) {
   if (!first?.id || !second?.id) return { mutated: false, outcome: "invalid" };
   const { husband, wife } = surnameSidesForPair(first, second);
+  if (!husband || !wife) {
+    const mutated = removePartnerRelationship(first, second);
+    return { mutated, outcome: "invalid-sex-pair", husbandId: null, wifeId: null };
+  }
   const husbandSurname = personSurname(husband);
   const wifeSurname = personSurname(wife);
   const outcome = marriageSurnameOutcomeForPair(first.id, second.id);
@@ -121,6 +131,12 @@ export function childFamilySurname(firstParent, secondParent, childId) {
   if (!firstParent) return inheritedSurnameForChild(personSurname(secondParent), childId);
   if (!secondParent) return inheritedSurnameForChild(personSurname(firstParent), childId);
   const { husband: father, wife: mother } = surnameSidesForPair(firstParent, secondParent);
+  if (!father || !mother) {
+    const inherited = stableUnit(`${childId}:fallback-parent-surname`) < 0.5
+      ? personSurname(firstParent)
+      : personSurname(secondParent);
+    return inheritedSurnameForChild(inherited, childId);
+  }
   const inherited = stableUnit(`${childId}:paternal-surname`) < CHILD_PATERNAL_SURNAME_CHANCE
     ? personSurname(father)
     : personSurname(mother);
@@ -131,14 +147,13 @@ export function ensurePopulationFamilyNames(population) {
   if (!Array.isArray(population)) return 0;
   const people = population.filter((person) => person?.id && personGivenName(person));
   const byId = new Map(people.map((person) => [person.id, person]));
+  let changed = repairInvalidPartnerPairs(people, byId);
   const initiallyMissing = new Set(people.filter((person) => !explicitPersonSurname(person)).map((person) => person.id));
   if (initiallyMissing.size === 0) {
-    let repaired = 0;
-    for (const person of people) repaired += setSurname(person, personSurname(person)) ? 1 : 0;
-    return repaired;
+    for (const person of people) changed += setSurname(person, personSurname(person)) ? 1 : 0;
+    return changed;
   }
 
-  let changed = 0;
   const visited = new Set();
   for (const person of people) {
     if (!initiallyMissing.has(person.id) || visited.has(person.id)) continue;
@@ -174,6 +189,7 @@ export function sharesSurnameComponent(first, second) {
 }
 
 export function visualSurnamePairPenaltyDays(first, second) {
+  if (!areOppositePersonSexes(first, second)) return Number.POSITIVE_INFINITY;
   return sharesSurnameComponent(first, second) ? SAME_SURNAME_PAIR_PENALTY_DAYS : 0;
 }
 
@@ -198,6 +214,28 @@ export function familyLineBirthWeight(first, second, population) {
   const density = pairComponents.reduce((total, surname) => total + (counts.get(surname) ?? 1), 0) / pairComponents.length;
   const weight = 1 + 0.12 * Math.log2(Math.max(0.01, mean / Math.max(1, density)));
   return clamp(weight, FAMILY_LINE_BIRTH_WEIGHT_MIN, FAMILY_LINE_BIRTH_WEIGHT_MAX);
+}
+
+function repairInvalidPartnerPairs(people, byId) {
+  let changed = 0;
+  for (const [first, second] of partnerPairs(people, byId)) {
+    if (areOppositePersonSexes(first, second)) continue;
+    if (removePartnerRelationship(first, second)) changed += 1;
+  }
+  return changed;
+}
+
+function removePartnerRelationship(first, second) {
+  if (!first || !second) return false;
+  const firstBefore = Array.isArray(first.relationships) ? first.relationships.length : 0;
+  const secondBefore = Array.isArray(second.relationships) ? second.relationships.length : 0;
+  first.relationships = (Array.isArray(first.relationships) ? first.relationships : [])
+    .filter((relationship) => !(relationship?.kind === "partner" && relationship.personId === second.id));
+  second.relationships = (Array.isArray(second.relationships) ? second.relationships : [])
+    .filter((relationship) => !(relationship?.kind === "partner" && relationship.personId === first.id));
+  first.relatedPersonIds = first.relationships.map((relationship) => relationship.personId);
+  second.relatedPersonIds = second.relationships.map((relationship) => relationship.personId);
+  return first.relationships.length !== firstBefore || second.relationships.length !== secondBefore;
 }
 
 function partnerPairs(people, byId) {
