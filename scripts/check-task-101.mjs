@@ -145,6 +145,17 @@ assert(familyTree);
 for (const node of [...familyTree.parents, ...familyTree.grandparents]) {
   assert(node.fullDisplayName.split(/\s+/u).length >= 2, "real and fictional ancestry displays a surname");
 }
+const focusSurnameComponents = surnameComponents(familyTree.focus.canonicalSurname);
+assert(familyTree.parents.some((parent) => surnamesOverlap(parent.canonicalSurname, focusSurnameComponents)),
+  "fictional parent generation keeps at least one visible surname line connected to the child");
+for (let parentIndex = 0; parentIndex < familyTree.parents.length; parentIndex += 1) {
+  const parent = familyTree.parents[parentIndex];
+  if (!parent.fictional) continue;
+  const grandparents = familyTree.grandparents.slice(parentIndex * 2, parentIndex * 2 + 2);
+  const ancestryComponents = surnameComponents(parent.ancestrySurname ?? parent.canonicalSurname);
+  assert(grandparents.some((grandparent) => surnamesOverlap(grandparent.canonicalSurname, ancestryComponents)),
+    `fictional grandparent branch ${parentIndex} keeps a surname connected to its child`);
+}
 
 const greatGrandparentGraph = lineageGraph("g", 3);
 assert(arePopulationPairCloseRelatives("g-left-0", "g-right-0", greatGrandparentGraph),
@@ -211,13 +222,32 @@ for (const contract of [
   "familyMarqueeWindow",
   "CARD.familyWidth - familyTitleText.width",
   "state.hovered = hovered",
-  "else {\n        state.running = false;",
+  "state.scrollDurationMs = cycleDistance / FAMILY_MARQUEE_SPEED_PX_PER_SECOND * 1000",
+  "state.cycleMs = state.scrollDurationMs + FAMILY_MARQUEE_HOLD_MS",
+  "const offset = phaseMs < state.scrollDurationMs",
+  "if (!hovered && state.scrollDurationMs > 0",
 ]) assert(inspectionSource.includes(contract), `inspection exposes family-card presentation contract: ${contract}`);
 
-console.log("Task #101 surname inheritance, compound decay, ancestry labels, age labels, kinship guard and recent-event contracts OK");
+const familyTreeSource = readFileSync(new URL("../src/character/personFamilyTree.js", import.meta.url), "utf8");
+for (const contract of [
+  "fictionalParentPair",
+  "ancestrySurname",
+  "fictionalSpouseNode",
+]) assert(familyTreeSource.includes(contract), `family tree exposes coherent fictional surname flow: ${contract}`);
+
+console.log("Task #101 surname inheritance, compound decay, coherent ancestry, age labels, kinship guard and recent-event contracts OK");
 
 function makePerson(id, displayName) {
   return { id, displayName, ageYears: 30, lifeStatus: "alive", relationships: [], relatedPersonIds: [] };
+}
+
+function surnameComponents(value) {
+  return String(value ?? "").toLowerCase().split("-").map((part) => part.trim()).filter(Boolean);
+}
+
+function surnamesOverlap(value, expectedComponents) {
+  const actual = new Set(surnameComponents(value));
+  return expectedComponents.some((component) => actual.has(component));
 }
 
 function lineageGraph(prefix, depth) {
