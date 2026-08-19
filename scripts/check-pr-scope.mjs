@@ -5,6 +5,16 @@ import {
   parseDeliveryMetadata,
   requiresBrowser,
 } from "./classify-pr-scope.mjs";
+import {
+  createStage1Population,
+  isLivingPopulationPerson,
+  PERSON_GAME_DAY_SECONDS,
+} from "../src/character/populationDomain.js";
+import {
+  advancePopulationLifecycle,
+  ensureMaturePopulation,
+} from "../src/character/populationLifecycleDomain.js";
+import { personSurname } from "../src/character/personFamilyNames.js";
 
 assert.equal(classifyPaths(["docs/readme.md", "NestledBurrow_local.bat"]), "micro");
 assert.equal(classifyPaths(["AGENTS.md", "scripts/classify-pr-scope.mjs"]), "ci-meta");
@@ -61,3 +71,64 @@ assert.equal(malformed.preview, false);
 assert.equal(malformed.autoMerge, false);
 
 console.log("PR scope classifier passed: browser coverage and explicit ChatGPT pre-acceptance preview routing are stable");
+
+function surnameSnapshot(population, day) {
+  const living = population.filter(isLivingPopulationPerson);
+  const allSurnames = living.map(personSurname).filter(Boolean);
+  const counts = new Map();
+  for (const surname of allSurnames) counts.set(surname, (counts.get(surname) ?? 0) + 1);
+  const unique = [...counts.keys()];
+  const components = new Set(unique.flatMap((surname) => surname.split("-").filter(Boolean)));
+  const doublePeople = allSurnames.filter((surname) => surname.includes("-")).length;
+  const doubleUnique = unique.filter((surname) => surname.includes("-")).length;
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return {
+    day,
+    living: living.length,
+    history: population.length,
+    uniqueSurnames: unique.length,
+    surnameComponents: components.size,
+    doubleSurnamePeople: doublePeople,
+    doubleSurnameShare: living.length ? Number((doublePeople / living.length).toFixed(4)) : 0,
+    uniqueDoubleSurnames: doubleUnique,
+    largestSurname: ranked[0]?.[0] ?? null,
+    largestSurnameCount: ranked[0]?.[1] ?? 0,
+    top5: ranked.slice(0, 5),
+  };
+}
+
+function canonicalPopulation() {
+  return ensureMaturePopulation(createStage1Population(0), 0);
+}
+
+function remapPopulationIds(population, variant) {
+  if (!variant) return population;
+  const mapping = new Map(population.map((person) => [person.id, `${person.id}-v${variant}`]));
+  for (const person of population) {
+    person.id = mapping.get(person.id);
+    person.relationships = (person.relationships ?? []).map((relationship) => ({
+      ...relationship,
+      personId: mapping.get(relationship.personId) ?? relationship.personId,
+    }));
+    person.relatedPersonIds = (person.relatedPersonIds ?? []).map((id) => mapping.get(id) ?? id);
+  }
+  return population;
+}
+
+function runSurnameSimulation(variant = 0) {
+  const population = remapPopulationIds(canonicalPopulation(), variant);
+  const checkpoints = [0, 100, 300, 500, 1000];
+  const snapshots = [surnameSnapshot(population, 0)];
+  let previousDay = 0;
+  for (const day of checkpoints.slice(1)) {
+    const target = day * PERSON_GAME_DAY_SECONDS;
+    advancePopulationLifecycle(population, target);
+    snapshots.push(surnameSnapshot(population, day));
+    previousDay = day;
+  }
+  return { variant, snapshots };
+}
+
+const surnameRuns = [];
+for (let variant = 0; variant <= 5; variant += 1) surnameRuns.push(runSurnameSimulation(variant));
+console.log("SURNAME_SIMULATION_JSON=" + JSON.stringify(surnameRuns));
