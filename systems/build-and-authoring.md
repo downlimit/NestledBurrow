@@ -17,7 +17,7 @@ Owns construction, placeable lifecycle and asset/layout editing.
 
 ## Universal placeable lifecycle
 
-Every catalog object declares one `placeableOwner` and `place → move → remove → restore`; one descriptor drives hover, commit and grouped undo. Resource profiles use the same lifecycle and pose; authoring selection shares it.
+Every catalog object declares one `placeableOwner` and `place → move → remove → restore`; one descriptor drives hover, commit and grouped undo. Resource profiles such as `berry-bush` use the same lifecycle and pose; authoring selection shares it.
 
 ## Developer-authoring contract
 
