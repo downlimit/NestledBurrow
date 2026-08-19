@@ -22,11 +22,11 @@ const STAGE1_SEX_BY_ID = Object.freeze({
 });
 
 const MALE_NAME_EXCEPTIONS = new Set([
-  "andrea", "ari", "dana", "ilya", "jari", "kari", "luca", "mika", "niko", "sami", "toni",
+  "andrea", "ari", "ilya", "jari", "kari", "luca", "mika", "niko", "sami", "toni",
 ]);
 const FEMALE_NAME_EXCEPTIONS = new Set([
   "abigail", "adele", "agnes", "alice", "amber", "amy", "ann", "anne", "ashley", "astrid", "audrey",
-  "beth", "birgit", "britt", "brittany", "carol", "catherine", "charlotte", "cheryl", "chloe", "claire",
+  "beth", "birgit", "britt", "brittany", "bryn", "carol", "catherine", "charlotte", "cheryl", "chloe", "claire",
   "crystal", "dawn", "deborah", "denise", "edith", "elise", "elizabeth", "ellen", "emily", "erin",
   "esther", "evelyn", "gabrielle", "grete", "gwen", "heather", "helen", "hilary", "holly", "ingrid",
   "ines", "iris", "isabel", "isabelle", "jane", "janet", "jennifer", "jill", "judith", "juliet",
