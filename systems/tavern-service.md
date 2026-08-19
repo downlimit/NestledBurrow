@@ -82,7 +82,7 @@ Self-service atomically claims the free table and reserves its exact displayed i
 - Prices are fixed; the player controls offer, quality, quantity and fulfillment capacity.
 - Food preference layers are cuisine/origin, dish class and ingredients; exact weights are balance constants.
 - Inspecting an unsuitable offer and buying nothing is missed revenue without feedback damage.
-- Ingredient/cooking quality may later affect satisfaction while nominal prices stay simple.
+- Dish quality `bronze → silver → gold → platinum` is probabilistic from ingredient quality, cooking skill, equipment, recipe difficulty and modifiers; no hard tier cap, so high skill may sometimes rescue poor inputs. Recipes aggregate ingredient quality by default, with optional weights only for meaningful exceptions; gardening and repair may improve inputs/equipment.
 
 ## Opening hours and menu activation
 
