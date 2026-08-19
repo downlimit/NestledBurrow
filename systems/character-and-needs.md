@@ -13,7 +13,7 @@ Owns movement, time, sleep, energy and canonical `0..100` N/E/S/T/L/D needs. Hig
 - Children persist and inherit spending, food preferences and visit periods with variation. Skills/talents are not implemented. No general time acceleration; sleep advances world time. `populationDomain` owns person data; `populationLifecycleDomain` owns generations; `personNames` and `personFamilyNames` own given-name and surname policy.
 - Visit periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors `1/0.2`. Physical guests advance live needs/lifecycle and cannot die mid-visit.
 - One hysteretic N/E/S/T/L/D intent guides a live guest; critical non-food pressure may interrupt accepted-order waiting and later resume it.
-- Hover shows NESTLD after `667 ms`; at `1334 ms` the card expands into a family tree. Real parents win; missing ancestors are deterministic display-only placeholders with surnames, never population/save entities. Long full names stay still until their own cell is hovered; then a looped marquee starts after `1 s`, and cursor leave lets the current loop finish before stopping. Coarse pointers use long-press and bar edits persist.
+- Hover shows NESTLD after `667 ms`; at `1334 ms` the card expands into a family tree. Missing ancestors are deterministic display-only placeholders with surnames. Every full name is hard-clipped to its own cell; only the hovered long name runs a looped marquee after `1 s`, and cursor leave lets that loop finish. `СЕМЬЯ/FAMILY` is centered over the tree; fully expanded header adds the localized age stage with sex-aware Russian grammar. Coarse pointers use long-press and bar edits persist.
 
 ## Time, energy and satiety
 
