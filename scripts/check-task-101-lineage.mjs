@@ -16,13 +16,55 @@ import {
   SURNAME_DIVERSITY_INTERVENTION_START,
   SURNAME_DIVERSITY_SOFT_TARGET,
 } from "../src/character/populationLineageBalance.js";
-import { personSurname } from "../src/character/personFamilyNames.js";
+import {
+  applyMarriageFamilyNames,
+  personSurname,
+  surnameSidesForPair,
+  visualSurnamePairPenaltyDays,
+} from "../src/character/personFamilyNames.js";
+import {
+  areOppositePersonSexes,
+  assignedPersonSex,
+  personSex,
+  PERSON_SEXES,
+} from "../src/character/personDemographics.js";
+import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
 
 assert.equal(SURNAME_DIVERSITY_INTERVENTION_START, 105);
 assert.equal(SURNAME_DIVERSITY_SOFT_TARGET, 90);
 assert.equal(SURNAME_DIVERSITY_HARD_FLOOR, 75);
 assert.equal(IMMIGRANT_EXTINCT_SURNAME_CHANCE, 0.95);
 assert.equal(IMMIGRANT_MAX_PER_DAY, 2);
+
+const assignedSamples = Array.from({ length: 5000 }, (_value, index) => (
+  assignedPersonSex(`person-born-${index}-0-${index}`)
+));
+const assignedFemaleShare = assignedSamples.filter((sex) => sex === PERSON_SEXES.female).length / assignedSamples.length;
+assert(assignedFemaleShare >= 0.48 && assignedFemaleShare <= 0.52,
+  `deterministic newborn sex assignment stays near 50/50, got ${assignedFemaleShare}`);
+
+const husband = makePerson("marriage-male", "Alex Smith", "alive", PERSON_SEXES.male);
+const wife = makePerson("marriage-female", "Maria Gosling", "alive", PERSON_SEXES.female);
+assert.deepEqual(surnameSidesForPair(husband, wife), { husband, wife });
+assert(areOppositePersonSexes(husband, wife));
+
+const sameSexA = makePerson("same-sex-a", "Alex Alpha", "alive", PERSON_SEXES.male);
+const sameSexB = makePerson("same-sex-b", "Mark Beta", "alive", PERSON_SEXES.male);
+addRelationship(sameSexA, sameSexB, "partner", "partner");
+assert.equal(visualSurnamePairPenaltyDays(sameSexA, sameSexB), Number.POSITIVE_INFINITY,
+  "same-sex candidates are never valid marriage choices");
+const rejectedMarriage = applyMarriageFamilyNames(sameSexA, sameSexB);
+assert.equal(rejectedMarriage.outcome, "invalid-sex-pair");
+assert.equal(sameSexA.relationships.some(({ kind }) => kind === "partner"), false);
+assert.equal(sameSexB.relationships.some(({ kind }) => kind === "partner"), false,
+  "an invalid same-sex partner edge is removed instead of persisting");
+
+const fictionalFocus = makePerson("fictional-focus", "Alex Root", "alive", PERSON_SEXES.male);
+const fictionalTree = createDisplayFamilyTree([fictionalFocus], fictionalFocus.id);
+assert(fictionalTree);
+assertOppositePair(fictionalTree.parents, "fictional parents");
+assertOppositePair(fictionalTree.grandparents.slice(0, 2), "first fictional grandparent pair");
+assertOppositePair(fictionalTree.grandparents.slice(2, 4), "second fictional grandparent pair");
 
 const dense = makeDenseFamily(38);
 const index = createBloodlinePressureIndex(dense);
@@ -84,7 +126,12 @@ assert(populationTestSource.includes("const arrivalIds = new Set(summary.arrival
 assert(populationTestSource.includes(".filter((person) => !arrivalIds.has(person.id))"),
   "adult arrivals must not be mislabeled as births in the recent-event feed");
 
-console.log("Task #101 long-run bloodline pressure and surname renewal contract OK");
+console.log("Task #101 long-run bloodline pressure, opposite-sex family pairing and surname renewal contract OK");
+
+function assertOppositePair(pair, label) {
+  assert.equal(pair.length, 2, `${label} must contain two people`);
+  assert.notEqual(personSex(pair[0]), personSex(pair[1]), `${label} must contain one male and one female`);
+}
 
 function scheduledAcrossDays(population, days) {
   let total = 0;
@@ -110,8 +157,8 @@ function makeDenseFamily(count) {
   return people;
 }
 
-function makePerson(id, displayName, lifeStatus = "alive") {
-  return { id, displayName, ageYears: 30, lifeStatus, relationships: [], relatedPersonIds: [] };
+function makePerson(id, displayName, lifeStatus = "alive", sex = null) {
+  return { id, displayName, ageYears: 30, lifeStatus, sex, relationships: [], relatedPersonIds: [] };
 }
 
 function addRelationship(first, second, firstKind, secondKind) {
