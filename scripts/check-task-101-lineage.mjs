@@ -7,11 +7,21 @@ import {
   createBloodlinePressureIndex,
   createPopulationImmigrant,
   extinctSurnameRoots,
+  IMMIGRANT_EXTINCT_SURNAME_CHANCE,
   IMMIGRANT_MAX_PER_DAY,
   livingSurnameDiversity,
   plannedImmigrantCount,
+  SURNAME_DIVERSITY_HARD_FLOOR,
+  SURNAME_DIVERSITY_INTERVENTION_START,
+  SURNAME_DIVERSITY_SOFT_TARGET,
 } from "../src/character/populationLineageBalance.js";
 import { personSurname } from "../src/character/personFamilyNames.js";
+
+assert.equal(SURNAME_DIVERSITY_INTERVENTION_START, 105);
+assert.equal(SURNAME_DIVERSITY_SOFT_TARGET, 90);
+assert.equal(SURNAME_DIVERSITY_HARD_FLOOR, 75);
+assert.equal(IMMIGRANT_EXTINCT_SURNAME_CHANCE, 0.95);
+assert.equal(IMMIGRANT_MAX_PER_DAY, 2);
 
 const dense = makeDenseFamily(38);
 const index = createBloodlinePressureIndex(dense);
@@ -48,6 +58,18 @@ for (let day = 1; day <= 20; day += 1) {
 }
 assert(scheduled > 0, "collapsed surname diversity should schedule newcomer replacement slots");
 
+const healthyDiversity = uniqueSurnamePopulation(SURNAME_DIVERSITY_INTERVENTION_START + 1);
+assert.equal(plannedImmigrantCount(healthyDiversity, 3, 7), 0,
+  "healthy surname diversity should not schedule newcomer slots by itself");
+const nearTarget = uniqueSurnamePopulation(SURNAME_DIVERSITY_SOFT_TARGET);
+const nearTargetScheduled = scheduledAcrossDays(nearTarget, 40);
+assert(nearTargetScheduled > 0,
+  "surname renewal should already be active around the 90-surname soft target");
+const belowFloor = uniqueSurnamePopulation(SURNAME_DIVERSITY_HARD_FLOOR);
+const belowFloorScheduled = scheduledAcrossDays(belowFloor, 40);
+assert(belowFloorScheduled > nearTargetScheduled,
+  "surname renewal should strengthen further below the diversity floor");
+
 const before = renewalPopulation.length;
 const newcomer = createPopulationImmigrant(renewalPopulation, 42 * 24 * 60 * 60, 0);
 assert(newcomer);
@@ -57,6 +79,18 @@ assert.deepEqual(newcomer.relationships, [], "newcomers do not invent persistent
 assert(personSurname(newcomer), "newcomers always arrive with a stable surname");
 
 console.log("Task #101 long-run bloodline pressure and surname renewal contract OK");
+
+function scheduledAcrossDays(population, days) {
+  let total = 0;
+  for (let day = 1; day <= days; day += 1) total += plannedImmigrantCount(population, 3, day);
+  return total;
+}
+
+function uniqueSurnamePopulation(count) {
+  return Array.from({ length: count }, (_value, index) => (
+    makePerson(`unique-${count}-${index}`, `Person${index} Surname${index}`)
+  ));
+}
 
 function makeDenseFamily(count) {
   const people = Array.from({ length: count }, (_value, index) => makePerson(`family-${index}`, `Family${index} Alpha`));
