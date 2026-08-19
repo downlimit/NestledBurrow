@@ -1,8 +1,8 @@
 export const MARRIAGE_SURNAME_CHANCES = Object.freeze({
-  wifeTakesHusband: 0.85,
+  wifeTakesHusband: 0.89,
   keepBoth: 0.05,
   husbandTakesWife: 0.05,
-  combineBoth: 0.05,
+  combineBoth: 0.01,
 });
 export const CHILD_PATERNAL_SURNAME_CHANCE = 0.9;
 export const FAMILY_LINE_BIRTH_WEIGHT_MIN = 0.8;
@@ -43,7 +43,7 @@ export function explicitPersonSurname(value) {
 
 export function personSurname(value) {
   const explicit = explicitPersonSurname(value);
-  if (explicit) return explicit;
+  if (explicit) return normalizeSurnameSpelling(explicit);
   if (value && typeof value === "object" && value.id) return generatedBaseSurname(value.id);
   return "";
 }
@@ -57,7 +57,7 @@ export function personSurnameComponents(value) {
 
 export function withPersonSurname(displayName, surname) {
   const givenName = personGivenName(displayName);
-  const safeSurname = String(surname ?? "").trim();
+  const safeSurname = normalizeSurnameSpelling(surname);
   return [givenName, safeSurname].filter(Boolean).join(" ");
 }
 
@@ -130,7 +130,11 @@ export function ensurePopulationFamilyNames(population) {
   const people = population.filter((person) => person?.id && personGivenName(person));
   const byId = new Map(people.map((person) => [person.id, person]));
   const initiallyMissing = new Set(people.filter((person) => !explicitPersonSurname(person)).map((person) => person.id));
-  if (initiallyMissing.size === 0) return 0;
+  if (initiallyMissing.size === 0) {
+    let repaired = 0;
+    for (const person of people) repaired += setSurname(person, personSurname(person)) ? 1 : 0;
+    return repaired;
+  }
 
   let changed = 0;
   const visited = new Set();
@@ -240,8 +244,20 @@ function parentPeople(person, byId) {
 function combineSurnames(husbandSurname, wifeSurname) {
   const husbandPart = personSurnameComponents(`X ${husbandSurname}`)[0] ?? husbandSurname;
   const wifePart = personSurnameComponents(`X ${wifeSurname}`)[0] ?? wifeSurname;
-  if (husbandPart.toLowerCase() === wifePart.toLowerCase()) return husbandPart;
-  return `${husbandPart}-${wifePart}`;
+  if (husbandPart.toLowerCase() === wifePart.toLowerCase()) return normalizeSurnameSpelling(husbandPart);
+  return normalizeSurnameSpelling(`${husbandPart}-${wifePart}`);
+}
+
+function normalizeSurnameSpelling(value) {
+  return String(value ?? "")
+    .trim()
+    .split("-")
+    .map((part) => {
+      const text = part.trim();
+      return text ? `${text[0].toUpperCase()}${text.slice(1)}` : "";
+    })
+    .filter(Boolean)
+    .join("-");
 }
 
 function setSurname(person, surname) {
