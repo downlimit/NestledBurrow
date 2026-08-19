@@ -81,10 +81,8 @@ Self-service atomically claims the free table and reserves its exact displayed i
 
 - Prices are fixed; the player controls offer, quality, quantity and fulfillment capacity.
 - Food preference layers are cuisine/origin, dish class and ingredients; exact weights are balance constants.
-- Dish quality is probabilistic `bronze → silver → gold → platinum`: ingredient quality, cooking skill, equipment, recipe difficulty and future modifiers shift the tier chances; no one factor hard-sets the result.
-- Recipes aggregate ingredient quality automatically by default. Explicit per-ingredient quality weights or quality-neutral ingredients are optional only when a recipe genuinely needs them; every recipe does not require a manually declared “main ingredient”.
-- A strong cook may compensate poor ingredients, but never with certainty: lower ingredient quality reduces the probability of top tiers rather than imposing a hard ceiling. High cooking skill can still occasionally produce platinum from mediocre inputs, while strong inputs make platinum much more likely.
-- Ingredient quality can itself come from other skills such as gardening; equipment upgrades created through repair may add another quality modifier. Recipe difficulty may also shift the final distribution.
+- Dish quality is a `bronze → silver → gold → platinum` probability distribution shifted by ingredient quality, cooking skill, equipment, recipe difficulty and future modifiers. No factor sets a hard tier ceiling: high skill may occasionally rescue poor inputs, while better inputs make high tiers likelier.
+- Recipes aggregate ingredient quality automatically; optional weights or quality-neutral ingredients are used only where semantically needed. Gardening can raise ingredient quality, and repair upgrades can modify equipment quality.
 - Inspecting an unsuitable offer and buying nothing is missed revenue without feedback damage.
 - Dish quality may later affect satisfaction while nominal prices stay simple.
 
