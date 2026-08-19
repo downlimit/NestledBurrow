@@ -5,6 +5,7 @@ export const MARRIAGE_SURNAME_CHANCES = Object.freeze({
   combineBoth: 0.01,
 });
 export const CHILD_PATERNAL_SURNAME_CHANCE = 0.9;
+export const COMPOUND_SURNAME_CHILD_RETENTION_CHANCE = 0.2;
 export const FAMILY_LINE_BIRTH_WEIGHT_MIN = 0.8;
 export const FAMILY_LINE_BIRTH_WEIGHT_MAX = 1.2;
 export const SAME_SURNAME_PAIR_PENALTY_DAYS = 12;
@@ -117,12 +118,13 @@ export function applyMarriageFamilyNames(first, second) {
 
 export function childFamilySurname(firstParent, secondParent, childId) {
   if (!firstParent && !secondParent) return generatedBaseSurname(childId);
-  if (!firstParent) return personSurname(secondParent) || generatedBaseSurname(childId);
-  if (!secondParent) return personSurname(firstParent) || generatedBaseSurname(childId);
+  if (!firstParent) return inheritedSurnameForChild(personSurname(secondParent), childId);
+  if (!secondParent) return inheritedSurnameForChild(personSurname(firstParent), childId);
   const { husband: father, wife: mother } = surnameSidesForPair(firstParent, secondParent);
-  return stableUnit(`${childId}:paternal-surname`) < CHILD_PATERNAL_SURNAME_CHANCE
+  const inherited = stableUnit(`${childId}:paternal-surname`) < CHILD_PATERNAL_SURNAME_CHANCE
     ? personSurname(father)
     : personSurname(mother);
+  return inheritedSurnameForChild(inherited, childId);
 }
 
 export function ensurePopulationFamilyNames(population) {
@@ -239,6 +241,17 @@ function parentPeople(person, byId) {
     .map((relationship) => byId.get(relationship.personId))
     .filter(Boolean)
     .slice(0, 2);
+}
+
+function inheritedSurnameForChild(surname, childId) {
+  const normalized = normalizeSurnameSpelling(surname);
+  const components = normalized.split("-").filter(Boolean);
+  if (components.length <= 1) return normalized;
+  if (stableUnit(`${childId}:compound-surname-retention`) < COMPOUND_SURNAME_CHILD_RETENTION_CHANCE) {
+    return normalizeSurnameSpelling(components.slice(0, 2).join("-"));
+  }
+  const componentIndex = stableUnit(`${childId}:compound-surname-component`) < 0.5 ? 0 : Math.min(1, components.length - 1);
+  return normalizeSurnameSpelling(components[componentIndex]);
 }
 
 function combineSurnames(husbandSurname, wifeSurname) {
