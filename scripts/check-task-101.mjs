@@ -21,7 +21,13 @@ import {
   personSurname,
   surnameSidesForPair,
 } from "../src/character/personFamilyNames.js";
+import { localizePersonDisplayName } from "../src/character/personNameLocalization.js";
 import { createStage1Population } from "../src/character/populationDomain.js";
+import {
+  getSimulationPopulationTestSnapshot,
+  grantSimulationTestCoins,
+  SIMULATION_TEST_GROUPS,
+} from "../src/build/simulationTestPalette.js";
 import {
   createFreshGameSessionState,
   normalizeGameSessionState,
@@ -30,11 +36,12 @@ import {
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
 
 assert.deepEqual(MARRIAGE_SURNAME_CHANCES, {
-  wifeTakesHusband: 0.85,
+  wifeTakesHusband: 0.89,
   keepBoth: 0.05,
   husbandTakesWife: 0.05,
-  combineBoth: 0.05,
+  combineBoth: 0.01,
 });
+assert.equal(Object.values(MARRIAGE_SURNAME_CHANCES).reduce((sum, value) => sum + value, 0), 1);
 assert.equal(CHILD_PATERNAL_SURNAME_CHANCE, 0.9);
 assert.equal(FAMILY_LINE_BIRTH_WEIGHT_MIN, 0.8);
 assert.equal(FAMILY_LINE_BIRTH_WEIGHT_MAX, 1.2);
@@ -42,11 +49,18 @@ assert.equal(COMMON_PERSON_SURNAMES.length, 512);
 assert.equal(new Set(COMMON_PERSON_SURNAMES.map((surname) => surname.toLowerCase())).size, 512);
 assert.equal(SESSION_STATE_VERSION, 19);
 assert.equal(SAVE_SCHEMA_VERSION, 19, "Task #101 repairs family names within the existing v19 person record");
+assert.equal(localizePersonDisplayName("Mira Smith-Gosling", "ru"), "Мира Смит-Гослинг",
+  "compound surnames preserve the hyphen and capitalize both parts in Russian presentation");
 
 const population = ensureMaturePopulation(createStage1Population(0), 0);
 assert.equal(population.length, 300);
 assert(population.every((person) => explicitPersonSurname(person)), "every mature resident persists an explicit surname");
 assert(population.every((person) => canonicalFullPersonName(person).split(/\s+/u).length >= 2));
+for (const person of population) {
+  for (const part of personSurname(person).split("-")) {
+    assert.equal(part[0], part[0].toUpperCase(), `surname component must be capitalized: ${person.displayName}`);
+  }
+}
 
 const componentById = familyComponents(population);
 const componentsBySurname = new Map();
@@ -61,7 +75,7 @@ for (const [surname, components] of componentsBySurname) {
 }
 
 const samples = new Map();
-for (let index = 0; index < 20_000 && samples.size < 4; index += 1) {
+for (let index = 0; index < 50_000 && samples.size < 4; index += 1) {
   const firstId = `pair-a-${index}`;
   const secondId = `pair-b-${index}`;
   const outcome = marriageSurnameOutcomeForPair(firstId, secondId);
@@ -69,8 +83,8 @@ for (let index = 0; index < 20_000 && samples.size < 4; index += 1) {
 }
 assert.deepEqual([...samples.keys()].sort(), ["combine-both", "husband-takes-wife", "keep-both", "wife-takes-husband"].sort());
 for (const [outcome, [firstId, secondId]] of samples) {
-  const first = makePerson(firstId, "Alex Alpha");
-  const second = makePerson(secondId, "Dana Beta");
+  const first = makePerson(firstId, "Alex Smith");
+  const second = makePerson(secondId, "Dana Gosling");
   const { husband, wife } = surnameSidesForPair(first, second);
   const oldHusband = personSurname(husband);
   const oldWife = personSurname(wife);
@@ -86,7 +100,7 @@ for (const [outcome, [firstId, secondId]] of samples) {
     assert.equal(personSurname(wife), oldWife);
   } else {
     assert.equal(personSurname(husband), personSurname(wife));
-    assert(personSurname(husband).includes("-"));
+    assert.match(personSurname(husband), /^[A-Z][A-Za-z]+-[A-Z][A-Za-z]+$/u);
   }
 }
 
@@ -138,12 +152,32 @@ const roundTrip = deserializeSessionEnvelope(serializeSessionEnvelope(repaired))
 assert.equal(roundTrip.status, "loaded");
 assert.deepEqual(roundTrip.state.gameplay.population, repaired.gameplay.population, "full names survive save/load");
 
+const populationTestGroup = SIMULATION_TEST_GROUPS.find(({ id }) => id === "population");
+assert.equal(populationTestGroup.items.filter(({ debugId }) => /^population-event-\d+$/u.test(debugId ?? "")).length, 10,
+  "TEST shows ten recent population event rows");
+const longRun = populationTestGroup.items.find(({ labelKey }) => labelKey === "build:test.population.longRun");
+assert(longRun);
+grantSimulationTestCoins(fresh.gameplay, longRun.quantities[0]);
+const snapshot = getSimulationPopulationTestSnapshot(fresh.gameplay);
+assert(snapshot.events.length <= 10);
+assert(snapshot.events.some(({ type }) => type === "birth"), "recent events retain births even in a long run");
+assert(snapshot.events.some(({ type }) => type === "death"), "recent events retain deaths even in a long run");
+
+const paletteSource = readFileSync(new URL("../src/build/simulationTestPalette.js", import.meta.url), "utf8");
+for (const contract of [
+  "RECENT_POPULATION_EVENT_LIMIT = 10",
+  "diversePopulationEvents",
+  "род.",
+  "ум.",
+  "несч. случ.",
+]) assert(paletteSource.includes(contract), `population event presentation exposes ${contract}`);
+
 const inspectionSource = readFileSync(new URL("../src/character/personInspectionRuntime.js", import.meta.url), "utf8");
 for (const contract of ["personSurname", "localizedFullPersonName", "fullDisplayName"]) {
   assert(inspectionSource.includes(contract), `inspection exposes surname presentation: ${contract}`);
 }
 
-console.log("Task #101 surname inheritance, kinship guard and anti-dynasty contracts OK");
+console.log("Task #101 surname inheritance, spelling, kinship guard, anti-dynasty and recent-event contracts OK");
 
 function makePerson(id, displayName) {
   return { id, displayName, ageYears: 30, lifeStatus: "alive", relationships: [], relatedPersonIds: [] };
