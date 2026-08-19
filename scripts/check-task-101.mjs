@@ -11,6 +11,7 @@ import {
   CHILD_PATERNAL_SURNAME_CHANCE,
   childFamilySurname,
   COMMON_PERSON_SURNAMES,
+  COMPOUND_SURNAME_CHILD_RETENTION_CHANCE,
   explicitPersonSurname,
   familyLineBirthWeight,
   FAMILY_LINE_BIRTH_WEIGHT_MAX,
@@ -21,6 +22,7 @@ import {
   personSurname,
   surnameSidesForPair,
 } from "../src/character/personFamilyNames.js";
+import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
 import { localizePersonDisplayName } from "../src/character/personNameLocalization.js";
 import { createStage1Population } from "../src/character/populationDomain.js";
 import {
@@ -36,13 +38,14 @@ import {
 import { deserializeSessionEnvelope, SAVE_SCHEMA_VERSION, serializeSessionEnvelope } from "../src/session/sessionPersistence.js";
 
 assert.deepEqual(MARRIAGE_SURNAME_CHANCES, {
-  wifeTakesHusband: 0.89,
+  wifeTakesHusband: 0.85,
   keepBoth: 0.05,
   husbandTakesWife: 0.05,
-  combineBoth: 0.01,
+  combineBoth: 0.05,
 });
 assert.equal(Object.values(MARRIAGE_SURNAME_CHANCES).reduce((sum, value) => sum + value, 0), 1);
 assert.equal(CHILD_PATERNAL_SURNAME_CHANCE, 0.9);
+assert.equal(COMPOUND_SURNAME_CHILD_RETENTION_CHANCE, 0.2);
 assert.equal(FAMILY_LINE_BIRTH_WEIGHT_MIN, 0.8);
 assert.equal(FAMILY_LINE_BIRTH_WEIGHT_MAX, 1.2);
 assert.equal(COMMON_PERSON_SURNAMES.length, 512);
@@ -75,7 +78,7 @@ for (const [surname, components] of componentsBySurname) {
 }
 
 const samples = new Map();
-for (let index = 0; index < 50_000 && samples.size < 4; index += 1) {
+for (let index = 0; index < 20_000 && samples.size < 4; index += 1) {
   const firstId = `pair-a-${index}`;
   const secondId = `pair-b-${index}`;
   const outcome = marriageSurnameOutcomeForPair(firstId, secondId);
@@ -101,6 +104,7 @@ for (const [outcome, [firstId, secondId]] of samples) {
   } else {
     assert.equal(personSurname(husband), personSurname(wife));
     assert.match(personSurname(husband), /^[A-Z][A-Za-z]+-[A-Z][A-Za-z]+$/u);
+    assert.equal(personSurname(husband).split("-").length, 2, "marriage never stacks a surname past two components");
   }
 }
 
@@ -115,6 +119,24 @@ for (let index = 0; index < childSamples; index += 1) {
 assert(paternal / childSamples >= 0.88 && paternal / childSamples <= 0.92,
   `paternal surname sampling should stay near 90%, got ${paternal / childSamples}`);
 assert.notEqual(personSurname(father), personSurname(mother));
+
+const compoundParent = makePerson("compound-parent", "Aster Smith-Gosling");
+let retainedCompound = 0;
+const compoundSamples = 5000;
+for (let index = 0; index < compoundSamples; index += 1) {
+  const inherited = childFamilySurname(compoundParent, null, `compound-child-${index}`);
+  if (inherited.includes("-")) retainedCompound += 1;
+  assert(inherited === "Smith" || inherited === "Gosling" || inherited === "Smith-Gosling");
+}
+const compoundRetention = retainedCompound / compoundSamples;
+assert(compoundRetention >= 0.18 && compoundRetention <= 0.22,
+  `compound surnames should usually collapse in the next generation, got retention ${compoundRetention}`);
+
+const familyTree = createDisplayFamilyTree(population, population[0].id);
+assert(familyTree);
+for (const node of [...familyTree.parents, ...familyTree.grandparents]) {
+  assert(node.fullDisplayName.split(/\s+/u).length >= 2, "real and fictional ancestry displays a surname");
+}
 
 const greatGrandparentGraph = lineageGraph("g", 3);
 assert(arePopulationPairCloseRelatives("g-left-0", "g-right-0", greatGrandparentGraph),
@@ -173,11 +195,15 @@ for (const contract of [
 ]) assert(paletteSource.includes(contract), `population event presentation exposes ${contract}`);
 
 const inspectionSource = readFileSync(new URL("../src/character/personInspectionRuntime.js", import.meta.url), "utf8");
-for (const contract of ["personSurname", "localizedFullPersonName", "fullDisplayName"]) {
-  assert(inspectionSource.includes(contract), `inspection exposes surname presentation: ${contract}`);
-}
+for (const contract of [
+  "localizePersonFullName",
+  "FAMILY_MARQUEE_HOLD_MS = 1000",
+  "updateFamilyMarqueeStates",
+  "state.hovered = hovered",
+  "else {\n        state.running = false;",
+]) assert(inspectionSource.includes(contract), `inspection exposes hover-finished marquee contract: ${contract}`);
 
-console.log("Task #101 surname inheritance, spelling, kinship guard, anti-dynasty and recent-event contracts OK");
+console.log("Task #101 surname inheritance, compound decay, ancestry labels, kinship guard and recent-event contracts OK");
 
 function makePerson(id, displayName) {
   return { id, displayName, ageYears: 30, lifeStatus: "alive", relationships: [], relatedPersonIds: [] };
