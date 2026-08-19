@@ -22,6 +22,7 @@ import {
   personSurname,
   surnameSidesForPair,
 } from "../src/character/personFamilyNames.js";
+import { localizedPersonLifeStageLabel, personSex, PERSON_SEXES } from "../src/character/personDemographics.js";
 import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
 import { localizePersonDisplayName } from "../src/character/personNameLocalization.js";
 import { createStage1Population } from "../src/character/populationDomain.js";
@@ -64,6 +65,13 @@ for (const person of population) {
     assert.equal(part[0], part[0].toUpperCase(), `surname component must be capitalized: ${person.displayName}`);
   }
 }
+
+const mira = population.find(({ id }) => id === "person-mira");
+const rowan = population.find(({ id }) => id === "person-rowan");
+assert.equal(personSex(mira), PERSON_SEXES.female);
+assert.equal(personSex(rowan), PERSON_SEXES.male);
+assert.equal(localizedPersonLifeStageLabel(mira, "ru"), "Взрослая");
+assert.equal(localizedPersonLifeStageLabel(rowan, "ru"), "Взрослый");
 
 const componentById = familyComponents(population);
 const componentsBySurname = new Map();
@@ -197,13 +205,16 @@ for (const contract of [
 const inspectionSource = readFileSync(new URL("../src/character/personInspectionRuntime.js", import.meta.url), "utf8");
 for (const contract of [
   "localizePersonFullName",
+  "localizedPersonLifeStageLabel",
   "FAMILY_MARQUEE_HOLD_MS = 1000",
   "updateFamilyMarqueeStates",
+  "familyMarqueeWindow",
+  "CARD.familyWidth - familyTitleText.width",
   "state.hovered = hovered",
   "else {\n        state.running = false;",
-]) assert(inspectionSource.includes(contract), `inspection exposes hover-finished marquee contract: ${contract}`);
+]) assert(inspectionSource.includes(contract), `inspection exposes family-card presentation contract: ${contract}`);
 
-console.log("Task #101 surname inheritance, compound decay, ancestry labels, kinship guard and recent-event contracts OK");
+console.log("Task #101 surname inheritance, compound decay, ancestry labels, age labels, kinship guard and recent-event contracts OK");
 
 function makePerson(id, displayName) {
   return { id, displayName, ageYears: 30, lifeStatus: "alive", relationships: [], relatedPersonIds: [] };
