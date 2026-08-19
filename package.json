@@ -89,7 +89,7 @@
     "check:task-098": "node scripts/check-task-098.mjs",
     "check:task-099": "node scripts/check-task-099.mjs",
     "check:task-100": "node scripts/check-task-100.mjs",
-    "check:task-101": "node scripts/check-task-101.mjs"
+    "check:task-101": "node scripts/check-task-101.mjs && node scripts/check-task-101-lineage.mjs"
   },
   "dependencies": {
     "@fontsource/pixelify-sans": "5.2.7",
