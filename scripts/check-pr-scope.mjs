@@ -61,3 +61,6 @@ assert.equal(malformed.preview, false);
 assert.equal(malformed.autoMerge, false);
 
 console.log("PR scope classifier passed: browser coverage and explicit ChatGPT pre-acceptance preview routing are stable");
+
+await import("./check-task-101-lineage.mjs");
+await import("./check-task-101.mjs");
