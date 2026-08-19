@@ -14,6 +14,14 @@ import {
   STAGE1_POPULATION_SIZE,
   VISIT_TIME_PERIODS,
 } from "./populationDomain.js";
+import {
+  applyMarriageFamilyNames,
+  childFamilySurname,
+  ensurePopulationFamilyNames,
+  familyLineBirthWeight,
+  visualSurnamePairPenaltyDays,
+  withPersonSurname,
+} from "./personFamilyNames.js";
 import { generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 
 export const MATURE_POPULATION_TARGET = 300;
@@ -47,6 +55,7 @@ export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
   if (!Array.isArray(population)) throw new Error("Mature population requires an array");
   assignGeneratedPopulationNames(population);
   if (population.some((person) => isGeneratedPersonId(person?.id)) || population.length > STAGE1_POPULATION_SIZE) {
+    ensurePopulationFamilyNames(population);
     return population;
   }
   const evaluationTime = nonNegativeNumber(worldTimeSeconds, 0);
@@ -60,6 +69,7 @@ export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
       worldTimeSeconds: evaluationTime,
     }));
   }
+  ensurePopulationFamilyNames(population);
   ensurePopulationPartners(population);
   seedExistingFamilies(population);
   return population;
@@ -145,6 +155,7 @@ export function birthTargetRateForPopulation(populationCount) {
 
 export function ensurePopulationPartners(population) {
   if (!Array.isArray(population)) return 0;
+  ensurePopulationFamilyNames(population);
   const byId = new Map(population.map((person) => [person.id, person]));
   const singles = population.filter((person) => (
     isLivingPopulationPerson(person)
@@ -158,14 +169,14 @@ export function ensurePopulationPartners(population) {
     if (used.has(first.id)) continue;
     const second = singles
       .filter((candidate) => candidate.id !== first.id && !used.has(candidate.id))
-      .filter((candidate) => !areCloseRelatives(first.id, candidate.id, byId))
+      .filter((candidate) => !arePopulationPairCloseRelatives(first.id, candidate.id, byId))
       .sort((a, b) => {
-        const ageDelta = Math.abs(lifeDaysForAgeYears(first.ageYears) - lifeDaysForAgeYears(a.ageYears))
-          - Math.abs(lifeDaysForAgeYears(first.ageYears) - lifeDaysForAgeYears(b.ageYears));
-        return ageDelta || stableUnit(`pair:${first.id}:${a.id}`) - stableUnit(`pair:${first.id}:${b.id}`);
+        const scoreDelta = pairCandidateScore(first, a, byId) - pairCandidateScore(first, b, byId);
+        return scoreDelta || stableUnit(`pair:${first.id}:${a.id}`) - stableUnit(`pair:${first.id}:${b.id}`);
       })[0];
     if (!second) continue;
     addReciprocalRelationship(first, second, PERSON_RELATIONSHIP_KINDS.partner, PERSON_RELATIONSHIP_KINDS.partner);
+    applyMarriageFamilyNames(first, second);
     used.add(first.id);
     used.add(second.id);
     created += 1;
@@ -257,8 +268,15 @@ function eligibleBirthPairs(population, boundaryTime) {
     pairs.push([first, second]);
   }
   const dayIndex = Math.floor(boundaryTime / PERSON_GAME_DAY_SECONDS);
-  return pairs.sort((left, right) => stableUnit(`birth-order:${dayIndex}:${pairKey(left[0].id, left[1].id)}`)
-    - stableUnit(`birth-order:${dayIndex}:${pairKey(right[0].id, right[1].id)}`));
+  return pairs.sort((left, right) => {
+    const leftKey = pairKey(left[0].id, left[1].id);
+    const rightKey = pairKey(right[0].id, right[1].id);
+    const leftPriority = stableUnit(`birth-order:${dayIndex}:${leftKey}`)
+      / familyLineBirthWeight(left[0], left[1], population);
+    const rightPriority = stableUnit(`birth-order:${dayIndex}:${rightKey}`)
+      / familyLineBirthWeight(right[0], right[1], population);
+    return leftPriority - rightPriority || leftKey.localeCompare(rightKey);
+  });
 }
 
 function createBirth(population, [first, second], boundaryTime, slot) {
@@ -266,7 +284,7 @@ function createBirth(population, [first, second], boundaryTime, slot) {
   const id = `person-born-${dayIndex}-${slot}-${population.length}`;
   const child = createGeneratedPopulationPerson({
     id,
-    displayName: generatedPopulationName(id),
+    displayName: withPersonSurname(generatedPopulationName(id), childFamilySurname(first, second, id)),
     ageYears: 0,
     worldTimeSeconds: boundaryTime,
     spendingCapacity: inheritedSpendingCapacity(first, second, id),
@@ -316,6 +334,7 @@ function seedExistingFamilies(population) {
     const existingSiblingIds = new Set([...childIdsForParent(first), ...childIdsForParent(second)]);
     addReciprocalRelationship(first, child, PERSON_RELATIONSHIP_KINDS.parent, PERSON_RELATIONSHIP_KINDS.child);
     addReciprocalRelationship(second, child, PERSON_RELATIONSHIP_KINDS.parent, PERSON_RELATIONSHIP_KINDS.child);
+    child.displayName = withPersonSurname(child.displayName, childFamilySurname(first, second, child.id));
     for (const siblingId of existingSiblingIds) {
       const sibling = byId.get(siblingId);
       if (sibling && sibling.id !== child.id) {
@@ -372,16 +391,35 @@ function inheritedVisitPeriods(first, second, childId) {
   return periods.slice(0, 2);
 }
 
-function areCloseRelatives(firstId, secondId, byId) {
+export function arePopulationPairCloseRelatives(firstId, secondId, byId) {
   const first = byId.get(firstId);
   const second = byId.get(secondId);
   if (!first || !second) return true;
   if (first.relationships.some((relationship) => relationship.personId === secondId
     && [PERSON_RELATIONSHIP_KINDS.parent, PERSON_RELATIONSHIP_KINDS.child, PERSON_RELATIONSHIP_KINDS.sibling].includes(relationship.kind))) return true;
-  const firstAncestors = ancestorIds(firstId, byId, 2);
-  const secondAncestors = ancestorIds(secondId, byId, 2);
+  const firstAncestors = ancestorIds(firstId, byId, 3);
+  const secondAncestors = ancestorIds(secondId, byId, 3);
   if (firstAncestors.has(secondId) || secondAncestors.has(firstId)) return true;
   return [...firstAncestors].some((id) => secondAncestors.has(id));
+}
+
+export function populationPairSoftPenaltyDays(firstId, secondId, byId) {
+  const first = byId.get(firstId);
+  const second = byId.get(secondId);
+  if (!first || !second) return Number.POSITIVE_INFINITY;
+  let penalty = visualSurnamePairPenaltyDays(first, second);
+  const firstFour = ancestorIds(firstId, byId, 4);
+  const secondFour = ancestorIds(secondId, byId, 4);
+  if (firstFour.has(secondId) || secondFour.has(firstId) || [...firstFour].some((id) => secondFour.has(id))) return penalty + 6;
+  const firstFive = ancestorIds(firstId, byId, 5);
+  const secondFive = ancestorIds(secondId, byId, 5);
+  if (firstFive.has(secondId) || secondFive.has(firstId) || [...firstFive].some((id) => secondFive.has(id))) penalty += 3;
+  return penalty;
+}
+
+function pairCandidateScore(first, candidate, byId) {
+  return Math.abs(lifeDaysForAgeYears(first.ageYears) - lifeDaysForAgeYears(candidate.ageYears))
+    + populationPairSoftPenaltyDays(first.id, candidate.id, byId);
 }
 
 function ancestorIds(personId, byId, depth) {

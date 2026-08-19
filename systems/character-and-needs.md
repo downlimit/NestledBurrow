@@ -7,12 +7,10 @@ Owns movement, time, sleep, energy and canonical `0..100` N/E/S/T/L/D needs. Hig
 ## Shared person need contract
 
 - Stage 3 gives persistent people spending capacity and food preferences. Stage 9 nominal life is `100` days / ~`40` real hours: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10`; individual boundaries vary by about ±1 day.
-- `ageYears` stores progress; `lifeStage` derives from age/timing. `lifeStatus` and reciprocal `partner/parent/child/sibling` links persist.
-- Mature population targets ~`300`; natural life is `98..102` days, with rare age-weighted accidents targeting ~`1..2%` lifetime risk. Dead residents remain in family history and never visit.
-- Generated residents use a deterministic `1000`-name pool; the initial 284 are distinct, legacy `Resident N` names are repaired, and births reuse the pool.
-- `youngAdult`/`adult` couples may have `1..3` children ≥`6` days apart. Mean births/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:0`, interpolated with daily variation.
-- Children persist and inherit spending, food preferences and visit periods with variation. Mature residents are seeded into prototype families; later eligible singles may pair offscreen, excluding close relatives. Skills/talents are not implemented.
-- No general time acceleration; sleep advances world time. `populationDomain` owns person data; `populationLifecycleDomain` owns seeding, naming repair, pairing, death/birth and balance; `personNames` owns names.
+- `ageYears` stores progress; `lifeStage` derives from age/timing. `lifeStatus` and reciprocal `partner/parent/child/sibling` links persist. Mature population targets ~`300`; natural life is `98..102` days and rare accidents target ~`1..2%` lifetime risk. Dead residents remain in family history and never visit.
+- Generated residents use a deterministic `1000`-name pool; legacy `Resident N` names are repaired. Real residents also have stable surnames: unrelated founder lines are distinct where possible. On pairing: `85%` wife-side takes husband-side surname, `5%` both keep, `5%` reverse, `5%` both take `A-B`; children inherit paternal surname `90%`, maternal `10%`.
+- `youngAdult`/`adult` couples may have `1..3` children ≥`6` days apart. Mean births/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:0`, interpolated with daily variation. Shared ancestry through great-grandparents forbids pairing; farther known ancestry and shared surname only lower pairing priority. Large living surname lines receive a mild `0.8..1.2` birth-priority correction without changing the daily birth target.
+- Children persist and inherit spending, food preferences and visit periods with variation. Skills/talents are not implemented. No general time acceleration; sleep advances world time. `populationDomain` owns person data; `populationLifecycleDomain` owns generations; `personNames` and `personFamilyNames` own given-name and surname policy.
 - Visit periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors `1/0.2`. Physical guests advance live needs/lifecycle and cannot die mid-visit.
 - One hysteretic N/E/S/T/L/D intent guides a live guest; critical non-food pressure may interrupt accepted-order waiting and later resume it.
 - Hover shows NESTLD after `667 ms`; at `1334 ms` the card expands into a family tree. Real parents win; missing ancestors are deterministic display-only placeholders, never population/save entities. All seven boxes are distinct; coarse pointers use long-press and bar edits persist.
@@ -50,7 +48,7 @@ Running is unavailable below `20 E`.
 - `T>25`: no modifier.
 - `0<=T<=25`: walk `1x`, run speed `1.15x`, run E surcharge `1.25x`.
 - T never slows walking or blocks running; long actions require `T>=20`.
-- `T=0` for `10` game minutes starts one unskippable accident: three `750 ms` shakes, puddle/scent hooks, `-20 N`, and witnessed `-15 D`. During the final `2 s`, T rises `0->70`, L falls `45`, then control returns.
+- `T=0` for `10` game minutes starts one unskippable accident: three `750 ms` shakes, puddle/scent hooks, `-20 N`, witnessed `-15 D`; final `2 s` raises T `0->70`, lowers L `45`, then returns control.
 
 | Activity | L loss/hour |
 |---|---:|
@@ -90,20 +88,19 @@ The target need is protected through exit; recovery is active-only. Normal cance
 
 ## Invariants
 
-- formulas stay deterministic, framework-free and JSON-safe;
-- time drain and discrete costs are additive;
-- presentation never rewrites safe motor position;
-- approach masks change automatic positioning, not timeline pose or effects;
+- formulas stay deterministic, framework-free and JSON-safe; time drain and discrete costs are additive;
+- presentation never rewrites safe motor position; approach masks alter automatic positioning, not timeline effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
-- saves exclude debug presets and interaction timeline state; population age/status/family/needs persist, including early death;
-- dead people stay addressable by ID for family history and never enter ordinary visit candidate pools;
+- saves exclude debug presets/timeline state; population age/status/family/full-name/needs persist, including early death;
+- dead people remain addressable for family history and never enter ordinary visit candidate pools;
 - fictional ancestry is presentation-only and never enters relationships, saves, births or tavern demand;
+- surname equality is presentation evidence, never proof of kinship; ancestry graph is authoritative;
 - one family-tree box never aliases another displayed identity.
 
 ## Current baseline
 
-`populationDomain` owns person data and the named 16-person baseline; `populationLifecycleDomain` expands mature worlds to 300 and advances generations. `personNames`, `guestIntentDomain`, `personInspectionRuntime` and `personFamilyTree` own names, live lifecycle, inspection and missing-history presentation.
+`populationDomain` owns person data and the named baseline; `populationLifecycleDomain` expands worlds to 300 and advances generations. `personNames`/`personFamilyNames`, `guestIntentDomain`, `personInspectionRuntime` and `personFamilyTree` own names, surname policy, live lifecycle, inspection and missing-history presentation.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:task-098`, `check:task-099`, `check:task-100`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:task-098`, `check:task-099`, `check:task-100`, `check:task-101`, `check:interaction`; focused browser E2E.

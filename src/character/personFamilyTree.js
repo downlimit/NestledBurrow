@@ -1,4 +1,5 @@
 import { localizePersonDisplayName } from "./personNameLocalization.js";
+import { personGivenName, personSurname } from "./personFamilyNames.js";
 import { commonNameForKey, generatedPopulationName, isLegacyResidentName } from "./personNames.js";
 import { PERSON_LIFE_STATUSES, PERSON_RELATIONSHIP_KINDS } from "./populationDomain.js";
 
@@ -56,12 +57,15 @@ function relationshipPeople(getPerson, person, kind) {
 
 function realNode(person, usedNames) {
   if (isLegacyResidentName(person.displayName)) person.displayName = generatedPopulationName(person.id);
-  const canonicalName = String(person.displayName ?? generatedPopulationName(person.id));
-  const displayName = localizePersonDisplayName(canonicalName);
+  const canonicalGivenName = personGivenName(person) || generatedPopulationName(person.id);
+  const displayName = localizePersonDisplayName(canonicalGivenName);
+  const localizedSurname = localizePersonDisplayName(personSurname(person));
+  const fullDisplayName = [displayName, localizedSurname].filter(Boolean).join(" ");
   usedNames.add(displayName.toLowerCase());
   return {
     id: person.id,
     displayName,
+    fullDisplayName,
     fictional: false,
     lifeStatus: person.lifeStatus ?? PERSON_LIFE_STATUSES.alive,
   };
@@ -80,6 +84,7 @@ function fictionalNode(key, usedNames) {
   return {
     id: `fictional-${stableHash(key).toString(16)}`,
     displayName,
+    fullDisplayName: displayName,
     fictional: true,
     lifeStatus: PERSON_LIFE_STATUSES.dead,
   };
