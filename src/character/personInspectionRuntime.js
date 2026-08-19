@@ -6,7 +6,7 @@ import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js"
 import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
 import { createDisplayFamilyTree } from "./personFamilyTree.js";
-import { personGivenName, personSurname } from "./personFamilyNames.js";
+import { canonicalFullPersonName, personSurname } from "./personFamilyNames.js";
 import { localizePersonDisplayName } from "./personNameLocalization.js";
 import { PERSON_LIFE_STATUSES } from "./populationDomain.js";
 
@@ -314,7 +314,7 @@ export function createPersonInspectionRuntime(scene, {
       .strokeRoundedRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1, 2);
     const color = fictional ? "#9e978c" : node?.lifeStatus === PERSON_LIFE_STATUSES.dead ? "#c9b7a0" : "#f2eadc";
     setManagedTextStyle(text, scene, { fontSize: "5px", color })
-      .setText(compactFamilyName(node?.fullDisplayName ?? node?.displayName))
+      .setText(compactFamilyName(node?.displayName))
       .setPosition(rect.x + 3, rect.y + 4)
       .setAlpha(alpha)
       .setVisible(true);
@@ -367,26 +367,25 @@ export function createPersonInspectionRuntime(scene, {
     forceExpanded,
     forceFamilyExpanded,
     setInspectedNeed,
-    getState: () => {
-      const person = personId ? getPerson(personId) : null;
-      const language = scene.localization?.getLanguage?.();
-      return {
-        personId,
-        displayName: person ? localizePersonDisplayName(personGivenName(person), language) || null : null,
-        fullDisplayName: person ? localizedFullPersonName(person, language) || null : null,
-        expanded,
-        familyExpanded,
-        pinned,
-        expandProgress,
-        familyProgress,
-        hoverElapsedMs,
-        leaveElapsedMs,
-        cardRect: cardRect ? { ...cardRect } : null,
-        needs: needRows.map((row) => ({ ...row })),
-        familyTree: familyTree ? cloneFamilyTree(familyTree) : null,
-        coarsePointer: Boolean(isCoarsePointer()),
-      };
-    },
+    getState: () => ({
+      personId,
+      displayName: personId
+        ? localizedFullPersonName(getPerson(personId), scene.localization?.getLanguage?.()) || null
+        : null,
+      expanded,
+      familyExpanded,
+      pinned,
+      expandProgress,
+      familyProgress,
+      hoverElapsedMs,
+      leaveElapsedMs,
+      cardRect: cardRect ? { ...cardRect } : null,
+      needs: needRows.map((row) => ({ ...row })),
+      familyTree: familyTree ? cloneFamilyTree(familyTree) : null,
+      coarsePointer: Boolean(isCoarsePointer()),
+      fullDisplayName: personId ? canonicalFullPersonName(getPerson(personId)) : null,
+      surname: personId ? personSurname(getPerson(personId)) : null,
+    }),
     isPointInHud(x, y) {
       return Boolean(cardRect && pointInRect({ x, y }, cardRect));
     },
@@ -422,7 +421,7 @@ function drawPairConnector(graphics, left, right, child) {
 
 function compactFamilyName(value) {
   const text = String(value ?? "-").trim() || "-";
-  return text.length <= 10 ? text : `${text.slice(0, 7)}...`;
+  return text.length <= 18 ? text : `${text.slice(0, 15)}...`;
 }
 
 function cloneFamilyTree(tree) {
@@ -436,9 +435,7 @@ function cloneFamilyTree(tree) {
 }
 
 function localizedFullPersonName(person, language) {
-  const givenName = localizePersonDisplayName(personGivenName(person), language);
-  const surname = localizePersonDisplayName(personSurname(person), language);
-  return [givenName, surname].filter(Boolean).join(" ");
+  return localizePersonDisplayName(canonicalFullPersonName(person), language);
 }
 
 function pointerWorldPoint(pointer, camera) {
