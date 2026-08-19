@@ -10,7 +10,7 @@ Owns construction, placeable lifecycle and asset/layout editing.
 - `BUILD / TEST` separates construction from prototype simulation; TEST never starts placement, move or demolition;
 - TEST grants canonical inventory/coins and then ordinary HUD/persistence refresh;
 - valid TEST actions give a short effects-channel click. Changed numeric rows emit signed `+N/-N` feedback that moves right, holds briefly and fades;
-- population proof uses a transient clone: `+1/+10/+100` days, drop to `240`, reset, alive/dead/stage counts and recent births/deaths. It never changes real clock, gameplay or save;
+- population proof uses a transient clone: `+1/+10/+100` days, drop to `240`, reset, alive/dead/stage counts and a rolling list of `10` recent people/events. Births, natural deaths and accidental deaths are deliberately mixed so one category cannot crowd out the others; compact labels distinguish born/died/accident. It never changes real clock, gameplay or save;
 - library items expose names/previews; placement uses the `16 px` grid;
 - the cursor anchor is the midpoint between the current pivot and current effective collider centre;
 - preview and commit share position, pivot, visual offset and effective collider; construction is not gameplay-persisted.
@@ -59,8 +59,8 @@ Canon export downloads `nestledburrow-authoring-canon.json` with layout, collide
 
 ## Current baseline
 
-Village objects use the full construction lifecycle. BUILD holds the catalog; TEST grants canonical food, produce, seeds, resources and coins and runs a transient demographic proof with audible presses and floating deltas. Burrow/Nest stairs and Atoll transitions share fixed-world move/collider/collision authoring; only the village exposes construction.
+Village objects use the full construction lifecycle. BUILD holds the catalog; TEST grants canonical food, produce, seeds, resources and coins and runs a transient demographic proof with audible presses, floating deltas and a mixed ten-event history. Burrow/Nest stairs and Atoll transitions share fixed-world move/collider/collision authoring; only the village exposes construction.
 
 ## Evidence
 
-`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `check:task-074`, `check:task-085`, `check:task-090`, `check:task-100`, `authoring-persistence.spec.js`.
+`check:build-mode`, `check:facilities`, `check:authoring`, `check:task-071`, `check:task-072`, `check:task-074`, `check:task-085`, `check:task-090`, `check:task-100`, `check:task-101`, `authoring-persistence.spec.js`.
