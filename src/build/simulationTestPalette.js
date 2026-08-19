@@ -20,6 +20,7 @@ import { emitSimulationTestActionFeedback } from "./simulationTestFeedback.js";
 import { getCurrentWorldScene } from "./worldSceneRegistry.js";
 
 const POPULATION_TEST_SANDBOXES = new WeakMap();
+const RECENT_POPULATION_EVENT_LIMIT = 10;
 const POPULATION_STAGE_ORDER = Object.freeze([
   PERSON_LIFE_STAGES.newborn,
   PERSON_LIFE_STAGES.infant,
@@ -73,9 +74,9 @@ const POPULATION_TEST_ITEMS = Object.freeze([
     populationTest: true,
   }),
   populationReadoutItem("population-events-title", () => populationEventsTitle()),
-  populationReadoutItem("population-event-0", () => populationEventLabel(0)),
-  populationReadoutItem("population-event-1", () => populationEventLabel(1)),
-  populationReadoutItem("population-event-2", () => populationEventLabel(2)),
+  ...Array.from({ length: RECENT_POPULATION_EVENT_LIMIT }, (_value, index) => (
+    populationReadoutItem(`population-event-${index}`, () => populationEventLabel(index))
+  )),
 ]);
 
 export const SIMULATION_TEST_GROUPS = Object.freeze([
@@ -224,7 +225,7 @@ function applyPopulationTestAction(gameplay, action) {
       accidentalDeaths: 0,
       stress: true,
     };
-    sandbox.events = [{ type: "stress", count: removedCount }];
+    sandbox.events = mergePopulationEventHistory([{ type: "stress", count: removedCount }], sandbox.events);
     const after = populationSnapshotFromSandbox(sandbox);
     return {
       status: "population-test-dropped",
@@ -255,27 +256,23 @@ function applyPopulationTestAction(gameplay, action) {
     stress: false,
   };
 
-  const births = sandbox.population.slice(beforeLength).map((person) => ({
-    type: "birth",
-    personId: person.id,
-    displayName: person.displayName,
-    parentNames: person.relationships
-      .filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)
-      .map(({ personId }) => sandbox.population.find((candidate) => candidate.id === personId)?.displayName)
-      .filter(Boolean)
-      .slice(0, 2),
-  }));
-  const accidentalIds = new Set(summary.accidentalDeathIds ?? []);
-  const deaths = [...beforeLiving.entries()]
-    .filter(([personId]) => sandbox.population.find((person) => person.id === personId)?.lifeStatus === PERSON_LIFE_STATUSES.dead)
-    .map(([personId, displayName]) => ({
-      type: "death",
-      cause: accidentalIds.has(personId) ? "accident" : "natural",
-      personId,
-      displayName,
-      parentNames: [],
-    }));
-  sandbox.events = [...births, ...deaths].slice(-6).reverse();
+  const arrivalIds = new Set(summary.arrivalIds ?? []);
+  const births = sandbox.population.slice(beforeLength)
+    .filter((person) => !arrivalIds.has(person.id))
+    .map((person) => ({
+      type: "birth",
+      personId: person.id,
+      displayName: person.displayName,
+      parentNames: person.relationships
+        .filter(({ kind }) => kind === PERSON_RELATIONSHIP_KINDS.child)
+        .map(({ personId }) => sandbox.population.find((candidate) => candidate.id === personId)?.displayName)
+        .filter(Boolean)
+        .slice(0, 2),
+    })).reverse();
+  const naturalDeaths = populationDeathEvents(summary.naturalDeathIds, "natural", sandbox.population, beforeLiving);
+  const accidents = populationDeathEvents(summary.accidentalDeathIds, "accident", sandbox.population, beforeLiving);
+  const recentEvents = diversePopulationEvents(births, naturalDeaths, accidents);
+  sandbox.events = mergePopulationEventHistory(recentEvents, sandbox.events);
   const after = populationSnapshotFromSandbox(sandbox);
   return {
     status: "population-test-advanced",
@@ -290,6 +287,46 @@ function applyPopulationTestAction(gameplay, action) {
     aliveCount: summary.aliveCount,
     feedbackDeltas: populationFeedbackDeltas(before, after),
   };
+}
+
+function populationDeathEvents(ids, cause, population, beforeLiving) {
+  return [...(ids ?? [])].reverse().map((personId) => ({
+    type: "death",
+    cause,
+    personId,
+    displayName: beforeLiving.get(personId)
+      ?? population.find((person) => person.id === personId)?.displayName
+      ?? personId,
+    parentNames: [],
+  }));
+}
+
+function diversePopulationEvents(births, naturalDeaths, accidents) {
+  const queues = [births, naturalDeaths, accidents].map((events) => [...events]);
+  const result = [];
+  while (result.length < RECENT_POPULATION_EVENT_LIMIT && queues.some((queue) => queue.length > 0)) {
+    for (const queue of queues) {
+      if (result.length >= RECENT_POPULATION_EVENT_LIMIT) break;
+      const event = queue.shift();
+      if (event) result.push(event);
+    }
+  }
+  return result;
+}
+
+function mergePopulationEventHistory(recent, previous) {
+  const seen = new Set();
+  const merged = [];
+  for (const event of [...recent, ...(previous ?? [])]) {
+    const key = event?.type === "stress"
+      ? `stress:${event.count}`
+      : `${event?.type}:${event?.cause ?? ""}:${event?.personId ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(event);
+    if (merged.length >= RECENT_POPULATION_EVENT_LIMIT) break;
+  }
+  return merged;
 }
 
 function evenlySpacedSample(source, count) {
@@ -469,18 +506,18 @@ function populationEventsTitle() {
 function populationEventLabel(index) {
   const snapshot = activePopulationSnapshot();
   const event = snapshot?.events?.[index];
-  if (!event) return isRussian() ? "Нет события" : "No event";
+  if (!event) return isRussian() ? "—" : "—";
   const language = isRussian() ? "ru" : "en";
   const name = shortName(localizePersonDisplayName(event.displayName, language));
-  if (event.type === "birth") return isRussian() ? `Рождение: ${name}` : `Birth: ${name}`;
+  if (event.type === "birth") return isRussian() ? `род. ${name}` : `born ${name}`;
   if (event.type === "death" && event.cause === "accident") {
-    return isRussian() ? `Несчастный случай: ${name}` : `Accident: ${name}`;
+    return isRussian() ? `несч. случ. ${name}` : `accident ${name}`;
   }
-  if (event.type === "death") return isRussian() ? `Смерть: ${name}` : `Death: ${name}`;
-  return isRussian() ? `Тест: убрано ${event.count}` : `Test: removed ${event.count}`;
+  if (event.type === "death") return isRussian() ? `ум. ${name}` : `died ${name}`;
+  return isRussian() ? `тест: -${event.count}` : `test: -${event.count}`;
 }
 
 function shortName(value) {
   const text = String(value ?? "-");
-  return text.length <= 18 ? text : `${text.slice(0, 15)}...`;
+  return text.length <= 24 ? text : `${text.slice(0, 21)}...`;
 }

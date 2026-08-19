@@ -28,6 +28,7 @@ import {
   naturalLifeDaysForPerson,
 } from "../src/character/populationLifecycleDomain.js";
 import { createDisplayFamilyTree } from "../src/character/personFamilyTree.js";
+import { personGivenName } from "../src/character/personFamilyNames.js";
 import { COMMON_PERSON_NAMES, generatedPopulationName } from "../src/character/personNames.js";
 import {
   getSimulationPopulationTestSnapshot,
@@ -88,7 +89,7 @@ assert.equal(seededPeople.length, 284);
 assert(seededPeople.every((person) => !/^Resident(?:\s|$)/i.test(person.displayName)), "generated residents receive real names");
 assert.equal(new Set(seededPeople.map((person) => person.displayName.toLowerCase())).size, seededPeople.length,
   "the initial mature population receives distinct names from the 1000-name pool");
-assert.equal(seededPeople[0].displayName, generatedPopulationName(seededPeople[0].id));
+assert.equal(personGivenName(seededPeople[0]), generatedPopulationName(seededPeople[0].id));
 const legacyNamed = clone(population.slice(0, 20));
 const legacyGenerated = legacyNamed.filter((person) => person.id.startsWith("person-seed-")).slice(0, 3);
 for (const person of legacyGenerated) person.displayName = `Resident ${person.id.slice(-3)}`;
@@ -214,7 +215,8 @@ for (const person of lowRun.slice(-60)) {
 }
 ensurePopulationPartners(lowRun);
 const lowSummary = advancePopulationLifecycle(lowRun, 120 * PERSON_GAME_DAY_SECONDS);
-assert(lowSummary.births > lowSummary.deaths, "aggressive births repair a population deficit");
+assert(lowSummary.births + lowSummary.arrivals > lowSummary.deaths,
+  "births plus arrivals repair a population deficit");
 assert(lowSummary.aliveCount >= 275 && lowSummary.aliveCount <= 330,
   `240-person deficit returns to working range, got ${lowSummary.aliveCount}`);
 

@@ -6,20 +6,20 @@ Owns movement, time, sleep, energy and canonical `0..100` N/E/S/T/L/D needs. Hig
 
 ## Shared person need contract
 
-- Stage 3 gives persistent people spending capacity and food preferences. Stage 9 nominal life is `100` days / ~`40` real hours: `newborn 1`, `infant 4`, `toddler 5`, `child 11`, `teen 16`, `youngAdult 21`, `adult 32`, `elder 10`; individual boundaries vary by about ±1 day.
-- `ageYears` stores progress; `lifeStage` derives from age/timing. `lifeStatus` and reciprocal `partner/parent/child/sibling` links persist.
-- Mature population targets ~`300`; natural life is `98..102` days, with rare age-weighted accidents targeting ~`1..2%` lifetime risk. Dead residents remain in family history and never visit.
-- Generated residents use a deterministic `1000`-name pool; the initial 284 are distinct, legacy `Resident N` names are repaired, and births reuse the pool.
-- `youngAdult`/`adult` couples may have `1..3` children ≥`6` days apart. Mean births/day: `<=240:6`, `260:5`, `280:4`, `300:3`, `320:2`, `340:1`, `>=360:0`, interpolated with daily variation.
-- Children persist and inherit spending, food preferences and visit periods with variation. Mature residents are seeded into prototype families; later eligible singles may pair offscreen, excluding close relatives. Skills/talents are not implemented.
-- No general time acceleration; sleep advances world time. `populationDomain` owns person data; `populationLifecycleDomain` owns seeding, naming repair, pairing, death/birth and balance; `personNames` owns names.
-- Visit periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule factors `1/0.2`. Physical guests advance live needs/lifecycle and cannot die mid-visit.
-- One hysteretic N/E/S/T/L/D intent guides a live guest; critical non-food pressure may interrupt accepted-order waiting and later resume it.
-- Hover shows NESTLD after `667 ms`; at `1334 ms` the card expands into a family tree. Real parents win; missing ancestors are deterministic display-only placeholders, never population/save entities. All seven boxes are distinct; coarse pointers use long-press and bar edits persist.
+- Life: nominal `100` days / ~`40` real hours: newborn `1`, infant `4`, toddler `5`, child `11`, teen `16`, youngAdult `21`, adult `32`, elder `10`; boundaries vary ~±1 day. Natural life `98..102` days; accidents ~`1..2%` lifetime.
+- `ageYears`, derived `lifeStage`, `lifeStatus` and reciprocal `partner/parent/child/sibling` persist. Dead remain family history and never visit. Mature population targets ~`300`.
+- Every resident resolves to stable male/female sex. Generated people are deterministic and near `50/50`; `partner` is valid only across opposite sexes and invalid same-sex partner edges are repaired. Husband/wife surname roles follow sex.
+- Generated residents use a deterministic `1000`-name pool; legacy names are repaired. Founder lines are distinct where possible. Marriage surnames: `85%` wife takes husband, `5%` both keep, `5%` reverse, `5%` both take `A-B`. Children inherit paternal/maternal side `90/10`; double surname survives in `20%`, else one component; max two components.
+- `youngAdult`/`adult` couples may have `1..3` children ≥`6` days apart. Mean births/day: `6@<=240`, `5@260`, `4@280`, `3@300`, `2@320`, `1@340`, `0@>=360`, interpolated with daily variation. Shared ancestry through great-grandparents blocks pairing; farther ancestry/shared surname only lowers priority.
+- Dense bloodlines lose birth priority and may be capped at fewer children. Visible surname diversity trends toward ~`90`: intervention starts below `105`, strengthens below `90`, strong floor `75`. Some replenishment slots become adult arrivals, max `2/day`; when possible `95%` restore an extinct surname root, `5%` introduce unused surnames. Arrivals have display-only missing ancestry.
+- Children inherit spending, food preferences and visit periods with variation. Skills/talents are not implemented.
+- Visit periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule `1/0.2`. Physical guests advance live needs/lifecycle and cannot die mid-visit.
+- One N/E/S/T/L/D intent guides a live guest; critical non-food pressure may interrupt accepted-order waiting and resume.
+- Hover shows NESTLD after `667 ms`; at `1334 ms` family tree expands. Missing ancestors are deterministic display-only opposite-sex family lines with plausible surname flow. Names are clipped per cell; long names scroll immediately on hover, loop, wait `1 s`, and repeat while hovered. Cursor leave lets the active loop finish. `СЕМЬЯ/FAMILY` is centered; expanded header adds localized age stage with sex-aware Russian grammar.
 
 ## Time, energy and satiety
 
-One hour is `60` real seconds. E/hour: ordinary `5`, walking `5.5`, running `8`. Actions: axe `0.2`, pickaxe `0.3`, hoe `0.15`, watering `0.1`, sword `0.75`, battle axe `0.1`. Targets: `20h` near-idle, `16..18h` normal, `14..16h` heavy.
+One hour is `60` real seconds. E/hour: ordinary `5`, walking `5.5`, running `8`. Actions: axe `0.2`, pickaxe `0.3`, hoe `0.15`, watering `0.1`, sword `0.75`, battle axe `0.1`. Targets: `20h` idle, `16..18h` normal, `14..16h` heavy.
 
 Waking rates: `S -7/hour`, `T -6/hour`, `N -1/hour`, `D -2/hour` without friendly company. L depends on activity.
 
@@ -32,9 +32,9 @@ physical cost = base * (1 + 0.5 * hunger) * urgency * repetition
 E recovery multiplier = 1 - 0.4 * hunger
 ```
 
-Activity surcharge: ordinary `0`, walking `0.5`, running `3`. At `S=15`, load/actions are `1.25x` and recovery `0.8x`; at `S=0`, `1.5x/0.6x`.
+Activity surcharge: ordinary `0`, walking `0.5`, running `3`. At `S=15`, load/actions `1.25x`, recovery `0.8x`; at `S=0`, `1.5x/0.6x`.
 
-No normal awake regeneration. At `E<15`, three inactive real seconds with `S>0` start catch-breath: `1 E/s` up to `15`. Sleep restores `14 E/game hour * recovery multiplier`. At `E=0`, collapse lasts at least two game hours and until `E=25`; other needs continue.
+No normal awake regeneration. At `E<15`, three inactive real seconds with `S>0` start catch-breath: `1 E/s` up to `15`. Sleep restores `14 E/game hour * recovery multiplier`. At `E=0`, collapse lasts ≥2 game hours and until `E=25`.
 
 ```text
 E>=30: speed 1
@@ -47,27 +47,16 @@ Running is unavailable below `20 E`.
 
 ## Toilet, lustre and movement
 
-- `T>25`: no modifier.
-- `0<=T<=25`: walk `1x`, run speed `1.15x`, run E surcharge `1.25x`.
-- T never slows walking or blocks running; long actions require `T>=20`.
-- `T=0` for `10` game minutes starts one unskippable accident: three `750 ms` shakes, puddle/scent hooks, `-20 N`, and witnessed `-15 D`. During the final `2 s`, T rises `0->70`, L falls `45`, then control returns.
-
-| Activity | L loss/hour |
-|---|---:|
-| idle, walking, conversation, cooking | 1 |
-| running | 2 |
-| watering | 1.5 |
-| axe/logging or hoe/soil | 3 |
-| pickaxe/mining | 4 |
-
-Resource work overrides running. Tool hits have no discrete L cost. HUD arrows show actual deltas for `660 ms`.
+- `T>25`: no modifier; `0<=T<=25`: walk `1x`, run `1.15x`, run E surcharge `1.25x`; long actions require `T>=20`.
+- `T=0` for `10` game minutes starts one unskippable accident: three `750 ms` shakes, puddle/scent hooks, `-20 N`, witnessed `-15 D`; final `2 s` raises T `0->70`, lowers L `45`.
+- L loss/hour: idle/walk/conversation/cooking `1`, running `2`, watering `1.5`, axe/hoe `3`, pickaxe `4`. Resource work overrides running; tool hits have no discrete L cost. HUD arrows show deltas for `660 ms`.
 
 ```text
 lustre speed = 1 - 0.50 * pressure(L,33)
 novelty drain multiplier = 1 + 0.5 * pressure(L,33)
 ```
 
-At `L=0`, speed is `0.5x` and N drain `1.5x`. E/L compose with a `0.5..1` clamp; T affects only running.
+At `L=0`, speed `0.5x`, N drain `1.5x`. E/L compose with a `0.5..1` clamp; T affects only running.
 
 ## Novelty and dialogue
 
@@ -77,7 +66,7 @@ NPC proximity pauses D loss; conversation restores `15..30 D`; shared rest may r
 
 ## Long interaction timeline
 
-Long uses `approach -> enter -> active -> exit -> free`. Activation uses A* through reachable profile points; enter/exit never moves the motor and effects are active-only.
+Long uses `approach -> enter -> active -> exit -> free`; A* reaches profile points, enter/exit never moves the motor, effects are active-only.
 
 | Profile | Protected | Enter | Exit | Emergency |
 |---|---|---:|---:|---:|
@@ -86,24 +75,23 @@ Long uses `approach -> enter -> active -> exit -> free`. Activation uses A* thro
 | table/eating | S | 500 ms | 650 ms | 300 ms |
 | bed/sleep | E | 1000 ms | 1200 ms | 500 ms |
 
-The target need is protected through exit; recovery is active-only. Normal cancel starts exit; urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
+Target need stays protected through exit. Cancel starts exit; urgent exit leaves `60%`; emergency uses profile time. Timelines are transient; load resumes `free`.
 
 ## Invariants
 
-- formulas stay deterministic, framework-free and JSON-safe;
-- time drain and discrete costs are additive;
-- presentation never rewrites safe motor position;
-- approach masks change automatic positioning, not timeline pose or effects;
+- formulas stay deterministic, framework-free and JSON-safe; time drain and discrete costs are additive;
+- presentation never rewrites safe motor position; approach masks alter automatic positioning, not timeline effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
-- saves exclude debug presets and interaction timeline state; population age/status/family/needs persist, including early death;
-- dead people stay addressable by ID for family history and never enter ordinary visit candidate pools;
+- saves exclude debug presets/timeline state; population age/status/family/full-name/needs persist, including early death;
+- dead people remain addressable for family history and never enter ordinary visit pools;
 - fictional ancestry is presentation-only and never enters relationships, saves, births or tavern demand;
+- surname equality is presentation evidence, never proof of kinship; ancestry graph is authoritative;
 - one family-tree box never aliases another displayed identity.
 
 ## Current baseline
 
-`populationDomain` owns person data and the named 16-person baseline; `populationLifecycleDomain` expands mature worlds to 300 and advances generations. `personNames`, `guestIntentDomain`, `personInspectionRuntime` and `personFamilyTree` own names, live lifecycle, inspection and missing-history presentation.
+`populationDomain` owns person data; `populationLifecycleDomain` expands worlds to 300 and advances generations. `personNames`/`personFamilyNames`, `populationLineageBalance`, `guestIntentDomain`, `personInspectionRuntime` and `personFamilyTree` own names, lineage renewal, live lifecycle, inspection and missing-history presentation.
 
 ## Evidence
 
-`check:needs`, `check:task-061`, `check:task-065`, `check:task-067`, `check:task-070`, `check:task-071`, `check:task-086`, `check:task-088`, `check:task-090`, `check:task-091`, `check:task-096`, `check:task-098`, `check:task-099`, `check:task-100`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-100`, `check:task-101`, `check:interaction`; focused browser E2E.

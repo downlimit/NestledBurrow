@@ -57,12 +57,19 @@ const LETTERS = Object.freeze({
 export function localizePersonDisplayName(value, language = currentPersonNameLanguage()) {
   const name = String(value ?? "").trim();
   if (!name || language !== "ru") return name;
-  return RUSSIAN_NAME_OVERRIDES[name] ?? transliterateName(name);
+  return name
+    .split(/\s+/u)
+    .map((token) => token.split("-").map(localizeNamePart).join("-"))
+    .join(" ");
 }
 
 export function currentPersonNameLanguage() {
   if (typeof document === "undefined") return "en";
   return String(document.documentElement?.lang ?? "en").toLowerCase().startsWith("ru") ? "ru" : "en";
+}
+
+function localizeNamePart(value) {
+  return RUSSIAN_NAME_OVERRIDES[value] ?? transliterateName(value);
 }
 
 function transliterateName(value) {

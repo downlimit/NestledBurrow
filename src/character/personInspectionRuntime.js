@@ -5,7 +5,10 @@ import { createNeedsPanelGeometry, drawNeedsPanel, NEED_PANEL_SIZE } from "../ui
 import { createManagedText, setManagedTextStyle } from "../ui/textResolution.js";
 import { PRESENTATION_DENSITY } from "../ui/presentationCameraRuntime.js";
 import { GAME_HEIGHT, GAME_WIDTH } from "../world/worldConfig.js";
+import { localizedPersonLifeStageLabel } from "./personDemographics.js";
 import { createDisplayFamilyTree } from "./personFamilyTree.js";
+import { personGivenName } from "./personFamilyNames.js";
+import { localizePersonFullName } from "./personFullNameLocalization.js";
 import { localizePersonDisplayName } from "./personNameLocalization.js";
 import { PERSON_LIFE_STATUSES } from "./populationDomain.js";
 
@@ -15,12 +18,17 @@ export const NPC_CARD_EXPAND_MS = 220;
 export const NPC_FAMILY_EXPAND_MS = 280;
 export const NPC_CARD_LEAVE_GRACE_MS = 660;
 
-const CARD = Object.freeze({ width: 84, familyWidth: 196, compactHeight: 14, expandedHeight: 82, margin: 4 });
+const CARD = Object.freeze({ width: 84, familyWidth: 196, compactHeight: 14, expandedHeight: 92, margin: 4 });
 const NEEDS_PANEL_OFFSET = Object.freeze({ x: Math.round((CARD.width - NEED_PANEL_SIZE.width) / 2), y: CARD.compactHeight });
 const ACTOR_HIT = Object.freeze({ halfWidth: 10, top: -28, bottom: 3 });
 const ACTOR_VISUAL_WORLD_HEIGHT = 16;
 const TOUCH_MOVE_CANCEL_PX = 7;
 const FAMILY_NODE_COUNT = 7;
+const FAMILY_MARQUEE_HOLD_MS = 1000;
+const FAMILY_MARQUEE_SPEED_PX_PER_SECOND = 14;
+const FAMILY_MARQUEE_GAP = "   ";
+const FAMILY_TEXT_GLYPH_ADVANCE = 6;
+const FAMILY_TEXT_SPACE_ADVANCE = 4;
 
 export function createPersonInspectionRuntime(scene, {
   getActivePersonBindings = () => [],
@@ -42,6 +50,14 @@ export function createPersonInspectionRuntime(scene, {
     fontSize: "5px",
     color: "#f2eadc",
   }).setDepth(HUD_DEPTH + 12).setScrollFactor(0).setVisible(false));
+  const familyMarqueeStates = Array.from({ length: FAMILY_NODE_COUNT }, () => ({
+    running: false,
+    hovered: false,
+    scrollable: false,
+    elapsedMs: 0,
+    scrollDurationMs: 0,
+    cycleMs: 0,
+  }));
   const cardHit = scene.add.zone(0, 0, CARD.width + CARD.familyWidth, CARD.expandedHeight)
     .setOrigin(0)
     .setDepth(HUD_DEPTH + 15)
@@ -61,6 +77,7 @@ export function createPersonInspectionRuntime(scene, {
   let cardRect = null;
   let needRows = [];
   let familyTree = null;
+  let familyNodeRects = [];
 
   cardHit.on("pointerdown", (pointer, _localX, _localY, event) => {
     event?.stopPropagation?.();
@@ -130,6 +147,7 @@ export function createPersonInspectionRuntime(scene, {
     familyProgress = familyTarget
       ? Math.min(1, familyProgress + familyStep)
       : Math.max(0, familyProgress - familyStep);
+    updateFamilyMarqueeStates(delta);
     if (!personId && expandProgress === 0 && familyProgress === 0) hide();
     else render();
   }
@@ -172,6 +190,42 @@ export function createPersonInspectionRuntime(scene, {
     }
   }
 
+  function updateFamilyMarqueeStates(deltaMs) {
+    const pointer = !isCoarsePointer() && familyExpanded && familyProgress >= 0.95
+      ? pointerScreenPoint(scene.input.activePointer)
+      : null;
+    familyMarqueeStates.forEach((state, index) => {
+      const hovered = Boolean(pointer && state.scrollable && familyNodeRects[index] && pointInRect(pointer, familyNodeRects[index]));
+      state.hovered = hovered;
+      if (hovered && !state.running) {
+        state.running = true;
+        state.elapsedMs = 0;
+      }
+      if (!state.running) return;
+      state.elapsedMs += deltaMs;
+      if (!hovered && state.scrollDurationMs > 0 && state.elapsedMs >= state.scrollDurationMs) {
+        state.running = false;
+        state.elapsedMs = 0;
+        return;
+      }
+      if (hovered && state.cycleMs > 0 && state.elapsedMs >= state.cycleMs) {
+        state.elapsedMs %= state.cycleMs;
+      }
+    });
+  }
+
+  function resetFamilyMarquees() {
+    familyNodeRects = [];
+    for (const state of familyMarqueeStates) {
+      state.running = false;
+      state.hovered = false;
+      state.scrollable = false;
+      state.elapsedMs = 0;
+      state.scrollDurationMs = 0;
+      state.cycleMs = 0;
+    }
+  }
+
   function selectPerson(nextPersonId, { pinExpanded = false } = {}) {
     if (!nextPersonId) {
       clearInspection();
@@ -185,6 +239,7 @@ export function createPersonInspectionRuntime(scene, {
     if (personId !== nextPersonId) {
       expandProgress = 0;
       familyProgress = 0;
+      resetFamilyMarquees();
     }
     personId = nextPersonId;
     pinned = pinExpanded;
@@ -205,6 +260,7 @@ export function createPersonInspectionRuntime(scene, {
     pinned = false;
     touchPress = null;
     familyTree = null;
+    resetFamilyMarquees();
     if (expandProgress === 0 && familyProgress === 0) hide();
   }
 
@@ -240,9 +296,12 @@ export function createPersonInspectionRuntime(scene, {
     graphics.clear().setVisible(true);
     graphics.fillStyle(0x171724, 0.96).fillRoundedRect(cardRect.x, cardRect.y, cardRect.width, cardRect.height, 2);
     graphics.lineStyle(1, 0xb39a6a, 0.95).strokeRoundedRect(cardRect.x + 0.5, cardRect.y + 0.5, cardRect.width - 1, cardRect.height - 1, 2);
-    const localizedName = localizePersonDisplayName(person.displayName, scene.localization?.getLanguage?.());
+    const language = scene.localization?.getLanguage?.();
+    const localizedName = localizePersonFullName(person, language);
+    const stageLabel = familyProgress >= 0.95 ? localizedPersonLifeStageLabel(person, language) : "";
+    const header = stageLabel ? `${localizedName} (${stageLabel})` : localizedName;
     setManagedTextStyle(nameText, scene, { fontSize: "7px", color: "#fff2c1" })
-      .setText(localizedName)
+      .setText(header)
       .setPosition(cardRect.x + 5, cardRect.y + 3)
       .setVisible(true);
     const rowsAlpha = Math.max(0, Math.min(1, (expandProgress - 0.8) / 0.2));
@@ -277,23 +336,23 @@ export function createPersonInspectionRuntime(scene, {
   function drawFamilyTree(tree, rect, alpha) {
     const panelX = rect.x + CARD.width;
     const title = scene.localization?.t?.("common:familyTree") ?? "FAMILY";
+    familyTitleText.setText(title);
     familyTitleText
-      .setText(title)
-      .setPosition(panelX + 5, rect.y + 3)
+      .setPosition(panelX + Math.round((CARD.familyWidth - familyTitleText.width) / 2), rect.y + 14)
       .setAlpha(alpha)
       .setVisible(true);
 
     const grandparentRects = Array.from({ length: 4 }, (_value, index) => ({
       x: panelX + 5 + index * 46,
-      y: rect.y + 13,
+      y: rect.y + 24,
       width: 41,
       height: 13,
     }));
     const parentRects = [
-      { x: panelX + 18, y: rect.y + 39, width: 66, height: 14 },
-      { x: panelX + 112, y: rect.y + 39, width: 66, height: 14 },
+      { x: panelX + 18, y: rect.y + 50, width: 66, height: 14 },
+      { x: panelX + 112, y: rect.y + 50, width: 66, height: 14 },
     ];
-    const focusRect = { x: panelX + 61, y: rect.y + 64, width: 74, height: 14 };
+    const focusRect = { x: panelX + 61, y: rect.y + 75, width: 74, height: 14 };
 
     graphics.lineStyle(1, 0x7e725f, 0.6 * alpha);
     drawPairConnector(graphics, grandparentRects[0], grandparentRects[1], parentRects[0]);
@@ -302,18 +361,53 @@ export function createPersonInspectionRuntime(scene, {
 
     const nodes = [...tree.grandparents, ...tree.parents, tree.focus];
     const rects = [...grandparentRects, ...parentRects, focusRect];
-    nodes.forEach((node, index) => drawFamilyNode(node, rects[index], familyNodeTexts[index], alpha, index === nodes.length - 1));
+    familyNodeRects = rects.map((nodeRect) => ({ ...nodeRect }));
+    nodes.forEach((node, index) => drawFamilyNode(
+      node,
+      rects[index],
+      familyNodeTexts[index],
+      familyMarqueeStates[index],
+      alpha,
+      index === nodes.length - 1,
+    ));
   }
 
-  function drawFamilyNode(node, rect, text, alpha, focus = false) {
+  function drawFamilyNode(node, rect, text, marqueeState, alpha, focus = false) {
     const fictional = Boolean(node?.fictional);
     const fillAlpha = (fictional ? 0.36 : focus ? 0.9 : 0.66) * alpha;
     graphics.fillStyle(focus ? 0x3a3328 : 0x242433, fillAlpha).fillRoundedRect(rect.x, rect.y, rect.width, rect.height, 2);
     graphics.lineStyle(1, focus ? 0xb39a6a : 0x766f66, (fictional ? 0.45 : 0.8) * alpha)
       .strokeRoundedRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1, 2);
     const color = fictional ? "#9e978c" : node?.lifeStatus === PERSON_LIFE_STATUSES.dead ? "#c9b7a0" : "#f2eadc";
-    setManagedTextStyle(text, scene, { fontSize: "5px", color })
-      .setText(compactFamilyName(node?.displayName))
+    setManagedTextStyle(text, scene, { fontSize: "5px", color });
+    setFamilyNodeMarquee(text, node?.fullDisplayName ?? node?.displayName, rect, marqueeState, alpha);
+  }
+
+  function setFamilyNodeMarquee(text, value, rect, state, alpha) {
+    const fullName = String(value ?? "-").trim() || "-";
+    const availableWidth = Math.max(1, rect.width - 6);
+    text.setText(fullName);
+    state.scrollable = text.width > availableWidth;
+    if (!state.scrollable) {
+      state.running = false;
+      state.elapsedMs = 0;
+      state.scrollDurationMs = 0;
+      state.cycleMs = 0;
+      text.setPosition(rect.x + 3, rect.y + 4).setAlpha(alpha).setVisible(true);
+      return;
+    }
+
+    const loopPrefix = `${fullName}${FAMILY_MARQUEE_GAP}`;
+    text.setText(loopPrefix);
+    const cycleDistance = Math.max(1, text.width);
+    state.scrollDurationMs = cycleDistance / FAMILY_MARQUEE_SPEED_PX_PER_SECOND * 1000;
+    state.cycleMs = state.scrollDurationMs + FAMILY_MARQUEE_HOLD_MS;
+    const phaseMs = state.running ? Math.min(state.elapsedMs, state.cycleMs) : 0;
+    const offset = phaseMs < state.scrollDurationMs
+      ? Math.min(cycleDistance, phaseMs * FAMILY_MARQUEE_SPEED_PX_PER_SECOND / 1000)
+      : 0;
+    const visibleText = familyMarqueeWindow(`${loopPrefix}${fullName}`, offset, availableWidth);
+    text.setText(visibleText)
       .setPosition(rect.x + 3, rect.y + 4)
       .setAlpha(alpha)
       .setVisible(true);
@@ -328,6 +422,7 @@ export function createPersonInspectionRuntime(scene, {
     cardRect = null;
     needRows = [];
     familyTree = null;
+    familyNodeRects = [];
     graphics.clear().setVisible(false);
     nameText.setVisible(false);
     hideFamilyTexts();
@@ -366,23 +461,27 @@ export function createPersonInspectionRuntime(scene, {
     forceExpanded,
     forceFamilyExpanded,
     setInspectedNeed,
-    getState: () => ({
-      personId,
-      displayName: personId
-        ? localizePersonDisplayName(getPerson(personId)?.displayName ?? "", scene.localization?.getLanguage?.()) || null
-        : null,
-      expanded,
-      familyExpanded,
-      pinned,
-      expandProgress,
-      familyProgress,
-      hoverElapsedMs,
-      leaveElapsedMs,
-      cardRect: cardRect ? { ...cardRect } : null,
-      needs: needRows.map((row) => ({ ...row })),
-      familyTree: familyTree ? cloneFamilyTree(familyTree) : null,
-      coarsePointer: Boolean(isCoarsePointer()),
-    }),
+    getState: () => {
+      const person = personId ? getPerson(personId) : null;
+      const language = scene.localization?.getLanguage?.();
+      return {
+        personId,
+        displayName: person ? localizePersonDisplayName(personGivenName(person), language) || null : null,
+        fullDisplayName: person ? localizePersonFullName(person, language) || null : null,
+        lifeStageLabel: person ? localizedPersonLifeStageLabel(person, language) || null : null,
+        expanded,
+        familyExpanded,
+        pinned,
+        expandProgress,
+        familyProgress,
+        hoverElapsedMs,
+        leaveElapsedMs,
+        cardRect: cardRect ? { ...cardRect } : null,
+        needs: needRows.map((row) => ({ ...row })),
+        familyTree: familyTree ? cloneFamilyTree(familyTree) : null,
+        coarsePointer: Boolean(isCoarsePointer()),
+      };
+    },
     isPointInHud(x, y) {
       return Boolean(cardRect && pointInRect({ x, y }, cardRect));
     },
@@ -403,6 +502,33 @@ export function createPersonInspectionRuntime(scene, {
   };
 }
 
+function familyMarqueeWindow(value, offsetPx, maxWidth) {
+  const source = String(value ?? "");
+  if (!source) return "";
+  const safeOffset = Math.max(0, Number(offsetPx) || 0);
+  let startIndex = 0;
+  let consumed = 0;
+  while (startIndex < source.length) {
+    const advance = familyCharacterAdvance(source[startIndex]);
+    if (consumed + advance > safeOffset) break;
+    consumed += advance;
+    startIndex += 1;
+  }
+  let visible = "";
+  let width = 0;
+  for (let index = startIndex; index < source.length; index += 1) {
+    const advance = familyCharacterAdvance(source[index]);
+    if (width + advance > maxWidth) break;
+    visible += source[index];
+    width += advance;
+  }
+  return visible || source[startIndex] || source[0];
+}
+
+function familyCharacterAdvance(character) {
+  return character === " " ? FAMILY_TEXT_SPACE_ADVANCE : FAMILY_TEXT_GLYPH_ADVANCE;
+}
+
 function drawPairConnector(graphics, left, right, child) {
   const leftX = left.x + left.width / 2;
   const rightX = right.x + right.width / 2;
@@ -414,11 +540,6 @@ function drawPairConnector(graphics, left, right, child) {
   graphics.lineBetween(rightX, right.y + right.height, rightX, midY);
   graphics.lineBetween(leftX, midY, rightX, midY);
   graphics.lineBetween(childX, midY, childX, childTop);
-}
-
-function compactFamilyName(value) {
-  const text = String(value ?? "-").trim() || "-";
-  return text.length <= 10 ? text : `${text.slice(0, 7)}...`;
 }
 
 function cloneFamilyTree(tree) {
