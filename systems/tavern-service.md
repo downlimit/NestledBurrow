@@ -25,14 +25,17 @@ These terms are canonical. They describe different layers of the same system and
 - **Visit motive (`visitMotive`)** — the current need-based reason to consider a venue.
 - **Visit opportunity (`visitOpportunity`)** — one bounded chance for a population member to consider the venue.
 - **Popularity / flow pressure (`popularity`)** — a separate bounded persistent value controlling opportunity cadence. Organic gain is slow; explicit rare-event/dev impulses may be sharp.
-- **Reputation profile (`reputationProfile`)** — descriptive venue identity that biases audience composition. Sale tags and universal service reliability remain separate dimensions; discovery weight stays positive.
+- **Reputation profile (`reputationProfile`)** — descriptive venue identity that biases audience composition. Sale tags, including observed price segment, and universal service reliability remain separate dimensions; discovery weight stays positive.
 - **Personal venue opinion (`venueOpinion`)** — one person's bounded attitude from direct experience, with gradual world-time drift toward neutral.
 - **Venue offer (`venueOffer`)** — currently promised menu, goods, activities or facilities; unoffered inventory creates no demand.
 - **Food preference (`foodPreference`)** — layered cuisine, dish-class and ingredient tastes.
-- **Offer fit (`offerFit`)** — motive, taste and budget fit for the current offer; affordability failure is ordinary mismatch.
+- **Ценовой сегмент (`priceBand`)** — coarse price class of one offered product: `budget`, `standard` or `premium`. Current fixed-price thresholds are `<=2`, `<=4`, `>4` coins and remain balance constants.
+- **Ценовое предпочтение (`pricePreference`)** — stable person taste for `budget`, `premium` or neither (`neutral`), independent from wealth.
+- **Ценовая чувствительность (`priceSensitivity`)** — strength of that non-neutral preference. It changes willingness, never the affordability ceiling.
+- **Offer fit (`offerFit`)** — motive, food taste, price preference and budget fit for the current offer; affordability failure is ordinary mismatch.
 - **Visit memory (`visitMemory`)** — remembered visits, outcomes, purchases and recency.
 - **Recent-visit suppression (`recentVisitSuppression`)** — a soft repeat-visit reduction that fades with world time.
-- **Spending capacity (`spendingCapacity`)** — the person's affordable price range.
+- **Spending capacity (`spendingCapacity`)** — the person's persistent purchasing-power/wealth proxy and hard affordable price ceiling; it is distinct from price preference.
 - **Influence (`influence`)** — future receiver-specific social reach based on tastes and relationships.
 - **Potential demand (`potentialDemand`)** — people currently willing to visit before physical constraints.
 - **Service capacity (`serviceCapacity`)** — demand the live venue can admit and serve.
@@ -49,7 +52,7 @@ venue is open or scheduled open
 → one persistent person becomes a candidate, biased by reputation but never hard-locked by it
 → that person's offscreen needs are reconstructed
 → current needs create one or more possible visit motives
-→ venue offer is compared with motive, tastes and spending capacity
+→ venue offer is compared with motive, food tastes, price preference and spending capacity
 → reputation fit, personal venue opinion and recent-visit suppression are applied
 → the person decides whether to visit, alone or eventually with a group
 → physical service capacity determines whether the willing visit can actually be served
@@ -57,11 +60,11 @@ venue is open or scheduled open
 → all of that person's needs become live while present
 → service, facilities and other people produce an actual experience
 → the visit updates personal memory and opinion
-→ the experience contributes reputation evidence and may weakly reinforce aggregate flow
+→ the completed sale contributes food-tag and price-segment reputation evidence and may weakly reinforce aggregate flow
 → later social systems propagate that experience selectively through real relationships
 ```
 
-Four separate questions remain visible: popularity controls **reach**; reconstructed needs create **motive**; offer/tastes/budget/reputation/opinion determine **choice**; physical capacity and service determine **conversion**. Flow never changes wealth. Unsuitable pre-commitment offers create missed revenue. Descriptive reputation has inertia, while positive discovery weight lets a changed menu redirect the audience progressively.
+Four separate questions remain visible: popularity controls **reach**; reconstructed needs create **motive**; offer/tastes/price/budget/reputation/opinion determine **choice**; physical capacity and service determine **conversion**. Flow never changes wealth. Unsuitable pre-commitment offers create missed revenue. Descriptive reputation has inertia, while positive discovery weight lets a changed menu redirect the audience progressively.
 
 ## Flow density and pacing
 
@@ -79,10 +82,20 @@ Self-service atomically claims the free table and reserves its exact displayed i
 
 ## Food offer and pricing
 
-- Prices are fixed; the player controls offer, quality, quantity and fulfillment capacity.
+- Prices are currently fixed; the player controls offer, quality, quantity and fulfillment capacity. Player-authored prices are future work.
+- Price complexity and price segment are independent concepts. Expensive food is not intrinsically better, and cheap food is not intrinsically worse.
+- Affordability is a hard gate: an item above `spendingCapacity` cannot be ordered. Price preference is a separate soft fit after that gate. A low-wealth premium-preferring person may want expensive food but still choose only among affordable items; a rich budget-preferring person may deliberately favor cheap food.
+- Neutral people ignore price segment. Non-neutral people prefer their matching segment according to stable sensitivity; adjacent/opposite segments reduce willingness without changing their money.
+- The menu may legally contain only cheap, only middle-priced or eventually only premium items. There is no rule requiring the player to maintain a mixed-price menu.
 - Food preference layers are cuisine/origin, dish class and ingredients; exact weights are balance constants.
 - Inspecting an unsuitable offer and buying nothing is missed revenue without feedback damage.
 - Dish quality `bronze → silver → gold → platinum` is probabilistic from ingredient quality, cooking skill, equipment, recipe difficulty and modifiers; no hard tier cap, so high skill may sometimes rescue poor inputs. Recipes aggregate ingredient quality by default, with optional weights only for meaningful exceptions; gardening and repair may improve inputs/equipment.
+
+## Price audience and reputation inertia
+
+Completed sales add the current item's price segment to the same inertial descriptive reputation evidence used by cuisine/dish/ingredient tags. Repeated cheap sales progressively make budget-preferring people more likely candidates; repeated sales in another segment gradually redirect that evidence. A single changed sale cannot instantly replace the established audience.
+
+Wealth and price preference remain separate. Reputation may bias which people hear about or consider the venue, while every otherwise eligible person retains positive discovery weight. Changing menu prices or segment therefore may temporarily reduce effective demand until the venue accumulates matching evidence; it does not spawn an immediately matching audience and does not alter anyone's wealth.
 
 ## Opening hours and menu activation
 
@@ -117,6 +130,7 @@ Validation proceeds through observable slices that may be revised after playtest
 7. **Groups and time:** stable relationships and shared-clock schedule profiles shape plausible visitors and groups of up to three.
 8. **Venue formats:** ordered food and live infrastructure produce assisted dine-in, takeaway or self-service behavior per visit.
 9. **Social lifecycle:** relationships, families, ageing, death and replenishment deepen the population.
+10. **Price audience:** persistent purchasing power, independent price preference and inertial price-segment reputation shape affordable choice and audience composition.
 
 Early play prioritizes optimization, then recognizable people, then need-driven social situations.
 
@@ -131,11 +145,11 @@ Early play prioritizes optimization, then recognizable people, then need-driven 
 
 ## Live guest intent
 
-`guestIntentDomain` owns deterministic live rates, one hysteretic N/E/S/T/L/D intent, interruption, menu timing, takeout and satisfaction policy; `guestRuntime` owns routes/orders. Critical pressure may interrupt accepted waiting, use ordinary toilet/wash facilities (quick sink before stronger shower), rest, wander or converse, then resume the same valid commitment. Player talk uses shared interaction and never seizes control.
+`guestIntentDomain` owns deterministic live rates, one hysteretic N/E/S/T/L/D intent, interruption, takeout and satisfaction policy; `guestRuntime` owns routes/orders. Critical pressure may interrupt accepted waiting, use ordinary toilet/wash facilities (quick sink before stronger shower), rest, wander or converse, then resume the same valid commitment. Player talk uses shared interaction and never seizes control.
 
 ## Implemented stages
 
-Stages 1–4 provide persistent people, offer, demand, order and history; Stage 5 adds live needs/service/satisfaction; Stage 6 adds opinion, reputation and flow. Stage 7 independently combines reputation/time, invites linked on-time people and keeps each agreeing guest independent. Stage 8 derives assisted, takeaway and self-service behavior per participant from the ordered item and live infrastructure.
+Stages 1–4 provide persistent people, offer, demand, order and history; Stage 5 adds live needs/service/satisfaction; Stage 6 adds opinion, reputation and flow. Stage 7 independently combines reputation/time, invites linked on-time people and keeps each agreeing guest independent. Stage 8 derives assisted, takeaway and self-service behavior per participant from the ordered item and live infrastructure. Stage 10 adds wealth/affordability semantics, independent price preference and inertial price-audience evidence without requiring new menu UI.
 
 ## Owners
 
@@ -147,14 +161,14 @@ Stages 1–4 provide persistent people, offer, demand, order and history; Stage 
 - guest flow/pathing: `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`;
 - live need/intent policy: `src/tavern/guestIntentDomain.js`;
 - scheduling and orchestration: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`;
-- persistent opinion, descriptive reputation, flow cadence and overload/closure feedback formulas: `src/tavern/tavernFeedbackDomain.js`;
+- persistent opinion, descriptive food/price reputation, flow cadence and overload/closure feedback formulas: `src/tavern/tavernFeedbackDomain.js`;
 - time/reputation candidate diagnostics and linked-party selection: `src/tavern/visitPartyDomain.js`;
 - order state, timers and legal transitions: `src/tavern/orderDomain.js`;
 - visit decision and diagnostic breakdown: `src/tavern/visitDemandDomain.js`; canonical prices/tags/allowed service formats: `src/tavern/saleProfileDomain.js`;
 - active food offer: `src/tavern/venueOfferDomain.js`; unified sign-menu presentation/input and activity switch: `src/tavern/venueMenuRuntime.js`;
 - overhead thought/action owner: `src/tavern/overheadPresentationRuntime.js`; guest adapter: `src/tavern/guestFeedback.js`;
 - payment: `src/tavern/coinRuntime.js`;
-- persistent people, budgets/preferences and offscreen needs: `src/character/populationDomain.js` (external owner consumed through its public evaluation API);
+- persistent people, wealth ceiling and food preferences: `src/character/populationDomain.js`; derived wealth labels and price preference/sensitivity: `src/character/personEconomyProfile.js`;
 - `WorldScene` composes owners and delegates updates and callbacks.
 
 ## Invariants
@@ -167,6 +181,9 @@ Stages 1–4 provide persistent people, offer, demand, order and history; Stage 
 - sign, stock reservation and service lifecycle cannot contradict each other;
 - an active menu uses bounded flow pressure to scale the prototype three-to-eight-second opportunity cadence; this interval is not target progression balance;
 - `venueOffer` remains independent from physical stock: stock cannot create or block demand, and zero stock does not prevent an exact order from being offered;
+- price preference never overrides `spendingCapacity`; wealth, price preference, food taste, opinion, reputation and flow remain distinct variables;
+- no price segment is intrinsically superior. The player may legally run a single-segment menu; audience mismatch is demand fit, not a universal satisfaction penalty;
+- completed sales reinforce their price-segment tag with the same inertia as descriptive food tags; changing segment redirects audience progressively and discovery weight never reaches zero;
 - a live visit keeps separate technical `guestId` and stable `personId`; one person cannot have two active visits, and fulfillment may reserve only exact `order.itemId` after acceptance;
 - the sale profile bounds allowed visit-local formats: potato never becomes takeaway; lemonade may be assisted, takeaway or exact-stock self-service;
 - self-service atomically claims one free service place and one exact displayed portion, creates no `take-order` interaction and falls back to a physically available ordinary path after a failed capture;
@@ -179,22 +196,22 @@ Stages 1–4 provide persistent people, offer, demand, order and history; Stage 
 - lemonade is two coins and may use takeaway; fried potato is four-coin dine-in;
 - canonical needs, exact order and service-table ownership persist; transient intent/presentation may re-arbitrate after load;
 - satisfaction tier 3 is neutral, tiers 4–5 strengthen that person's opinion and tiers 1–2 weaken it; satisfaction itself is never persisted;
-- completed sales reinforce their canonical cuisine/dish-class/ingredient tags with inertia, while universal service reliability remains a separate reputation dimension;
+- completed sales reinforce their canonical cuisine/dish-class/ingredient/price-band tags with inertia, while universal service reliability remains a separate reputation dimension;
 - reputation biases candidate weighting while every otherwise eligible person retains a strictly positive discovery weight;
 - shared-clock time multiplies reputation weight independently; off-schedule weight stays positive and flow cadence is unchanged. Only linked, inactive, on-time invitees independently evaluate the existing full visit decision;
 - an agreeing group of at most three fits `GUEST_ACTIVE_CAP` as one unit or nobody spawns and each records `open-unserved`; spawned guests keep separate identity, order, needs, service, payment, history and opinion;
-- flow pressure changes opportunity cadence only and cannot mutate population tastes, wealth, opinions or reputation tags;
+- flow pressure changes opportunity cadence only and cannot mutate population tastes, wealth, price preference, opinions or reputation tags;
 - willing demand at the live cap and a materialized guest timing out without service capacity both record `open-unserved`; accepted-order failure has stronger feedback, sustained manual closure has weaker feedback;
 - the physical guest count remains bounded by `GUEST_ACTIVE_CAP`; excess willing demand becomes offscreen feedback outcomes.
 
 ## Current baseline
 
-Guests independently receive assisted, takeaway or self-service behavior after demand/group selection. Assisted orders retain manual acceptance, takeaway frees the handoff table after transfer, and pre-set exact stock may be captured without `take-order`. Interruptions resume the same order, satisfaction precedes payment, and history/feedback update once per person. Opinion/reliability affect willingness; reputation and coarse time independently bias candidates; flow controls cadence.
+Guests independently receive assisted, takeaway or self-service behavior after demand/group selection. Assisted orders retain manual acceptance, takeaway frees the handoff table after transfer, and pre-set exact stock may be captured without `take-order`. Interruptions resume the same order, satisfaction precedes payment, and history/feedback update once per person. Affordability is a hard wealth ceiling; stable price preference modifies affordable item choice; completed sales build inertial food and price-segment reputation. Opinion/reliability affect willingness; reputation and coarse time independently bias candidates; flow controls cadence.
 
 ## Not yet
 
-Recipe book, broader ingredients/storage, influence, relationship propagation, configurable schedules, families, staff, chairs/seated poses, shared tables/group payment, a visible queue/forecast panel, event format and non-food venue formats.
+Recipe book, broader ingredients/storage, player-authored prices, recipe complexity/margin balance, influence, relationship propagation, configurable schedules, families, staff, chairs/seated poses, shared tables/group payment, a visible queue/forecast panel, event format, non-food venue formats and competing NPC businesses.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`; focused service-format, order, population, feedback, group and live-visit Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-102`; focused service-format, order, population, feedback, group and live-visit Browser E2E.

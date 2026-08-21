@@ -12,6 +12,8 @@ Owns movement, time, sleep, energy and canonical `0..100` N/E/S/T/L/D needs. Hig
 - Generated residents use a deterministic `1000`-name pool; legacy names are repaired. Founder lines are distinct where possible. Marriage surnames: `85%` wife takes husband, `5%` both keep, `5%` reverse, `5%` both take `A-B`. Children inherit paternal/maternal side `90/10`; double surname survives in `20%`, else one component; max two components.
 - `youngAdult`/`adult` couples may have `1..3` children ≥`6` days apart. Mean births/day: `6@<=240`, `5@260`, `4@280`, `3@300`, `2@320`, `1@340`, `0@>=360`, interpolated with daily variation. Shared ancestry through great-grandparents blocks pairing; farther ancestry/shared surname only lowers priority.
 - Dense bloodlines lose birth priority and may be capped at fewer children. Visible surname diversity trends toward ~`90`: intervention starts below `105`, strengthens below `90`, strong floor `75`. Some replenishment slots become adult arrivals, max `2/day`; when possible `95%` restore an extinct surname root, `5%` introduce unused surnames. Arrivals have display-only missing ancestry.
+- `spendingCapacity` remains the persistent purchasing-power/wealth proxy (`2/4/6` in the current balance) and is inherited by children with variation. It is a hard affordability ceiling, not a taste for cheap or expensive goods.
+- `personEconomyProfile` derives a stable price preference (`budget/neutral/premium`) and preference strength from person identity independently of wealth. A rich person may prefer cheap offers; a low-wealth person may prefer premium offers but cannot bypass `spendingCapacity`. Neutral people receive no price-band preference effect. These derived traits are recoverable from stable ID and are not additional save fields.
 - Children inherit spending, food preferences and visit periods with variation. Skills/talents are not implemented.
 - Visit periods: night `00..06`, morning `06..12`, day `12..18`, evening `18..24`; preferred/off-schedule `1/0.2`. Physical guests advance live needs/lifecycle and cannot die mid-visit.
 - One N/E/S/T/L/D intent guides a live guest; critical non-food pressure may interrupt accepted-order waiting and resume.
@@ -83,6 +85,7 @@ Target need stays protected through exit. Cancel starts exit; urgent exit leaves
 - presentation never rewrites safe motor position; approach masks alter automatic positioning, not timeline effects;
 - `WorldLocationRuntime` owns location facility/needs lifecycle;
 - saves exclude debug presets/timeline state; population age/status/family/full-name/needs persist, including early death;
+- `spendingCapacity` is persistent wealth/affordability; derived price preference never mutates wealth and never bypasses affordability;
 - dead people remain addressable for family history and never enter ordinary visit pools;
 - fictional ancestry is presentation-only and never enters relationships, saves, births or tavern demand;
 - surname equality is presentation evidence, never proof of kinship; ancestry graph is authoritative;
@@ -90,8 +93,8 @@ Target need stays protected through exit. Cancel starts exit; urgent exit leaves
 
 ## Current baseline
 
-`populationDomain` owns person data; `populationLifecycleDomain` expands worlds to 300 and advances generations. `personNames`/`personFamilyNames`, `populationLineageBalance`, `guestIntentDomain`, `personInspectionRuntime` and `personFamilyTree` own names, lineage renewal, live lifecycle, inspection and missing-history presentation.
+`populationDomain` owns person data; `populationLifecycleDomain` expands worlds to 300 and advances generations. `personEconomyProfile` derives wealth labels and stable price preference/sensitivity without adding save state. `personNames`/`personFamilyNames`, `populationLineageBalance`, `guestIntentDomain`, `personInspectionRuntime` and `personFamilyTree` own names, lineage renewal, live lifecycle, inspection and missing-history presentation.
 
 ## Evidence
 
-`check:needs`, `check:task-100`, `check:task-101`, `check:interaction`; focused browser E2E.
+`check:needs`, `check:task-100`, `check:task-101`, `check:task-102`, `check:interaction`; focused browser E2E.

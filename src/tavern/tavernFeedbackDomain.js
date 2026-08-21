@@ -1,3 +1,8 @@
+import {
+  PRICE_PREFERENCES,
+  personEconomyProfile,
+  priceBandFitForPerson,
+} from "../character/personEconomyProfile.js";
 import { getSaleProfile, getSaleProfiles, getSaleProfileTags } from "./saleProfileDomain.js";
 
 export const VISIT_OPPORTUNITY_INTERVAL_MIN_MS = 3_000;
@@ -193,15 +198,49 @@ export function sampleVisitOpportunityDelay(randomSource = Math.random, flowPres
 
 export function reputationFitForPerson(feedbackState, person) {
   const tagWeights = feedbackState?.reputationProfile?.foodTagWeights ?? {};
-  let totalWeight = 0;
-  let weightedFit = 0;
+  const economy = personEconomyProfile(person);
+  let totalFoodWeight = 0;
+  let weightedFoodFit = 0;
+  let totalPriceWeight = 0;
+  let weightedPriceFit = 0;
   for (const [tag, rawWeight] of Object.entries(tagWeights)) {
     const weight = clamp(Number(rawWeight), 0, 1, 0);
     if (weight <= 0) continue;
-    totalWeight += weight;
-    weightedFit += weight * preferenceForTag(person?.foodPreferences, tag);
+    const priceBand = priceBandFromTag(tag);
+    if (priceBand) {
+      if (economy.pricePreference === PRICE_PREFERENCES.neutral) continue;
+      totalPriceWeight += weight;
+      weightedPriceFit += weight * priceBandFitForPerson(person, priceBand);
+      continue;
+    }
+    totalFoodWeight += weight;
+    weightedFoodFit += weight * preferenceForTag(person?.foodPreferences, tag);
   }
-  return totalWeight > 0 ? round(weightedFit / totalWeight) : 0;
+  const foodFit = totalFoodWeight > 0 ? weightedFoodFit / totalFoodWeight : 0;
+  if (totalPriceWeight <= 0) return round(foodFit);
+  const priceRawFit = weightedPriceFit / totalPriceWeight;
+  const priceConfidence = clamp(totalPriceWeight, 0, 1, 0);
+  if (totalFoodWeight <= 0) return round(priceRawFit * priceConfidence);
+  const priceInfluence = 0.5 * priceConfidence;
+  return round(foodFit * (1 - priceInfluence) + priceRawFit * priceInfluence);
+}
+
+export function priceReputationFitForPerson(feedbackState, person) {
+  const economy = personEconomyProfile(person);
+  if (economy.pricePreference === PRICE_PREFERENCES.neutral) return 0;
+  const tagWeights = feedbackState?.reputationProfile?.foodTagWeights ?? {};
+  let totalWeight = 0;
+  let weightedFit = 0;
+  for (const [tag, rawWeight] of Object.entries(tagWeights)) {
+    const priceBand = priceBandFromTag(tag);
+    const weight = clamp(Number(rawWeight), 0, 1, 0);
+    if (!priceBand || weight <= 0) continue;
+    totalWeight += weight;
+    weightedFit += weight * priceBandFitForPerson(person, priceBand);
+  }
+  if (totalWeight <= 0) return 0;
+  const confidence = clamp(totalWeight, 0, 1, 0);
+  return round((weightedFit / totalWeight) * confidence);
 }
 
 export function reputationCandidateWeight(feedbackState, person) {
@@ -298,6 +337,10 @@ function feedbackSnapshot(feedbackState, personId, outcome) {
     flowPressure: feedbackState.flowPressure,
     outcomeCounts: { ...feedbackState.outcomeCounts },
   };
+}
+
+function priceBandFromTag(tag) {
+  return typeof tag === "string" && tag.startsWith("priceBand:") ? tag.slice("priceBand:".length) : null;
 }
 
 function preferenceForTag(foodPreferences, tag) {

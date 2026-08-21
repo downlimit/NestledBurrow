@@ -1,5 +1,6 @@
+import { personEconomyProfile, priceAppealForPerson } from "../character/personEconomyProfile.js";
 import { normalizeVenueOffer } from "./venueOfferDomain.js";
-import { getSaleProfiles } from "./saleProfileDomain.js";
+import { getSalePriceBand, getSaleProfiles } from "./saleProfileDomain.js";
 
 export const FOOD_PREFERENCE_WEIGHTS = Object.freeze({
   cuisine: 0.5,
@@ -66,11 +67,22 @@ export function decideFoodVisit({
   const satiety = clamp(Number(person.needs?.satiety), 0, 100);
   const foodMotive = foodMotiveFromSatiety(satiety);
   const normalizedOffer = normalizeVenueOffer(venueOffer);
+  const economyProfile = personEconomyProfile(person);
   const affordableProfiles = getSaleProfiles(normalizedOffer.foodItemIds)
     .filter((profile) => profile.price <= person.spendingCapacity)
     .map((profile) => {
       const preferenceScore = scoreFoodPreference(person.foodPreferences, profile);
-      return { ...profile, preferenceScore, offerFit: round((preferenceScore + 1) / 2) };
+      const tasteFit = round((preferenceScore + 1) / 2);
+      const priceBand = getSalePriceBand(profile);
+      const priceAppeal = priceAppealForPerson(person, priceBand);
+      return {
+        ...profile,
+        preferenceScore,
+        tasteFit,
+        priceBand,
+        priceAppeal,
+        offerFit: round(tasteFit * priceAppeal),
+      };
     });
   const best = affordableProfiles.reduce((selected, candidate) => (
     !selected || candidate.offerFit > selected.offerFit ? candidate : selected
@@ -89,6 +101,9 @@ export function decideFoodVisit({
     satiety,
     foodMotive,
     spendingCapacity: person.spendingCapacity,
+    wealthLevel: economyProfile.wealthLevel,
+    pricePreference: economyProfile.pricePreference,
+    priceSensitivity: economyProfile.priceSensitivity,
     activeMenuItemIds: [...normalizedOffer.foodItemIds],
     affordableItemIds: affordableProfiles.map(({ itemId }) => itemId),
     acceptableItemIds: affordableProfiles
@@ -96,6 +111,8 @@ export function decideFoodVisit({
       .map(({ itemId }) => itemId),
     bestOfferItemId: best?.itemId ?? null,
     bestOfferFit: best?.offerFit ?? 0,
+    bestOfferPriceBand: best?.priceBand ?? null,
+    bestOfferPriceAppeal: best?.priceAppeal ?? 0,
     hoursSinceLastVisit: recency.hoursSinceLastVisit,
     recentVisitFactor: recency.recentVisitFactor,
     venueOpinionScore: clamp(Number(venueOpinionScore), -1, 1),
