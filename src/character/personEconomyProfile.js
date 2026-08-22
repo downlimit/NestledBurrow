@@ -1,8 +1,18 @@
 export const WEALTH_LEVELS = Object.freeze({
-  low: "low",
+  poor: "poor",
+  modest: "modest",
   middle: "middle",
-  high: "high",
+  comfortable: "comfortable",
+  wealthy: "wealthy",
 });
+
+export const WEALTH_LEVEL_ORDER = Object.freeze([
+  WEALTH_LEVELS.poor,
+  WEALTH_LEVELS.modest,
+  WEALTH_LEVELS.middle,
+  WEALTH_LEVELS.comfortable,
+  WEALTH_LEVELS.wealthy,
+]);
 
 export const PRICE_BANDS = Object.freeze({
   budget: "budget",
@@ -17,12 +27,15 @@ export const PRICE_PREFERENCES = Object.freeze({
 });
 
 export const PRICE_SENSITIVITY_VALUES = Object.freeze([0.4, 0.7, 1]);
+export const MIN_PRICE_APPEAL = 0.15;
 
 export function wealthLevelForSpendingCapacity(spendingCapacity) {
   const value = Number(spendingCapacity);
-  if (!Number.isFinite(value) || value <= 2) return WEALTH_LEVELS.low;
+  if (!Number.isFinite(value) || value <= 2) return WEALTH_LEVELS.poor;
+  if (value <= 3) return WEALTH_LEVELS.modest;
   if (value <= 4) return WEALTH_LEVELS.middle;
-  return WEALTH_LEVELS.high;
+  if (value <= 5) return WEALTH_LEVELS.comfortable;
+  return WEALTH_LEVELS.wealthy;
 }
 
 export function personEconomyProfile(person) {
@@ -73,7 +86,8 @@ export function priceAppealForPerson(person, priceBand) {
       : priceBand === PRICE_BANDS.premium ? 1 : 0;
   const rawFit = 1 - Math.abs(target - position);
   const baseAppeal = (rawFit + 1) / 2;
-  return round(1 - profile.priceSensitivity * (1 - baseAppeal));
+  return round(Math.max(MIN_PRICE_APPEAL,
+    1 - profile.priceSensitivity * (1 - baseAppeal)));
 }
 
 export function priceBandFitForPerson(person, priceBand) {

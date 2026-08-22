@@ -2,7 +2,8 @@ import { NEED_IDS, normalizeNeedValue } from "../needs/needsDomain.js";
 import { secondsOfDay } from "../session/gameClock.js";
 
 export const STAGE1_POPULATION_SIZE = 16;
-export const SPENDING_CAPACITY_VALUES = Object.freeze([2, 4, 6]);
+export const SPENDING_CAPACITY_VALUES = Object.freeze([2, 3, 4, 5, 6]);
+export const SPENDING_CAPACITY_WEIGHTS = Object.freeze([32, 28, 21, 15, 7]);
 export const FOOD_PREFERENCE_TAGS = Object.freeze({
   cuisine: Object.freeze(["local"]),
   dishClass: Object.freeze(["hot", "drink"]),
@@ -284,8 +285,7 @@ function createStage1Person(identity, evaluationTime) {
 export function createPersonDemandProfile(personId) {
   const id = String(personId ?? "").trim();
   if (!id) throw new Error("Person demand profile requires a stable id");
-  const spendingIndex = Math.min(SPENDING_CAPACITY_VALUES.length - 1,
-    Math.floor(stableUnit(`${id}:spending-capacity`) * SPENDING_CAPACITY_VALUES.length));
+  const spendingIndex = weightedIndex(stableUnit(`${id}:spending-capacity`), SPENDING_CAPACITY_WEIGHTS);
   return {
     spendingCapacity: SPENDING_CAPACITY_VALUES[spendingIndex],
     foodPreferences: Object.fromEntries(Object.entries(FOOD_PREFERENCE_TAGS).map(([level, tags]) => [
@@ -597,6 +597,15 @@ function generatedFallbackDisplayName(id) {
   return `Resident ${id.slice(-8)}`;
 }
 
+function weightedIndex(unit, weights) {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let cursor = clamp(unit, 0, 1) * total;
+  for (let index = 0; index < weights.length; index += 1) {
+    cursor -= weights[index];
+    if (cursor <= 0) return index;
+  }
+  return weights.length - 1;
+}
 function stablePreference(key) { return Math.min(1, Math.floor(stableUnit(key) * 3) - 1); }
 function normalizeWorldTime(value, fallback) {
   const number = Number(value);

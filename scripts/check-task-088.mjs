@@ -37,7 +37,7 @@ const rejectedFoodPreferences = {
 
 assert.equal(SESSION_STATE_VERSION, 19);
 assert.equal(SAVE_SCHEMA_VERSION, 19);
-assert.deepEqual(SPENDING_CAPACITY_VALUES, [2, 4, 6]);
+assert.deepEqual(SPENDING_CAPACITY_VALUES, [2, 3, 4, 5, 6]);
 assert.deepEqual(SALE_PROFILES["fried-potato-dish"], {
   itemId: "fried-potato-dish", price: 4, cuisine: "local", dishClass: "hot", ingredients: ["potato"],
   serviceFormats: ["assisted", "self-service"],
@@ -94,8 +94,9 @@ assert.deepEqual(visit.activeMenuItemIds, ["fried-potato-dish", "lemonade"]);
 assert.deepEqual(visit.affordableItemIds, ["lemonade"]);
 assert.deepEqual(visit.acceptableItemIds, ["lemonade"]);
 assert.equal(visit.bestOfferItemId, "lemonade");
-assert.equal(visit.bestOfferFit, 1);
-assert.equal(visit.visitChance, 1);
+assert(visit.bestOfferFit > 0 && visit.bestOfferFit <= 1,
+  "Task #102 price taste may soften a perfect food match but never hard-reject an affordable liked offer");
+assert.equal(visit.visitChance, visit.bestOfferFit);
 for (const key of [
   "personId", "displayName", "satiety", "foodMotive", "spendingCapacity", "activeMenuItemIds", "affordableItemIds",
   "acceptableItemIds", "bestOfferItemId", "bestOfferFit", "hoursSinceLastVisit", "recentVisitFactor",
@@ -117,7 +118,8 @@ const suppressed = decideFoodVisit({
   worldTimeSeconds: 1_000,
   randomSource: () => 0.2,
 });
-assert.equal(suppressed.visitChance, 0.15);
+const expectedSuppressedChance = Math.round(visit.bestOfferFit * 0.15 * 1_000_000) / 1_000_000;
+assert.equal(suppressed.visitChance, expectedSuppressedChance);
 assert.equal(suppressed.decision, "NO_VISIT");
 assert.equal(selectVisitCandidate(population, [population[0].id], () => 0).id, population[1].id);
 
