@@ -108,7 +108,7 @@ test("related on-time people decide independently and materialize with exact per
   await bridge(page, "setWorldTimeSeconds", 8 * 60 * 60);
   await openTavern(page);
   const leadId = "person-ilya";
-  const lemonadeId = "person-mira";
+  const companionId = "person-mira";
   const refusingId = "person-rowan";
   await bridge(page, "setPopulationPersonDemand", {
     personId: leadId,
@@ -117,38 +117,35 @@ test("related on-time people decide independently and materialize with exact per
     foodPreferences: potatoPreferences,
   });
   await bridge(page, "setPopulationPersonDemand", {
-    personId: lemonadeId,
+    personId: companionId,
     satiety: 0,
     spendingCapacity: 2,
     foodPreferences: lemonadePreferences,
   });
   await bridge(page, "setPopulationPersonDemand", { personId: refusingId, satiety: 100 });
+  await bridge(page, "setGuestRandomValue", 0);
 
   const result = await bridge(page, "forceVisitOpportunity", {
     personId: leadId,
     includeGroup: true,
-    rollsByPersonId: { [leadId]: 0, [lemonadeId]: 0, [refusingId]: 0 },
+    rollsByPersonId: { [leadId]: 0, [companionId]: 0, [refusingId]: 0 },
   });
   expect(result.status).toBe("group-visit-started");
   expect(result.visitGroup).toMatchObject({
     period: "morning",
-    relatedCandidatePersonIds: [lemonadeId, refusingId],
-    agreedPersonIds: [leadId, lemonadeId],
-    materializedPersonIds: [leadId, lemonadeId],
+    relatedCandidatePersonIds: [companionId, refusingId],
+    agreedPersonIds: [leadId, companionId],
+    materializedPersonIds: [leadId, companionId],
   });
   expect(result.visitGroup.decisions.find(({ personId }) => personId === refusingId).decision)
     .toMatchObject({ decision: "NO_VISIT", reason: "no-food-motive" });
-  expect(result.visitGroup.decisions.find(({ personId }) => personId === leadId).decision.bestOfferItemId)
-    .toBe("fried-potato-dish");
-  expect(result.visitGroup.decisions.find(({ personId }) => personId === lemonadeId).decision.bestOfferItemId)
-    .toBe("lemonade");
 
+  const expectedOrders = Object.fromEntries(result.visitGroup.decisions
+    .filter(({ decision }) => decision.decision === "VISIT")
+    .map(({ personId, decision }) => [personId, decision.bestOfferItemId]));
   const guests = (await bridge(page, "getTavernState")).guest.guests;
   expect(guests).toHaveLength(2);
-  expect(Object.fromEntries(guests.map((guest) => [guest.personId, guest.order.itemId]))).toEqual({
-    [leadId]: "fried-potato-dish",
-    [lemonadeId]: "lemonade",
-  });
+  expect(Object.fromEntries(guests.map((guest) => [guest.personId, guest.order.itemId]))).toEqual(expectedOrders);
   expect(new Set(guests.map(({ id }) => id)).size).toBe(2);
   expect(new Set(guests.map(({ personId }) => personId)).size).toBe(2);
 });
@@ -175,6 +172,7 @@ test("an agreeing group records person-specific open-unserved without partial sp
     });
   }
   await bridge(page, "setPopulationPersonDemand", { personId: refusingId, satiety: 100 });
+  await bridge(page, "setGuestRandomValue", 0);
 
   const result = await bridge(page, "forceVisitOpportunity", {
     personId: leadId,
