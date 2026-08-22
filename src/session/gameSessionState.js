@@ -4,10 +4,17 @@ import { DEFAULT_START_TIME_SECONDS, LEGACY_ELAPSED_GAME_SECONDS_MULTIPLIER, adv
 import { DEFAULT_NEEDS, normalizeNeeds } from "../needs/needsDomain.js";
 import { normalizePopulation } from "../character/populationDomain.js";
 import { advancePopulationLifecycle, ensureMaturePopulation } from "../character/populationLifecycleDomain.js";
+import {
+  advanceHouseholdEconomy,
+  ensureHouseholdPurchaseReservation,
+  normalizeHouseholdEconomy,
+  tavernHouseholdReservationId,
+} from "../character/householdEconomyDomain.js";
 import { normalizeKitchenState } from "../tavern/cookingDomain.js";
 import { createFreshFarmState, normalizeFarmState } from "../resources/farmingDomain.js";
 import { normalizeTavernServiceState } from "../tavern/tavernServiceDomain.js";
 import { normalizeTavernFeedbackState } from "../tavern/tavernFeedbackDomain.js";
+import { getSalePrice } from "../tavern/saleProfileDomain.js";
 import { normalizeVenueOffer } from "../tavern/venueOfferDomain.js";
 import {
   addInventoryItem,
@@ -168,6 +175,21 @@ function normalizeGameplayState(value = {}) {
   );
   const tavernService = normalizeTavernServiceState(value.tavernService ?? {}, { population });
   const tavernFeedback = normalizeTavernFeedbackState(value.tavernFeedback ?? {}, { population, worldTimeSeconds });
+  const validHouseholdReservationIds = tavernService.guests
+    .filter((guest) => !["completed", "failed"].includes(guest?.order?.status))
+    .map((guest) => tavernHouseholdReservationId(guest.personId));
+  const householdEconomy = normalizeHouseholdEconomy(value.householdEconomy, population, {
+    worldTimeSeconds,
+    validReservationIds: validHouseholdReservationIds,
+  });
+  for (const guest of tavernService.guests) {
+    if (!guest?.personId || !guest?.order?.itemId || ["completed", "failed"].includes(guest.order.status)) continue;
+    ensureHouseholdPurchaseReservation(householdEconomy, population, {
+      personId: guest.personId,
+      reservationId: tavernHouseholdReservationId(guest.personId),
+      amount: getSalePrice(guest.order.itemId),
+    });
+  }
   const resumableReservations = new Map(tavernService.guests
     .filter((guest) => guest.reservationActive)
     .map((guest) => [guest.id, guest.servingTableId]));
@@ -187,6 +209,7 @@ function normalizeGameplayState(value = {}) {
     farm: normalizeFarmState(value.farm ?? createFreshFarmState(worldTimeSeconds), worldTimeSeconds),
     needs: normalizeNeeds(value.needs ?? DEFAULT_NEEDS),
     population,
+    householdEconomy,
     kitchen,
     tavernService,
     tavernFeedback,
@@ -275,7 +298,7 @@ export function getSessionFlag(state, flagId) {
 
 export function setEntityFlag(state, entityId, flagId, value) {
   assertNonEmptyString(flagId, "Flag ID");
-  assertBoolean(value, "Entity flag value");
+  assertBoolean(value, "Session flag value");
   const entity = getSessionEntity(state, entityId);
   if (!entity) throw new Error(`Unknown session entity: ${entityId}`);
   return setOwn(entity.flags, flagId, value);
@@ -374,6 +397,9 @@ export function resetBalanceRun(state) {
   state.gameplay.worldItems.splice(0, state.gameplay.worldItems.length);
   state.gameplay.farm = createFreshFarmState(DEFAULT_START_TIME_SECONDS);
   state.gameplay.needs = normalizeNeeds();
+  state.gameplay.householdEconomy = normalizeHouseholdEconomy(null, state.gameplay.population, {
+    worldTimeSeconds: DEFAULT_START_TIME_SECONDS,
+  });
   for (const node of Object.values(state.gameplay.resourceNodes)) {
     node.cleared = false;
     node.progress = 0;
@@ -408,5 +434,15 @@ export function advanceGameTime(state, realDeltaSeconds, timeScale = 1) {
     state.gameplay.worldTimeSeconds,
     { protectedPersonIds },
   );
-  return { worldTimeSeconds: state.gameplay.worldTimeSeconds, timeScale: scale, populationLifecycle };
+  const householdEconomy = advanceHouseholdEconomy(
+    state.gameplay.householdEconomy,
+    state.gameplay.population,
+    state.gameplay.worldTimeSeconds,
+  );
+  return {
+    worldTimeSeconds: state.gameplay.worldTimeSeconds,
+    timeScale: scale,
+    populationLifecycle,
+    householdEconomy,
+  };
 }

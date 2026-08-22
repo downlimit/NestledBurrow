@@ -85,10 +85,21 @@ const hungryPerson = {
 const noMotive = decideFoodVisit({ person: { ...hungryPerson, needs: { ...hungryPerson.needs, satiety: 60 } }, venueOffer: { foodItemIds: ["lemonade"] }, randomSource: () => 0 });
 assert.equal(noMotive.reason, "no-food-motive");
 assert.equal(noMotive.roll, null);
-const noBudget = decideFoodVisit({ person: hungryPerson, venueOffer: { foodItemIds: ["fried-potato-dish"] }, randomSource: () => 0 });
-assert.equal(noBudget.reason, "no-affordable-offer");
+const noBudget = decideFoodVisit({
+  person: hungryPerson,
+  venueOffer: { foodItemIds: ["fried-potato-dish"] },
+  householdAvailableCoins: 2,
+  randomSource: () => 0,
+});
+assert.equal(noBudget.reason, "no-household-funds");
 assert.deepEqual(noBudget.affordableItemIds, []);
-const visit = decideFoodVisit({ person: hungryPerson, venueOffer: { foodItemIds: ["fried-potato-dish", "lemonade"] }, worldTimeSeconds: 1_000, randomSource: () => 0 });
+const visit = decideFoodVisit({
+  person: hungryPerson,
+  venueOffer: { foodItemIds: ["fried-potato-dish", "lemonade"] },
+  householdAvailableCoins: 2,
+  worldTimeSeconds: 1_000,
+  randomSource: () => 0,
+});
 assert.equal(visit.decision, "VISIT");
 assert.deepEqual(visit.activeMenuItemIds, ["fried-potato-dish", "lemonade"]);
 assert.deepEqual(visit.affordableItemIds, ["lemonade"]);

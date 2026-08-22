@@ -1,6 +1,14 @@
 import { getActorProfile } from "../character/actorProfiles.js";
 import { createCharacter } from "../character/character.js";
 import { getCharacterVisualProfile } from "../character/characterVisualProfiles.js";
+import {
+  householdAvailableCoins,
+  householdIdForPerson,
+  releaseHouseholdPurchase,
+  reserveHouseholdPurchase,
+  settleHouseholdPurchase,
+  tavernHouseholdReservationId,
+} from "../character/householdEconomyDomain.js";
 import { createCoinRuntime } from "./coinRuntime.js";
 import {
   consumeServingReservation,
@@ -230,24 +238,40 @@ export function createTavernServiceRuntime(scene, {
         primary.evaluation.person,
         activePersonIds,
         worldTimeSeconds,
+        candidateRandomSource,
       )
       : [];
-    const evaluated = [primary, ...relatedCandidates.map((person) => evaluateVisitParticipant(
-      person,
-      worldTimeSeconds,
-      explicitRoll(person.id, rollsByPersonId),
-    ))];
+    const evaluated = [primary];
+    for (const person of relatedCandidates) {
+      evaluated.push(evaluateVisitParticipant(
+        person,
+        worldTimeSeconds,
+        explicitRoll(person.id, rollsByPersonId),
+        plannedSpendForHousehold(person.id, evaluated),
+      ));
+    }
     const agreed = evaluated.filter(({ decision }) => decision.decision === "VISIT");
-    const capacityAvailable = agreed.length > 0
-      && hasCapacityForVisitGroup(activePersonIds.length, agreed.length);
-    const capacityFeedbacks = !capacityAvailable && agreed.length > 0
-      ? agreed.map(({ person }) => recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
+    const funded = [];
+    for (const participant of agreed) {
+      const reservation = reserveVisitFunds(participant.person.id, participant.decision.bestOfferPrice);
+      if (reservation.reserved) funded.push(participant);
+      else participant.decision = {
+        ...participant.decision,
+        decision: "NO_VISIT",
+        reason: "no-household-funds",
+      };
+    }
+    const capacityAvailable = funded.length > 0
+      && hasCapacityForVisitGroup(activePersonIds.length, funded.length);
+    const capacityFeedbacks = !capacityAvailable && funded.length > 0
+      ? funded.map(({ person }) => recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
         personId: person.id,
         worldTimeSeconds,
       }))
       : [];
+    if (!capacityAvailable) releaseVisitFundsForParticipants(funded);
     const spawnedGuestIds = capacityAvailable
-      ? guestRuntime.spawnVisitGroup(agreed.map(({ person, decision }) => ({
+      ? guestRuntime.spawnVisitGroup(funded.map(({ person, decision }) => ({
         personId: person.id,
         orderItemId: decision.bestOfferItemId,
         acceptableItemIds: decision.acceptableItemIds,
@@ -255,7 +279,8 @@ export function createTavernServiceRuntime(scene, {
       })))
       : [];
     const guestIds = Array.isArray(spawnedGuestIds) ? spawnedGuestIds : [];
-    const guestIdByPersonId = Object.fromEntries(agreed.map(({ person }, index) => [
+    if (capacityAvailable && guestIds.length !== funded.length) releaseVisitFundsForParticipants(funded);
+    const guestIdByPersonId = Object.fromEntries(funded.map(({ person }, index) => [
       person.id,
       guestIds[index] ?? null,
     ]));
@@ -276,8 +301,8 @@ export function createTavernServiceRuntime(scene, {
       primaryCandidate: { ...selection.selected },
       candidateWeights: selection.candidateWeights.map((candidateWeight) => ({ ...candidateWeight })),
       relatedCandidatePersonIds: relatedCandidates.map(({ id }) => id),
-      agreedPersonIds: agreed.map(({ person }) => person.id),
-      materializedPersonIds: agreed.filter(({ person }) => guestIdByPersonId[person.id]).map(({ person }) => person.id),
+      agreedPersonIds: funded.map(({ person }) => person.id),
+      materializedPersonIds: funded.filter(({ person }) => guestIdByPersonId[person.id]).map(({ person }) => person.id),
       guestIds: [...guestIds],
       decisions: evaluated.map(({ person, decision, evaluation }) => ({
         personId: person.id,
@@ -302,7 +327,7 @@ export function createTavernServiceRuntime(scene, {
     const turnedAway = capacityFeedbacks.length > 0;
     return {
       status: turnedAway
-        ? agreed.length > 1 ? "group-turned-away-cap" : "visitor-turned-away-cap"
+        ? funded.length > 1 ? "group-turned-away-cap" : "visitor-turned-away-cap"
         : guestIds.length > 1 ? "group-visit-started" : guestId ? "visit-started" : "decision-complete",
       decision: { ...lastDecision },
       guestId: guestId || null,
@@ -329,7 +354,7 @@ export function createTavernServiceRuntime(scene, {
     };
   }
 
-  function evaluateVisitParticipant(person, worldTimeSeconds, requestedRoll = null) {
+  function evaluateVisitParticipant(person, worldTimeSeconds, requestedRoll = null, plannedSpend = 0) {
     const evaluation = evaluatePopulationPerson(
       sessionState.gameplay.population,
       person.id,
@@ -345,10 +370,46 @@ export function createTavernServiceRuntime(scene, {
       venueOffer: sessionState.gameplay.venueOffer,
       visitorHistory: sessionState.gameplay.tavernService.visitorHistoryByPersonId[person.id],
       ...feedbackFactors,
+      householdAvailableCoins: Math.max(0,
+        householdAvailableCoins(sessionState.gameplay.householdEconomy, person.id) - plannedSpend),
       worldTimeSeconds,
       randomSource: isFiniteRoll(requestedRoll) ? () => Number(requestedRoll) : decisionRandomSource,
     });
     return { person: evaluation.person, evaluation, decision };
+  }
+
+  function plannedSpendForHousehold(personId, evaluated) {
+    const householdId = householdIdForPerson(sessionState.gameplay.householdEconomy, personId);
+    if (!householdId) return 0;
+    return evaluated.reduce((sum, participant) => {
+      if (participant.decision.decision !== "VISIT") return sum;
+      const participantHouseholdId = householdIdForPerson(
+        sessionState.gameplay.householdEconomy,
+        participant.person.id,
+      );
+      return participantHouseholdId === householdId
+        ? sum + Math.max(0, Number(participant.decision.bestOfferPrice) || 0)
+        : sum;
+    }, 0);
+  }
+
+  function reserveVisitFunds(personId, amount) {
+    return reserveHouseholdPurchase(sessionState.gameplay.householdEconomy, sessionState.gameplay.population, {
+      personId,
+      reservationId: tavernHouseholdReservationId(personId),
+      amount,
+    });
+  }
+
+  function releaseVisitFunds(personId) {
+    return releaseHouseholdPurchase(
+      sessionState.gameplay.householdEconomy,
+      tavernHouseholdReservationId(personId),
+    );
+  }
+
+  function releaseVisitFundsForParticipants(participants) {
+    for (const participant of participants) releaseVisitFunds(participant.person.id);
   }
 
   function explicitRoll(personId, rollsByPersonId, primaryRoll = null) {
@@ -447,6 +508,7 @@ export function createTavernServiceRuntime(scene, {
       });
     },
     onOrderFailure: ({ guestId, personId, order }) => {
+      releaseVisitFunds(personId);
       const history = recordFailedAcceptedOrder(
         sessionState.gameplay.tavernService,
         personId,
@@ -467,6 +529,7 @@ export function createTavernServiceRuntime(scene, {
       });
     },
     onOpenUnserved: ({ guestId, personId, reason }) => {
+      releaseVisitFunds(personId);
       const feedback = recordOpenUnservedFeedback(sessionState.gameplay.tavernFeedback, {
         personId,
         worldTimeSeconds: getWorldTimeSeconds(),
@@ -480,8 +543,25 @@ export function createTavernServiceRuntime(scene, {
         feedback,
       });
     },
-    onVisitFinished: () => scene.interactionRuntime?.refresh?.(),
+    onVisitFinished: ({ personId }) => {
+      releaseVisitFunds(personId);
+      scene.interactionRuntime?.refresh?.();
+    },
     onPurchaseComplete: ({ position, value, itemId, personId, satisfactionTier }) => {
+      const householdPayment = settleHouseholdPurchase(
+        sessionState.gameplay.householdEconomy,
+        tavernHouseholdReservationId(personId),
+      );
+      if (!householdPayment.settled) {
+        onPersistentMutation({
+          status: "guest-payment-missing-household-reservation",
+          mutated: false,
+          value,
+          itemId,
+          personId,
+        });
+        return;
+      }
       facilityRuntime?.syncKitchenVisuals?.();
       scene.audioRuntime?.playEffect?.("coin-toss");
       coinRuntime.spawn(position, value);
@@ -502,6 +582,7 @@ export function createTavernServiceRuntime(scene, {
         value,
         itemId,
         personId,
+        householdPayment,
         history: history.history,
         feedback,
       });
@@ -517,6 +598,30 @@ export function createTavernServiceRuntime(scene, {
     createFeedback: (character) => createGuestFeedback(scene, character),
   });
 
+  function spawnForcedVisit(person, itemId, acceptableItemIds, options) {
+    if (!person || !itemId) return false;
+    const reservation = reserveVisitFunds(person.id, getSalePrice(itemId));
+    if (!reservation.reserved) return false;
+    const guestId = guestRuntime.spawnVisit(person.id, itemId, acceptableItemIds, options);
+    if (!guestId) releaseVisitFunds(person.id);
+    return guestId;
+  }
+
+  function spawnForcedGroup(materializable) {
+    const reservedPersonIds = [];
+    for (const participant of materializable) {
+      const reservation = reserveVisitFunds(participant.personId, getSalePrice(participant.orderItemId));
+      if (!reservation.reserved) {
+        for (const personId of reservedPersonIds) releaseVisitFunds(personId);
+        return false;
+      }
+      reservedPersonIds.push(participant.personId);
+    }
+    const result = guestRuntime.spawnVisitGroup(materializable);
+    if (!result) for (const personId of reservedPersonIds) releaseVisitFunds(personId);
+    return result;
+  }
+
   return {
     guestRuntime,
     coinRuntime,
@@ -528,12 +633,12 @@ export function createTavernServiceRuntime(scene, {
         ? sessionState.gameplay.population.find((candidate) => candidate.id === personId && !active.includes(candidate.id))
         : sessionState.gameplay.population.find((candidate) => !active.includes(candidate.id));
       const itemId = sessionState.gameplay.venueOffer.foodItemIds[0] ?? null;
-      return person ? guestRuntime.spawnVisit(
-        person.id,
+      return spawnForcedVisit(
+        person,
         itemId,
         sessionState.gameplay.venueOffer.foodItemIds,
         { offerFit: 0.75, serviceFormat: SERVICE_FORMATS.assisted },
-      ) : false;
+      );
     },
     forceGuestOrder(personId = null, itemId = null, { serviceFormat = SERVICE_FORMATS.assisted } = {}) {
       const active = guestRuntime.getActivePersonIds();
@@ -541,10 +646,10 @@ export function createTavernServiceRuntime(scene, {
         ? sessionState.gameplay.population.find((candidate) => candidate.id === personId && !active.includes(candidate.id))
         : sessionState.gameplay.population.find((candidate) => !active.includes(candidate.id));
       const exactItemId = itemId ?? sessionState.gameplay.venueOffer.foodItemIds[0] ?? null;
-      return person ? guestRuntime.spawnVisit(person.id, exactItemId, [exactItemId], {
+      return spawnForcedVisit(person, exactItemId, [exactItemId], {
         offerFit: 1,
         serviceFormat: serviceFormat === "auto" ? null : serviceFormat,
-      }) : false;
+      });
     },
     forceGuestGroup(participants = []) {
       const active = new Set(guestRuntime.getActivePersonIds());
@@ -564,7 +669,7 @@ export function createTavernServiceRuntime(scene, {
           },
         };
       });
-      return materializable.every(Boolean) ? guestRuntime.spawnVisitGroup(materializable) : false;
+      return materializable.every(Boolean) ? spawnForcedGroup(materializable) : false;
     },
     getOrderInteractionDefinitions: () => guestRuntime.getInteractionDefinitions(),
     getGuestInteractionDefinitions: () => guestRuntime.getInteractionDefinitions(),
@@ -590,6 +695,7 @@ export function createTavernServiceRuntime(scene, {
     getLastVisitGroup: () => clone(lastVisitGroup),
     getVisitorHistory: () => JSON.parse(JSON.stringify(sessionState.gameplay.tavernService.visitorHistoryByPersonId)),
     getFeedbackState: () => cloneTavernFeedbackState(sessionState.gameplay.tavernFeedback),
+    getHouseholdEconomy: () => clone(sessionState.gameplay.householdEconomy),
     setFlowPressure(value) {
       const result = setTavernFlowPressure(sessionState.gameplay.tavernFeedback, value);
       if (result.mutated) onPersistentMutation({ status: "tavern-flow-set", ...result });

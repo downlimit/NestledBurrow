@@ -60,6 +60,7 @@ export function decideFoodVisit({
   venueOpinionFactor = 1,
   serviceReliability = 0,
   serviceReliabilityFactor = 1,
+  householdAvailableCoins = Number.POSITIVE_INFINITY,
   worldTimeSeconds = 0,
   randomSource = Math.random,
 } = {}) {
@@ -68,8 +69,10 @@ export function decideFoodVisit({
   const foodMotive = foodMotiveFromSatiety(satiety);
   const normalizedOffer = normalizeVenueOffer(venueOffer);
   const economyProfile = personEconomyProfile(person);
-  const affordableProfiles = getSaleProfiles(normalizedOffer.foodItemIds)
-    .filter((profile) => profile.price <= person.spendingCapacity)
+  const availableCoins = normalizeAvailableCoins(householdAvailableCoins);
+  const offeredProfiles = getSaleProfiles(normalizedOffer.foodItemIds);
+  const affordableProfiles = offeredProfiles
+    .filter((profile) => profile.price <= availableCoins)
     .map((profile) => {
       const preferenceScore = scoreFoodPreference(person.foodPreferences, profile);
       const tasteFit = round((preferenceScore + 1) / 2);
@@ -101,15 +104,18 @@ export function decideFoodVisit({
     satiety,
     foodMotive,
     spendingCapacity: person.spendingCapacity,
+    householdAvailableCoins: Number.isFinite(availableCoins) ? availableCoins : null,
     wealthLevel: economyProfile.wealthLevel,
     pricePreference: economyProfile.pricePreference,
     priceSensitivity: economyProfile.priceSensitivity,
     activeMenuItemIds: [...normalizedOffer.foodItemIds],
+    wealthAffordableItemIds: offeredProfiles.map(({ itemId }) => itemId),
     affordableItemIds: affordableProfiles.map(({ itemId }) => itemId),
     acceptableItemIds: affordableProfiles
       .filter(({ offerFit }) => offerFit > 0)
       .map(({ itemId }) => itemId),
     bestOfferItemId: best?.itemId ?? null,
+    bestOfferPrice: best?.price ?? null,
     bestOfferFit: best?.offerFit ?? 0,
     bestOfferPriceBand: best?.priceBand ?? null,
     bestOfferPriceAppeal: best?.priceAppeal ?? 0,
@@ -122,7 +128,12 @@ export function decideFoodVisit({
     visitChance,
   };
   if (foodMotive === 0) return { ...base, roll: null, decision: "NO_VISIT", reason: "no-food-motive" };
-  if (!best) return { ...base, roll: null, decision: "NO_VISIT", reason: "no-affordable-offer" };
+  if (!best) {
+    const reason = offeredProfiles.length > 0 && Number.isFinite(availableCoins)
+      ? "no-household-funds"
+      : "no-affordable-offer";
+    return { ...base, roll: null, decision: "NO_VISIT", reason };
+  }
   const roll = randomUnit(randomSource);
   return roll < visitChance
     ? { ...base, roll, decision: "VISIT", reason: "visit" }
@@ -136,6 +147,12 @@ export function selectVisitCandidate(population, activePersonIds = [], randomSou
     : [];
   if (candidates.length === 0) return null;
   return candidates[Math.min(candidates.length - 1, Math.floor(randomUnit(randomSource) * candidates.length))];
+}
+
+function normalizeAvailableCoins(value) {
+  if (value === Number.POSITIVE_INFINITY) return value;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, number) : Number.POSITIVE_INFINITY;
 }
 
 function preferenceValue(value) {

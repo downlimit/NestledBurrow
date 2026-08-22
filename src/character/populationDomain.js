@@ -3,7 +3,7 @@ import { secondsOfDay } from "../session/gameClock.js";
 
 export const STAGE1_POPULATION_SIZE = 16;
 export const SPENDING_CAPACITY_VALUES = Object.freeze([2, 3, 4, 5, 6]);
-export const SPENDING_CAPACITY_WEIGHTS = Object.freeze([32, 28, 21, 15, 7]);
+export const SPENDING_CAPACITY_WEIGHTS = Object.freeze([22, 31, 24, 16, 7]);
 export const FOOD_PREFERENCE_TAGS = Object.freeze({
   cuisine: Object.freeze(["local"]),
   dishClass: Object.freeze(["hot", "drink"]),

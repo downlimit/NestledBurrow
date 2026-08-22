@@ -8,8 +8,8 @@ import {
 import { personEconomyProfile } from "./personEconomyProfile.js";
 
 export const WEALTH_SUBGROUP_MIN_SIZE = 15;
-export const WEALTH_BALANCE_MAX_HOUSEHOLDS_PER_DAY = 2;
-export const WEALTH_MOBILITY_CHANCE_PER_DAY = 0.35;
+export const WEALTH_BALANCE_MAX_HOUSEHOLDS_PER_DAY = 4;
+export const WEALTH_MOBILITY_CHANCE_PER_DAY = 0.035;
 export const EXTREME_GENERATION_WEALTH_EXCEPTION_CHANCE = 0.02;
 
 const INDEPENDENT_LIFE_STAGES = new Set([
@@ -124,18 +124,30 @@ export function rebalancePopulationWealth(population, dayIndex, {
   if (!Array.isArray(population) || maxHouseholdMoves <= 0) return [];
   synchronizePartnerWealth(population);
   const excluded = new Set(excludedPersonIds ?? []);
+  const byId = new Map(population.map((person) => [person?.id, person]).filter(([id]) => id));
+  const units = economicUnits(population)
+    .filter((members) => members.every((person) => !excluded.has(person.id)))
+    .sort((left, right) => (
+      stableUnit(`career-order:${dayIndex}:${unitKey(left)}`)
+      - stableUnit(`career-order:${dayIndex}:${unitKey(right)}`)
+    ));
   const moves = [];
-  for (let moveIndex = 0; moveIndex < maxHouseholdMoves; moveIndex += 1) {
-    const candidate = bestWealthMove(population, dayIndex, moveIndex, excluded, mobilityChance);
-    if (!candidate || candidate.improvement <= 0.001) break;
-    const capacity = SPENDING_CAPACITY_VALUES[candidate.toIndex];
-    for (const person of candidate.members) person.spendingCapacity = capacity;
+  for (const members of units) {
+    if (moves.length >= maxHouseholdMoves) break;
+    if (stableUnit(`career-event:${dayIndex}:${unitKey(members)}`) >= clamp(Number(mobilityChance), 0, 1)) continue;
+    const move = chooseCareerMove(population, members, dayIndex, byId);
+    if (!move) continue;
+    const capacity = SPENDING_CAPACITY_VALUES[move.toIndex];
+    for (const person of members) person.spendingCapacity = capacity;
     moves.push({
-      personIds: candidate.members.map((person) => person.id),
-      from: SPENDING_CAPACITY_VALUES[candidate.fromIndex],
+      event: move.toIndex > move.fromIndex ? "promotion" : "demotion",
+      personIds: members.map((person) => person.id),
+      from: SPENDING_CAPACITY_VALUES[move.fromIndex],
       to: capacity,
+      balanceImprovement: round(move.improvement),
     });
   }
+  synchronizePartnerWealth(population);
   return moves;
 }
 
@@ -153,6 +165,29 @@ export function wealthSubgroupsForPopulation(population) {
     .map(([key, members]) => ({ key, members }));
 }
 
+function chooseCareerMove(population, members, dayIndex, byId) {
+  const fromIndex = spendingCapacityIndex(members[0].spendingCapacity);
+  if (!members.every((person) => spendingCapacityIndex(person.spendingCapacity) === fromIndex)) return null;
+  const distribution = wealthDistributionForPopulation(population);
+  const subgroups = wealthSubgroupsForPopulation(population);
+  const options = [-1, 1].flatMap((direction) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= SPENDING_CAPACITY_VALUES.length) return [];
+    if (!generationMoveAllowed(members, toIndex, byId)) return [];
+    const improvement = moveImprovement(distribution, subgroups, members, fromIndex, toIndex);
+    const balanceWeight = Math.exp(clamp(improvement, -3, 3));
+    return [{ fromIndex, toIndex, improvement, weight: balanceWeight }];
+  });
+  if (options.length === 0) return null;
+  const total = options.reduce((sum, option) => sum + option.weight, 0);
+  let cursor = stableUnit(`career-direction:${dayIndex}:${unitKey(members)}`) * total;
+  for (const option of options) {
+    cursor -= option.weight;
+    if (cursor <= 0) return option;
+  }
+  return options.at(-1);
+}
+
 function alignAllLivingPartners(population, byId) {
   const seen = new Set();
   let changes = 0;
@@ -166,32 +201,6 @@ function alignAllLivingPartners(population, byId) {
     if (alignPartnerWealth(person, byId.get(partnerId))) changes += 1;
   }
   return changes;
-}
-
-function bestWealthMove(population, dayIndex, moveIndex, excluded, mobilityChance) {
-  const byId = new Map((Array.isArray(population) ? population : []).map((person) => [person?.id, person]).filter(([id]) => id));
-  const units = economicUnits(population).filter((unit) => (
-    unit.every((person) => !excluded.has(person.id))
-    && stableUnit(`wealth-mobility:${dayIndex}:${unitKey(unit)}`) < clamp(Number(mobilityChance), 0, 1)
-  ));
-  const distribution = wealthDistributionForPopulation(population);
-  const subgroups = wealthSubgroupsForPopulation(population);
-  let best = null;
-  for (const members of units) {
-    const fromIndex = spendingCapacityIndex(members[0].spendingCapacity);
-    if (!members.every((person) => spendingCapacityIndex(person.spendingCapacity) === fromIndex)) continue;
-    for (const direction of [-1, 1]) {
-      const toIndex = fromIndex + direction;
-      if (toIndex < 0 || toIndex >= SPENDING_CAPACITY_VALUES.length) continue;
-      if (!generationMoveAllowed(members, toIndex, byId)) continue;
-      const improvement = moveImprovement(distribution, subgroups, members, fromIndex, toIndex);
-      const tie = stableUnit(`wealth-move:${dayIndex}:${moveIndex}:${unitKey(members)}:${direction}`);
-      if (!best || improvement > best.improvement || (improvement === best.improvement && tie < best.tie)) {
-        best = { members, fromIndex, toIndex, improvement, tie };
-      }
-    }
-  }
-  return best;
 }
 
 function generationMoveAllowed(members, toIndex, byId) {
@@ -258,17 +267,22 @@ function economicUnits(population) {
   const units = [];
   for (const person of living) {
     if (used.has(person.id) || !INDEPENDENT_LIFE_STAGES.has(person.lifeStage)) continue;
+    const members = [person];
     const partnerId = livingPartnerId(person, byId);
     if (partnerId) {
       const partner = byId.get(partnerId);
-      if (!partner || used.has(partner.id)) continue;
-      used.add(person.id);
-      used.add(partner.id);
-      units.push([person, partner]);
-      continue;
+      if (partner && !used.has(partner.id)) members.push(partner);
     }
-    used.add(person.id);
-    units.push([person]);
+    const anchorIds = new Set(members.map((member) => member.id));
+    for (const candidate of living) {
+      if (used.has(candidate.id) || INDEPENDENT_LIFE_STAGES.has(candidate.lifeStage)) continue;
+      const livingParents = (Array.isArray(candidate.relationships) ? candidate.relationships : [])
+        .filter((relationship) => relationship.kind === PERSON_RELATIONSHIP_KINDS.child)
+        .map((relationship) => relationship.personId);
+      if (livingParents.some((parentId) => anchorIds.has(parentId))) members.push(candidate);
+    }
+    for (const member of members) used.add(member.id);
+    units.push(members);
   }
   return units;
 }
@@ -315,4 +329,7 @@ function stableUnit(key) {
   }
   return (hash >>> 0) / 0xffffffff;
 }
-function clamp(value, minimum, maximum) { return Math.max(minimum, Math.min(maximum, Number.isFinite(value) ? value : minimum)); }
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, Number.isFinite(value) ? value : minimum));
+}
+function round(value) { return Math.round((Number(value) || 0) * 1_000_000) / 1_000_000; }

@@ -127,11 +127,13 @@ const potatoGuest = {
 const lemonadeDecision = decideFoodVisit({
   person: lemonadeGuest,
   venueOffer: { foodItemIds: ["fried-potato-dish", "lemonade"] },
+  householdAvailableCoins: 2,
   randomSource: () => 0,
 });
 const potatoDecision = decideFoodVisit({
   person: potatoGuest,
   venueOffer: { foodItemIds: ["fried-potato-dish", "lemonade"] },
+  householdAvailableCoins: 100,
   randomSource: () => 0,
 });
 assert.equal(lemonadeDecision.decision, "VISIT");
