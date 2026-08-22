@@ -8,8 +8,8 @@ import {
 import { personEconomyProfile } from "./personEconomyProfile.js";
 
 export const WEALTH_SUBGROUP_MIN_SIZE = 15;
-export const WEALTH_BALANCE_MAX_HOUSEHOLDS_PER_DAY = 2;
-export const WEALTH_MOBILITY_CHANCE_PER_DAY = 0.02;
+export const WEALTH_BALANCE_MAX_HOUSEHOLDS_PER_DAY = 4;
+export const WEALTH_MOBILITY_CHANCE_PER_DAY = 0.035;
 export const EXTREME_GENERATION_WEALTH_EXCEPTION_CHANCE = 0.02;
 
 const INDEPENDENT_LIFE_STAGES = new Set([

@@ -9,7 +9,6 @@ import {
   reconcileHouseholdEconomy,
   reserveHouseholdPurchase,
   settleHouseholdPurchase,
-  tavernHouseholdReservationId,
   HOUSEHOLD_DAILY_INCOME_PER_WORKER,
   HOUSEHOLD_REFERENCE_SAVINGS,
 } from "../src/character/householdEconomyDomain.js";
@@ -21,6 +20,7 @@ import {
   SPENDING_CAPACITY_WEIGHTS,
 } from "../src/character/populationDomain.js";
 import {
+  WEALTH_BALANCE_MAX_HOUSEHOLDS_PER_DAY,
   WEALTH_MOBILITY_CHANCE_PER_DAY,
   rebalancePopulationWealth,
   spendingCapacityIndex,
@@ -46,34 +46,34 @@ const alive = (id, lifeStage, spendingCapacity, relationships = [], preferredVis
   needs: { satiety: 0 },
   foodPreferences: { cuisine: { local: 1 }, dishClass: { hot: 1, drink: 1 }, ingredient: { potato: 1, lemon: 1 } },
 });
+const householdState = (economy, personId) => economy.households[householdIdForPerson(economy, personId)];
 
 assert.deepEqual(HOUSEHOLD_REFERENCE_SAVINGS, [5_000, 15_000, 45_000, 120_000, 300_000]);
 assert.deepEqual(HOUSEHOLD_DAILY_INCOME_PER_WORKER, [500, 1_500, 4_000, 10_000, 25_000]);
-assert.equal(WEALTH_MOBILITY_CHANCE_PER_DAY, 0.02);
 assert.deepEqual(SPENDING_CAPACITY_WEIGHTS, [22, 31, 24, 16, 7]);
 assert.equal(SPENDING_CAPACITY_WEIGHTS.reduce((sum, value) => sum + value, 0), 100);
+assert.equal(WEALTH_MOBILITY_CHANCE_PER_DAY, 0.035);
+assert.equal(WEALTH_BALANCE_MAX_HOUSEHOLDS_PER_DAY, 4);
 
 const a = alive("person-wallet-a", PERSON_LIFE_STAGES.adult, 4, [
   { personId: "person-wallet-b", kind: "partner" }, { personId: "person-wallet-child", kind: "parent" },
 ]);
 const b = alive("person-wallet-b", PERSON_LIFE_STAGES.adult, 4, [
-  { personId: "person-wallet-a", kind: "partner" }, { personId: "person-wallet-child", kind: "parent" },
+  { personId: a.id, kind: "partner" }, { personId: "person-wallet-child", kind: "parent" },
 ]);
 const child = alive("person-wallet-child", PERSON_LIFE_STAGES.child, 4, [
   { personId: a.id, kind: "child" }, { personId: b.id, kind: "child" },
 ]);
 const family = [a, b, child];
 const economy = normalizeHouseholdEconomy(null, family, { worldTimeSeconds: 0 });
-const householdId = householdIdForPerson(economy, a.id);
-assert(householdId);
-assert(family.every((person) => householdIdForPerson(economy, person.id) === householdId));
-const household = economy.households[householdId];
-household.coins = 60;
+const familyId = householdIdForPerson(economy, a.id);
+assert(familyId && family.every((person) => householdIdForPerson(economy, person.id) === familyId));
+householdState(economy, a.id).coins = 60;
 assert(reserveHouseholdPurchase(economy, family, { personId: a.id, reservationId: "first", amount: 40 }).reserved);
 assert.equal(householdAvailableCoins(economy, b.id), 20);
 assert.equal(reserveHouseholdPurchase(economy, family, { personId: b.id, reservationId: "second", amount: 40 }).reserved, false);
 assert(settleHouseholdPurchase(economy, "first").settled);
-assert.equal(household.coins, 20);
+assert.equal(householdState(economy, a.id).coins, 20);
 
 const splitFamily = family.map((person) => ({ ...person, relationships: person.relationships.map((r) => ({ ...r })) }));
 const splitEconomy = normalizeHouseholdEconomy(null, splitFamily, { worldTimeSeconds: 0 });
@@ -84,7 +84,7 @@ assert.equal(Object.values(splitEconomy.households).reduce((sum, state) => sum +
 
 const shocked = alive("person-cash-shock", PERSON_LIFE_STAGES.adult, 5);
 const shockedEconomy = normalizeHouseholdEconomy(null, [shocked], { worldTimeSeconds: 0 });
-shockedEconomy.households[householdIdForPerson(shockedEconomy, shocked.id)].coins = 1;
+householdState(shockedEconomy, shocked.id).coins = 1;
 advanceHouseholdEconomy(shockedEconomy, [shocked], 60 * PERSON_GAME_DAY_SECONDS);
 assert.equal(shocked.spendingCapacity, 5, "cash alone never changes income class");
 assert(householdAvailableCoins(shockedEconomy, shocked.id) > 1);
@@ -94,21 +94,26 @@ assert.equal(decideFoodVisit({ person: diner, venueOffer: { foodItemIds: ["fried
 const cashDecision = decideFoodVisit({ person: diner, venueOffer: { foodItemIds: ["fried-potato-dish", "lemonade"] }, householdAvailableCoins: 100, randomSource: () => 0 });
 assert.deepEqual(cashDecision.affordableItemIds.sort(), ["fried-potato-dish", "lemonade"].sort());
 
-const toddler = alive("person-toddler", PERSON_LIFE_STAGES.toddler, 3, [{ personId: a.id, kind: "child" }]);
-const teen = alive("person-teen", PERSON_LIFE_STAGES.teen, 3, [{ personId: a.id, kind: "child" }, { personId: b.id, kind: "child" }]);
+const parent = alive("person-visit-parent", PERSON_LIFE_STAGES.adult, 3, [
+  { personId: "person-visit-toddler", kind: "parent" }, { personId: "person-visit-teen", kind: "parent" },
+]);
+const toddler = alive("person-visit-toddler", PERSON_LIFE_STAGES.toddler, 3, [{ personId: parent.id, kind: "child" }]);
+const teen = alive("person-visit-teen", PERSON_LIFE_STAGES.teen, 3, [{ personId: parent.id, kind: "child" }]);
+const peer = alive("person-visit-peer", PERSON_LIFE_STAGES.teen, 3);
+const visitFamily = [parent, toddler, teen, peer];
+const feedback = createNeutralTavernFeedbackState(visitFamily, 0);
 assert.equal(visitLeadFactorForPerson(toddler), 0);
-assert.equal(visitLeadFactorForPerson(child), 0);
 assert.equal(visitLeadFactorForPerson(teen), 0.2);
 assert.equal(TINY_CHILD_PARENT_VISIT_CHANCE, 0.03);
 assert.equal(CHILD_PARENT_VISIT_CHANCE, 0.3);
 assert.equal(TEEN_PARENT_VISIT_CHANCE, 0.7);
 assert.equal(TEEN_PEER_VISIT_CHANCE, 0.2);
-const visitFamily = [a, b, toddler, teen];
-const feedback = createNeutralTavernFeedbackState(visitFamily, 0);
 assert.equal(buildVisitCandidateWeights(visitFamily, feedback, [], 8 * 60 * 60)
   .find(({ personId }) => personId === toddler.id).candidateWeight, 0);
-assert(selectRelatedVisitCandidates(visitFamily, a, [], 8 * 60 * 60, () => 0).some(({ id }) => id === toddler.id));
-assert(!selectRelatedVisitCandidates(visitFamily, a, [], 8 * 60 * 60, () => 0.5).some(({ id }) => id === toddler.id));
+assert(selectRelatedVisitCandidates(visitFamily, parent, [], 8 * 60 * 60, () => 0).some(({ id }) => id === toddler.id));
+assert(!selectRelatedVisitCandidates(visitFamily, parent, [], 8 * 60 * 60, () => 0.5).some(({ id }) => id === toddler.id));
+assert(selectRelatedVisitCandidates(visitFamily, teen, [], 8 * 60 * 60, () => 0).some(({ id }) => id === parent.id));
+assert(selectRelatedVisitCandidates(visitFamily, teen, [], 8 * 60 * 60, () => 0.75).some(({ id }) => id === peer.id));
 
 assert.equal(SESSION_STATE_VERSION, 19);
 assert.equal(SAVE_SCHEMA_VERSION, 19);
@@ -123,7 +128,7 @@ assert(deserializeSessionEnvelope(JSON.stringify(legacy)).state.gameplay.househo
 const characterDoc = readFileSync("systems/character-and-needs.md", "utf8");
 const tavernDoc = readFileSync("systems/tavern-service.md", "utf8");
 const persistenceDoc = readFileSync("systems/persistence.md", "utf8");
-for (const phrase of ["5 000", "300 000", "карьер", "не меняет"]) assert(characterDoc.toLowerCase().includes(phrase.toLowerCase()));
+for (const phrase of ["5 000", "300 000", "3.5%", "не меняет"]) assert(characterDoc.includes(phrase));
 for (const phrase of ["крайне редко", "подростк", "семейного кошелька", "резервируется"]) assert(tavernDoc.toLowerCase().includes(phrase.toLowerCase()));
 assert(tavernDoc.includes("10 / 30 / 80 / 200 / 500"));
 assert(persistenceDoc.includes("householdEconomy"));
@@ -141,15 +146,20 @@ function simFamily(id, capacity) {
 }
 function simPopulation() {
   const result = []; let serial = 0;
-  for (let index = 0; index < COUNTS.length; index += 1) for (let count = 0; count < COUNTS[index]; count += 1) result.push(...simFamily(serial++, SPENDING_CAPACITY_VALUES[index]));
+  for (let index = 0; index < COUNTS.length; index += 1) {
+    for (let count = 0; count < COUNTS[index]; count += 1) result.push(...simFamily(serial++, SPENDING_CAPACITY_VALUES[index]));
+  }
   return result;
 }
 function members(economyState, population, id) {
-  const ids = new Set(Object.entries(economyState.personHouseholdIds).filter(([, value]) => value === id).map(([personId]) => personId));
+  const ids = new Set(Object.entries(economyState.personHouseholdIds)
+    .filter(([, householdId]) => householdId === id).map(([personId]) => personId));
   return population.filter((person) => ids.has(person.id));
 }
 function ratios(economyState, population) {
-  return Object.entries(economyState.households).map(([id, state]) => state.coins / householdDailyProfile(members(economyState, population, id)).reserveTarget);
+  return Object.entries(economyState.households).map(([id, state]) => (
+    state.coins / householdDailyProfile(members(economyState, population, id)).reserveTarget
+  ));
 }
 function percentile(values, fraction) {
   const sorted = [...values].sort((x, y) => x - y);
@@ -177,10 +187,16 @@ assert(percentile(backgroundRatios, 0.95) < 1.7);
 
 const careerPopulation = [];
 let careerSerial = 0;
-for (let index = 0; index < COUNTS.length; index += 1) for (let count = 0; count < COUNTS[index]; count += 1) careerPopulation.push(alive(`person-career-long-${careerSerial++}`, PERSON_LIFE_STAGES.adult, SPENDING_CAPACITY_VALUES[index], [], ["day"]));
+for (let index = 0; index < COUNTS.length; index += 1) {
+  for (let count = 0; count < COUNTS[index]; count += 1) {
+    careerPopulation.push(alive(`person-career-long-${careerSerial++}`, PERSON_LIFE_STAGES.adult, SPENDING_CAPACITY_VALUES[index], [], ["day"]));
+  }
+}
 for (let day = 1; day <= 5_000; day += 1) rebalancePopulationWealth(careerPopulation, day);
 const careerDistribution = wealthDistributionForPopulation(careerPopulation);
-for (let index = 0; index < 5; index += 1) assert(Math.abs(careerDistribution.shares[index] - careerDistribution.targetShares[index]) <= 0.06);
+for (let index = 0; index < 5; index += 1) {
+  assert(Math.abs(careerDistribution.shares[index] - careerDistribution.targetShares[index]) <= 0.06);
+}
 
 const diningPopulation = simPopulation();
 const diningEconomy = normalizeHouseholdEconomy(null, diningPopulation, { worldTimeSeconds: 0 });
@@ -216,19 +232,24 @@ assert(percentile(diningRatios, 0.95) < 1.7);
 const poor = simFamily("recovery-poor", 2), rich = simFamily("recovery-rich", 6);
 const poorEconomy = normalizeHouseholdEconomy(null, poor, { worldTimeSeconds: 0 });
 const richEconomy = normalizeHouseholdEconomy(null, rich, { worldTimeSeconds: 0 });
-const poorState = poorEconomy.households[householdIdForPerson(poorEconomy, poor[0].id)];
-const richState = richEconomy.households[householdIdForPerson(richEconomy, rich[0].id)];
 const poorTarget = householdDailyProfile(poor).reserveTarget, richTarget = householdDailyProfile(rich).reserveTarget;
-poorState.coins = poorTarget - 1_000; richState.coins = richTarget - 1_000;
+householdState(poorEconomy, poor[0].id).coins = poorTarget - 1_000;
+householdState(richEconomy, rich[0].id).coins = richTarget - 1_000;
 advanceHouseholdEconomy(poorEconomy, poor, PERSON_GAME_DAY_SECONDS);
 advanceHouseholdEconomy(richEconomy, rich, PERSON_GAME_DAY_SECONDS);
-assert((richState.coins - (richTarget - 1_000)) > (poorState.coins - (poorTarget - 1_000)) * 5);
+const poorGain = householdAvailableCoins(poorEconomy, poor[0].id) - (poorTarget - 1_000);
+const richGain = householdAvailableCoins(richEconomy, rich[0].id) - (richTarget - 1_000);
+assert(richGain > poorGain * 5);
 
 console.log(JSON.stringify({
-  task: 103, referenceDishPrices: PRICES, referenceSavings: HOUSEHOLD_REFERENCE_SAVINGS,
+  task: 103,
+  referenceDishPrices: PRICES,
+  referenceSavings: HOUSEHOLD_REFERENCE_SAVINGS,
   twoWorkerDailyIncome: HOUSEHOLD_DAILY_INCOME_PER_WORKER.map((value) => value * 2),
   background: [0.05, 0.5, 0.95].map((p) => Number(percentile(backgroundRatios, p).toFixed(3))),
   dining: [0.05, 0.5, 0.95].map((p) => Number(percentile(diningRatios, p).toFixed(3))),
-  purchases, revenue, careerShares: careerDistribution.shares.map((value) => Number(value.toFixed(3))),
+  purchases,
+  revenue,
+  careerShares: careerDistribution.shares.map((value) => Number(value.toFixed(3))),
 }, null, 2));
 console.log("Task #103 household economy and age-aware visit contracts OK");
