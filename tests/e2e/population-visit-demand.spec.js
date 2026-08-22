@@ -76,12 +76,13 @@ test("inactive menu pauses opportunities; active zero-stock menu can create one 
   expect((await bridge(page, "getTavernState")).service.demand.opportunityRemainingMs).toBe(100);
 
   await openTavern(page);
+  await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: false });
   await bridge(page, "advanceWorldSimulation", 150);
   const decision = await bridge(page, "getLastVisitDecision");
   expect(decision).toMatchObject({
     personId,
     spendingCapacity: 2,
-    activeMenuItemIds: ["fried-potato-dish", "lemonade"],
+    activeMenuItemIds: ["lemonade"],
     bestOfferItemId: "lemonade",
     acceptableItemIds: ["lemonade"],
     decision: "VISIT",
@@ -143,6 +144,7 @@ test("acceptable stock completes once, persists personId and updates visitor his
     foodPreferences: lemonadePreference,
   });
   await openTavern(page);
+  await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: false });
   await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
   await bridge(page, "setVisitCandidatePersonId", person.id);
   await bridge(page, "setVisitDecisionRoll", 0);
