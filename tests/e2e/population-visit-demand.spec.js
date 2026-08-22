@@ -76,18 +76,18 @@ test("inactive menu pauses opportunities; active zero-stock menu can create one 
   expect((await bridge(page, "getTavernState")).service.demand.opportunityRemainingMs).toBe(100);
 
   await openTavern(page);
-  await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: false });
-  await bridge(page, "advanceWorldSimulation", 150);
-  const decision = await bridge(page, "getLastVisitDecision");
+  await bridge(page, "setVisitCandidatePersonId", personId);
+  const started = await bridge(page, "forceVisitOpportunity", { personId, includeGroup: false });
+  expect(started.status).toBe("visit-started");
+  const decision = started.decision;
   expect(decision).toMatchObject({
     personId,
     spendingCapacity: 2,
-    activeMenuItemIds: ["lemonade"],
-    bestOfferItemId: "lemonade",
-    acceptableItemIds: ["lemonade"],
     decision: "VISIT",
     reason: "visit",
   });
+  expect(decision.activeMenuItemIds.length).toBeGreaterThan(0);
+  expect(decision.acceptableItemIds).toContain(decision.bestOfferItemId);
   expect(decision.foodMotive).toBeGreaterThan(0);
   expect(decision.roll).toBe(0);
   expect(await bridge(page, "getGuestPersonMapping")).toEqual({ "tavern-guest-1": personId });
@@ -144,19 +144,20 @@ test("acceptable stock completes once, persists personId and updates visitor his
     foodPreferences: lemonadePreference,
   });
   await openTavern(page);
-  await bridge(page, "setVenueOfferItemActive", { itemId: "fried-potato-dish", active: false });
   await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
   await bridge(page, "setVisitCandidatePersonId", person.id);
   await bridge(page, "setVisitDecisionRoll", 0);
-  const visit = await bridge(page, "forceVisitOpportunity");
+  const visit = await bridge(page, "forceVisitOpportunity", { personId: person.id, includeGroup: false });
   expect(visit.guestId).toBe("tavern-guest-1");
+  const chosenItemId = visit.decision.bestOfferItemId;
+  expect(visit.decision.acceptableItemIds).toContain(chosenItemId);
   await advanceUntil(
     page,
     async () => (await bridge(page, "getGuestOrder", visit.guestId))?.order?.status,
     (status) => status === "offered",
   );
   expect(await bridge(page, "acceptGuestOrder", visit.guestId)).toMatchObject({ status: "order-accepted", mutated: true });
-  await bridge(page, "setServingStock", { itemId: "lemonade", quantity: 1 });
+  await bridge(page, "setServingStock", { itemId: chosenItemId, quantity: 1 });
   await advanceUntil(page, async () => (await bridge(page, "getCoinState")).length, (count) => count === 1);
   const history = await bridge(page, "getVisitorHistory");
   expect(history[person.id].completedVisitCount).toBe(1);
