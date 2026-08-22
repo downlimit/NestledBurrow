@@ -109,11 +109,11 @@ Implemented slices: persistent population → venue offer → visit decision →
 
 ## Owners
 
-- kitchen: `cookingDomain.js`, `cookingRuntime.js`, `kitchenInteractionRuntime.js`;
-- facilities/sign/menu: `facilityConfig.js`, `facilityRuntime.js`, `tavernSignRuntime.js`, `venueOfferDomain.js`, `venueMenuRuntime.js`;
-- demand/groups: `visitDemandDomain.js`, `visitPartyDomain.js`, `saleProfileDomain.js`;
-- service/guests: `tavernServiceDomain.js`, `tavernServiceRuntime.js`, `guestRuntime.js`, `guestController.js`, `gridPathfinder.js`, `guestIntentDomain.js`;
-- orders/feedback/payment: `orderDomain.js`, `tavernFeedbackDomain.js`, `guestFeedback.js`, `coinRuntime.js`, `overheadPresentationRuntime.js`;
+- kitchen: `src/tavern/cookingDomain.js`, `src/tavern/cookingRuntime.js`, `src/tavern/kitchenInteractionRuntime.js`;
+- facilities/sign/menu: `src/facilities/facilityConfig.js`, `src/facilities/facilityRuntime.js`, `src/tavern/tavernSignRuntime.js`, `src/tavern/venueOfferDomain.js`, `src/tavern/venueMenuRuntime.js`;
+- demand/groups: `src/tavern/visitDemandDomain.js`, `src/tavern/visitPartyDomain.js`, `src/tavern/saleProfileDomain.js`;
+- service/guests: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`, `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`, `src/tavern/guestIntentDomain.js`;
+- orders/feedback/payment: `src/tavern/orderDomain.js`, `src/tavern/tavernFeedbackDomain.js`, `src/tavern/guestFeedback.js`, `src/tavern/coinRuntime.js`, `src/tavern/overheadPresentationRuntime.js`;
 - people/wealth/food preferences: `src/character/populationDomain.js`; derived price profile: `src/character/personEconomyProfile.js`;
 - `WorldScene` composes owners and delegates callbacks.
 
