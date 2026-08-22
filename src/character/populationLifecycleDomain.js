@@ -10,10 +10,16 @@ import {
   PERSON_LIFE_STAGES,
   PERSON_LIFE_STATUSES,
   PERSON_RELATIONSHIP_KINDS,
-  SPENDING_CAPACITY_VALUES,
   STAGE1_POPULATION_SIZE,
   VISIT_TIME_PERIODS,
 } from "./populationDomain.js";
+import {
+  alignPartnerWealth,
+  inheritedFamilySpendingCapacity,
+  rebalancePopulationWealth,
+  spendingCapacityIndex,
+  synchronizePartnerWealth,
+} from "./populationWealthBalance.js";
 import {
   applyMarriageFamilyNames,
   childFamilySurname,
@@ -63,6 +69,7 @@ export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
   assignGeneratedPopulationNames(population);
   if (population.some((person) => isGeneratedPersonId(person?.id)) || population.length > STAGE1_POPULATION_SIZE) {
     ensurePopulationFamilyNames(population);
+    synchronizePartnerWealth(population);
     return population;
   }
   const evaluationTime = nonNegativeNumber(worldTimeSeconds, 0);
@@ -79,6 +86,7 @@ export function ensureMaturePopulation(population, worldTimeSeconds = 0) {
   ensurePopulationFamilyNames(population);
   ensurePopulationPartners(population);
   seedExistingFamilies(population);
+  synchronizePartnerWealth(population);
   return population;
 }
 
@@ -180,8 +188,10 @@ export function ensurePopulationPartners(population) {
   let created = 0;
   for (const first of singles) {
     if (used.has(first.id)) continue;
+    const firstWealthIndex = spendingCapacityIndex(first.spendingCapacity);
     const second = singles
       .filter((candidate) => candidate.id !== first.id && !used.has(candidate.id))
+      .filter((candidate) => Math.abs(firstWealthIndex - spendingCapacityIndex(candidate.spendingCapacity)) <= 1)
       .filter((candidate) => !arePopulationPairCloseRelatives(first.id, candidate.id, byId))
       .sort((a, b) => {
         const scoreDelta = pairCandidateScore(first, a, byId) - pairCandidateScore(first, b, byId);
@@ -189,6 +199,7 @@ export function ensurePopulationPartners(population) {
       })[0];
     if (!second) continue;
     addReciprocalRelationship(first, second, PERSON_RELATIONSHIP_KINDS.partner, PERSON_RELATIONSHIP_KINDS.partner);
+    alignPartnerWealth(first, second);
     applyMarriageFamilyNames(first, second);
     used.add(first.id);
     used.add(second.id);
@@ -240,6 +251,7 @@ function processPopulationDay(population, boundaryTime, protectedIds) {
     createBirth(population, pairs[slot], boundaryTime, slot);
     births += 1;
   }
+  rebalancePopulationWealth(population, dayIndex, { excludedPersonIds: protectedIds });
   return {
     births,
     arrivals: arrivalIds.length,
@@ -317,7 +329,7 @@ function createBirth(population, [first, second], boundaryTime, slot) {
     displayName: withPersonSurname(generatedPopulationName(id), childFamilySurname(first, second, id)),
     ageYears: 0,
     worldTimeSeconds: boundaryTime,
-    spendingCapacity: inheritedSpendingCapacity(first, second, id),
+    spendingCapacity: inheritedFamilySpendingCapacity(first, second, id, population),
     foodPreferences: inheritedFoodPreferences(first, second, id),
     preferredVisitPeriods: inheritedVisitPeriods(first, second, id),
   });
@@ -381,16 +393,6 @@ function familyChildTarget(firstId, secondId) {
   return 3;
 }
 
-function inheritedSpendingCapacity(first, second, childId) {
-  const unit = stableUnit(`${childId}:spending-inheritance`);
-  if (unit < 0.45) return first.spendingCapacity;
-  if (unit < 0.9) return second.spendingCapacity;
-  return SPENDING_CAPACITY_VALUES[Math.min(
-    SPENDING_CAPACITY_VALUES.length - 1,
-    Math.floor(stableUnit(`${childId}:spending-variation`) * SPENDING_CAPACITY_VALUES.length),
-  )];
-}
-
 function inheritedFoodPreferences(first, second, childId) {
   return Object.fromEntries(Object.entries(FOOD_PREFERENCE_TAGS).map(([level, tags]) => [
     level,
@@ -448,7 +450,10 @@ export function populationPairSoftPenaltyDays(firstId, secondId, byId) {
 }
 
 function pairCandidateScore(first, candidate, byId) {
+  const wealthDistance = Math.abs(spendingCapacityIndex(first.spendingCapacity)
+    - spendingCapacityIndex(candidate.spendingCapacity));
   return Math.abs(lifeDaysForAgeYears(first.ageYears) - lifeDaysForAgeYears(candidate.ageYears))
+    + wealthDistance * 4
     + populationPairSoftPenaltyDays(first.id, candidate.id, byId);
 }
 

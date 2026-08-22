@@ -1,3 +1,4 @@
+import { PRICE_BANDS } from "../character/personEconomyProfile.js";
 import { SELLABLE_ITEM_IDS } from "./cookingDomain.js";
 
 export const SERVICE_FORMATS = Object.freeze({
@@ -41,6 +42,15 @@ export function getSaleProfiles(itemIds = SELLABLE_ITEM_IDS) {
   return itemIds.map((itemId) => getSaleProfile(itemId)).filter(Boolean);
 }
 
+export function getSalePriceBand(profileOrItemId) {
+  const profile = typeof profileOrItemId === "string" ? getSaleProfile(profileOrItemId) : profileOrItemId;
+  const price = Number(profile?.price);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  if (price <= 2) return PRICE_BANDS.budget;
+  if (price <= 4) return PRICE_BANDS.standard;
+  return PRICE_BANDS.premium;
+}
+
 export function getSaleProfileTags(profileOrItemId) {
   const profile = typeof profileOrItemId === "string" ? getSaleProfile(profileOrItemId) : profileOrItemId;
   if (!profile) return [];
@@ -48,6 +58,7 @@ export function getSaleProfileTags(profileOrItemId) {
     `cuisine:${profile.cuisine}`,
     `dishClass:${profile.dishClass}`,
     ...profile.ingredients.map((ingredient) => `ingredient:${ingredient}`),
+    `priceBand:${getSalePriceBand(profile)}`,
   ];
 }
 

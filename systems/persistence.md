@@ -2,49 +2,49 @@
 
 ## Purpose
 
-Separates player session progress from developer-authored project defaults.
+Separates player session progress from developer-authored defaults and keeps gameplay state JSON-safe, versioned and recoverable.
 
 ## Session save
 
-`src/session/gameSessionState.js` owns JSON-safe normalized state. `src/session/sessionPersistence.js` owns versioned envelopes, migrations, load/save/clear and safe fallback.
+`src/session/gameSessionState.js` owns normalized state; `src/session/sessionPersistence.js` owns envelopes, migrations, load/save/clear and safe fallback.
 
-Session data includes player/world progress, needs, population, inventory/world items, farm, kitchen, offer, tavern history/orders/feedback and coins. Accepted guests persist service format/place ownership; visit-local presentation and diagnostics are transient.
+Session state includes player/world progress, needs, persistent population, inventory/world items, farm, kitchen, venue offer, tavern history/orders/feedback and coins. Accepted guests persist identity/order/service ownership; visit-local presentation, intent diagnostics and developer TEST state are transient.
 
-Stage 9 keeps variable persistent population inside the existing `gameplay.population` array. Person records persist age, alive/dead status, reciprocal family links, needs and demand preferences. The original named identities keep their canonical baseline links; generated residents keep validated reciprocal links.
+Schema remains **v19** through Tasks #100–#102:
+- old v19 saves with only the original 16 residents expand once to the mature ~300-person population; stable generated IDs prevent reseeding. Age/status/family links persist, including early death and later births;
+- surnames persist inside `displayName`; older residents are deterministically repaired. Locale presentation is derived and not saved;
+- `spendingCapacity` remains the persistent wealth field; legal values expand from `2/4/6` to `2/3/4/5/6`, so old values need no conversion. Partner alignment, inheritance and gradual mobility mutate that same field;
+- price preference/sensitivity are derived from stable identity and add no save field;
+- price-audience memory reuses `tavernFeedback.reputationProfile.foodTagWeights` with `priceBand:*`; missing old evidence reconstructs as zero.
 
-Task #100 adds no new top-level save field, so schema remains v19. A pre-#100 v19 save containing only the named 16 is deterministically expanded once to the mature ~300-person baseline during normalization; generated IDs then prevent reseeding. Dead residents remain saved for family history, including rare deaths before old age, and births append new stable person IDs. Existing `ageYears` now has enough range to carry the longest ~102-day natural life without a structural migration.
-
-Task #101 stores surname state inside each existing `displayName`, so schema also remains v19. Older v19 residents without surnames are repaired deterministically during normalization, preserving real relationship history. Persisted surnames use canonical capitalization and a hyphen for rare double surnames (`Smith-Gosling`); locale-specific Cyrillic presentation is derived at runtime and never written back into the save.
-
-BUILD/TEST view and person-inspection hover/pin/expansion are transient. TEST grants use gameplay fields; inspector edits use persistent population needs. The demographic TEST event list is presentation-only and never enters the save.
+The confirmed future real household wallet is **not** part of Task #102 or schema v19 yet. Adding it requires an explicit persistent owner/migration rather than treating `spendingCapacity` as money.
 
 ## Authoring data
 
-Starting layout, collider/profile drafts and authoring backups are developer tools. Browser storage/dev write endpoints do not make them gameplay save data.
+Starting layout, collider/profile drafts and authoring backups are developer data. Browser storage/dev write endpoints do not make them gameplay save state. BUILD/TEST presentation and demographic event lists never enter saves.
 
 ## `NEW GAME`
 
-`NEW GAME` restores the canonical starting inventory/world, mature population, kitchen, tavern and economy state. Browser authoring drafts may intentionally survive.
+`NEW GAME` restores canonical starting world/inventory, mature population, kitchen, tavern and economy state. Authoring drafts may intentionally survive.
 
 ## Invariants
 
-- every persisted field has a normalized owner and migration path;
-- Phaser objects/functions never enter JSON state and corrupted/old data fails safely;
-- v6→v7 moves resource counters into inventory; v9→v10 migrates tools, water and kitchen stock; v10→v11 adds combat loadout; v11→v12 moves serving stock under canonical tables; v12→v13 creates persistent population; v13→v14 adds venue offer; v14→v15 adds demand/preferences/history; v15→v16 adds exact orders; v16→v17 adds tavern opinions/reputation/flow; v17→v18 derives relationships/visit periods; v18→v19 adds service format/place activity;
-- within v19, lifecycle age/status, full names and reciprocal generated-family links are mutable person state; valid `dead` persists at any age while invalid age/link data still recovers or is rejected by the population owner;
-- active guest IDs, reservations, orders and service ownership survive compatible normalization without duplicate physical ownership;
-- the Task #049 warning persists until presentation;
-- dropped items persist stable ID, item payload and logical position; selection, drag, throw and feedback presentation do not;
-- authoring backup version is independent from session schema.
+- every persisted field has a normalized owner and migration/recovery path; Phaser objects/functions never enter JSON state;
+- migration chain: v6→v7 resources into inventory; v9→v10 tools/water/kitchen stock; v10→v11 combat loadout; v11→v12 serving stock under tables; v12→v13 population; v13→v14 venue offer; v14→v15 demand/preferences/history; v15→v16 exact orders; v16→v17 opinion/reputation/flow; v17→v18 relationships/visit periods; v18→v19 service format/place activity;
+- within v19, age/status/full names/reciprocal family links and canonical `spendingCapacity` `2..6` are mutable persistent person state; valid `dead` persists at any age;
+- price preference/sensitivity remain recoverable identity traits; `priceBand:*` may occupy the existing reputation map without schema change;
+- active guest IDs, reservations, exact orders and service ownership restore without duplicate physical ownership;
+- dropped items persist stable ID, payload and logical position; selection/drag/throw/feedback presentation do not;
+- authoring backup version is independent from gameplay schema; the Task #049 warning persists until presentation.
 
 ## Current baseline
 
-Schema v19 persists a variable multigeneration population with stable full names alongside offer, feedback/flow, history, active guest mappings, station ownership, inventory, farm, kitchen and coins. Old v19 saves upgrade in place without a schema bump.
+Schema v19 persists a multigeneration population with names, relationships and five-level wealth ceiling alongside tavern offer/feedback/price reputation/history, active service state, inventory, farm, kitchen and player coins. Existing v19 saves normalize in place without a schema bump.
 
 ## Not yet
 
-Arbitrary player-construction gameplay saves, save slots, cloud sync and multiplayer ownership.
+Real household coin balances, arbitrary construction saves, save slots, cloud sync and multiplayer ownership.
 
 ## Evidence
 
-`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-098`, `check:task-099`, `check:task-100`, `check:task-101`, domain checks, `check:authoring`, persistence Browser E2E.
+`check:inventory`, `check:progress`, `check:task-049`, `check:task-086`, `check:task-088`, `check:task-089`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-098`, `check:task-099`, `check:task-100`, `check:task-101`, `check:task-102`, `check:authoring`; persistence Browser E2E.

@@ -5,6 +5,7 @@ import {
   evaluatePersonOffscreen,
   evaluatePopulationPerson,
   normalizePopulation,
+  SPENDING_CAPACITY_VALUES,
   STAGE1_POPULATION_SIZE,
 } from "../src/character/populationDomain.js";
 import { MATURE_POPULATION_TARGET } from "../src/character/populationLifecycleDomain.js";
@@ -37,7 +38,7 @@ function assertPopulation(population, expectedSize) {
       assert(Number.isFinite(person.needs[needId]));
       assert(person.needs[needId] >= 0 && person.needs[needId] <= 100);
     }
-    assert([2, 4, 6].includes(person.spendingCapacity));
+    assert(SPENDING_CAPACITY_VALUES.includes(person.spendingCapacity));
     assert.equal(typeof person.foodPreferences, "object");
     assert(Number.isFinite(person.lastEvaluatedWorldTimeSeconds));
     assert(person.lastEvaluatedWorldTimeSeconds >= 0);
