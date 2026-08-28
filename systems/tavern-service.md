@@ -16,19 +16,20 @@ A persistent person first has a reason to go out, chooses one exact offered item
 ## Demand terminology
 
 - **Population (`population`)** — finite persistent people considered as visitors.
-- **Person (`person`)** — stable identity with needs, preferences, spending capacity and history; **candidate** considers the venue, **guest** is the same person after a materialized visit.
+- **Person (`person`)** — stable identity with needs, preferences, income class and history; **candidate** considers the venue, **guest** is the same person after a materialized visit.
 - **Needs / visit motive / visit opportunity** — needs create a reason to visit; an opportunity is one bounded chance to consider the venue.
 - **Popularity (`popularity`)** — bounded persistent flow pressure controlling opportunity cadence; it is not reputation or wealth.
 - **Reputation profile (`reputationProfile`)** — descriptive venue identity from observed food/price tags plus separate universal reliability evidence; candidate discovery always stays positive.
 - **Personal venue opinion (`venueOpinion`)** — one person's bounded direct-experience attitude, drifting slowly toward neutral.
 - **Venue offer (`venueOffer`)** — currently promised menu/facilities; unoffered stock creates no demand.
 - **Food preference (`foodPreference`)** — cuisine, dish-class and ingredient tastes.
-- **Ценовой сегмент (`priceBand`)** — `budget/standard/premium`; current thresholds `<=2`, `<=4`, `>4` coins.
+- **Ценовой сегмент (`priceBand`)** — `budget/standard/premium`; current prototype thresholds `<=2`, `<=4`, `>4` coins.
 - **Ценовое предпочтение (`pricePreference`)** — stable `budget/premium/neutral` taste independent of wealth.
-- **Ценовая чувствительность (`priceSensitivity`)** — strength of a non-neutral price preference; never overrides affordability.
-- **Offer fit (`offerFit`)** — motive + food taste + price preference + affordability.
+- **Ценовая чувствительность (`priceSensitivity`)** — strength of a non-neutral price preference.
+- **Offer fit (`offerFit`)** — motive + food taste + price preference among currently payable items.
 - **Visit memory / recent-visit suppression** — remembered outcomes and a soft repeat-visit reduction that fades with time.
-- **Spending capacity (`spendingCapacity`)** — persistent wealth/affordability ceiling, distinct from price preference and future real household funds.
+- **Spending capacity (`spendingCapacity`)** — historical field name for the persistent five-level income/wealth class; it is not a second wallet and no longer directly forbids a price.
+- **Семейный кошелёк (`householdEconomy`)** — реальный общий запас монет домохозяйства; свободный остаток является жёсткой денежной проверкой покупки.
 - **Potential demand / service capacity** — willing visitors before physical constraints / visits the live venue can actually admit and serve.
 - **Group** — linked multi-person visit; **audience composition** — derived population mix, never a currency.
 
@@ -39,23 +40,36 @@ open/scheduled venue
 → popularity schedules an opportunity
 → persistent candidate, reputation-biased but never hard-locked
 → reconstruct offscreen needs → motive
-→ compare offer with motive, tastes, price preference and affordability
+→ compare offer with motive, tastes, price preference and free household coins
 → apply reputation, personal opinion and recent-visit suppression
 → person/group decides
+→ reserve real household money for each materialized order
 → physical capacity admits or records open-unserved
 → same persistent person becomes a live guest
 → service/facilities/people create experience
+→ payment settles the reserved family money
 → memory/opinion update
 → completed sale updates food/price reputation and weakly reinforces flow
 ```
 
-Popularity controls **reach**; needs create **motive**; offer/taste/price/budget/reputation/opinion determine **choice**; physical service determines **conversion**. Flow never changes wealth. Pre-commitment mismatch is missed revenue, not service failure. Reputation has inertia, but discovery stays nonzero so a changed venue can redirect its audience.
+Popularity controls **reach**; needs create **motive**; offer/taste/price/cash/reputation/opinion determine **choice**; physical service determines **conversion**. Flow never changes wealth. Pre-commitment mismatch is missed revenue, not service failure. Reputation has inertia, but discovery stays nonzero so a changed venue can redirect its audience.
 
 ## Flow density and offscreen people
 
 Current opportunity cadence `3..8` real seconds is prototype instrumentation. Flow grows slowly; direct experience dominates return choice. Above `GUEST_ACTIVE_CAP`, willing demand records deterministic `open-unserved`. Sustained manual closure has a weaker recoverable penalty than being open and unable to serve.
 
 Offscreen people reconstruct from elapsed world time only when relevant. A physical guest advances canonical needs live on the same persistent person.
+
+## Возраст посетителей
+
+Естественный поток зависит от возраста, но принудительные TEST/E2E-вызовы конкретного человека могут обходить этот фильтр для диагностики.
+
+- `newborn`, `infant`, `toddler` и `child` никогда не становятся инициаторами обычного визита;
+- `newborn/infant/toddler` появляются в таверне **крайне редко** и только как сопровождаемый ребёнок собственного родителя; текущий стартовый шанс такого присоединения к подходящему родительскому визиту — `3%`;
+- `child` тоже приходит только с родителем, но заметно чаще маленьких детей; стартовый шанс присоединения — `30%`;
+- `teen` может инициировать визит, но его вес в естественном потоке сейчас `0.2` от обычного взрослого;
+- если подросток инициировал групповой визит, примерно `70%` таких случаев пытаются собрать доступных родителей, `20%` — компанию других подростков, оставшиеся `10%` остаются одиночными;
+- подросток также может присоединиться к родительскому визиту. Эти числа являются стартовым балансом, а не отдельными социальными классами.
 
 ## Venue formats
 
@@ -69,10 +83,18 @@ Self-service atomically claims a free service place plus exact unreserved displa
 
 - Prices are fixed for now; the player controls assortment, quality, quantity and fulfillment. Player-authored prices are future work.
 - Recipe complexity and price segment are independent. Expensive is not intrinsically better and cheap is not intrinsically worse.
-- Affordability is a hard gate. Price preference is a soft fit among affordable items. A poor premium-preferring person may want expensive food but cannot buy above the ceiling; a rich budget-preferring person may deliberately choose cheap food.
+- Для будущих пяти классов блюд стартовая **балансная** лестница цен: `10 / 30 / 80 / 200 / 500`. Это опорные числа для экономики и длинных симуляций, а не автоматическая замена текущих двух prototype prices `2/4`.
+- Реальный семейный кошелёк — единственный жёсткий денежный барьер. Уровень достатка определяет масштаб доходов/накоплений семьи, поэтому богатые в среднем легче восполняют крупные траты, но сам по себе класс не запрещает бедной семье купить дорогое блюдо, если деньги реально накоплены.
+- Ценовое предпочтение остаётся отдельным вкусом: богатый может любить дешёвое, бедный — дорогое. Оно влияет на выбор, но не создаёт деньги и не меняет класс.
 - Neutral people ignore price segment. The player may legally run only cheap, only middle or only premium food; mixed-price menus are never mandatory.
 - Food taste layers are cuisine/origin, dish class and ingredients. Unsuitable offer without commitment is missed revenue without feedback damage.
 - Dish quality `bronze → silver → gold → platinum` is probabilistic from ingredient quality, cooking skill, equipment, recipe difficulty and modifiers; no hard tier cap. Recipes aggregate ingredient quality by default, with weights only for meaningful exceptions.
+
+## Household payment
+
+После положительного решения цена выбранного блюда резервируется из свободных денег семейного кошелька до появления физического гостя. Несколько членов одной семьи не могут одновременно обещать одни и те же монеты: последующие решения видят уже уменьшенный свободный остаток.
+
+Если визит не материализовался, заказ сорвался или гость ушёл без покупки, резерв снимается. При успешной оплате резерв списывается ровно один раз; только после успешного списания появляется монета игроку и записывается завершённая покупка. Фоновые семейные расходы не могут потратить уже зарезервированные деньги. Активный заказ после загрузки восстанавливает соответствующий резерв.
 
 ## Price audience and reputation inertia
 
@@ -105,7 +127,7 @@ Satisfaction tier `3` is neutral; `4–5` improve personal opinion, `1–2` redu
 
 ## Development sequence
 
-Implemented slices: persistent population → venue offer → visit decision → exact order/fulfillment → live guest needs → feedback/reputation/flow → groups/time → visit-local service formats → social lifecycle → price audience. Early play prioritizes optimization, then recognizable people, then need-driven social situations.
+Implemented slices: persistent population → venue offer → visit decision → exact order/fulfillment → live guest needs → feedback/reputation/flow → groups/time → visit-local service formats → social lifecycle → price audience → real household funds and age-aware visits. Early play prioritizes optimization, then recognizable people, then need-driven social situations.
 
 ## Owners
 
@@ -114,7 +136,8 @@ Implemented slices: persistent population → venue offer → visit decision →
 - demand/groups: `src/tavern/visitDemandDomain.js`, `src/tavern/visitPartyDomain.js`, `src/tavern/saleProfileDomain.js`;
 - service/guests: `src/tavern/tavernServiceDomain.js`, `src/tavern/tavernServiceRuntime.js`, `src/tavern/guestRuntime.js`, `src/tavern/guestController.js`, `src/tavern/gridPathfinder.js`, `src/tavern/guestIntentDomain.js`;
 - orders/feedback/payment: `src/tavern/orderDomain.js`, `src/tavern/tavernFeedbackDomain.js`, `src/tavern/guestFeedback.js`, `src/tavern/coinRuntime.js`, `src/tavern/overheadPresentationRuntime.js`;
-- people/wealth/food preferences: `src/character/populationDomain.js`; derived price profile: `src/character/personEconomyProfile.js`;
+- people/wealth/food preferences: `src/character/populationDomain.js`, `src/character/populationWealthBalance.js`, `src/character/personEconomyProfile.js`;
+- household money: `src/character/householdEconomyDomain.js`;
 - `WorldScene` composes owners and delegates callbacks.
 
 ## Invariants
@@ -123,9 +146,11 @@ Implemented slices: persistent population → venue offer → visit decision →
 - facility positions are read live; moved furniture changes only the assigned path; the movable tavern sign shares one position across visual/collider/interaction/guest check;
 - sign, offer, stock reservation, service place and order lifecycle cannot contradict; `venueOffer` stays independent from physical stock;
 - popularity controls opportunity cadence only; it cannot mutate tastes, wealth, price preference, opinions or reputation;
-- wealth, price preference, food taste, opinion, reputation and flow remain distinct; price preference never overrides `spendingCapacity`; no price segment is intrinsically superior;
+- income class, free household coins, price preference, food taste, opinion, reputation and flow remain distinct; only real free household coins are the hard monetary gate;
+- a materialized visit reserves its exact price; one household cannot double-spend that money; only successful settlement can create the player's sale value;
 - completed sales reinforce cuisine/dish/ingredient/price tags with inertia; universal reliability is separate; reputation bias never makes discovery zero;
 - one live `personId` has at most one visit; technical `guestId` stays separate; fulfillment/reservation always targets exact `order.itemId`;
+- tiny children never lead natural visits; any tiny child guest is accompanied through a parent group; teens remain a reduced but nonzero natural audience;
 - potato never becomes takeaway; lemonade may be assisted/takeaway/self-service. Self-service claims exact stock atomically; takeaway releases at transfer; dine-in retains place through consumption;
 - accepted `serviceFormat`, service-place ownership, exact order and canonical needs persist; transient intent/presentation may re-arbitrate after load;
 - one `guest-service` place belongs to at most one active guest/order; accepted commitments survive menu deactivation/edits and `served` ends timeout;
@@ -136,12 +161,12 @@ Implemented slices: persistent population → venue offer → visit decision →
 
 ## Current baseline
 
-Guests can use assisted, takeaway or exact-stock self-service paths. Orders survive interruptions, satisfaction precedes payment, and history/feedback update once per person. Affordability is a hard wealth ceiling; stable price preference shapes affordable choice; sales build inertial food and price reputation. Personal opinion/reliability affect willingness, reputation/time bias candidate composition, and popularity controls cadence.
+Guests can use assisted, takeaway or exact-stock self-service paths. Orders survive interruptions, satisfaction precedes payment, and history/feedback update once per person. A purchase requires enough free money in the shared household wallet; `spendingCapacity` is now the persistent income class rather than a second price ceiling. Purchase funds are reserved before materialization and settled at payment. Stable price preference shapes choice; sales build inertial food and price reputation. Natural visitor composition also respects life stage: small children only accompany parents, teens appear less often and usually with family.
 
 ## Not yet
 
-Recipe book, broader ingredients/storage, real household wallet, player-authored prices, recipe complexity/margin balance, influence/word of mouth, configurable schedules, staff, seated/group payment, visible queue/forecast, event/non-food formats and competing NPC businesses.
+Recipe book, broader ingredients/storage, player-authored prices, final five-dish price mapping, recipe complexity/margin balance, individual NPC professions/salaries, influence/word of mouth, configurable schedules, staff, seated/group payment, visible queue/forecast, event/non-food formats and competing NPC businesses.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-102`; focused service-format, order, population, feedback, group and live-visit Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-102`, `check:task-103`; focused service-format, order, population, feedback, group and live-visit Browser E2E.
