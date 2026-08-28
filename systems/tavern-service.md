@@ -90,6 +90,21 @@ Self-service atomically claims a free service place plus exact unreserved displa
 - Food taste layers are cuisine/origin, dish class and ingredients. Unsuitable offer without commitment is missed revenue without feedback damage.
 - Dish quality `bronze → silver → gold → platinum` is probabilistic from ingredient quality, cooking skill, equipment, recipe difficulty and modifiers; no hard tier cap. Recipes aggregate ingredient quality by default, with weights only for meaningful exceptions.
 
+## Плейсхолдерная экономика рецептов
+
+Балансная модель пяти будущих классов не добавляет новые блюда в живое меню. Она проверяет, что массовая дешёвая и редкая дорогая кухня остаются разными, но жизнеспособными стратегиями до создания реального контента.
+
+- цена: **`10 / 30 / 80 / 200 / 500`**;
+- полная производственная нагрузка на порцию: **`1 / 3 / 8 / 20 / 50`** условных единиц;
+- часть, требующая собственно кулинарного мастерства: **`1 / 2 / 4 / 7 / 10`**;
+- остальная повторяющаяся работа добычи, логистики, подготовки и обработки: **`0 / 1 / 4 / 13 / 40`**.
+
+Условная единица нагрузки не равна секунде, количеству ингредиентов или будущему числу действий. Она нужна только для сравнения стратегий. Цена на единицу полной нагрузки одинакова у всех пяти уровней, поэтому дорогая кухня не получает бесплатное преимущество только из-за малого числа заказов.
+
+На целевом составе населения `22:31:24:16:7` частота повода для уровней калибруется примерно как **`100% / 37.5% / 18.4% / 11.0% / 7.7%`**. Это мягкая привычность цены относительно образа жизни, а не разрешение на покупку: реальный кошелёк остаётся единственным денежным запретом. При одинаковом нормальном потоке длинная базовая выручка пяти специализаций получается сопоставимой, но дорогие уровни намного более волатильны. Более бедная аудитория естественно усиливает дешёвую кухню, более богатая — дорогую.
+
+Автоматизация снимает прежде всего повторяющуюся часть производства. Обычные помощники могут почти полностью разгрузить простую кухню, но на сложной хуже справляются с точной работой и автономным завершением, что выражается скоростью, потерей качества или перерасходом ресурсов. Точные проценты помощников в `Task #104` являются только симуляционными профилями, не финальными характеристиками. Жёсткого запрета нет: специализированная дорогая инфраструктура должна позволять приблизиться к полной автоматизации сложной кухни, сохраняя преимущество хорошей ручной работы раньше по прогрессии.
+
 ## Household payment
 
 После положительного решения цена выбранного блюда резервируется из свободных денег семейного кошелька до появления физического гостя. Несколько членов одной семьи не могут одновременно обещать одни и те же монеты: последующие решения видят уже уменьшенный свободный остаток.
@@ -127,7 +142,7 @@ Satisfaction tier `3` is neutral; `4–5` improve personal opinion, `1–2` redu
 
 ## Development sequence
 
-Implemented slices: persistent population → venue offer → visit decision → exact order/fulfillment → live guest needs → feedback/reputation/flow → groups/time → visit-local service formats → social lifecycle → price audience → real household funds and age-aware visits. Early play prioritizes optimization, then recognizable people, then need-driven social situations.
+Implemented slices: persistent population → venue offer → visit decision → exact order/fulfillment → live guest needs → feedback/reputation/flow → groups/time → visit-local service formats → social lifecycle → price audience → real household funds and age-aware visits → placeholder recipe economy/automation balance. Early play prioritizes optimization, then recognizable people, then need-driven social situations.
 
 ## Owners
 
@@ -147,6 +162,8 @@ Implemented slices: persistent population → venue offer → visit decision →
 - sign, offer, stock reservation, service place and order lifecycle cannot contradict; `venueOffer` stays independent from physical stock;
 - popularity controls opportunity cadence only; it cannot mutate tastes, wealth, price preference, opinions or reputation;
 - income class, free household coins, price preference, food taste, opinion, reputation and flow remain distinct; only real free household coins are the hard monetary gate;
+- placeholder recipe tier changes soft lifestyle frequency and production load, never creates a second affordability gate;
+- automation may reduce routine work strongly, but complex work keeps a larger mastery-sensitive residue until sufficiently specialized investment exists;
 - a materialized visit reserves its exact price; one household cannot double-spend that money; only successful settlement can create the player's sale value;
 - completed sales reinforce cuisine/dish/ingredient/price tags with inertia; universal reliability is separate; reputation bias never makes discovery zero;
 - one live `personId` has at most one visit; technical `guestId` stays separate; fulfillment/reservation always targets exact `order.itemId`;
@@ -161,12 +178,12 @@ Implemented slices: persistent population → venue offer → visit decision →
 
 ## Current baseline
 
-Guests can use assisted, takeaway or exact-stock self-service paths. Orders survive interruptions, satisfaction precedes payment, and history/feedback update once per person. A purchase requires enough free money in the shared household wallet; `spendingCapacity` is now the persistent income class rather than a second price ceiling. Purchase funds are reserved before materialization and settled at payment. Stable price preference shapes choice; sales build inertial food and price reputation. Natural visitor composition also respects life stage: small children only accompany parents, teens appear less often and usually with family.
+Guests can use assisted, takeaway or exact-stock self-service paths. Orders survive interruptions, satisfaction precedes payment, and history/feedback update once per person. A purchase requires enough free money in the shared household wallet; `spendingCapacity` is now the persistent income class rather than a second price ceiling. Purchase funds are reserved before materialization and settled at payment. Stable price preference shapes choice; sales build inertial food and price reputation. Natural visitor composition also respects life stage: small children only accompany parents, teens appear less often and usually with family. Five future recipe tiers now have a non-player-visible balance model for price, production load, lifestyle frequency and automation pressure; current potato/lemonade content is unchanged.
 
 ## Not yet
 
-Recipe book, broader ingredients/storage, player-authored prices, final five-dish price mapping, recipe complexity/margin balance, individual NPC professions/salaries, influence/word of mouth, configurable schedules, staff, seated/group payment, visible queue/forecast, event/non-food formats and competing NPC businesses.
+Recipe book, broader ingredients/storage, player-authored prices, real five-dish mapping, final helper/minion stats, individual NPC professions/salaries, influence/word of mouth, configurable schedules, staff, seated/group payment, visible queue/forecast, event/non-food formats and competing NPC businesses.
 
 ## Evidence
 
-`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-102`, `check:task-103`; focused service-format, order, population, feedback, group and live-visit Browser E2E.
+`check:cooking`, `check:guest`, `check:facilities`, `check:task-049`, `check:task-058`, `check:task-086`, `check:task-087`, `check:task-088`, `check:task-089`, `check:task-091`, `check:task-095`, `check:task-096`, `check:task-097`, `check:task-102`, `check:task-103`, `check:task-104`; focused service-format, order, population, feedback, group and live-visit Browser E2E.
