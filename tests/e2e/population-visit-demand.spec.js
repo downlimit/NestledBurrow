@@ -75,6 +75,7 @@ test("inactive menu pauses opportunities; active zero-stock menu can create one 
   expect(await bridge(page, "getLastVisitDecision")).toBeNull();
   expect((await bridge(page, "getTavernState")).service.demand.opportunityRemainingMs).toBe(100);
 
+  await bridge(page, "setVisitOpportunityRemainingMs", 1_000_000);
   await openTavern(page);
   await bridge(page, "setVisitCandidatePersonId", personId);
   const started = await bridge(page, "forceVisitOpportunity", { personId, includeGroup: false });
